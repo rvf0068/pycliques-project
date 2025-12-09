@@ -1,0 +1,24 @@
+[project]
+name = "pyg6data"
+version = "0.1.0"
+description = "Graph datasets in .g6.gz format"
+readme = "README.md"
+authors = [
+    { name = "Rafael Villarroel", email = "rvf0068@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "networkx>=3.6",
+    "platformdirs>=4.5.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Ensure data files are included in the wheel
+[tool.hatch.build.targets.wheel]
+packages = ["src/pyg6data"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/pyg6data"]

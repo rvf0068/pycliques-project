@@ -1,0 +1,16 @@
+[project]
+name = "pycombtop"
+version = "0.1.0"
+description = "Combinatorial topology"
+readme = "README.md"
+authors = [
+    { name = "Rafael Villarroel", email = "rvf0068@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "networkx>=3.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

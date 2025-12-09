@@ -1,0 +1,21 @@
+[project]
+name = "pyhomrep"
+version = "0.1.0"
+description = "Group representations on homology"
+readme = "README.md"
+authors = [
+    { name = "Rafael Villarroel", email = "rvf0068@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2.3.5",
+    "pycombtop",
+    "sympy>=1.14.0",
+]
+
+[tool.uv.sources]
+pycombtop = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -1,0 +1,24 @@
+[project]
+name = "pycliques"
+version = "0.1.0"
+description = "The clique graph operator K(G)"
+readme = "README.md"
+authors = [
+    { name = "Rafael Villarroel", email = "rvf0068@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "networkx>=3.6",
+]
+
+[project.optional-dependencies]
+data = [
+    "pyg6data",
+]
+
+[tool.uv.sources]
+pyg6data = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

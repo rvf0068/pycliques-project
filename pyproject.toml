@@ -1,0 +1,16 @@
+[project]
+name = "pycliques-project"
+version = "0.1.0"
+description = "Monorepo for the Pycliques Graph Theory Ecosystem"
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.uv]
+workspace.members = ["packages/*"]
+
+[tool.uv.sources]
+# This allows installing all docs dependencies at the root level easily
+pycliques = { workspace = true }
+pyg6data = { workspace = true }
+pycombtop = { workspace = true }
+pyhomrep = { workspace = true }
