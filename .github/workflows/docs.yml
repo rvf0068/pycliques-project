@@ -11,6 +11,8 @@ permissions:
 
 jobs:
   deploy:
+    env:
+      PAGES_ARTIFACT_NAME: docs-pages-${{ github.run_id }}-${{ github.run_attempt }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -23,10 +25,8 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Install Workspace and Doc Dependencies
-        # This installs all packages in editable mode + sphinx
         run: |
-          uv sync
-          uv pip install sphinx sphinx-rtd-theme myst-parser
+          uv sync --group dev
 
       - name: Build Sphinx
         run: |
@@ -37,8 +37,11 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
+          name: ${{ env.PAGES_ARTIFACT_NAME }}
           path: docs/_build/html
 
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: ${{ env.PAGES_ARTIFACT_NAME }}
