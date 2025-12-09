@@ -14,3 +14,9 @@ pycliques = { workspace = true }
 pyg6data = { workspace = true }
 pycombtop = { workspace = true }
 pyhomrep = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "sphinx>=9.0.4",
+    "sphinx-rtd-theme>=0.5.1",
+]
