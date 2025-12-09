@@ -33,9 +33,14 @@ extensions = [
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
-html_theme = "sphinx_rtd_theme"
+html_theme = "pydata_sphinx_theme"
 html_static_path = ["_static"]
-html_theme_options: dict[str, object] = {}
+html_theme_options: dict[str, object] = {
+    "logo": {
+        "text": project,
+    },
+    "show_toc_level": 2,
+}
 
 autosummary_generate = True
 autosummary_imported_members = True
