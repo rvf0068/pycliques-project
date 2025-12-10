@@ -417,6 +417,9 @@ provides-extras = ["data"]
 name = "pycliques-project"
 version = "0.1.0"
 source = { virtual = "." }
+dependencies = [
+    { name = "pycliques" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -426,6 +429,7 @@ dev = [
 ]
 
 [package.metadata]
+requires-dist = [{ name = "pycliques", editable = "packages/pycliques" }]
 
 [package.metadata.requires-dev]
 dev = [
