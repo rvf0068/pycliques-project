@@ -11,6 +11,12 @@ help: ## Show this help message
 test: ## Run tests with pytest against the workspace env
 	uv run pytest
 
+coverage: ## Run tests with coverage report
+	uv run pytest --cov=packages
+
+coverage-html: ## Run tests with HTML coverage report
+	uv run pytest --cov=packages --cov-report=html
+
 html: ## Build HTML documentation via docs/Makefile
 	uv run make -C docs html
 

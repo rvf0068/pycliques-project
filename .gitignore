@@ -12,3 +12,12 @@ wheels/
 
 # Documentation builds
 docs/_build/
+
+# .gitignore
+
+# Coverage reports
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.cover
