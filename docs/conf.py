@@ -63,7 +63,7 @@ latex_documents = [
     ("index", "pycliques.tex", project, author, "manual"),
 ]
 latex_elements = {
-    "papersize": "a4paper",
+    "papersize": "letterpaper",
     "pointsize": "11pt",
     "preamble": r"""
 \usepackage{enumitem}
