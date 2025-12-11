@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  test:
+    name: Test ${{ matrix.package }} (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11"]
+        # List your packages here. 
+        # Ideally, 'pyg6data' is tested first if others depend on it, 
+        # but parallel execution handles this fine.
+        package: ["pycliques", "pyg6data", "pycombtop", "pyhomrep"]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          lfs: true  # IMPORTANT: Pulls LFS files if you store .g6.gz data there
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install Dependencies
+        # This reads uv.lock and installs the whole workspace + dev tools (pytest)
+        run: uv sync
+
+      - name: Run Tests
+        # Runs pytest on the specific package folder
+        # --cov generates the report for Codecov
+        run: |
+          uv run pytest packages/${{ matrix.package }} \
+            --cov=packages/${{ matrix.package }}/src \
+            --cov-report=xml:coverage-${{ matrix.package }}.xml
+
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage-${{ matrix.package }}.xml
+          flags: ${{ matrix.package }}
+          fail_ci_if_error: false # Don't break build if Codecov is down
