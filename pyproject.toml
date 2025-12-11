@@ -5,6 +5,9 @@ description = "Monorepo for the Pycliques Graph Theory Ecosystem"
 requires-python = ">=3.10"
 dependencies = [
     "pycliques",
+    "pyg6data",
+    "pycombtop",
+    "pyhomrep",
 ]
 
 [tool.uv]
