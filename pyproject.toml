@@ -2,7 +2,7 @@
 name = "pycliques-project"
 version = "0.1.0"
 description = "Monorepo for the Pycliques Graph Theory Ecosystem"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "pycliques",
     "pyg6data",
