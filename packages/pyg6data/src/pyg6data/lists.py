@@ -1,7 +1,7 @@
 """
 This file gives an interface to use graph data from
 Brendan McKay's page (http://cs.anu.edu.au/~bdm/data/graphs.html).
-Currently only includes the data for connected graphs from 6 to 10 vertices.
+Includes all graphs from 5 to 10 vertices and connected graphs from 6 to 10.
 """
 
 import gzip
@@ -12,6 +12,9 @@ from importlib import resources
 DATA_PACKAGE = 'pyg6data.data'
 
 _dict_all = {
+    5: 'graph5.g6',
+    6: 'graph6.g6',
+    7: 'graph7.g6',
     8: 'graph8.g6.gz',
     9: 'graph9.g6.gz',
     10: 'graph10.g6.gz'
@@ -56,12 +59,18 @@ def graph_generator(n: int, connected: bool = True):
         raise ValueError(msg)
 
     # Get the secure path to the file inside the installed package
-    file_path = _get_data_file_path(the_dict[n])
+    filename = the_dict[n]
+    file_path = _get_data_file_path(filename)
 
-    # file_path.open() handles the context dynamically whether it's a real file
-    # or zipped inside a wheel.
-    with file_path.open('rb') as raw_file:
-        with gzip.open(raw_file, 'rt', encoding='utf-8') as graph_file:
+    if filename.endswith('.gz'):
+        with file_path.open('rb') as raw_file:
+            with gzip.open(raw_file, 'rt', encoding='utf-8') as graph_file:
+                for graph_string in graph_file:
+                    graph_string = graph_string.strip()
+                    if graph_string:
+                        yield nx.from_graph6_bytes(graph_string.encode('utf-8'))
+    else:
+        with file_path.open('r', encoding='utf-8') as graph_file:
             for graph_string in graph_file:
                 graph_string = graph_string.strip()
                 if graph_string:
