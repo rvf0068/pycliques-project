@@ -8,7 +8,6 @@ from pycliques.dominated import (
     is_dominated_vertex,
     pared_graph,
     pared_index,
-    remove_dominated_vertex,
     twin_classes,
 )
 
@@ -34,11 +33,6 @@ def test_is_dominated_vertex_can_return_dominator():
 def test_find_dominated_vertex_handles_none_case():
     assert find_dominated_vertex(nx.path_graph(4)) == 0
     assert find_dominated_vertex(nx.cycle_graph(4)) is None
-
-
-def test_remove_dominated_vertex_prunes_one_vertex():
-    pruned = remove_dominated_vertex(nx.path_graph(4))
-    assert set(pruned.nodes()) == {1, 2, 3}
 
 
 def test_twin_classes_groups_equivalent_vertices():

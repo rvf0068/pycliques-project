@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Hashable
+from typing import cast
+
 import networkx as nx
 
 
@@ -54,17 +57,19 @@ def is_dominated_vertex(
     >>> is_dominated_vertex(path, 2)
     False
     """
-    for u in graph:
-        if u != v:
-            if dominates(graph, u, v):
-                if return_dominator:
-                    return (True, u)
-                else:
-                    return True
+    neigh_v = closed_neighborhood(graph, v)
+    deg_v = graph.degree(v)
+
+    candidates = [u for u in graph[v] if graph.degree(u) >= deg_v]
+
+    for u in candidates:
+        if neigh_v.issubset(closed_neighborhood(graph, u)):
+            return (True, u) if return_dominator else True
+
     return False
 
 
-def find_dominated_vertex(graph: nx.Graph) -> int | None:
+def find_dominated_vertex(graph: nx.Graph) -> Hashable | None:
     """Return the first dominated vertex in ``graph`` if one exists.
 
     The result may be ``0``, so prefer identity comparisons when checking for
@@ -81,7 +86,7 @@ def find_dominated_vertex(graph: nx.Graph) -> int | None:
     """
     for v in graph:
         if is_dominated_vertex(graph, v):
-            return v  # type: ignore[no-any-return]
+            return cast(Hashable, v)
     return None
 
 
@@ -212,9 +217,15 @@ def completely_pared_graph(graph: nx.Graph) -> nx.Graph:
     [3]
     """
     g1 = graph.copy()
+
     while True:
         n = g1.order()
-        g1 = remove_dominated_vertex(g1)
+        # Find one dominated vertex and remove it in-place
+        x = find_dominated_vertex(g1)
+        if x is not None:
+            g1.remove_node(x)
+
+        # If the order didn't change (no dominated vertex found), we are done
         if n == g1.order():
             return g1
 
