@@ -91,7 +91,7 @@ class SimplicialComplex:
         self,
         vertex_set: Iterable,
         facet_set: Iterable | None = None,
-        function: Callable[[set], bool] | None = None,
+        function: Callable[..., bool] | None = None,
     ) -> None:
         self.vertex_set = set(vertex_set)
 
@@ -122,7 +122,7 @@ class SimplicialComplex:
         if self.function(self.vertex_set):
             return {Simplex(self.vertex_set)}
 
-        facets = set()
+        facets: set[Simplex] = set()
         # Evaluate subsets lazily to save memory
         for r in reversed(range(1, len(self.vertex_set) + 1)):
             for subset in combinations(self.vertex_set, r):
@@ -184,7 +184,7 @@ class SimplicialComplex:
 
         good_facets = set(not_containing)
         for s in containing:
-            candidate = s - {x}
+            candidate = Simplex(s - {x})
             # Only add if it's not strictly contained in another existing facet
             if not any(candidate.issubset(f) for f in not_containing):
                 good_facets.add(candidate)
@@ -290,7 +290,7 @@ class SimplicialComplex:
         >>> sorted(len(s) for s in sc.all_simplices())
         [0, 1, 1, 2]
         """
-        all_simplices_set = set()
+        all_simplices_set: set[tuple] = set()
         for facet in self.facet_set:
             s = list(facet)
             # chain.from_iterable creates a generator, set() consumes it.
@@ -336,7 +336,7 @@ class SimplicialComplex:
             link_simplices = the_link.all_simplices()
 
             for s in link_simplices:
-                s_plus_v = s | {vertex}
+                s_plus_v = Simplex(s | {vertex})
                 if (s not in matched) and (s_plus_v not in matched):
                     matched.add(s)
                     matched.add(s_plus_v)
@@ -369,7 +369,7 @@ def all_subsets(the_set: set) -> Generator[Simplex]:
         yield Simplex(x)
 
 
-def nerve_of_sets(sets: Iterable[set]) -> SimplicialComplex:
+def nerve_of_sets(sets: Iterable[set | frozenset]) -> SimplicialComplex:
     """Return the nerve of a collection of sets.
 
     The nerve is the simplicial complex whose vertices are the given sets and
@@ -434,7 +434,9 @@ def nerve_of_cliques(graph: nx.Graph) -> SimplicialComplex:
     return nerve_of_sets(the_cliques)
 
 
-def bounded_degree(graph: nx.Graph, lambda_vector: dict, list_of_edges: list) -> bool:
+def bounded_degree(
+    graph: nx.Graph, lambda_vector: dict, list_of_edges: Iterable
+) -> bool:
     """Return whether the edge-induced subgraph respects degree bounds.
 
     For every vertex *v* in the subgraph induced by *list_of_edges*, check
@@ -497,7 +499,9 @@ def is_oriented_simplex(digraph: nx.DiGraph) -> bool:
     >>> is_oriented_simplex(d2)
     False
     """
-    return nx.is_directed_acyclic_graph(digraph) and tournament.is_tournament(digraph)
+    return nx.is_directed_acyclic_graph(digraph) and bool(
+        tournament.is_tournament(digraph)
+    )
 
 
 def oriented_complex(digraph: nx.DiGraph) -> SimplicialComplex:
