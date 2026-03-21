@@ -109,7 +109,7 @@ class SimplicialComplex:
 
     def _default_is_simplex(self, s: set) -> bool:
         """Fallback membership function if none is provided."""
-        if not hasattr(self, 'facet_set') or self.facet_set is None:
+        if not hasattr(self, "facet_set") or self.facet_set is None:
             return False
         return any(s <= facet for facet in self.facet_set)
 
@@ -141,10 +141,7 @@ class SimplicialComplex:
         if not isinstance(other, SimplicialComplex):
             return False
 
-        return (
-            self.vertex_set == other.vertex_set
-            and self.facet_set == other.facet_set
-        )
+        return self.vertex_set == other.vertex_set and self.facet_set == other.facet_set
 
     def dimension(self) -> int:
         """Return the dimension of the simplicial complex.
@@ -232,8 +229,10 @@ class SimplicialComplex:
         >>> sk.dimension()
         1
         """
+
         def _new_function(s: set) -> bool:
             return self.function(s) and len(s) <= n + 1
+
         return SimplicialComplex(self.vertex_set, function=_new_function)
 
     def one_skeleton_graph(self) -> nx.Graph:
@@ -253,8 +252,11 @@ class SimplicialComplex:
         """
         the_graph = nx.Graph()
         the_graph.add_nodes_from(self.vertex_set)
-        edges = [(i, j) for (i, j) in combinations(self.vertex_set, 2)
-                 if self.function({i, j})]
+        edges = [
+            (i, j)
+            for (i, j) in combinations(self.vertex_set, 2)
+            if self.function({i, j})
+        ]
         the_graph.add_edges_from(edges)
         return the_graph
 
@@ -292,14 +294,14 @@ class SimplicialComplex:
         for facet in self.facet_set:
             s = list(facet)
             # chain.from_iterable creates a generator, set() consumes it.
-            subset_generator = chain.from_iterable(combinations(s, r)
-                                                   for r in range(len(s) + 1))
+            subset_generator = chain.from_iterable(
+                combinations(s, r) for r in range(len(s) + 1)
+            )
             all_simplices_set.update(subset_generator)
         return {Simplex(s) for s in all_simplices_set}
 
     def dong_matching(
-            self,
-            order_function: Callable[[set], list] = list
+        self, order_function: Callable[[set], list] = list
     ) -> set[Simplex]:
         """Return the critical simplices under Dong's matching.
 
@@ -341,6 +343,7 @@ class SimplicialComplex:
 
         return self.all_simplices() - matched
 
+
 # --- Module Functions ---
 
 
@@ -359,8 +362,9 @@ def all_subsets(the_set: set) -> Generator[Simplex]:
     True
     """
     n = len(the_set)
-    subsets = chain.from_iterable(combinations(the_set, r)
-                                  for r in reversed(range(1, n + 1)))
+    subsets = chain.from_iterable(
+        combinations(the_set, r) for r in reversed(range(1, n + 1))
+    )
     for x in subsets:
         yield Simplex(x)
 
@@ -381,6 +385,7 @@ def nerve_of_sets(sets: Iterable[set]) -> SimplicialComplex:
     >>> n2.dimension()
     2
     """
+
     def _non_empty_intersection(s: set) -> bool:
         if not s:
             return False
@@ -429,9 +434,7 @@ def nerve_of_cliques(graph: nx.Graph) -> SimplicialComplex:
     return nerve_of_sets(the_cliques)
 
 
-def bounded_degree(graph: nx.Graph,
-                   lambda_vector: dict,
-                   list_of_edges: list) -> bool:
+def bounded_degree(graph: nx.Graph, lambda_vector: dict, list_of_edges: list) -> bool:
     """Return whether the edge-induced subgraph respects degree bounds.
 
     For every vertex *v* in the subgraph induced by *list_of_edges*, check
@@ -454,8 +457,7 @@ def bounded_degree(graph: nx.Graph,
     return True
 
 
-def bounded_degree_complex(graph: nx.Graph,
-                           lambda_vector: dict) -> SimplicialComplex:
+def bounded_degree_complex(graph: nx.Graph, lambda_vector: dict) -> SimplicialComplex:
     """Return the bounded-degree complex of *graph*.
 
     The simplices are subsets of edges whose induced subgraph satisfies the
@@ -471,8 +473,10 @@ def bounded_degree_complex(graph: nx.Graph,
     >>> bdc.dimension()
     0
     """
+
     def _bounded(s: set) -> bool:
         return bounded_degree(graph, lambda_vector, s)
+
     return SimplicialComplex(graph.edges(), function=_bounded)
 
 
@@ -493,10 +497,7 @@ def is_oriented_simplex(digraph: nx.DiGraph) -> bool:
     >>> is_oriented_simplex(d2)
     False
     """
-    return (
-        nx.is_directed_acyclic_graph(digraph)
-        and tournament.is_tournament(digraph)
-    )
+    return nx.is_directed_acyclic_graph(digraph) and tournament.is_tournament(digraph)
 
 
 def oriented_complex(digraph: nx.DiGraph) -> SimplicialComplex:
@@ -515,13 +516,16 @@ def oriented_complex(digraph: nx.DiGraph) -> SimplicialComplex:
     >>> oc.dimension()
     2
     """
+
     def _oriented_simplex(s: set) -> bool:
         return is_oriented_simplex(digraph.subgraph(s))
+
     return SimplicialComplex(digraph.nodes(), function=_oriented_simplex)
 
 
-def complex_of_forests(graph: nx.Graph,
-                       max_deg: int | float = math.inf) -> SimplicialComplex:
+def complex_of_forests(
+    graph: nx.Graph, max_deg: int | float = math.inf
+) -> SimplicialComplex:
     """Return the forest complex of *graph*.
 
     The simplices are subsets of vertices that induce a forest whose maximum
@@ -551,13 +555,13 @@ def complex_of_forests(graph: nx.Graph,
     >>> cf_deg1.dimension()
     1
     """
+
     def _is_forest(s: set) -> bool:
         if not s:  # Handle the empty face safely
             return True
         subgraph = graph.subgraph(s)
         # Prevent max() empty sequence error by setting default=0
-        maxd = max([subgraph.degree(node) for node in subgraph.nodes],
-                   default=0)
+        maxd = max([subgraph.degree(node) for node in subgraph.nodes], default=0)
         return nx.is_forest(subgraph) and maxd <= max_deg
 
     return SimplicialComplex(graph.nodes(), function=_is_forest)
