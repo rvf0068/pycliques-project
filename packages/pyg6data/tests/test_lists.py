@@ -1,6 +1,5 @@
-import pytest
 import networkx as nx
-
+import pytest
 from pyg6data.lists import graph_generator, list_graphs, small_torsion_graphs
 
 

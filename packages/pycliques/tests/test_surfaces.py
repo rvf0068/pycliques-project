@@ -1,5 +1,4 @@
 import networkx as nx
-
 from pycliques.surfaces import (
     is_closed_surface,
     is_cycle,

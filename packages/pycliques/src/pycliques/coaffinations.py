@@ -8,14 +8,15 @@ A *coaffination* of a graph :math:`G` is an automorphism
 from __future__ import annotations
 
 import math
+from collections.abc import Hashable, Iterator
+
 import networkx as nx
 from networkx.algorithms import isomorphism
-from typing import Dict, Iterator
 
 from .cliques import Clique, clique_graph
 
 
-class CoaffinePair(object):
+class CoaffinePair:
     """Bundle a graph with one of its coaffinations.
 
     .. rubric:: Examples
@@ -32,17 +33,15 @@ class CoaffinePair(object):
     >>> kpair.coaffination
     {{0, 1}: {2, 3}, {0, 3}: {1, 2}, {1, 2}: {0, 3}, {2, 3}: {0, 1}}
     """
-    def __init__(self, graph: nx.Graph, coaffination: dict[int, int]):
+
+    def __init__(self, graph: nx.Graph, coaffination: dict[Hashable, Hashable]):
         """Store the base graph and its associated automorphism."""
         self.graph = graph
         self.coaffination = coaffination
 
 
 @clique_graph.register
-def _(
-        pair: CoaffinePair,
-        bound: int | float = math.inf
-) -> CoaffinePair | None:
+def _(pair: CoaffinePair, bound: int | float = math.inf) -> CoaffinePair | None:
     """Return the clique graph of a :class:`CoaffinePair` as another pair.
 
     .. rubric:: Parameters
@@ -68,7 +67,7 @@ def _(
     kg = clique_graph.registry[object](g, bound)
     if kg is None:
         return None
-    coaf_k: Dict[Clique, Clique] = {}
+    coaf_k: dict[Hashable, Hashable] = {}
     for q in kg:
         coaf_k[q] = Clique([sigma[x] for x in q])
     return CoaffinePair(kg, coaf_k)

@@ -1,5 +1,4 @@
 import networkx as nx
-
 from pycliques.cliques import clique_graph
 from pycliques.coaffinations import CoaffinePair, automorphisms, coaffinations
 

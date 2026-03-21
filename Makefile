@@ -1,5 +1,5 @@
 # Root make targets for the Pycliques monorepo
-.PHONY: help test html pdf clean
+.PHONY: help test html pdf clean lint lint-fix typecheck
 .DEFAULT_GOAL := help
 
 help: ## Show this help message
@@ -10,6 +10,17 @@ help: ## Show this help message
 
 test: ## Run tests with pytest against the workspace env
 	uv run pytest
+
+lint: ## Run ruff linter and formatter check
+	uv run ruff check packages/
+	uv run ruff format --check packages/
+
+lint-fix: ## Auto-fix ruff lint and formatting issues
+	uv run ruff check --fix packages/
+	uv run ruff format packages/
+
+typecheck: ## Run mypy type checking
+	uv run mypy packages/
 
 coverage: ## Run tests with coverage report
 	uv run pytest --cov=packages

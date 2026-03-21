@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from functools import singledispatch
 import itertools
 import math
+from functools import singledispatch
 from typing import TypeAlias
 
 import networkx as nx
@@ -28,6 +28,7 @@ class Clique(frozenset):
         >>> Clique([])
         {}
     """
+
     def __repr__(self) -> str:
         """Return a set-style string representation."""
         u = set(self)
@@ -41,10 +42,7 @@ NodeH: TypeAlias = tuple[int, Clique]
 
 
 @singledispatch
-def clique_graph(
-        graph: nx.Graph,
-        bound: int | float = math.inf
-) -> nx.Graph | None:
+def clique_graph(graph: nx.Graph, bound: int | float = math.inf) -> nx.Graph | None:
     """Produce the clique graph of an undirected NetworkX graph.
 
     .. rubric:: Parameters
@@ -129,9 +127,7 @@ def homotopy_clique_graph(graph: nx.Graph) -> nx.Graph:
 
     H = nx.Graph()
     cliques: list[Clique] = [Clique(q) for q in nx.find_cliques(graph)]
-    vertices: list[NodeH] = [
-        (x, q) for x in graph.nodes() for q in cliques if x in q
-    ]
+    vertices: list[NodeH] = [(x, q) for x in graph.nodes() for q in cliques if x in q]
     H.add_nodes_from(vertices)
     vertex_pairs = itertools.combinations(vertices, 2)
     H.add_edges_from((c1, c2) for (c1, c2) in vertex_pairs if _ady(c1, c2))

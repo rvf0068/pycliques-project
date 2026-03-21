@@ -1,5 +1,4 @@
 import networkx as nx
-
 from pycliques import Clique, clique_graph, homotopy_clique_graph
 
 

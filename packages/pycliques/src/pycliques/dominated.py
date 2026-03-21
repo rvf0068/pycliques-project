@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import networkx as nx
 
 
@@ -80,7 +81,7 @@ def find_dominated_vertex(graph: nx.Graph) -> int | None:
     """
     for v in graph:
         if is_dominated_vertex(graph, v):
-            return v
+            return v  # type: ignore[no-any-return]
     return None
 
 
@@ -119,7 +120,7 @@ def twin_classes(graph: nx.Graph) -> list[list]:
     >>> sorted(sorted(cls) for cls in twin_classes(graph))
     [[0, 1, 2], [3]]
     """
-    neighborhoods = {}
+    neighborhoods: dict[tuple[int, ...], list[int]] = {}
     for v in graph:
         # Create a hashable signature for the neighborhood (sorted tuple)
         nb_signature = tuple(sorted(closed_neighborhood(graph, v)))
@@ -157,9 +158,8 @@ def pared_graph(graph: nx.Graph) -> nx.Graph:
             nodes_to_keep.append(vertex)
         else:
             # If dominated, check if it's only dominated by its own twins
-            dom_info = is_dominated_vertex(graph, vertex,
-                                           return_dominator=True)
-            if dom_info:
+            dom_info = is_dominated_vertex(graph, vertex, return_dominator=True)
+            if isinstance(dom_info, tuple):
                 dominator = dom_info[1]
                 neigh_v = closed_neighborhood(graph, vertex)
                 neigh_dom = closed_neighborhood(graph, dominator)
@@ -172,10 +172,7 @@ def pared_graph(graph: nx.Graph) -> nx.Graph:
     return graph.subgraph(nodes_to_keep).copy()
 
 
-def pared_index(
-        graph: nx.Graph,
-        return_cp: bool = False
-) -> int | tuple[int, nx.Graph]:
+def pared_index(graph: nx.Graph, return_cp: bool = False) -> int | tuple[int, nx.Graph]:
     """Return how many pared-graph iterations are needed until stability.
 
     When ``return_cp`` is True, the pared index and the final fixed-point
@@ -234,4 +231,4 @@ def is_dismantlable(graph: nx.Graph) -> bool:
     >>> is_dismantlable(nx.cycle_graph(4))
     False
     """
-    return completely_pared_graph(graph).order() == 1
+    return bool(completely_pared_graph(graph).order() == 1)

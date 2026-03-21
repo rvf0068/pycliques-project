@@ -5,31 +5,33 @@ Includes all graphs from 5 to 10 vertices and connected graphs from 6 to 10.
 """
 
 import gzip
-import networkx as nx
+from collections.abc import Iterator
 from importlib import resources
 
+import networkx as nx
+
 # We define the subpackage where the data files actually reside
-DATA_PACKAGE = 'pyg6data.data'
+DATA_PACKAGE = "pyg6data.data"
 
 _dict_all = {
-    5: 'graph5.g6',
-    6: 'graph6.g6',
-    7: 'graph7.g6',
-    8: 'graph8.g6.gz',
-    9: 'graph9.g6.gz',
-    10: 'graph10.g6.gz'
+    5: "graph5.g6",
+    6: "graph6.g6",
+    7: "graph7.g6",
+    8: "graph8.g6.gz",
+    9: "graph9.g6.gz",
+    10: "graph10.g6.gz",
 }
 
 _dict_connected = {
-    6: 'graph6c.g6.gz',
-    7: 'graph7c.g6.gz',
-    8: 'graph8c.g6.gz',
-    9: 'graph9c.g6.gz',
-    10: 'graph10c.g6.gz'
+    6: "graph6c.g6.gz",
+    7: "graph7c.g6.gz",
+    8: "graph8c.g6.gz",
+    9: "graph9c.g6.gz",
+    10: "graph10c.g6.gz",
 }
 
 
-def _get_data_file_path(filename: str):
+def _get_data_file_path(filename: str) -> resources.abc.Traversable:
     """Helper function to resolve the modern path to a package data file."""
     # resources.files() returns a Traversable object representing the
     # directory.
@@ -37,7 +39,7 @@ def _get_data_file_path(filename: str):
     return resources.files(DATA_PACKAGE).joinpath(filename)
 
 
-def graph_generator(n: int, connected: bool = True):
+def graph_generator(n: int, connected: bool = True) -> Iterator[nx.Graph]:
     """
     Yields NetworkX graphs from a g6.gz file.
 
@@ -62,19 +64,19 @@ def graph_generator(n: int, connected: bool = True):
     filename = the_dict[n]
     file_path = _get_data_file_path(filename)
 
-    if filename.endswith('.gz'):
-        with file_path.open('rb') as raw_file:
-            with gzip.open(raw_file, 'rt', encoding='utf-8') as graph_file:
+    if filename.endswith(".gz"):
+        with file_path.open("rb") as raw_file:
+            with gzip.open(raw_file, "rt", encoding="utf-8") as graph_file:
                 for graph_string in graph_file:
                     graph_string = graph_string.strip()
                     if graph_string:
-                        yield nx.from_graph6_bytes(graph_string.encode('utf-8'))
+                        yield nx.from_graph6_bytes(graph_string.encode("utf-8"))
     else:
-        with file_path.open('r', encoding='utf-8') as graph_file:
+        with file_path.open("r", encoding="utf-8") as graph_file:
             for graph_string in graph_file:
                 graph_string = graph_string.strip()
                 if graph_string:
-                    yield nx.from_graph6_bytes(graph_string.encode('utf-8'))
+                    yield nx.from_graph6_bytes(graph_string.encode("utf-8"))
 
 
 def list_graphs(n: int, connected: bool = True) -> list[nx.Graph]:
@@ -84,13 +86,14 @@ def list_graphs(n: int, connected: bool = True) -> list[nx.Graph]:
 
 def small_torsion_graphs() -> list[nx.Graph]:
     """Loads the small-torsion graphs."""
-    file_path = _get_data_file_path('small-torsion.g6')
+    file_path = _get_data_file_path("small-torsion.g6")
     list_of_graphs = []
     # This is a regular .g6 file (not gzipped)
-    with file_path.open('r', encoding='utf-8') as graph_file:
+    with file_path.open("r", encoding="utf-8") as graph_file:
         for graph_string in graph_file:
             graph_string = graph_string.strip()
             if graph_string:
-                list_of_graphs.append(nx.from_graph6_bytes(
-                    graph_string.encode('utf-8')))
+                list_of_graphs.append(
+                    nx.from_graph6_bytes(graph_string.encode("utf-8"))
+                )
     return list_of_graphs

@@ -1,5 +1,4 @@
 import networkx as nx
-
 from pycliques.dominated import (
     closed_neighborhood,
     completely_pared_graph,
