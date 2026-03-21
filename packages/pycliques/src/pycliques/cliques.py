@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import itertools
 import math
+from collections.abc import Hashable
 from functools import singledispatch
 from typing import TypeAlias
 
@@ -126,15 +127,39 @@ def homotopy_clique_graph(graph: nx.Graph) -> nx.Graph:
     >>> nx.is_connected(H)
     True
     """
-    # A node in H is a (vertex, clique) tuple
-
-    def _ady(c1: NodeH, c2: NodeH) -> bool:
-        return (c1[0] in c2[1]) and (c2[0] in c1[1])
 
     H = nx.Graph()
-    cliques: list[Clique] = [Clique(q) for q in nx.find_cliques(graph)]
-    vertices: list[NodeH] = [(x, q) for x in graph.nodes() for q in cliques if x in q]
-    H.add_nodes_from(vertices)
-    vertex_pairs = itertools.combinations(vertices, 2)
-    H.add_edges_from((c1, c2) for (c1, c2) in vertex_pairs if _ady(c1, c2))
+
+    # 1. Extract cliques and precompute which cliques contain which vertices
+    # Using sets for fast intersection later
+    cliques = [Clique(c) for c in nx.find_cliques(graph)]
+    cliques_of: dict[Hashable, set[Clique]] = {v: set() for v in graph}
+
+    for c in cliques:
+        for v in c:
+            cliques_of[v].add(c)
+
+    # 2. Add nodes and "same-vertex" edges (where v == w)
+    for v, v_cliques in cliques_of.items():
+        v_nodes = [(v, c) for c in v_cliques]
+        H.add_nodes_from(v_nodes)
+
+        # (v, C) is always adjacent to (v, D) because v in D and v in C
+        H.add_edges_from(itertools.combinations(v_nodes, 2))
+
+    # 3. Add "cross-vertex" edges (where v != w)
+    for v, w in graph.edges():
+        # A cross edge exists between (v, C) and (w, D) iff
+        # both C and D contain both v and w.
+        shared_cliques = cliques_of[v].intersection(cliques_of[w])
+
+        if not shared_cliques:
+            continue
+
+        cross_nodes_v = [(v, c) for c in shared_cliques]
+        cross_nodes_w = [(w, c) for c in shared_cliques]
+
+        # Connect every valid v-node to every valid w-node
+        H.add_edges_from(itertools.product(cross_nodes_v, cross_nodes_w))
+
     return H
