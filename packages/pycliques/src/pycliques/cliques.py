@@ -82,8 +82,14 @@ def clique_graph(graph: nx.Graph, bound: int | float = math.inf) -> nx.Graph | N
         except StopIteration:
             break
     K.add_nodes_from(cliques)
-    clique_pairs = itertools.combinations(cliques, 2)
-    K.add_edges_from((c1, c2) for (c1, c2) in clique_pairs if c1 & c2)
+
+    # Fast edge generation: group cliques by the vertices they contain
+    for v in graph:
+        # Find all cliques containing this vertex
+        cliques_with_v = [c for c in cliques if v in c]
+        # Link all of them together in the clique graph
+        K.add_edges_from(itertools.combinations(cliques_with_v, 2))
+
     return K
 
 
