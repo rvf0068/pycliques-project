@@ -21,3 +21,6 @@ packages = ["src/pyg6data"]
 
 [tool.hatch.build.targets.sdist]
 include = ["src/pyg6data"]
+
+[project.scripts]
+extract-graphs = "pyg6data.cli:main"
