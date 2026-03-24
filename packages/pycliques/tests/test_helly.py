@@ -48,8 +48,6 @@ def test_u_open_complete_graph():
 
 
 def test_u_open_cycle_graph():
-    """In C5, vertices 0 and 1 share neighbor {4, 2} but none are universal."""
-    # In C5, n_open(0,1) might be empty or a single vertex
     g = nx.cycle_graph(5)
     assert u_open(g, 0, 1) == set()
 

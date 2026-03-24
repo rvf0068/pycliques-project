@@ -8,7 +8,6 @@ from pycliques.surfaces import (
     open_neighborhood,
 )
 
-
 def test_is_regular_on_cycle_and_path():
     assert is_regular(nx.cycle_graph(4), 2)
     assert not is_regular(nx.path_graph(4), 2)
@@ -31,7 +30,7 @@ def test_open_neighborhood_induced_subgraph():
     assert neighborhood.number_of_edges() == 0
 
 
-def test_is_closed_surface_on_tetrahedral_graph():
+def test_is_closed_surface_on_octahedral_graph():
     sphere = nx.octahedral_graph()
     assert is_closed_surface(sphere)
     assert not is_closed_surface(nx.cycle_graph(4))
@@ -41,3 +40,8 @@ def test_is_surface_accepts_path_neighborhoods():
     graph = nx.diamond_graph()
     assert is_surface(graph)
     assert not is_surface(nx.cycle_graph(4))
+
+
+def test_is_surface():
+    graph = nx.icosahedral_graph()
+    assert is_surface(graph)

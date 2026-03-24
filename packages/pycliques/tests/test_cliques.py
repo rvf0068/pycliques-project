@@ -123,6 +123,16 @@ def test_clique_graph_of_petersen():
     assert all(d == 4 for _, d in kg.degree())  # each edge touches 4 others
 
 
+def test_clique_graph_of_clique_graph_of_petersen():
+    """K^2(Petersen) is isomorphic to Petersen since Petersen is triangle-free."""
+    petersen = nx.petersen_graph()
+    kg = clique_graph(petersen)
+    k2g = clique_graph(kg)
+    assert k2g is not None
+    assert k2g.number_of_nodes() == 10  
+    assert all(d == 3 for _, d in k2g.degree())  
+    
+
 def test_clique_graph_of_empty_graph():
     """K(empty graph on n vertices) has n isolated nodes."""
     g = nx.empty_graph(5)
