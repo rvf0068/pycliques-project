@@ -328,29 +328,27 @@ def _is_maximal_clique(graph: nx.Graph, clique: Iterable) -> bool:
 def special_octahedra(graph: nx.Graph) -> bool:
     """Check for retractions to special octahedra in the graph.
 
-    A *special octahedron* in ``graph`` is an induced octahedron whose
-    cliques are maximal cliques of the whole graph.  The algorithm works
-    by finding mutually disjoint edges in the complement graph, which
-    correspond to induced octahedra in the original graph.
+    This works by finding mutually disjoint edges in the complement graph
+        with no cross-edges between them, which correspond to induced
+        octahedra in the original graph.
+        .. rubric:: Parameters
 
-    .. rubric:: Parameters
+        graph : networkx.Graph
+            Input graph.
 
-    graph : networkx.Graph
-        Input graph.
+        .. rubric:: Returns
 
-    .. rubric:: Returns
+        bool
+            ``True`` if ``graph`` contains a special octahedron.
 
-    bool
-        ``True`` if ``graph`` contains a special octahedron.
+        .. rubric:: Examples
 
-    .. rubric:: Examples
-
-    >>> import networkx as nx
-    >>> from pycliques.retractions import special_octahedra
-    >>> special_octahedra(nx.octahedral_graph())
-    True
-    >>> special_octahedra(nx.cycle_graph(5))
-    False
+        >>> import networkx as nx
+        >>> from pycliques.retractions import special_octahedra
+        >>> special_octahedra(nx.octahedral_graph())
+        True
+        >>> special_octahedra(nx.cycle_graph(5))
+        False
     """
     c_graph = nx.complement(graph)
     edges_complement = list(c_graph.edges())
@@ -358,20 +356,30 @@ def special_octahedra(graph: nx.Graph) -> bool:
     aux_graph = nx.Graph()
     aux_graph.add_nodes_from(edges_complement)
 
-    # OPTIMIZATION: Instant disjointness check instead of building subgraphs
-    valid_pairs = (
-        (e1, e2)
-        for e1, e2 in itertools.combinations(edges_complement, 2)
-        if set(e1).isdisjoint(e2)
-    )
+    valid_pairs = []
+    for e1, e2 in itertools.combinations(edges_complement, 2):
+        u, v = e1
+        x, y = e2
+
+        # 1. The edges must be completely disjoint
+        if u == x or u == y or v == x or v == y:
+            continue
+
+        # 2. There must be NO cross-edges in the complement graph.
+        # This mathematically requires that all 4 cross-pairs ARE edges in the original
+        # graph.
+        if (
+            graph.has_edge(u, x)
+            and graph.has_edge(u, y)
+            and graph.has_edge(v, x)
+            and graph.has_edge(v, y)
+        ):
+            valid_pairs.append((e1, e2))
+
     aux_graph.add_edges_from(valid_pairs)
 
-    octas = 0
-    # OPTIMIZATION: Use native 'for' loop instead of try/except StopIteration
     for edges_octa in nx.find_cliques(aux_graph):
         if len(edges_octa) >= 3:
-            octas += 1
-
             # Flatten the list of edges into a set of vertices
             vertices_octa = {v for edge in edges_octa for v in edge}
             octa_subgraph = graph.subgraph(vertices_octa)
