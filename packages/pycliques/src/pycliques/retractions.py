@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import itertools
 import logging
 import sys
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from typing import Any
 
 import networkx as nx
@@ -304,44 +305,88 @@ def has_induced(large: nx.Graph, small: nx.Graph) -> dict | None:
         return None
 
 
+def _is_maximal_clique(graph: nx.Graph, clique: Iterable) -> bool:
+    """Return True if `clique` is maximal (cannot be extended)."""
+    clique_set = set(clique)
+
+    # Candidates for extending the clique are all vertices currently outside it
+    candidates = set(graph.nodes) - clique_set
+
+    # Intersect the candidates with the neighborhood of each vertex in the clique
+    for v in clique_set:
+        candidates &= set(graph[v])
+        if not candidates:
+            # If no outside vertex is connected to all elements so far,
+            # the clique is definitely maximal.
+            return True
+
+    # If candidates is not empty, those vertices are connected to EVERYTHING
+    # in the clique, meaning the clique can be extended and is NOT maximal.
+    return False
+
+
+def special_octahedra(graph: nx.Graph) -> bool:
+    """Check for retractions to special octahedra in the graph.
+
+    A *special octahedron* in ``graph`` is an induced octahedron whose
+    cliques are maximal cliques of the whole graph.  The algorithm works
+    by finding mutually disjoint edges in the complement graph, which
+    correspond to induced octahedra in the original graph.
+
+    .. rubric:: Parameters
+
+    graph : networkx.Graph
+        Input graph.
+
+    .. rubric:: Returns
+
+    bool
+        ``True`` if ``graph`` contains a special octahedron.
+
+    .. rubric:: Examples
+
+    >>> import networkx as nx
+    >>> from pycliques.retractions import special_octahedra
+    >>> special_octahedra(nx.octahedral_graph())
+    True
+    >>> special_octahedra(nx.cycle_graph(5))
+    False
+    """
+    c_graph = nx.complement(graph)
+    edges_complement = list(c_graph.edges())
+
+    aux_graph = nx.Graph()
+    aux_graph.add_nodes_from(edges_complement)
+
+    # OPTIMIZATION: Instant disjointness check instead of building subgraphs
+    valid_pairs = (
+        (e1, e2)
+        for e1, e2 in itertools.combinations(edges_complement, 2)
+        if set(e1).isdisjoint(e2)
+    )
+    aux_graph.add_edges_from(valid_pairs)
+
+    octas = 0
+    # OPTIMIZATION: Use native 'for' loop instead of try/except StopIteration
+    for edges_octa in nx.find_cliques(aux_graph):
+        if len(edges_octa) >= 3:
+            octas += 1
+
+            # Flatten the list of edges into a set of vertices
+            vertices_octa = {v for edge in edges_octa for v in edge}
+            octa_subgraph = graph.subgraph(vertices_octa)
+
+            # Check if any clique in this octahedron is maximal in the whole graph
+            for clique_octa in nx.find_cliques(octa_subgraph):
+                if _is_maximal_clique(graph, clique_octa):
+                    return True
+
+    return False
+
+
 # ---------------------------------------------------------------------------
 # CLI Application Logic
 # ---------------------------------------------------------------------------
-
-
-def _string_to_graph(string: str) -> nx.Graph:
-    if string.startswith("sc"):
-        return suspension_of_cycle(int(string[2:]))
-    elif string.startswith("cc"):
-        return complement_of_cycle(int(string[2:]))
-    elif string.startswith("o"):
-        return octahedron(int(string[1:]))
-    raise ValueError(f"Unknown graph string format: {string}")
-
-
-def _parse_args(args: list[str]) -> argparse.Namespace:
-    from pycliques import __version__
-
-    parser = argparse.ArgumentParser(description="Retractions to octahedra")
-    parser.add_argument(
-        "--version", action="version", version=f"pycliques {__version__}"
-    )
-    parser.add_argument(dest="n", help="index of clique graph", type=int, metavar="INT")
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        dest="loglevel",
-        help="set loglevel to INFO",
-        action="store_const",
-        const=logging.INFO,
-    )
-    parser.add_argument(
-        dest="large", help="large graph in g6 format", type=str, metavar="STR"
-    )
-    parser.add_argument(
-        dest="small", help="small graph in g6 format", type=str, metavar="STR"
-    )
-    return parser.parse_args(args)
 
 
 def _setup_logging(loglevel: int | None):
@@ -356,14 +401,84 @@ def _setup_logging(loglevel: int | None):
         )
 
 
+def _string_to_graph(string: str) -> nx.Graph:
+    """Parse a short graph descriptor into a NetworkX graph.
+
+    Recognized prefixes: ``sc`` (suspension of cycle), ``cc`` (complement
+    of cycle), ``o`` (octahedron).
+    """
+    if string.startswith("sc"):
+        return suspension_of_cycle(int(string[2:]))
+    elif string.startswith("cc"):
+        return complement_of_cycle(int(string[2:]))
+    elif string.startswith("o"):
+        return octahedron(int(string[1:]))
+    raise ValueError(f"Unknown graph string format: {string}")
+
+
+def _parse_args(args: list[str]) -> argparse.Namespace:
+    """Parse command-line arguments for the find-retractions script."""
+    from pycliques import __version__
+
+    parser = argparse.ArgumentParser(description="Find retractions to subgraphs.")
+    parser.add_argument(
+        "--version", action="version", version=f"pycliques {__version__}"
+    )
+
+    parser.add_argument(
+        "n", help="Number of clique graph iterations", type=int, metavar="INT"
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        dest="loglevel",
+        help="Set loglevel to INFO",
+        action="store_const",
+        const=logging.INFO,
+    )
+
+    # The flag to trigger the fast algorithm
+    parser.add_argument(
+        "--special",
+        action="store_true",
+        help="Use the fast algorithm for special octahedra",
+    )
+
+    parser.add_argument(
+        "large", help="Large graph in g6 format", type=str, metavar="STR"
+    )
+
+    # Make 'small' optional natively, so --special doesn't require a dummy string
+    parser.add_argument(
+        "small",
+        nargs="?",
+        default=None,
+        help="Small graph string (e.g. o3, sc4). Required unless --special is used.",
+        type=str,
+        metavar="STR",
+    )
+
+    parsed = parser.parse_args(args)
+
+    # Manually enforce the requirement only if --special is NOT used
+    if not parsed.special and parsed.small is None:
+        parser.error(
+            "The 'small' graph argument is required for general "
+            "retractions (e.g., 'o3')."
+        )
+
+    return parsed
+
+
 def _main(args: list[str]):
+    """Run the retraction search from parsed CLI arguments."""
     args_parsed = _parse_args(args)
     _setup_logging(args_parsed.loglevel)
 
     _logger.info("Parsing input graphs...")
     large = nx.from_graph6_bytes(bytes(args_parsed.large, "utf8"))
-    small = _string_to_graph(args_parsed.small)
 
+    # Iterate the operator
     for i in range(args_parsed.n):
         _logger.info(f"Iterating the clique operator (Step {i + 1})")
         large = completely_pared_graph(clique_graph(large))
@@ -372,10 +487,29 @@ def _main(args: list[str]):
     _logger.info(f"The large graph has order {large.order()}")
     _logger.info("Searching for retractions...")
 
-    has_retraction = retracts(large, small)
-    if has_retraction:
-        print(f"Found {has_retraction}")
+    # --- The Unified Routing Logic ---
+    if args_parsed.special:
+        _logger.info("Using fast combinatorial check for special octahedra...")
+        if special_octahedra(large):
+            print("Found special octahedra retraction!")
+        else:
+            print("Sorry, could not find it!")
     else:
-        print("Sorry, could not find it!")
+        _logger.info("Using general graph matcher...")
+        small = _string_to_graph(args_parsed.small)
+        has_retraction = retracts(large, small)
+        if has_retraction:
+            print(f"Found {has_retraction}")
+        else:
+            print("Sorry, could not find it!")
 
     _logger.info("Script ends here")
+
+
+def main():
+    """Entry point for console_scripts."""
+    _main(sys.argv[1:])
+
+
+if __name__ == "__main__":
+    main()

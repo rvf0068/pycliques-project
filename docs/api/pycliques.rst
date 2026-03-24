@@ -59,6 +59,15 @@ Retractions
    :show-inheritance:
    :member-order: bysource
 
+Small
+-----
+
+.. automodule:: pycliques.small
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :member-order: bysource
+
 Surfaces
 --------
 

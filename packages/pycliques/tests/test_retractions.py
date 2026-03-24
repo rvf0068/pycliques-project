@@ -1,5 +1,8 @@
 import networkx as nx
+import pytest
 from pycliques.retractions import (
+    _is_maximal_clique,
+    _string_to_graph,
     dict_to_tuple,
     graph_from_gap_adjacency_list,
     has_induced,
@@ -8,6 +11,7 @@ from pycliques.retractions import (
     retraction,
     retracts,
     retracts_to,
+    special_octahedra,
 )
 
 
@@ -84,3 +88,56 @@ def test_has_induced_finds_subgraph():
 def test_has_induced_returns_none_when_absent():
     result = has_induced(nx.cycle_graph(4), nx.complete_graph(3))
     assert result is None
+
+
+def test_special_octahedra_on_octahedral_graph():
+    assert special_octahedra(nx.octahedral_graph()) is True
+
+
+def test_special_octahedra_on_cycle():
+    assert special_octahedra(nx.cycle_graph(5)) is False
+
+
+def test_special_octahedra_on_complete_graph():
+    # K4 has no induced octahedron
+    assert special_octahedra(nx.complete_graph(4)) is False
+
+
+def test_is_maximal_clique_true():
+    # In a triangle, the full triangle is maximal
+    g = nx.complete_graph(3)
+    assert _is_maximal_clique(g, [0, 1, 2]) is True
+
+
+def test_is_maximal_clique_false():
+    # In K4, a triangle is not maximal
+    g = nx.complete_graph(4)
+    assert _is_maximal_clique(g, [0, 1, 2]) is False
+
+
+def test_is_maximal_clique_edge_in_path():
+    g = nx.path_graph(4)  # 0-1-2-3
+    # {0,1} is a maximal clique in a path
+    assert _is_maximal_clique(g, [0, 1]) is True
+
+
+def test_string_to_graph_suspension_of_cycle():
+    g = _string_to_graph("sc5")
+    # Suspension of C5 has 5+2=7 vertices
+    assert g.number_of_nodes() == 7
+
+
+def test_string_to_graph_complement_of_cycle():
+    g = _string_to_graph("cc5")
+    assert g.number_of_nodes() == 5
+
+
+def test_string_to_graph_octahedron():
+    g = _string_to_graph("o3")
+    # Octahedron(3) = complement of 3 disjoint edges = 6 vertices
+    assert g.number_of_nodes() == 6
+
+
+def test_string_to_graph_invalid_raises():
+    with pytest.raises(ValueError, match="Unknown graph string format"):
+        _string_to_graph("xyz")

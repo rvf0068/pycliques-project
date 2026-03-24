@@ -8,6 +8,7 @@ dependencies = [
     "pyg6data",
     "pycombtop",
     "pyhomrep",
+    "rich>=14.3.3",
 ]
 
 [tool.uv]
