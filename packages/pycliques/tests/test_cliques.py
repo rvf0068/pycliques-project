@@ -129,9 +129,9 @@ def test_clique_graph_of_clique_graph_of_petersen():
     kg = clique_graph(petersen)
     k2g = clique_graph(kg)
     assert k2g is not None
-    assert k2g.number_of_nodes() == 10  
-    assert all(d == 3 for _, d in k2g.degree())  
-    
+    assert k2g.number_of_nodes() == 10
+    assert all(d == 3 for _, d in k2g.degree())
+
 
 def test_clique_graph_of_empty_graph():
     """K(empty graph on n vertices) has n isolated nodes."""

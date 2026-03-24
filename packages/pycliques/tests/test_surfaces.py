@@ -8,6 +8,7 @@ from pycliques.surfaces import (
     open_neighborhood,
 )
 
+
 def test_is_regular_on_cycle_and_path():
     assert is_regular(nx.cycle_graph(4), 2)
     assert not is_regular(nx.path_graph(4), 2)
