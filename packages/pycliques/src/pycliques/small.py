@@ -21,7 +21,49 @@ from pycliques.retractions import retracts, special_octahedra
 _logger = logging.getLogger(__name__)
 
 
-def eventually_retracts_specially(graph: nx.Graph, max_steps: int = 15) -> bool:
+def is_eventually_helly(
+    graph: nx.Graph, tries: int = 8, bound: int = 30
+) -> bool | None:
+    """Whether `graph` is eventually Helly
+
+    Args:
+      graph (networkx.classes.graph.Graph): graph
+      tries : int
+      bound : int
+
+    Returns:
+      True if an iterated clique graph with index less than `tries` of `graph`
+      is Helly, in such a way that the order of an iterated clique graph
+      is never greater than `bound`.
+
+    Examples:
+      >>> import networkx as nx
+      >>> from pycliques.helly import is_clique_helly
+      >>> from pycliques.small import is_eventually_helly
+      >>> is_clique_helly(nx.triangular_lattice_graph(3,3))
+      False
+      >>> is_eventually_helly(nx.triangular_lattice_graph(3,3))
+      True
+
+    """
+    i = 0
+    while not is_clique_helly(graph) and i < tries:
+        i = i + 1
+        graph = clique_graph(graph, bound)
+        if graph is None:
+            return False
+        else:
+            graph = completely_pared_graph(graph)
+    if is_clique_helly(graph):
+        _logger.debug(f"Helly of index {i}")
+        return True
+    else:
+        return False
+
+
+def eventually_retracts_specially(
+    graph: nx.Graph, tries: int = 8, bound: int = 20
+) -> bool | None:
     """Check if iterated clique graphs eventually contain a special octahedron.
 
     Starting from ``graph``, repeatedly compute the completely-pared clique
@@ -45,22 +87,24 @@ def eventually_retracts_specially(graph: nx.Graph, max_steps: int = 15) -> bool:
 
     >>> import networkx as nx
     >>> from pycliques.small import eventually_retracts_specially
-    >>> eventually_retracts_specially(nx.cycle_graph(4))
-    False
+    >>> from pyg6data.lists import list_graphs
+    >>> g = list_graphs(8)[11045]
+    >>> eventually_retracts_specially(g)
+    True
     """
     g_curr = graph
-    for _ in range(max_steps):
-        # We pare the clique graph to keep it small
-        g_curr = completely_pared_graph(clique_graph(g_curr))
-
-        # If it collapses to a point (or empty), it converged safely
-        if g_curr.order() <= 1:
-            return False
-
+    for i in range(tries):
         if special_octahedra(g_curr):
+            _logger.debug(f"Index {i} has induced special octahedra")
             return True
 
-    return False
+        g_curr = clique_graph(g_curr, bound)
+
+        if g_curr is None:
+            return None
+        g_curr = completely_pared_graph(g_curr)
+
+    return None
 
 
 def _parse_args(args: list[str]) -> argparse.Namespace:
@@ -124,19 +168,12 @@ def _main(args: list[str]):
                 graph = nx.from_graph6_bytes(bytes(line.strip(), "utf-8"))
                 behavior = ""
 
-                # -------------------------------------------------------------
-                # The Classification Pipeline
-                # -------------------------------------------------------------
-                if is_clique_helly(graph):
-                    behavior = "is Helly"
-                    convergent.append(index)
-
-                elif is_clique_helly(clique_graph(graph)):
+                if is_eventually_helly(graph):
                     behavior = "is eventually Helly"
                     convergent.append(index)
 
-                elif special_octahedra(graph):
-                    behavior = "has an induced special octahedron"
+                elif eventually_retracts_specially(graph):
+                    behavior = "eventually has a special octahedron"
                     divergent.append(index)
 
                 elif retracts(graph, sc5):
@@ -149,10 +186,6 @@ def _main(args: list[str]):
 
                 elif retracts(graph, cc8):
                     behavior = "retracts to Comp(C_8)"
-                    divergent.append(index)
-
-                elif eventually_retracts_specially(graph):
-                    behavior = "eventually has a special octahedron"
                     divergent.append(index)
 
                 else:
