@@ -69,25 +69,25 @@ def test_retracts_finds_retraction():
 
 def test_retracts_returns_none_when_impossible():
     result = retracts(nx.wheel_graph(4), nx.cycle_graph(4))
-    assert result is None
+    assert result is False
 
 
 def test_retracts_to_returns_callable():
     checker = retracts_to(nx.path_graph(2))
-    assert checker(nx.path_graph(3)) is not None
+    assert checker(nx.path_graph(3)) is not False
     # An empty graph with one vertex cannot retract to an edge
-    assert checker(nx.empty_graph(1)) is None
+    assert checker(nx.empty_graph(1)) is False
 
 
 def test_has_induced_finds_subgraph():
     # C5 contains P3 as an induced subgraph
     result = has_induced(nx.cycle_graph(5), nx.path_graph(3))
-    assert result is not None
+    assert result
 
 
 def test_has_induced_returns_none_when_absent():
     result = has_induced(nx.cycle_graph(4), nx.complete_graph(3))
-    assert result is None
+    assert result is False
 
 
 def test_special_octahedra_on_octahedral_graph():

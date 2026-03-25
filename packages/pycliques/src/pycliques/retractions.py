@@ -218,7 +218,7 @@ def retraction(large: nx.Graph, small: nx.Graph) -> Iterator[tuple[dict, dict]]:
                     seen_signatures.add(sym_sig)
 
 
-def retracts(large: nx.Graph, small: nx.Graph) -> tuple[dict, dict] | None:
+def retracts(large: nx.Graph, small: nx.Graph) -> tuple[dict, dict] | bool:
     """Return a retraction from ``large`` to ``small`` if one exists.
 
     .. rubric:: Parameters
@@ -230,25 +230,25 @@ def retracts(large: nx.Graph, small: nx.Graph) -> tuple[dict, dict] | None:
 
     .. rubric:: Returns
 
-    tuple[dict, dict] | None
-        The first retraction found, or ``None``.
+    tuple[dict, dict] | False
+        The first retraction found, or ``False``.
 
     .. rubric:: Examples
 
     >>> import networkx as nx
     >>> from pycliques.retractions import retracts
-    >>> retracts(nx.path_graph(3), nx.path_graph(2)) is not None
-    True
-    >>> retracts(nx.wheel_graph(4), nx.cycle_graph(4)) is None
+    >>> retracts(nx.path_graph(3), nx.path_graph(2))
+    ({0: 0, 1: 1, 2: 0}, {0: 0, 1: 1})
+    >>> retracts(nx.wheel_graph(4), nx.cycle_graph(4)) is False
     True
     """
     try:
         return next(retraction(large, small))
     except StopIteration:
-        return None
+        return False
 
 
-def retracts_to(subgraph: nx.Graph) -> Callable[[nx.Graph], tuple[dict, dict] | None]:
+def retracts_to(subgraph: nx.Graph) -> Callable[[nx.Graph], tuple[dict, dict] | bool]:
     """Return a function that checks retraction to ``subgraph``.
 
     .. rubric:: Parameters
@@ -259,20 +259,20 @@ def retracts_to(subgraph: nx.Graph) -> Callable[[nx.Graph], tuple[dict, dict] | 
     .. rubric:: Returns
 
     Callable
-        A function ``f(g)`` returning the retraction or ``None``.
+        A function ``f(g)`` returning the retraction or ``False``.
 
     .. rubric:: Examples
 
     >>> import networkx as nx
     >>> from pycliques.retractions import retracts_to
     >>> checker = retracts_to(nx.path_graph(2))
-    >>> checker(nx.path_graph(3)) is not None
+    >>> checker(nx.path_graph(3)) is not False
     True
     """
     return lambda g: retracts(g, subgraph)
 
 
-def has_induced(large: nx.Graph, small: nx.Graph) -> dict | None:
+def has_induced(large: nx.Graph, small: nx.Graph) -> dict | bool:
     """Return an injective map witnessing ``small`` as an induced subgraph.
 
     .. rubric:: Parameters
@@ -284,17 +284,17 @@ def has_induced(large: nx.Graph, small: nx.Graph) -> dict | None:
 
     .. rubric:: Returns
 
-    dict | None
+    dict | bool
         A node mapping from ``large`` to ``small`` if one exists,
-        otherwise ``None``.
+        otherwise ``False``.
 
     .. rubric:: Examples
 
     >>> import networkx as nx
     >>> from pycliques.retractions import has_induced
-    >>> has_induced(nx.complete_graph(4), nx.path_graph(3)) is not None
-    True
-    >>> has_induced(nx.cycle_graph(4), nx.complete_graph(3)) is None
+    >>> has_induced(nx.complete_graph(4), nx.path_graph(3))
+    False
+    >>> has_induced(nx.cycle_graph(4), nx.complete_graph(3)) is False
     True
     """
     GM = isomorphism.GraphMatcher(large, small)
@@ -302,7 +302,7 @@ def has_induced(large: nx.Graph, small: nx.Graph) -> dict | None:
         result: dict = next(GM.subgraph_isomorphisms_iter())
         return result
     except StopIteration:
-        return None
+        return False
 
 
 def _is_maximal_clique(graph: nx.Graph, clique: Iterable) -> bool:
