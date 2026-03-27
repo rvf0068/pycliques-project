@@ -141,3 +141,134 @@ def test_string_to_graph_octahedron():
 def test_string_to_graph_invalid_raises():
     with pytest.raises(ValueError, match="Unknown graph string format"):
         _string_to_graph("xyz")
+
+
+# ---------- Same-size retraction (line 208) ----------
+
+
+def test_retraction_same_size_graphs():
+    """When large.order() == small.order(), retractions are automorphisms."""
+    rets = list(retraction(nx.cycle_graph(3), nx.cycle_graph(3)))
+    assert len(rets) >= 1
+    for ret_map, incl_map in rets:
+        assert len(ret_map) == 3
+
+
+# ---------- Recursive extension (lines 161-162) ----------
+
+
+def test_retraction_with_multiple_unmapped_vertices():
+    """P4 -> P2 requires mapping 2 extra vertices (recursive extension)."""
+    rets = list(retraction(nx.path_graph(4), nx.path_graph(2)))
+    assert len(rets) >= 1
+    for ret_map, incl_map in rets:
+        assert is_map(nx.path_graph(4), nx.path_graph(2), ret_map)
+
+
+# ---------- CLI tests for find-retractions ----------
+
+
+def test_retractions_parse_args_general():
+    """Parse args for a general retraction search."""
+    from pycliques.retractions import _parse_args
+
+    args = _parse_args(["1", "C`", "o3"])
+    assert args.n == 1
+    assert args.large == "C`"
+    assert args.small == "o3"
+    assert args.special is False
+
+
+def test_retractions_parse_args_special():
+    """Parse args with --special flag."""
+    from pycliques.retractions import _parse_args
+
+    args = _parse_args(["0", "--special", "C`"])
+    assert args.special is True
+    assert args.small is None
+
+
+def test_retractions_parse_args_verbose():
+    """Parse args with -v flag."""
+    import logging
+
+    from pycliques.retractions import _parse_args
+
+    args = _parse_args(["0", "-v", "C`", "o3"])
+    assert args.loglevel == logging.INFO
+
+
+def test_retractions_parse_args_no_small_without_special():
+    """Omitting 'small' without --special is an error."""
+    from pycliques.retractions import _parse_args
+
+    with pytest.raises(SystemExit):
+        _parse_args(["0", "C`"])
+
+
+def test_retractions_main_special_found(capsys):
+    """CLI special mode on the octahedral graph finds octahedra."""
+    from pycliques.retractions import _main
+
+    # Octahedral graph in g6 format
+    g6 = nx.to_graph6_bytes(nx.octahedral_graph(), header=False).decode().strip()
+    _main(["0", "--special", g6])
+    captured = capsys.readouterr()
+    assert "Found" in captured.out
+
+
+def test_retractions_main_special_not_found(capsys):
+    """CLI special mode on a cycle graph does not find octahedra."""
+    from pycliques.retractions import _main
+
+    g6 = nx.to_graph6_bytes(nx.cycle_graph(5), header=False).decode().strip()
+    _main(["0", "--special", g6])
+    captured = capsys.readouterr()
+    assert "could not find" in captured.out.lower()
+
+
+def test_retractions_main_general_found(capsys):
+    """CLI general mode finds a retraction of octahedron to itself."""
+    from pycliques.retractions import _main
+
+    g6 = nx.to_graph6_bytes(nx.octahedral_graph(), header=False).decode().strip()
+    _main(["0", g6, "o3"])
+    captured = capsys.readouterr()
+    assert "Found" in captured.out
+
+
+def test_retractions_main_general_not_found(capsys):
+    """CLI general mode reports failure for impossible retractions."""
+    from pycliques.retractions import _main
+
+    g6 = nx.to_graph6_bytes(nx.cycle_graph(5), header=False).decode().strip()
+    _main(["0", g6, "o3"])
+    captured = capsys.readouterr()
+    assert "could not find" in captured.out.lower()
+
+
+def test_retractions_main_with_iteration(capsys):
+    """CLI with n>=1 iterates the clique operator before searching."""
+    from pycliques.retractions import _main
+
+    g6 = nx.to_graph6_bytes(nx.cycle_graph(5), header=False).decode().strip()
+    _main(["1", "--special", g6])
+    captured = capsys.readouterr()
+    # After 1 clique-graph iteration, C5 stays C5; no special octahedra
+    assert "could not find" in captured.out.lower()
+
+
+def test_retractions_setup_logging_none():
+    """_setup_logging with None does nothing."""
+    from pycliques.retractions import _setup_logging
+
+    _setup_logging(None)
+
+
+def test_retractions_setup_logging_info():
+    """_setup_logging with a level configures logging."""
+    import logging
+
+    from pycliques.retractions import _setup_logging
+
+    _setup_logging(logging.INFO)

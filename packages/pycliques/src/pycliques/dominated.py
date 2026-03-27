@@ -158,20 +158,17 @@ def pared_graph(graph: nx.Graph) -> nx.Graph:
 
     nodes_to_keep = []
     for vertex in reps:
-        # We assume is_dominated_vertex checks against ALL nodes.
         if not is_dominated_vertex(graph, vertex):
             nodes_to_keep.append(vertex)
         else:
-            # If dominated, check if it's only dominated by its own twins
-            dom_info = is_dominated_vertex(graph, vertex, return_dominator=True)
-            if isinstance(dom_info, tuple):
-                dominator = dom_info[1]
-                neigh_v = closed_neighborhood(graph, vertex)
-                neigh_dom = closed_neighborhood(graph, dominator)
-                # If neighborhoods match, they are twins -> Keep rep
-                if neigh_v == neigh_dom:
-                    nodes_to_keep.append(vertex)
-            else:
+            # The vertex is dominated; check if it is only dominated by a twin.
+            # Since is_dominated_vertex returned True, the call with
+            # return_dominator=True is guaranteed to return (True, dominator).
+            _, dominator = is_dominated_vertex(graph, vertex, return_dominator=True)  # type: ignore[misc]
+            neigh_v = closed_neighborhood(graph, vertex)
+            neigh_dom = closed_neighborhood(graph, dominator)
+            # If neighborhoods match, they are twins -> keep representative
+            if neigh_v == neigh_dom:
                 nodes_to_keep.append(vertex)
 
     return graph.subgraph(nodes_to_keep).copy()

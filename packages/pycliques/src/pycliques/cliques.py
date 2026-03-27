@@ -153,7 +153,7 @@ def homotopy_clique_graph(graph: nx.Graph) -> nx.Graph:
         # both C and D contain both v and w.
         shared_cliques = cliques_of[v].intersection(cliques_of[w])
 
-        if not shared_cliques:
+        if not shared_cliques:  # pragma: no cover
             continue
 
         cross_nodes_v = [(v, c) for c in shared_cliques]

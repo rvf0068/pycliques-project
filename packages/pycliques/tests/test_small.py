@@ -1,4 +1,5 @@
 import networkx as nx
+import pytest
 from pycliques.retractions import retracts
 from pycliques.small import eventually_retracts_specially, is_eventually_helly
 from pyg6data.lists import list_graphs
@@ -37,3 +38,65 @@ def test_eventually_retracts():
     g = list_graphs(8)[11045]
     assert retracts(g, nx.octahedral_graph()) is False
     assert eventually_retracts_specially(g)
+
+
+# ---------- Coverage for is_eventually_helly edge cases ----------
+
+
+def test_is_eventually_helly_bound_exceeded():
+    """When the clique bound is exceeded, is_eventually_helly returns False."""
+    # The octahedral graph is NOT clique-Helly and has 8 maximal cliques.
+    # With bound=3, clique_graph will return None.
+    assert is_eventually_helly(nx.octahedral_graph(), bound=3) is False
+
+
+def test_is_eventually_helly_tries_exhausted():
+    """When tries are exhausted without finding a Helly iterate, return False."""
+    # With tries=0, the loop never runs.  The octahedral graph is not Helly.
+    assert is_eventually_helly(nx.octahedral_graph(), tries=0) is False
+
+
+# ---------- Coverage for eventually_retracts_specially edge cases ----------
+
+
+def test_eventually_retracts_specially_bound_exceeded():
+    """When the clique bound is exceeded, return None."""
+    # C6 has no special octahedra, and clique_graph(C6, bound=1) returns None.
+    assert eventually_retracts_specially(nx.cycle_graph(6), bound=1) is None
+
+
+# ---------- CLI tests for small-behavior ----------
+
+
+def test_small_parse_args():
+    """_parse_args parses the graph order correctly."""
+    from pycliques.small import _parse_args
+
+    args = _parse_args(["6"])
+    assert args.n == 6
+
+
+def test_small_parse_args_verbose():
+    """_parse_args sets DEBUG loglevel with -v."""
+    import logging
+
+    from pycliques.small import _parse_args
+
+    args = _parse_args(["-v", "6"])
+    assert args.loglevel == logging.DEBUG
+
+
+def test_small_main_invalid_order(capsys):
+    """_main exits with error for unavailable order."""
+    from pycliques.small import _main
+
+    with pytest.raises(SystemExit):
+        _main(["5"])
+
+
+def test_small_main_runs_successfully():
+    """_main completes for order 6 (112 connected graphs)."""
+    from pycliques.small import _main
+
+    # This processes all 112 connected graphs on 6 vertices.
+    _main(["6"])

@@ -59,3 +59,33 @@ def test_completely_pared_graph_leaves_single_vertex():
 def test_is_dismantlable_distinguishes_graphs():
     assert is_dismantlable(nx.path_graph(4))
     assert not is_dismantlable(nx.cycle_graph(4))
+
+
+# ---------- Coverage for remove_dominated_vertex ----------
+
+
+def test_remove_dominated_vertex_removes_leaf():
+    """remove_dominated_vertex removes the first dominated vertex."""
+    from pycliques.dominated import remove_dominated_vertex
+
+    result = remove_dominated_vertex(nx.path_graph(4))
+    assert sorted(result.nodes()) == [1, 2, 3]
+
+
+def test_remove_dominated_vertex_no_dominated():
+    """When no vertex is dominated, the graph is returned unchanged."""
+    from pycliques.dominated import remove_dominated_vertex
+
+    g = nx.cycle_graph(4)
+    result = remove_dominated_vertex(g)
+    assert sorted(result.nodes()) == [0, 1, 2, 3]
+
+
+# ---------- Coverage for pared_index with return_cp ----------
+
+
+def test_pared_index_with_return_cp():
+    """pared_index with return_cp=True returns a tuple."""
+    pi, cp = pared_index(nx.path_graph(4), return_cp=True)
+    assert pi == 2
+    assert isinstance(cp, nx.Graph)

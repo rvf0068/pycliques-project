@@ -84,6 +84,13 @@ def test_complex_inequality():
     assert sc1 != sc2
 
 
+def test_complex_not_equal_to_non_complex():
+    """Comparing a SimplicialComplex with a non-complex returns False."""
+    sc = SimplicialComplex({0, 1}, facet_set=[{0, 1}])
+    assert sc != 42
+    assert sc != "not a complex"
+
+
 def test_complex_repr():
     """Repr mentions vertex_set and facets."""
     sc = SimplicialComplex({0}, facet_set=[{0}])

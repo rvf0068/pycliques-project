@@ -25,3 +25,11 @@ def test_clique_graph_supports_coaffine_pair():
     assert isinstance(result, CoaffinePair)
     assert result.graph.number_of_nodes() == 4
     assert set(result.coaffination.keys()) == set(result.graph.nodes)
+
+
+def test_clique_graph_coaffine_pair_bound_exceeded():
+    """When the clique count exceeds the bound, the dispatch returns None."""
+    graph = nx.cycle_graph(6)
+    pair = CoaffinePair(graph, {0: 3, 1: 4, 2: 5, 3: 0, 4: 1, 5: 2})
+    result = clique_graph(pair, bound=2)
+    assert result is None

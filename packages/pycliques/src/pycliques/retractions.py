@@ -329,26 +329,27 @@ def special_octahedra(graph: nx.Graph) -> bool:
     """Check for retractions to special octahedra in the graph.
 
     This works by finding mutually disjoint edges in the complement graph
-        with no cross-edges between them, which correspond to induced
-        octahedra in the original graph.
-        .. rubric:: Parameters
+    with no cross-edges between them, which correspond to induced
+    octahedra in the original graph.
 
-        graph : networkx.Graph
-            Input graph.
+    .. rubric:: Parameters
 
-        .. rubric:: Returns
+    graph : networkx.Graph
+        Input graph.
 
-        bool
-            ``True`` if ``graph`` contains a special octahedron.
+    .. rubric:: Returns
 
-        .. rubric:: Examples
+    bool
+        ``True`` if ``graph`` contains a special octahedron.
 
-        >>> import networkx as nx
-        >>> from pycliques.retractions import special_octahedra
-        >>> special_octahedra(nx.octahedral_graph())
-        True
-        >>> special_octahedra(nx.cycle_graph(5))
-        False
+    .. rubric:: Examples
+
+    >>> import networkx as nx
+    >>> from pycliques.retractions import special_octahedra
+    >>> special_octahedra(nx.octahedral_graph())
+    True
+    >>> special_octahedra(nx.cycle_graph(5))
+    False
     """
     c_graph = nx.complement(graph)
     edges_complement = list(c_graph.edges())
@@ -514,10 +515,10 @@ def _main(args: list[str]):
     _logger.info("Script ends here")
 
 
-def main():
+def main():  # pragma: no cover
     """Entry point for console_scripts."""
     _main(sys.argv[1:])
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

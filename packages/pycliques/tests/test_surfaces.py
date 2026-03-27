@@ -46,3 +46,21 @@ def test_is_surface_accepts_path_neighborhoods():
 def test_is_surface():
     graph = nx.icosahedral_graph()
     assert is_surface(graph)
+
+
+# ---------- Empty graph edge cases ----------
+
+
+def test_is_regular_empty_graph():
+    """An empty graph is vacuously regular for any k."""
+    assert is_regular(nx.empty_graph(0), 2)
+
+
+def test_is_cycle_empty_graph():
+    """An empty graph is not a cycle."""
+    assert not is_cycle(nx.empty_graph(0))
+
+
+def test_is_path_empty_graph():
+    """An empty graph is not a path."""
+    assert not is_path(nx.empty_graph(0))

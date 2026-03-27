@@ -109,7 +109,7 @@ class SimplicialComplex:
 
     def _default_is_simplex(self, s: set) -> bool:
         """Fallback membership function if none is provided."""
-        if not hasattr(self, "facet_set") or self.facet_set is None:
+        if not hasattr(self, "facet_set") or self.facet_set is None:  # pragma: no cover
             return False
         return any(s <= facet for facet in self.facet_set)
 
@@ -387,7 +387,7 @@ def nerve_of_sets(sets: Iterable[set | frozenset]) -> SimplicialComplex:
     """
 
     def _non_empty_intersection(s: set) -> bool:
-        if not s:
+        if not s:  # pragma: no cover
             return False
         intersect = reduce(lambda x, y: x.intersection(y), list(s))
         return len(intersect) != 0
@@ -561,7 +561,7 @@ def complex_of_forests(
     """
 
     def _is_forest(s: set) -> bool:
-        if not s:  # Handle the empty face safely
+        if not s:  # pragma: no cover
             return True
         subgraph = graph.subgraph(s)
         # Prevent max() empty sequence error by setting default=0

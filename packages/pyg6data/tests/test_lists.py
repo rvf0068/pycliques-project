@@ -41,3 +41,14 @@ def test_small_torsion_graphs():
     assert isinstance(torsion_graphs, list)
     assert len(torsion_graphs) > 0
     assert isinstance(torsion_graphs[0], nx.Graph)
+
+
+# ---------- Coverage for non-gzip file reading (lines 75-79) ----------
+
+
+def test_graph_generator_non_gzip():
+    """Test the non-gzip file path (e.g., graph5.g6)."""
+    graphs = list(graph_generator(n=5, connected=False))
+    assert len(graphs) > 0
+    assert all(isinstance(g, nx.Graph) for g in graphs)
+    assert all(g.number_of_nodes() == 5 for g in graphs)

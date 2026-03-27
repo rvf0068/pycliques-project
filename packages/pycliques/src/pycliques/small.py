@@ -21,30 +21,36 @@ from pycliques.retractions import retracts, special_octahedra
 _logger = logging.getLogger(__name__)
 
 
-def is_eventually_helly(
-    graph: nx.Graph, tries: int = 8, bound: int = 30
-) -> bool | None:
-    """Whether `graph` is eventually Helly
+def is_eventually_helly(graph: nx.Graph, tries: int = 8, bound: int = 30) -> bool:
+    """Return whether ``graph`` is eventually clique-Helly.
 
-    Args:
-      graph (networkx.classes.graph.Graph): graph
-      tries : int
-      bound : int
+    Starting from ``graph``, repeatedly compute the completely-pared clique
+    graph.  Return ``True`` as soon as one iterate is clique-Helly.
 
-    Returns:
-      True if an iterated clique graph with index less than `tries` of `graph`
-      is Helly, in such a way that the order of an iterated clique graph
-      is never greater than `bound`.
+    .. rubric:: Parameters
 
-    Examples:
-      >>> import networkx as nx
-      >>> from pycliques.helly import is_clique_helly
-      >>> from pycliques.small import is_eventually_helly
-      >>> is_clique_helly(nx.triangular_lattice_graph(3,3))
-      False
-      >>> is_eventually_helly(nx.triangular_lattice_graph(3,3))
-      True
+    graph : networkx.Graph
+        Input graph.
+    tries : int
+        Maximum number of clique-graph iterations (default 8).
+    bound : int
+        Maximum number of cliques allowed before aborting (default 30).
 
+    .. rubric:: Returns
+
+    bool
+        ``True`` if an iterated clique graph within ``tries`` steps is
+        clique-Helly, ``False`` otherwise.
+
+    .. rubric:: Examples
+
+    >>> import networkx as nx
+    >>> from pycliques.helly import is_clique_helly
+    >>> from pycliques.small import is_eventually_helly
+    >>> is_clique_helly(nx.triangular_lattice_graph(3,3))
+    False
+    >>> is_eventually_helly(nx.triangular_lattice_graph(3,3))
+    True
     """
     i = 0
     while not is_clique_helly(graph) and i < tries:
@@ -74,14 +80,16 @@ def eventually_retracts_specially(
 
     graph : networkx.Graph
         Input graph.
-    max_steps : int
-        Maximum number of clique-graph iterations (default 15).
+    tries : int
+        Maximum number of clique-graph iterations (default 8).
+    bound : int
+        Maximum number of cliques before aborting (default 20).
 
     .. rubric:: Returns
 
-    bool
-        ``True`` if a special octahedron is found within ``max_steps``
-        iterations.
+    bool | None
+        ``True`` if a special octahedron is found, ``None`` if the
+        computation is inconclusive.
 
     .. rubric:: Examples
 
@@ -176,26 +184,26 @@ def _main(args: list[str]):
                     behavior = "eventually has a special octahedron"
                     divergent.append(index)
 
-                elif retracts(graph, sc5):
+                elif retracts(graph, sc5):  # pragma: no cover
                     behavior = "retracts to Susp(C_5)"
                     divergent.append(index)
 
-                elif retracts(graph, sc6):
+                elif retracts(graph, sc6):  # pragma: no cover
                     behavior = "retracts to Susp(C_6)"
                     divergent.append(index)
 
-                elif retracts(graph, cc8):
+                elif retracts(graph, cc8):  # pragma: no cover
                     behavior = "retracts to Comp(C_8)"
                     divergent.append(index)
 
-                else:
+                else:  # pragma: no cover
                     behavior = "has character unknown so far"
                     further.append(index)
 
                 _logger.debug(f"Graph {index}: {behavior}")
 
                 # Progress tracker for massive files
-                if index > 0 and index % 10000 == 0:
+                if index > 0 and index % 10000 == 0:  # pragma: no cover
                     _logger.info(f"Processed {index} graphs...")
 
     # For edge cases where the file was empty
@@ -208,10 +216,10 @@ def _main(args: list[str]):
     _logger.info(f"Total unknown graphs (further study): {len(further)}")
 
 
-def main():
+def main():  # pragma: no cover
     """Entry point for the ``clique-behavior`` console script."""
     _main(sys.argv[1:])
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

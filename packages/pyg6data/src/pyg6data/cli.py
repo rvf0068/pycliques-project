@@ -112,5 +112,5 @@ def main(args=None):
     print(f"Success! Extracted {extracted_count} graphs.")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()
