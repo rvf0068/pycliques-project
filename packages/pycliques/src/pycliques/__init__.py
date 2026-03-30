@@ -42,7 +42,10 @@ from .retractions import (
     retracts_to,
     special_octahedra,
 )
-from .small import eventually_retracts_specially
+from .small import (
+    eventually_retracts_specially,
+    is_eventually_helly,
+)
 from .surfaces import (
     is_closed_surface,
     is_cycle,
@@ -98,6 +101,7 @@ __all__ = [
     "special_octahedra",
     # small
     "eventually_retracts_specially",
+    "is_eventually_helly",
     # surfaces
     "is_closed_surface",
     "is_cycle",

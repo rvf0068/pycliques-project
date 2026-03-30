@@ -13,6 +13,7 @@ from rich.logging import RichHandler
 
 from pycliques import __version__
 from pycliques.cliques import clique_graph
+from pycliques.clockwork import is_clique_divergent_clockwork, recognize_clockwork
 from pycliques.dominated import completely_pared_graph
 from pycliques.helly import is_clique_helly
 from pycliques.named import complement_of_cycle, suspension_of_cycle
@@ -175,10 +176,27 @@ def _main(args: list[str]):
                 assert isinstance(line, str)
                 graph = nx.from_graph6_bytes(bytes(line.strip(), "utf-8"))
                 behavior = ""
+                graph = completely_pared_graph(graph)
 
                 if is_eventually_helly(graph):
                     behavior = "is eventually Helly"
                     convergent.append(index)
+
+                elif recognize_clockwork(graph)[0]:
+                    if is_clique_divergent_clockwork(graph):
+                        behavior = "is clockwork divergent"
+                        divergent.append(index)
+                    else:
+                        behavior = "is clockwork convergent"
+                        convergent.append(index)
+
+                elif recognize_clockwork(clique_graph(graph))[0]:
+                    if is_clique_divergent_clockwork(clique_graph(graph)):
+                        behavior = "is clockwork divergent"
+                        divergent.append(index)
+                    else:
+                        behavior = "is clockwork convergent"
+                        convergent.append(index)
 
                 elif eventually_retracts_specially(graph):
                     behavior = "eventually has a special octahedron"
