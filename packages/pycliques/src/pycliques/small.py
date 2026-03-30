@@ -6,6 +6,8 @@ import argparse
 import gzip
 import logging
 import sys
+from collections.abc import Callable
+from enum import Enum, auto
 from pathlib import Path
 
 import networkx as nx
@@ -21,6 +23,121 @@ from pycliques.named import complement_of_cycle, suspension_of_cycle
 from pycliques.retractions import retracts, special_octahedra
 
 _logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Verdict enum and CliqueSequence
+# ---------------------------------------------------------------------------
+
+
+class Verdict(Enum):
+    """Classification outcome for a graph's clique behavior."""
+
+    CONVERGENT = auto()
+    DIVERGENT = auto()
+
+
+#: Type alias for a classifier function.
+ClassifierResult = tuple[Verdict, str] | None
+Classifier = Callable[["CliqueSequence"], ClassifierResult]
+
+
+class CliqueSequence:
+    """Lazily computed, cached sequence of iterated pared clique graphs.
+
+    ``seq[0]`` is the original (pared) graph.  ``seq[i]`` for *i > 0* is
+    the completely-pared clique graph of ``seq[i-1]``.  Each level is
+    computed at most once.
+
+    .. rubric:: Parameters
+
+    graph : networkx.Graph
+        Starting (already pared) graph.
+    bound : int
+        Maximum number of cliques before aborting (default 30).
+
+    .. rubric:: Examples
+
+    >>> import networkx as nx
+    >>> from pycliques.small import CliqueSequence
+    >>> seq = CliqueSequence(nx.octahedral_graph())
+    >>> seq[0].order()
+    6
+    """
+
+    def __init__(self, graph: nx.Graph, bound: int = 30) -> None:
+        self._graphs: list[nx.Graph] = [graph]
+        self._bound = bound
+        self._exhausted = False
+
+    def __getitem__(self, i: int) -> nx.Graph | None:
+        """Return the *i*-th iterated pared clique graph, or ``None``."""
+        while len(self._graphs) <= i and not self._exhausted:
+            kg = clique_graph(self._graphs[-1], self._bound)
+            if kg is None:
+                self._exhausted = True
+                return None
+            self._graphs.append(completely_pared_graph(kg))
+        if i < len(self._graphs):
+            return self._graphs[i]
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Classifier functions
+# ---------------------------------------------------------------------------
+
+_MAX_ITERATIONS = 9
+
+
+def _test_eventually_helly(seq: CliqueSequence) -> ClassifierResult:
+    """Convergent if some iterate is clique-Helly."""
+    for i in range(_MAX_ITERATIONS):
+        g = seq[i]
+        if g is None:
+            return None
+        if is_clique_helly(g):
+            _logger.debug(f"Helly of index {i}")
+            return (Verdict.CONVERGENT, "is eventually Helly")
+    return None
+
+
+def _test_clockwork(seq: CliqueSequence) -> ClassifierResult:
+    """Check clockwork recognition on seq[0] and seq[1]."""
+    for i in range(2):
+        g = seq[i]
+        if g is None:
+            return None
+        if recognize_clockwork(g)[0]:
+            if is_clique_divergent_clockwork(g):
+                return (Verdict.DIVERGENT, "is clockwork divergent")
+            return (Verdict.CONVERGENT, "is clockwork convergent")
+    return None
+
+
+def _test_eventually_special_octahedra(seq: CliqueSequence) -> ClassifierResult:
+    """Divergent if some iterate contains a special octahedron."""
+    for i in range(_MAX_ITERATIONS):
+        g = seq[i]
+        if g is None:
+            return None
+        if special_octahedra(g):
+            _logger.debug(f"Index {i} has induced special octahedra")
+            return (Verdict.DIVERGENT, "eventually has a special octahedron")
+    return None
+
+
+def _make_retraction_test(target: nx.Graph, label: str) -> Classifier:
+    """Return a classifier that checks whether ``seq[0]`` retracts to *target*."""
+
+    def _test(seq: CliqueSequence) -> ClassifierResult:
+        g = seq[0]
+        if g is not None and retracts(g, target):
+            return (Verdict.DIVERGENT, label)
+        return None
+
+    return _test
+
 
 _DEFAULT_DATA_DIR = Path(".")
 
@@ -252,20 +369,25 @@ def _main(args: list[str]):
         _logger.error(f"Error: Internal data for order {order} not available.")
         sys.exit(1)
 
-    # 1. Precompute expensive targets ONCE
+    # 1. Build the classifier pipeline
     _logger.info("Precomputing target mathematical structures...")
-    sc5 = suspension_of_cycle(5)
-    sc6 = suspension_of_cycle(6)
-    cc8 = complement_of_cycle(8)
+    classifiers: list[Classifier] = [
+        _test_eventually_helly,
+        _test_clockwork,
+        _test_eventually_special_octahedra,
+        _make_retraction_test(suspension_of_cycle(5), "retracts to Susp(C_5)"),
+        _make_retraction_test(suspension_of_cycle(6), "retracts to Susp(C_6)"),
+        _make_retraction_test(complement_of_cycle(8), "retracts to Comp(C_8)"),
+    ]
 
     # Load previously saved indeterminate graphs for smaller orders
     known_indeterminate: dict[int, list[nx.Graph]] = {}
     if lookup:
         known_indeterminate = _load_indeterminate_graphs(order, data_dir)
 
-    convergent = []
-    divergent = []
-    further = []
+    convergent: list[int] = []
+    divergent: list[int] = []
+    further: list[int] = []
     further_pared: list[tuple[int, nx.Graph]] = []
     further_graphs: list[tuple[int, nx.Graph]] = []
 
@@ -273,70 +395,33 @@ def _main(args: list[str]):
 
     # 2. Securely resolve the dataset path
     data_path = _get_data_file_path(_dict_connected[order])
+    index = -1
 
     with data_path.open("rb") as raw_file:
         with gzip.open(raw_file, "rt", encoding="utf-8") as graph_file:
             for index, line in enumerate(graph_file):
                 assert isinstance(line, str)
                 graph = nx.from_graph6_bytes(bytes(line.strip(), "utf-8"))
-                behavior = ""
                 graph = completely_pared_graph(graph)
 
-                if known_indeterminate and _is_known_indeterminate(
-                    graph, known_indeterminate
-                ):
-                    behavior = "reduces to known indeterminate graph"
-                    further_pared.append((index, graph))
-
-                elif is_eventually_helly(graph):
-                    behavior = "is eventually Helly"
-                    convergent.append(index)
-
-                elif recognize_clockwork(graph)[0]:
-                    if is_clique_divergent_clockwork(graph):
-                        behavior = "is clockwork divergent"
-                        divergent.append(index)
-                    else:
-                        behavior = "is clockwork convergent"
-                        convergent.append(index)
-
-                elif recognize_clockwork(clique_graph(graph))[0]:
-                    if is_clique_divergent_clockwork(clique_graph(graph)):
-                        behavior = "is clockwork divergent"
-                        divergent.append(index)
-                    else:
-                        behavior = "is clockwork convergent"
-                        convergent.append(index)
-
-                elif eventually_retracts_specially(graph):
-                    behavior = "eventually has a special octahedron"
-                    divergent.append(index)
-
-                elif retracts(graph, sc5):  # pragma: no cover
-                    behavior = "retracts to Susp(C_5)"
-                    divergent.append(index)
-
-                elif retracts(graph, sc6):  # pragma: no cover
-                    behavior = "retracts to Susp(C_6)"
-                    divergent.append(index)
-
-                elif retracts(graph, cc8):  # pragma: no cover
-                    behavior = "retracts to Comp(C_8)"
-                    divergent.append(index)
-
-                else:  # pragma: no cover
-                    behavior = "has character unknown so far"
-                    further.append(index)
-                    further_graphs.append((index, graph))
+                behavior = _classify_graph(
+                    graph,
+                    classifiers,
+                    known_indeterminate,
+                    index,
+                    convergent,
+                    divergent,
+                    further,
+                    further_pared,
+                    further_graphs,
+                )
 
                 _logger.debug(f"Graph {index}: {behavior}")
 
-                # Progress tracker for massive files
                 if index > 0 and index % 10000 == 0:  # pragma: no cover
                     _logger.info(f"Processed {index} graphs...")
 
-    # For edge cases where the file was empty
-    total_processed = index + 1 if "index" in locals() else 0
+    total_processed = index + 1 if index >= 0 else 0
 
     _logger.info(f"Analysis Complete! Processed {total_processed} total graphs.")
     _logger.info(f"Indices that deserve further study: {further}")
@@ -347,6 +432,42 @@ def _main(args: list[str]):
 
     if save and further_graphs:
         _save_indeterminate(order, further_graphs, data_dir)
+
+
+def _classify_graph(
+    graph: nx.Graph,
+    classifiers: list[Classifier],
+    known_indeterminate: dict[int, list[nx.Graph]],
+    index: int,
+    convergent: list[int],
+    divergent: list[int],
+    further: list[int],
+    further_pared: list[tuple[int, nx.Graph]],
+    further_graphs: list[tuple[int, nx.Graph]],
+) -> str:
+    """Run the classifier pipeline on a single pared graph.
+
+    Returns the behavior description string for logging.
+    """
+    if known_indeterminate and _is_known_indeterminate(graph, known_indeterminate):
+        further_pared.append((index, graph))
+        return "reduces to known indeterminate graph"
+
+    seq = CliqueSequence(graph)
+
+    for classifier in classifiers:
+        result = classifier(seq)
+        if result is not None:
+            verdict, behavior = result
+            if verdict is Verdict.CONVERGENT:
+                convergent.append(index)
+            else:
+                divergent.append(index)
+            return behavior
+
+    further.append(index)
+    further_graphs.append((index, graph))
+    return "has character unknown so far"
 
 
 def main():  # pragma: no cover
