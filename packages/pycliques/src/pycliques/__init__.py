@@ -4,6 +4,15 @@ __version__ = "0.1.0"
 
 from .cliques import Clique, clique_graph, homotopy_clique_graph
 from .coaffinations import CoaffinePair, automorphisms, coaffinations
+from .cutpoints import (
+    cutpoint_edge_contractions,
+    cutpoint_edge_removals,
+    cutpoint_reductions,
+    has_local_cutpoints,
+    local_cutpoints,
+    neighborhood_components,
+    reduction_retracts_to,
+)
 from .dominated import (
     closed_neighborhood,
     completely_pared_graph,
@@ -43,6 +52,8 @@ from .retractions import (
     special_octahedra,
 )
 from .small import (
+    CliqueSequence,
+    Verdict,
     eventually_retracts_specially,
     is_eventually_helly,
 )
@@ -65,6 +76,14 @@ __all__ = [
     "CoaffinePair",
     "automorphisms",
     "coaffinations",
+    # cutpoints
+    "cutpoint_edge_contractions",
+    "cutpoint_edge_removals",
+    "cutpoint_reductions",
+    "has_local_cutpoints",
+    "local_cutpoints",
+    "neighborhood_components",
+    "reduction_retracts_to",
     # dominated
     "closed_neighborhood",
     "completely_pared_graph",
@@ -100,6 +119,8 @@ __all__ = [
     "retracts_to",
     "special_octahedra",
     # small
+    "CliqueSequence",
+    "Verdict",
     "eventually_retracts_specially",
     "is_eventually_helly",
     # surfaces
