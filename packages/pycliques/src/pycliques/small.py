@@ -6,6 +6,7 @@ import argparse
 import gzip
 import logging
 import sys
+from pathlib import Path
 
 import networkx as nx
 from pyg6data.lists import _dict_connected, _get_data_file_path
@@ -20,6 +21,78 @@ from pycliques.named import complement_of_cycle, suspension_of_cycle
 from pycliques.retractions import retracts, special_octahedra
 
 _logger = logging.getLogger(__name__)
+
+_DEFAULT_DATA_DIR = Path(".")
+
+
+def _indeterminate_file_path(order: int, data_dir: Path) -> Path:
+    """Return the path for the indeterminate-graphs file of a given order."""
+    return data_dir / f"indeterminate_order_{order}.txt"
+
+
+def _save_indeterminate(
+    order: int,
+    indeterminate: list[tuple[int, nx.Graph]],
+    data_dir: Path,
+) -> None:
+    """Save indeterminate pared graphs to a human-readable file.
+
+    Each line contains the original graph index, the order of the pared
+    graph, and its graph6 string.
+    """
+    path = _indeterminate_file_path(order, data_dir)
+    with path.open("w", encoding="utf-8") as f:
+        f.write(
+            f"# Indeterminate clique behavior – connected graphs of order {order}\n"
+        )
+        f.write("# Format: original_index pared_order graph6\n")
+        for idx, graph in indeterminate:
+            g = nx.convert_node_labels_to_integers(graph)
+            g6 = nx.to_graph6_bytes(g, header=False).decode("ascii").strip()
+            f.write(f"{idx} {g.order()} {g6}\n")
+    _logger.info(f"Saved {len(indeterminate)} indeterminate graphs to {path}")
+
+
+def _load_indeterminate_graphs(
+    max_order: int,
+    data_dir: Path,
+) -> dict[int, list[nx.Graph]]:
+    """Load indeterminate graphs from files for all orders less than *max_order*.
+
+    .. rubric:: Returns
+
+    dict[int, list[nx.Graph]]
+        Graphs grouped by their vertex count so that lookups only need to
+        test isomorphism against candidates of the same size.
+    """
+    by_vertex_count: dict[int, list[nx.Graph]] = {}
+    for order in range(1, max_order):
+        path = _indeterminate_file_path(order, data_dir)
+        if not path.is_file():
+            continue
+        count = 0
+        with path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                parts = line.split()
+                g6_str = parts[2]
+                graph = nx.from_graph6_bytes(g6_str.encode("ascii"))
+                n = graph.order()
+                by_vertex_count.setdefault(n, []).append(graph)
+                count += 1
+        _logger.info(f"Loaded {count} indeterminate graphs from order-{order} file")
+    return by_vertex_count
+
+
+def _is_known_indeterminate(
+    graph: nx.Graph,
+    known: dict[int, list[nx.Graph]],
+) -> bool:
+    """Return whether *graph* is isomorphic to any known indeterminate graph."""
+    candidates = known.get(graph.order(), [])
+    return any(nx.is_isomorphic(graph, c) for c in candidates)
 
 
 def is_eventually_helly(graph: nx.Graph, tries: int = 8, bound: int = 30) -> bool:
@@ -134,6 +207,27 @@ def _parse_args(args: list[str]) -> argparse.Namespace:
         const=logging.DEBUG,
         default=logging.INFO,
     )
+    parser.add_argument(
+        "--no-save",
+        dest="save",
+        help="Do not save indeterminate graphs to file",
+        action="store_false",
+        default=True,
+    )
+    parser.add_argument(
+        "--no-lookup",
+        dest="lookup",
+        help="Do not look up pared graphs in prior indeterminate files",
+        action="store_false",
+        default=True,
+    )
+    parser.add_argument(
+        "--data-dir",
+        dest="data_dir",
+        help="Directory for indeterminate graph files (default: current directory)",
+        type=Path,
+        default=_DEFAULT_DATA_DIR,
+    )
     return parser.parse_args(args)
 
 
@@ -150,6 +244,9 @@ def _main(args: list[str]):
     _setup_logging(parsed_args.loglevel)
 
     order = parsed_args.n
+    save = parsed_args.save
+    lookup = parsed_args.lookup
+    data_dir: Path = parsed_args.data_dir
 
     if order not in _dict_connected:
         _logger.error(f"Error: Internal data for order {order} not available.")
@@ -161,9 +258,16 @@ def _main(args: list[str]):
     sc6 = suspension_of_cycle(6)
     cc8 = complement_of_cycle(8)
 
+    # Load previously saved indeterminate graphs for smaller orders
+    known_indeterminate: dict[int, list[nx.Graph]] = {}
+    if lookup:
+        known_indeterminate = _load_indeterminate_graphs(order, data_dir)
+
     convergent = []
     divergent = []
     further = []
+    further_pared: list[tuple[int, nx.Graph]] = []
+    further_graphs: list[tuple[int, nx.Graph]] = []
 
     _logger.info(f"Beginning analysis of connected graphs of order {order}...")
 
@@ -178,7 +282,13 @@ def _main(args: list[str]):
                 behavior = ""
                 graph = completely_pared_graph(graph)
 
-                if is_eventually_helly(graph):
+                if known_indeterminate and _is_known_indeterminate(
+                    graph, known_indeterminate
+                ):
+                    behavior = "reduces to known indeterminate graph"
+                    further_pared.append((index, graph))
+
+                elif is_eventually_helly(graph):
                     behavior = "is eventually Helly"
                     convergent.append(index)
 
@@ -217,6 +327,7 @@ def _main(args: list[str]):
                 else:  # pragma: no cover
                     behavior = "has character unknown so far"
                     further.append(index)
+                    further_graphs.append((index, graph))
 
                 _logger.debug(f"Graph {index}: {behavior}")
 
@@ -231,7 +342,11 @@ def _main(args: list[str]):
     _logger.info(f"Indices that deserve further study: {further}")
     _logger.info(f"Total convergent graphs: {len(convergent)}")
     _logger.info(f"Total divergent graphs: {len(divergent)}")
+    _logger.info(f"Total graphs reduced to unknown: {len(further_pared)}")
     _logger.info(f"Total unknown graphs (further study): {len(further)}")
+
+    if save and further_graphs:
+        _save_indeterminate(order, further_graphs, data_dir)
 
 
 def main():  # pragma: no cover
