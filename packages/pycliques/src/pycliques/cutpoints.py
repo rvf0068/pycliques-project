@@ -22,7 +22,7 @@ _logger = logging.getLogger(__name__)
 _logger.addHandler(logging.NullHandler())
 
 
-def local_cutpoints(graph: nx.Graph) -> Iterator[Hashable]:
+def local_cutpoints(graph: nx.Graph) -> Iterator[int]:
     """Yield the local cutpoints of *graph*.
 
     A vertex *x* is a local cutpoint when its open neighborhood
@@ -35,7 +35,7 @@ def local_cutpoints(graph: nx.Graph) -> Iterator[Hashable]:
 
     .. rubric:: Yields
 
-    Hashable
+    int
         Vertices whose open neighborhood is disconnected.
 
     .. rubric:: Examples
@@ -82,14 +82,14 @@ def has_local_cutpoints(graph: nx.Graph) -> bool:
     return False
 
 
-def neighborhood_components(graph: nx.Graph, x: Hashable) -> list[set[Hashable]]:
+def neighborhood_components(graph: nx.Graph, x: int) -> list[set[Hashable]]:
     """Return the connected components of the open neighborhood of *x*.
 
     .. rubric:: Parameters
 
     graph : networkx.Graph
         Input graph.
-    x : Hashable
+    x : int
         A vertex of *graph*.
 
     .. rubric:: Returns
@@ -132,7 +132,7 @@ def cutpoint_edge_removals(graph: nx.Graph) -> Iterator[nx.Graph]:
 
     >>> import networkx as nx
     >>> from pycliques.cutpoints import cutpoint_edge_removals
-    >>> reductions = list(cutpoint_edge_removals(nx.path_graph(5)))
+    >>> reductions = list(cutpoint_edge_removals(nx.petersen_graph()))
     >>> len(reductions) > 0
     True
     """
@@ -170,7 +170,7 @@ def cutpoint_edge_contractions(graph: nx.Graph) -> Iterator[nx.Graph]:
 
     >>> import networkx as nx
     >>> from pycliques.cutpoints import cutpoint_edge_contractions
-    >>> reductions = list(cutpoint_edge_contractions(nx.path_graph(5)))
+    >>> reductions = list(cutpoint_edge_contractions(nx.petersen_graph()))
     >>> len(reductions) > 0
     True
     """
@@ -233,7 +233,7 @@ def reduction_retracts_to(graph: nx.Graph, target: nx.Graph) -> bool:
 
     >>> import networkx as nx
     >>> from pycliques.cutpoints import reduction_retracts_to
-    >>> reduction_retracts_to(nx.path_graph(5), nx.path_graph(2))
+    >>> reduction_retracts_to(nx.petersen_graph(), nx.cycle_graph(5))
     True
     >>> reduction_retracts_to(nx.complete_graph(4), nx.cycle_graph(4))
     False
