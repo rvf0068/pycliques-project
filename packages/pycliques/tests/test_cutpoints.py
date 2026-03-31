@@ -1,5 +1,4 @@
 import networkx as nx
-import pytest
 from pycliques.cutpoints import (
     cutpoint_edge_contractions,
     cutpoint_edge_removals,
@@ -113,7 +112,7 @@ def test_reduction_retracts_to_false():
 
 
 def test_local_cutpoints_wheel():
-    """The hub of a wheel graph is not a local cutpoint (its neighborhood is a cycle)."""
+    """Hub of a wheel graph is not a local cutpoint (neighborhood is a cycle)."""
     w = nx.wheel_graph(5)  # hub is vertex 0
     cutpts = list(local_cutpoints(w))
     assert 0 not in cutpts
