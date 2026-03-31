@@ -633,6 +633,7 @@ version = "0.1.0"
 source = { editable = "packages/pycliques" }
 dependencies = [
     { name = "networkx" },
+    { name = "rich" },
 ]
 
 [package.optional-dependencies]
@@ -644,6 +645,7 @@ data = [
 requires-dist = [
     { name = "networkx", specifier = ">=3.6" },
     { name = "pyg6data", marker = "extra == 'data'", editable = "packages/pyg6data" },
+    { name = "rich" },
 ]
 provides-extras = ["data"]
 
