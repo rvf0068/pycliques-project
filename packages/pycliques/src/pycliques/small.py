@@ -24,7 +24,6 @@ from pycliques.retractions import retracts, special_octahedra
 
 _logger = logging.getLogger(__name__)
 
-
 # ---------------------------------------------------------------------------
 # Verdict enum and CliqueSequence
 # ---------------------------------------------------------------------------
@@ -45,8 +44,8 @@ Classifier = Callable[["CliqueSequence"], ClassifierResult]
 class CliqueSequence:
     """Lazily computed, cached sequence of iterated pared clique graphs.
 
-    ``seq[0]`` is the original (pared) graph.  ``seq[i]`` for *i > 0* is
-    the completely-pared clique graph of ``seq[i-1]``.  Each level is
+    ``seq[0]`` is the original (pared) graph. ``seq[i]`` for *i > 0* is
+    the completely-pared clique graph of ``seq[i-1]``. Each level is
     computed at most once.
 
     .. rubric:: Parameters
@@ -63,6 +62,7 @@ class CliqueSequence:
     >>> seq = CliqueSequence(nx.octahedral_graph())
     >>> seq[0].order()
     6
+
     """
 
     def __init__(self, graph: nx.Graph, bound: int = 30) -> None:
@@ -156,18 +156,42 @@ def _save_indeterminate(
 
     Each line contains the original graph index, the order of the pared
     graph, and its graph6 string.
+
+    If the file already exists, the new results are merged with the
+    existing entries.  Duplicate indices are resolved in favour of the
+    new run so that re-processing a range always updates the record.
     """
     path = _indeterminate_file_path(order, data_dir)
+
+    # Load existing entries keyed by original index.
+    existing: dict[int, str] = {}
+    if path.is_file():
+        with path.open("r", encoding="utf-8") as f:
+            for line in f:
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#"):
+                    continue
+                parts = stripped.split(maxsplit=2)
+                existing[int(parts[0])] = stripped
+        _logger.info(
+            f"Found existing file with {len(existing)} entries; merging new results"
+        )
+
+    # Build lines for the new entries (overwrite any duplicate index).
+    for idx, graph in indeterminate:
+        g = nx.convert_node_labels_to_integers(graph)
+        g6 = nx.to_graph6_bytes(g, header=False).decode("ascii").strip()
+        existing[idx] = f"{idx} {g.order()} {g6}"
+
+    # Write everything back sorted by index.
     with path.open("w", encoding="utf-8") as f:
         f.write(
             f"# Indeterminate clique behavior – connected graphs of order {order}\n"
         )
         f.write("# Format: original_index pared_order graph6\n")
-        for idx, graph in indeterminate:
-            g = nx.convert_node_labels_to_integers(graph)
-            g6 = nx.to_graph6_bytes(g, header=False).decode("ascii").strip()
-            f.write(f"{idx} {g.order()} {g6}\n")
-    _logger.info(f"Saved {len(indeterminate)} indeterminate graphs to {path}")
+        for idx in sorted(existing):
+            f.write(f"{existing[idx]}\n")
+    _logger.info(f"Saved {len(existing)} indeterminate graphs to {path}")
 
 
 def _load_indeterminate_graphs(
@@ -216,7 +240,7 @@ def is_eventually_helly(graph: nx.Graph, tries: int = 8, bound: int = 30) -> boo
     """Return whether ``graph`` is eventually clique-Helly.
 
     Starting from ``graph``, repeatedly compute the completely-pared clique
-    graph.  Return ``True`` as soon as one iterate is clique-Helly.
+    graph. Return ``True`` as soon as one iterate is clique-Helly.
 
     .. rubric:: Parameters
 
@@ -242,6 +266,7 @@ def is_eventually_helly(graph: nx.Graph, tries: int = 8, bound: int = 30) -> boo
     False
     >>> is_eventually_helly(nx.triangular_lattice_graph(3,3))
     True
+
     """
     i = 0
     while not is_clique_helly(graph) and i < tries:
@@ -264,7 +289,7 @@ def eventually_retracts_specially(
     """Check if iterated clique graphs eventually contain a special octahedron.
 
     Starting from ``graph``, repeatedly compute the completely-pared clique
-    graph.  Return ``True`` as soon as one iterate contains a special
+    graph. Return ``True`` as soon as one iterate contains a special
     octahedron (see :func:`pycliques.retractions.special_octahedra`).
 
     .. rubric:: Parameters
@@ -290,19 +315,17 @@ def eventually_retracts_specially(
     >>> g = list_graphs(8)[11045]
     >>> eventually_retracts_specially(g)
     True
+
     """
     g_curr = graph
     for i in range(tries):
         if special_octahedra(g_curr):
             _logger.debug(f"Index {i} has induced special octahedra")
             return True
-
         g_curr = clique_graph(g_curr, bound)
-
         if g_curr is None:
             return None
         g_curr = completely_pared_graph(g_curr)
-
     return None
 
 
@@ -345,6 +368,33 @@ def _parse_args(args: list[str]) -> argparse.Namespace:
         type=Path,
         default=_DEFAULT_DATA_DIR,
     )
+    parser.add_argument(
+        "--start",
+        dest="start",
+        help="First graph index to process, inclusive (default: 0)",
+        type=int,
+        default=None,
+        metavar="INT",
+    )
+    parser.add_argument(
+        "--end",
+        dest="end",
+        help="Last graph index to process, inclusive (default: last graph)",
+        type=int,
+        default=None,
+        metavar="INT",
+    )
+    parser.add_argument(
+        "--output-file",
+        dest="output_file",
+        help=(
+            "Write one verdict line per graph to this file. "
+            "Format: index TAB verdict TAB reason"
+        ),
+        type=Path,
+        default=None,
+        metavar="FILE",
+    )
     return parser.parse_args(args)
 
 
@@ -364,9 +414,24 @@ def _main(args: list[str]):
     save = parsed_args.save
     lookup = parsed_args.lookup
     data_dir: Path = parsed_args.data_dir
+    start: int | None = parsed_args.start
+    end: int | None = parsed_args.end
+    output_file: Path | None = parsed_args.output_file
 
     if order not in _dict_connected:
         _logger.error(f"Error: Internal data for order {order} not available.")
+        sys.exit(1)
+
+    if start is not None and start < 0:
+        _logger.error("--start must be a non-negative integer.")
+        sys.exit(1)
+
+    if end is not None and end < 0:
+        _logger.error("--end must be a non-negative integer.")
+        sys.exit(1)
+
+    if start is not None and end is not None and start > end:
+        _logger.error("--start must be less than or equal to --end.")
         sys.exit(1)
 
     # 1. Build the classifier pipeline
@@ -391,38 +456,62 @@ def _main(args: list[str]):
     further_pared: list[tuple[int, nx.Graph]] = []
     further_graphs: list[tuple[int, nx.Graph]] = []
 
-    _logger.info(f"Beginning analysis of connected graphs of order {order}...")
+    range_msg = ""
+    if start is not None or end is not None:
+        lo = start if start is not None else 0
+        hi = end if end is not None else "last"
+        range_msg = f" (indices {lo}–{hi})"
+    _logger.info(
+        f"Beginning analysis of connected graphs of order {order}{range_msg}..."
+    )
 
     # 2. Securely resolve the dataset path
     data_path = _get_data_file_path(_dict_connected[order])
+
+    import contextlib
+
+    output_ctx = (
+        open(output_file, "w", encoding="utf-8")  # noqa: WPS515
+        if output_file is not None
+        else contextlib.nullcontext()
+    )
+
     index = -1
+    with output_ctx as verdict_file:
+        if verdict_file is not None:
+            verdict_file.write("# index\tverdict\treason\n")
+            _logger.info(f"Writing verdicts to {output_file}")
 
-    with data_path.open("rb") as raw_file:
-        with gzip.open(raw_file, "rt", encoding="utf-8") as graph_file:
-            for index, line in enumerate(graph_file):
-                assert isinstance(line, str)
-                graph = nx.from_graph6_bytes(bytes(line.strip(), "utf-8"))
-                graph = completely_pared_graph(graph)
+        with data_path.open("rb") as raw_file:
+            with gzip.open(raw_file, "rt", encoding="utf-8") as graph_file:
+                for index, line in enumerate(graph_file):
+                    if start is not None and index < start:
+                        continue
+                    if end is not None and index > end:
+                        break
 
-                behavior = _classify_graph(
-                    graph,
-                    classifiers,
-                    known_indeterminate,
-                    index,
-                    convergent,
-                    divergent,
-                    further,
-                    further_pared,
-                    further_graphs,
-                )
+                    assert isinstance(line, str)
+                    graph = nx.from_graph6_bytes(bytes(line.strip(), "utf-8"))
+                    graph = completely_pared_graph(graph)
 
-                _logger.debug(f"Graph {index}: {behavior}")
+                    behavior = _classify_graph(
+                        graph,
+                        classifiers,
+                        known_indeterminate,
+                        index,
+                        convergent,
+                        divergent,
+                        further,
+                        further_pared,
+                        further_graphs,
+                        verdict_file,
+                    )
+                    _logger.debug(f"Graph {index}: {behavior}")
 
-                if index > 0 and index % 10000 == 0:  # pragma: no cover
-                    _logger.info(f"Processed {index} graphs...")
+                    if index > 0 and index % 10000 == 0:  # pragma: no cover
+                        _logger.info(f"Processed up to index {index}...")
 
-    total_processed = index + 1 if index >= 0 else 0
-
+    total_processed = len(convergent) + len(divergent) + len(further)
     _logger.info(f"Analysis Complete! Processed {total_processed} total graphs.")
     _logger.info(f"Indices that deserve further study: {further}")
     _logger.info(f"Total convergent graphs: {len(convergent)}")
@@ -444,29 +533,40 @@ def _classify_graph(
     further: list[int],
     further_pared: list[tuple[int, nx.Graph]],
     further_graphs: list[tuple[int, nx.Graph]],
+    verdict_file=None,
 ) -> str:
     """Run the classifier pipeline on a single pared graph.
 
     Returns the behavior description string for logging.
+    If *verdict_file* is not ``None``, writes a tab-separated line
+    ``index\\tverdict\\treason`` for every graph processed.
     """
+
+    def _write_verdict(verdict_label: str, reason: str) -> None:
+        if verdict_file is not None:
+            verdict_file.write(f"{index}\t{verdict_label}\t{reason}\n")
+
     if known_indeterminate and _is_known_indeterminate(graph, known_indeterminate):
         further_pared.append((index, graph))
+        _write_verdict("UNKNOWN", "reduces to known indeterminate graph")
         return "reduces to known indeterminate graph"
 
     seq = CliqueSequence(graph)
-
     for classifier in classifiers:
         result = classifier(seq)
         if result is not None:
             verdict, behavior = result
             if verdict is Verdict.CONVERGENT:
                 convergent.append(index)
+                _write_verdict("CONVERGENT", behavior)
             else:
                 divergent.append(index)
+                _write_verdict("DIVERGENT", behavior)
             return behavior
 
     further.append(index)
     further_graphs.append((index, graph))
+    _write_verdict("UNKNOWN", "has character unknown so far")
     return "has character unknown so far"
 
 
