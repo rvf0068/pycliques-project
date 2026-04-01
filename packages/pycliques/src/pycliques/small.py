@@ -20,7 +20,7 @@ from pycliques.clockwork import is_clique_divergent_clockwork, recognize_clockwo
 from pycliques.dominated import completely_pared_graph
 from pycliques.helly import is_clique_helly
 from pycliques.named import complement_of_cycle, suspension_of_cycle
-from pycliques.retractions import retracts, special_octahedra
+from pycliques.retractions import retracts, special_octahedra_dimension
 
 _logger = logging.getLogger(__name__)
 
@@ -98,7 +98,7 @@ def _test_eventually_helly(seq: CliqueSequence) -> ClassifierResult:
             return None
         if is_clique_helly(g):
             _logger.debug(f"Helly of index {i}")
-            return (Verdict.CONVERGENT, "is eventually Helly")
+            return (Verdict.CONVERGENT, f"is eventually Helly (index {i})")
     return None
 
 
@@ -121,9 +121,13 @@ def _test_eventually_special_octahedra(seq: CliqueSequence) -> ClassifierResult:
         g = seq[i]
         if g is None:
             return None
-        if special_octahedra(g):
+        dim = special_octahedra_dimension(g)
+        if dim is not None:
             _logger.debug(f"Index {i} has induced special octahedra")
-            return (Verdict.DIVERGENT, "eventually has a special octahedron")
+            return (
+                Verdict.DIVERGENT,
+                f"eventually has a special octahedron (index {i}, dimension {dim})",
+            )
     return None
 
 
@@ -319,7 +323,7 @@ def eventually_retracts_specially(
     """
     g_curr = graph
     for i in range(tries):
-        if special_octahedra(g_curr):
+        if special_octahedra_dimension(g_curr) is not None:
             _logger.debug(f"Index {i} has induced special octahedra")
             return True
         g_curr = clique_graph(g_curr, bound)

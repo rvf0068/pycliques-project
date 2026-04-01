@@ -50,6 +50,7 @@ from .retractions import (
     retracts,
     retracts_to,
     special_octahedra,
+    special_octahedra_dimension,
 )
 from .small import (
     CliqueSequence,
@@ -118,6 +119,7 @@ __all__ = [
     "retracts",
     "retracts_to",
     "special_octahedra",
+    "special_octahedra_dimension",
     # small
     "CliqueSequence",
     "Verdict",

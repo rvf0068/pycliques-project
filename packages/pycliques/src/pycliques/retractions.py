@@ -325,6 +325,50 @@ def _is_maximal_clique(graph: nx.Graph, clique: Iterable) -> bool:
     return False
 
 
+def _find_special_octahedra(
+    graph: nx.Graph,
+) -> tuple[bool, int | None]:
+    """Shared implementation for special-octahedra detection.
+
+    Returns ``(True, dimension)`` when a special octahedron of dimension
+    *dimension* is found, or ``(False, None)`` otherwise.
+    """
+    c_graph = nx.complement(graph)
+    edges_complement = list(c_graph.edges())
+
+    aux_graph = nx.Graph()
+    aux_graph.add_nodes_from(edges_complement)
+
+    valid_pairs = []
+    for e1, e2 in itertools.combinations(edges_complement, 2):
+        u, v = e1
+        x, y = e2
+
+        if u == x or u == y or v == x or v == y:
+            continue
+
+        if (
+            graph.has_edge(u, x)
+            and graph.has_edge(u, y)
+            and graph.has_edge(v, x)
+            and graph.has_edge(v, y)
+        ):
+            valid_pairs.append((e1, e2))
+
+    aux_graph.add_edges_from(valid_pairs)
+
+    for edges_octa in nx.find_cliques(aux_graph):
+        if len(edges_octa) >= 3:
+            vertices_octa = {v for edge in edges_octa for v in edge}
+            octa_subgraph = graph.subgraph(vertices_octa)
+
+            for clique_octa in nx.find_cliques(octa_subgraph):
+                if _is_maximal_clique(graph, clique_octa):
+                    return True, len(edges_octa)
+
+    return False, None
+
+
 def special_octahedra(graph: nx.Graph) -> bool:
     """Check for retractions to special octahedra in the graph.
 
@@ -351,46 +395,37 @@ def special_octahedra(graph: nx.Graph) -> bool:
     >>> special_octahedra(nx.cycle_graph(5))
     False
     """
-    c_graph = nx.complement(graph)
-    edges_complement = list(c_graph.edges())
+    found, _ = _find_special_octahedra(graph)
+    return found
 
-    aux_graph = nx.Graph()
-    aux_graph.add_nodes_from(edges_complement)
 
-    valid_pairs = []
-    for e1, e2 in itertools.combinations(edges_complement, 2):
-        u, v = e1
-        x, y = e2
+def special_octahedra_dimension(graph: nx.Graph) -> int | None:
+    """Return the dimension of a special octahedron in *graph*, if any.
 
-        # 1. The edges must be completely disjoint
-        if u == x or u == y or v == x or v == y:
-            continue
+    The dimension equals the number of pairs of antipodal vertices in the
+    octahedron (e.g. the standard octahedron has dimension 3).
 
-        # 2. There must be NO cross-edges in the complement graph.
-        # This mathematically requires that all 4 cross-pairs ARE edges in the original
-        # graph.
-        if (
-            graph.has_edge(u, x)
-            and graph.has_edge(u, y)
-            and graph.has_edge(v, x)
-            and graph.has_edge(v, y)
-        ):
-            valid_pairs.append((e1, e2))
+    .. rubric:: Parameters
 
-    aux_graph.add_edges_from(valid_pairs)
+    graph : networkx.Graph
+        Input graph.
 
-    for edges_octa in nx.find_cliques(aux_graph):
-        if len(edges_octa) >= 3:
-            # Flatten the list of edges into a set of vertices
-            vertices_octa = {v for edge in edges_octa for v in edge}
-            octa_subgraph = graph.subgraph(vertices_octa)
+    .. rubric:: Returns
 
-            # Check if any clique in this octahedron is maximal in the whole graph
-            for clique_octa in nx.find_cliques(octa_subgraph):
-                if _is_maximal_clique(graph, clique_octa):
-                    return True
+    int or None
+        Dimension of the first special octahedron found, or ``None``.
 
-    return False
+    .. rubric:: Examples
+
+    >>> import networkx as nx
+    >>> from pycliques.retractions import special_octahedra_dimension
+    >>> special_octahedra_dimension(nx.octahedral_graph())
+    3
+    >>> special_octahedra_dimension(nx.cycle_graph(5)) is None
+    True
+    """
+    _, dim = _find_special_octahedra(graph)
+    return dim
 
 
 # ---------------------------------------------------------------------------

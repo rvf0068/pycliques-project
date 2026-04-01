@@ -21,3 +21,9 @@ docs/_build/
 coverage.xml
 htmlcov/
 *.cover
+order8.tsv
+order6.tsv
+.gitignore
+indeterminate_order_8.txt
+.vscode/settings.json
+order7.tsv
