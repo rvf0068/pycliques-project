@@ -143,6 +143,18 @@ def _make_retraction_test(target: nx.Graph, label: str) -> Classifier:
     return _test
 
 
+def _make_clique_retraction_test(target: nx.Graph, label: str) -> Classifier:
+    """Return a classifier that checks whether ``seq[1]`` retracts to *target*."""
+
+    def _test(seq: CliqueSequence) -> ClassifierResult:
+        g = seq[1]
+        if g is not None and retracts(g, target):
+            return (Verdict.DIVERGENT, label)
+        return None
+
+    return _test
+
+
 _DEFAULT_DATA_DIR = Path(".")
 
 
@@ -447,6 +459,9 @@ def _main(args: list[str]):
         _make_retraction_test(suspension_of_cycle(5), "retracts to Susp(C_5)"),
         _make_retraction_test(suspension_of_cycle(6), "retracts to Susp(C_6)"),
         _make_retraction_test(complement_of_cycle(8), "retracts to Comp(C_8)"),
+        _make_clique_retraction_test(
+            complement_of_cycle(10), "clique graph retracts to Comp(C_10)"
+        ),
     ]
 
     # Load previously saved indeterminate graphs for smaller orders

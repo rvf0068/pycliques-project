@@ -1,7 +1,14 @@
 import networkx as nx
 import pytest
+from pycliques.named import complement_of_cycle, suspension_of_cycle
 from pycliques.retractions import retracts
-from pycliques.small import eventually_retracts_specially, is_eventually_helly
+from pycliques.small import (
+    CliqueSequence,
+    Verdict,
+    _make_clique_retraction_test,
+    eventually_retracts_specially,
+    is_eventually_helly,
+)
 from pyg6data.lists import list_graphs
 
 
@@ -100,3 +107,27 @@ def test_small_main_runs_successfully():
 
     # This processes all 112 connected graphs on 6 vertices.
     _main(["6"])
+
+
+# ---------- Coverage for _make_clique_retraction_test ----------
+
+
+def test_clique_retraction_to_comp_c10_positive():
+    """K(Susp(C_5)) retracts to Comp(C_10), so the classifier returns DIVERGENT."""
+    classifier = _make_clique_retraction_test(
+        complement_of_cycle(10), "clique graph retracts to Comp(C_10)"
+    )
+    seq = CliqueSequence(suspension_of_cycle(5))
+    result = classifier(seq)
+    assert result is not None
+    assert result[0] is Verdict.DIVERGENT
+
+
+def test_clique_retraction_to_comp_c10_negative():
+    """K4 is Helly; its clique graph does not retract to Comp(C_10)."""
+    classifier = _make_clique_retraction_test(
+        complement_of_cycle(10), "clique graph retracts to Comp(C_10)"
+    )
+    seq = CliqueSequence(nx.complete_graph(4))
+    result = classifier(seq)
+    assert result is None
