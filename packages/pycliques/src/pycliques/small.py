@@ -17,7 +17,7 @@ from rich.logging import RichHandler
 from pycliques import __version__
 from pycliques.cliques import clique_graph
 from pycliques.clockwork import is_clique_divergent_clockwork, recognize_clockwork
-from pycliques.dominated import completely_pared_graph
+from pycliques.dominated import completely_pared_graph, find_dominated_vertex
 from pycliques.helly import is_clique_helly
 from pycliques.named import complement_of_cycle, suspension_of_cycle
 from pycliques.retractions import retracts, special_octahedra_dimension
@@ -411,6 +411,13 @@ def _parse_args(args: list[str]) -> argparse.Namespace:
         default=None,
         metavar="FILE",
     )
+    parser.add_argument(
+        "--skip-dominated",
+        dest="skip_dominated",
+        help="Skip graphs that have dominated vertices (default: True)",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
     return parser.parse_args(args)
 
 
@@ -433,6 +440,7 @@ def _main(args: list[str]):
     start: int | None = parsed_args.start
     end: int | None = parsed_args.end
     output_file: Path | None = parsed_args.output_file
+    skip_dominated: bool = parsed_args.skip_dominated
 
     if order not in _dict_connected:
         _logger.error(f"Error: Internal data for order {order} not available.")
@@ -459,9 +467,9 @@ def _main(args: list[str]):
         _make_retraction_test(suspension_of_cycle(5), "retracts to Susp(C_5)"),
         _make_retraction_test(suspension_of_cycle(6), "retracts to Susp(C_6)"),
         _make_retraction_test(complement_of_cycle(8), "retracts to Comp(C_8)"),
-        _make_clique_retraction_test(
-            complement_of_cycle(10), "clique graph retracts to Comp(C_10)"
-        ),
+        # _make_clique_retraction_test(
+        #     complement_of_cycle(10), "clique graph retracts to Comp(C_10)"
+        # ),
     ]
 
     # Load previously saved indeterminate graphs for smaller orders
@@ -474,6 +482,7 @@ def _main(args: list[str]):
     further: list[int] = []
     further_pared: list[tuple[int, nx.Graph]] = []
     further_graphs: list[tuple[int, nx.Graph]] = []
+    reducible: list[int] = []
 
     range_msg = ""
     if start is not None or end is not None:
@@ -511,6 +520,16 @@ def _main(args: list[str]):
 
                     assert isinstance(line, str)
                     graph = nx.from_graph6_bytes(bytes(line.strip(), "utf-8"))
+
+                    if skip_dominated and find_dominated_vertex(graph) is not None:
+                        reducible.append(index)
+                        if verdict_file is not None:
+                            verdict_file.write(
+                                f"{index}\tREDUCIBLE\thas dominated vertices\n"
+                            )
+                        _logger.debug(f"Graph {index}: has dominated vertices")
+                        continue
+
                     graph = completely_pared_graph(graph)
 
                     behavior = _classify_graph(
@@ -530,11 +549,12 @@ def _main(args: list[str]):
                     if index > 0 and index % 10000 == 0:  # pragma: no cover
                         _logger.info(f"Processed up to index {index}...")
 
-    total_processed = len(convergent) + len(divergent) + len(further)
+    total_processed = len(convergent) + len(divergent) + len(further) + len(reducible)
     _logger.info(f"Analysis Complete! Processed {total_processed} total graphs.")
     _logger.info(f"Indices that deserve further study: {further}")
     _logger.info(f"Total convergent graphs: {len(convergent)}")
     _logger.info(f"Total divergent graphs: {len(divergent)}")
+    _logger.info(f"Total reducible graphs skipped: {len(reducible)}")
     _logger.info(f"Total graphs reduced to unknown: {len(further_pared)}")
     _logger.info(f"Total unknown graphs (further study): {len(further)}")
 

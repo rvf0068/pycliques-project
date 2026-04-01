@@ -131,3 +131,44 @@ def test_clique_retraction_to_comp_c10_negative():
     seq = CliqueSequence(nx.complete_graph(4))
     result = classifier(seq)
     assert result is None
+
+
+# ---------- Coverage for --skip-dominated ----------
+
+
+def test_small_parse_args_skip_dominated_default():
+    """--skip-dominated defaults to True."""
+    from pycliques.small import _parse_args
+
+    args = _parse_args(["6"])
+    assert args.skip_dominated is True
+
+
+def test_small_parse_args_no_skip_dominated():
+    """--no-skip-dominated sets skip_dominated to False."""
+    from pycliques.small import _parse_args
+
+    args = _parse_args(["--no-skip-dominated", "6"])
+    assert args.skip_dominated is False
+
+
+def test_small_main_skip_dominated(tmp_path):
+    """With --skip-dominated, graphs with dominated vertices are skipped."""
+    from pycliques.small import _main
+
+    output = tmp_path / "verdicts.tsv"
+    _main(["6", "--output-file", str(output)])
+    lines = output.read_text().splitlines()
+    reducible_lines = [line for line in lines if "REDUCIBLE" in line]
+    assert len(reducible_lines) > 0
+
+
+def test_small_main_no_skip_dominated(tmp_path):
+    """With --no-skip-dominated, no graphs are marked REDUCIBLE."""
+    from pycliques.small import _main
+
+    output = tmp_path / "verdicts.tsv"
+    _main(["6", "--no-skip-dominated", "--output-file", str(output)])
+    lines = output.read_text().splitlines()
+    reducible_lines = [line for line in lines if "REDUCIBLE" in line]
+    assert len(reducible_lines) == 0
