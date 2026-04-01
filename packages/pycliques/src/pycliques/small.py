@@ -518,6 +518,9 @@ def _main(args: list[str]):
                     if end is not None and index > end:
                         break
 
+                    if index > 0 and index % 10000 == 0:  # pragma: no cover
+                        _logger.info(f"Processed up to index {index}...")
+
                     assert isinstance(line, str)
                     graph = nx.from_graph6_bytes(bytes(line.strip(), "utf-8"))
 
@@ -545,9 +548,6 @@ def _main(args: list[str]):
                         verdict_file,
                     )
                     _logger.debug(f"Graph {index}: {behavior}")
-
-                    if index > 0 and index % 10000 == 0:  # pragma: no cover
-                        _logger.info(f"Processed up to index {index}...")
 
     total_processed = len(convergent) + len(divergent) + len(further) + len(reducible)
     _logger.info(f"Analysis Complete! Processed {total_processed} total graphs.")
