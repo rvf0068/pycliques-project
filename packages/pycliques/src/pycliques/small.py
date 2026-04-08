@@ -202,7 +202,7 @@ def _save_indeterminate(
     # Write everything back sorted by index.
     with path.open("w", encoding="utf-8") as f:
         f.write(
-            f"# Indeterminate clique behavior – connected graphs of order {order}\n"
+            f"# Indeterminate clique behavior - connected graphs of order {order}\n"
         )
         f.write("# Format: original_index pared_order graph6\n")
         for idx in sorted(existing):
@@ -488,7 +488,7 @@ def _main(args: list[str]):
     if start is not None or end is not None:
         lo = start if start is not None else 0
         hi = end if end is not None else "last"
-        range_msg = f" (indices {lo}–{hi})"
+        range_msg = f" (indices {lo}-{hi})"
     _logger.info(
         f"Beginning analysis of connected graphs of order {order}{range_msg}..."
     )

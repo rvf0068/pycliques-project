@@ -215,7 +215,7 @@ def is_hereditary_clique_helly(graph: nx.Graph) -> bool:
 
     .. [2] Lin, M. C., & Szwarcfiter, J. L., Faster recognition of clique-Helly
        and hereditary clique-Helly graphs, Information Processing Letters,
-       103(1), 40–43 (2007).
+       103(1), 40-43 (2007).
     """
     uopen = {frozenset({u, v}): u_open(graph, u, v) for u, v in graph.edges()}
 

@@ -96,7 +96,7 @@ def blockI(m: Matrix, n: int, i: int) -> MutableDenseMatrix:
     .. rubric:: Returns
 
     Matrix
-        An n×n identity matrix with m inserted at position (i, i).
+        An nxn identity matrix with m inserted at position (i, i).
 
     .. rubric:: Examples
 

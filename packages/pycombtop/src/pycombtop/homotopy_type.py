@@ -24,7 +24,7 @@ References
 .. [Wh1939] J. H. C. Whitehead, "Simplicial spaces, nuclei and m-groups",
    Proc. London Math. Soc. 45 (1939) 243-327.  (Elementary collapses.)
 
-.. [MV1930] K. Mayer–Vietoris.  (Nerve / Mayer–Vietoris sequence used in the
+.. [MV1930] K. Mayer-Vietoris.  (Nerve / Mayer-Vietoris sequence used in the
    join-complement, cutpoint, and special-edge theorems.)
 """
 
@@ -74,22 +74,22 @@ class Theorem:
     )
     SPECIAL_NEIGHBOURHOOD = (
         "Vertex whose open neighbourhood is a disjoint union of two "
-        "complete graphs detected; Mayer–Vietoris / pushout argument "
+        "complete graphs detected; Mayer-Vietoris / pushout argument "
         "gives +1 to the S^1 count [MV1930]."
     )
     SPECIAL_EDGES = (
-        "Bridge edges (no common neighbour, both endpoints have degree ≥ 3) "
+        "Bridge edges (no common neighbour, both endpoints have degree >= 3) "
         "detected; graph splits into components whose complexes are vertex "
         "decomposable; polynomial addition formula applied [MV1930]."
     )
     CUTPOINT = (
         "Cut-point detected; complex splits as a wedge by a "
-        "Mayer–Vietoris argument; each piece is vertex decomposable "
+        "Mayer-Vietoris argument; each piece is vertex decomposable "
         "[MV1930]."
     )
     SPECIAL_CUTPOINT_KG = (
         "Special cut-point in G used to compute homotopy type of K(G) via "
-        "a pushout / Mayer–Vietoris argument on the clique graph [MV1930]."
+        "a pushout / Mayer-Vietoris argument on the clique graph [MV1930]."
     )
     SPECIAL_VERTEX_SC = (
         "Vertex with 0-dimensional link found in simplified complex; "
@@ -107,13 +107,13 @@ class Theorem:
 
 
 # ---------------------------------------------------------------------------
-# WedgeOfSpheres  – structured internal representation
+# WedgeOfSpheres  - structured internal representation
 # ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
 class WedgeOfSpheres:
-    """A wedge (one-point union) of spheres, stored as a dimension→count map.
+    """A wedge (one-point union) of spheres, stored as a dimension->count map.
 
     This is the internal structured representation used during homotopy-type
     computations.  It records how many copies of each sphere dimension appear
@@ -327,7 +327,7 @@ def betti_numbers_sc(s_complex: SimplicialComplex) -> list[int]:
     mc = mogutda.SimplicialComplex(simplices=simplices)
     dim = max((len(f) - 1 for f in s_complex.facet_set), default=-1)
     numbers = [mc.betti_number(i) for i in range(dim + 1)]
-    numbers[0] -= 1  # reduced β₀
+    numbers[0] -= 1  # reduced beta_0
     return _simplify_betti_list(numbers)
 
 
@@ -355,7 +355,7 @@ def _read_dong(dong) -> WedgeOfSpheres | None:
     return None
 
 
-# --- Polynomial helpers for Mayer–Vietoris arguments ---
+# --- Polynomial helpers for Mayer-Vietoris arguments ---
 
 
 def _list_to_poly(lst: list[int]) -> Poly:
@@ -393,7 +393,7 @@ def is_vertex_decomposable(s_complex: SimplicialComplex) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Individual strategies – each returns HomotopyVerdict | None
+# Individual strategies - each returns HomotopyVerdict | None
 # ---------------------------------------------------------------------------
 
 
@@ -447,7 +447,7 @@ def _try_vertex_decomposable(
 
 
 def _try_join_complement(graph: nx.Graph) -> HomotopyVerdict | None:
-    """Disconnected complement → clique complex is a join."""
+    """Disconnected complement -> clique complex is a join."""
     x = symbols("x")
     cg = nx.complement(nx.convert_node_labels_to_integers(graph))
     comps = [cg.subgraph(c).copy() for c in nx.connected_components(cg)]
@@ -468,7 +468,7 @@ def _try_join_complement(graph: nx.Graph) -> HomotopyVerdict | None:
 
 
 def _try_star_cluster(graph: nx.Graph) -> HomotopyVerdict | None:
-    """Isolated vertex in complement → star-cluster decomposition."""
+    """Isolated vertex in complement -> star-cluster decomposition."""
     if graph.order() == 1:
         return HomotopyVerdict(
             wedge=WedgeOfSpheres.contractible(),
@@ -505,7 +505,7 @@ def _is_disjoint_union_of_completes(graph: nx.Graph) -> bool:
 
 
 def _try_special_neighbourhood(graph: nx.Graph) -> HomotopyVerdict | None:
-    """Vertex with open neighbourhood = K_p ⊔ K_q → +1 to S^1 count."""
+    """Vertex with open neighbourhood = K_p disjoint union of K_q -> +1 to S^1 count."""
     neighs = [(v, open_neighborhood(graph, v)) for v in graph.nodes()]
     candidates = [
         v
@@ -532,7 +532,7 @@ def _is_special_edge(graph: nx.Graph, edge) -> bool:
 
 
 def _try_special_edges(graph: nx.Graph) -> HomotopyVerdict | None:
-    """Bridge-like edges with no common neighbour → polynomial addition."""
+    """Bridge-like edges with no common neighbour -> polynomial addition."""
     x = symbols("x")
     graph = _simplify_graph_ht(graph)
     if not nx.is_connected(graph):
@@ -560,7 +560,7 @@ def _try_special_edges(graph: nx.Graph) -> HomotopyVerdict | None:
 
 
 def _try_cutpoints(graph: nx.Graph) -> HomotopyVerdict | None:
-    """Cut-point → Mayer–Vietoris wedge."""
+    """Cut-point -> Mayer-Vietoris wedge."""
     x = symbols("x")
     graph = _simplify_graph_ht(graph)
     if not nx.is_connected(graph):
@@ -666,9 +666,9 @@ def homotopy_type_with_verdict(graph: nx.Graph) -> HomotopyVerdict:
     HomotopyVerdict
         A dataclass with fields:
 
-        * ``verdict`` – LaTeX string for the homotopy type.
-        * ``reason``  – The theorem(s) that justify the verdict.
-        * ``is_exact`` – ``False`` when only Betti numbers were computed.
+        * ``verdict`` - LaTeX string for the homotopy type.
+        * ``reason``  - The theorem(s) that justify the verdict.
+        * ``is_exact`` - ``False`` when only Betti numbers were computed.
 
     .. rubric:: Examples
     >>> import networkx as nx
@@ -693,7 +693,7 @@ def homotopy_type_with_verdict(graph: nx.Graph) -> HomotopyVerdict:
             reason=Theorem.COLLAPSIBLE,
         )
 
-    # 2. Disconnected complement → join
+    # 2. Disconnected complement -> join
     v = _try_join_complement(graph)
     if v:
         return v

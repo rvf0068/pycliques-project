@@ -5,12 +5,10 @@ permutations, simplices, and computing boundary operators.
 
 Mathematical Background
 -----------------------
-The boundary operator ∂_p: C_p(K) → C_{p-1}(K) is defined on oriented
-simplices as:
+The boundary operator d_p: C_p(K) -> C_{p-1}(K) is defined on oriented
+simplices as::
 
-    ∂_p[v_0, ..., v_p] = Σ_{i=0}^{p} (-1)^i [v_0, ..., v̂_i, ..., v_p]
-
-where v̂_i denotes the omission of vertex v_i.
+    d_p[v_0, ..., v_p] = sum_{i=0}^{p} (-1)^i [v_0, ..., v_i omitted, ..., v_p]
 
 References
 ----------

@@ -4,7 +4,7 @@ fundamental_group.py
 Compute the fundamental group of the clique complex of a graph.
 
 This is a Python translation of the GAP/GRAPE function
-``FundamentalRecordSimplicialComplex`` by Leonard H. Soicher (1999–2015),
+``FundamentalRecordSimplicialComplex`` by Leonard H. Soicher (1999-2015),
 from the file ``fundamental_v2.g``.
 
 Reference
@@ -12,7 +12,7 @@ Reference
 Sarah Rees and Leonard H. Soicher,
 'An algorithmic approach to fundamental groups and covers of
 combinatorial cell complexes',
-J. Symbolic Comp. 29 (2000), 59–77.
+J. Symbolic Comp. 29 (2000), 59-77.
 
 The algorithm works as follows:
 
@@ -43,10 +43,10 @@ Dependencies
 
 Public API
 ----------
-- :class:`FundamentalRecord`  – dataclass holding the result
-- :func:`fundamental_group`   – main entry point (networkx graph → FundamentalRecord)
-- :func:`covering_graph`      – construct the covering graph corresponding to
-                                a subgroup of π₁
+- :class:`FundamentalRecord`  - dataclass holding the result
+- :func:`fundamental_group`   - main entry point (networkx graph -> FundamentalRecord)
+- :func:`covering_graph`      - construct the covering graph corresponding to
+                                a subgroup of pi_1
 """
 
 from __future__ import annotations
@@ -71,8 +71,8 @@ class FundamentalRecord:
     .. rubric:: Attributes
 
     group : FpGroup
-        A finitely presented group isomorphic to π₁(Δ(G), basepoint),
-        where Δ(G) is the clique complex of G.
+        A finitely presented group isomorphic to pi_1(Delta(G), basepoint),
+        where Delta(G) is the clique complex of G.
         If the complex is simply connected the group has no generators.
     generators : list
         The generators of ``group`` as sympy FreeGroup elements,
@@ -90,7 +90,7 @@ class FundamentalRecord:
         The rank (number of generators) of the fundamental group,
         equal to |E(G)| - |V(G)| + 1  minus the number of triangles
         that killed generators.  This equals the first Betti number
-        β₁ of Δ(G) when Δ(G) is simply connected, and the rank of
+        beta_1 of Delta(G) when Delta(G) is simply connected, and the rank of
         the abelianisation otherwise.
     """
 
@@ -146,7 +146,7 @@ def fundamental_group(graph: nx.Graph) -> FundamentalRecord:
 
     graph : nx.Graph
         A simple, connected, non-empty graph.  The simplicial complex
-        used is the clique complex Δ(G): vertices are vertices of G,
+        used is the clique complex Delta(G): vertices are vertices of G,
         edges are edges of G, 2-simplices are triangles of G.
 
     .. rubric:: Returns
@@ -163,7 +163,7 @@ def fundamental_group(graph: nx.Graph) -> FundamentalRecord:
 
     >>> import networkx as nx
     >>> from pycombtop.fundamental_group import fundamental_group
-    >>> G = nx.cycle_graph(4)          # square — π₁ ≅ ℤ
+    >>> G = nx.cycle_graph(4)          # square — pi_1 is isomorphic to Z
     >>> rec = fundamental_group(G)
     >>> rec.rank
     1
@@ -294,7 +294,7 @@ def fundamental_group(graph: nx.Graph) -> FundamentalRecord:
             common = sorted(delta_adj[x] & delta_adj[y])
 
             if ngens == 0:
-                # All existing labels are identity → label is identity
+                # All existing labels are identity -> label is identity
                 label[(x, y)] = []
                 label[(y, x)] = []
             else:
@@ -410,14 +410,14 @@ def fundamental_group(graph: nx.Graph) -> FundamentalRecord:
 
 
 # ---------------------------------------------------------------------------
-# Convenience: abelianisation → first homology group H₁(Δ(G), ℤ)
+# Convenience: abelianisation -> first homology group H_1(Delta(G), Z)
 # ---------------------------------------------------------------------------
 
 
 def first_homology_rank(graph: nx.Graph) -> int:
-    """Return the rank of H₁(Δ(G), ℤ) — the first Betti number β₁.
+    """Return the rank of H_1(Delta(G), Z) — the first Betti number beta_1.
 
-    This equals the rank of the abelianisation of π₁(Δ(G)).
+    This equals the rank of the abelianisation of pi_1(Delta(G)).
     For a clique complex it is also |E| - |V| + c - (number of triangles
     that kill generators), where c is the number of connected components.
 
@@ -429,7 +429,7 @@ def first_homology_rank(graph: nx.Graph) -> int:
     .. rubric:: Returns
 
     int
-        β₁(Δ(G)).
+        beta_1(Delta(G)).
     """
     rec = fundamental_group(graph)
     return rec.rank
@@ -444,9 +444,9 @@ def fundamental_group_as_permutation_group(
     graph: nx.Graph,
     degree: int | None = None,
 ) -> PermutationGroup:
-    """Attempt to realise π₁(Δ(G)) as a sympy PermutationGroup.
+    """Attempt to realise pi_1(Delta(G)) as a sympy PermutationGroup.
 
-    This uses the Todd–Coxeter coset enumeration algorithm (via sympy's
+    This uses the Todd-Coxeter coset enumeration algorithm (via sympy's
     ``FpGroup.coset_enumeration``) on the trivial subgroup.  It works
     reliably for finite groups of small order, and for free groups of
     small rank.
@@ -462,7 +462,7 @@ def fundamental_group_as_permutation_group(
     .. rubric:: Returns
 
     PermutationGroup
-        A permutation group isomorphic to π₁(Δ(G)).
+        A permutation group isomorphic to pi_1(Delta(G)).
 
     .. rubric:: Raises
 
@@ -474,7 +474,7 @@ def fundamental_group_as_permutation_group(
 
     For graphs whose clique complex is simply connected (e.g. K_n, chordal
     graphs) the result is the trivial group ``PermutationGroup(Permutation(0))``.
-    For a cycle C_n (n ≥ 4) the result is ℤ, but sympy cannot represent
+    For a cycle C_n (n >= 4) the result is Z, but sympy cannot represent
     infinite groups as PermutationGroups — in that case ``rec.rank`` is
     more informative.
     """
@@ -515,16 +515,16 @@ def covering_graph(
     max_cosets: int = 10000,
 ) -> nx.Graph:
     """Construct the covering graph of *graph* corresponding to a subgroup
-    of π₁(Δ(G)).
+    of pi_1(Delta(G)).
 
     This is a Python translation of the GAP function ``CoveringGraph``
     (with the subgroup argument) from ``fundamental_v2.g`` by Soicher.
 
-    The covering is defined by the action of π₁ on the right cosets of H.
+    The covering is defined by the action of pi_1 on the right cosets of H.
     Concretely:
 
     - Number the right cosets of H as 0, 1, …, m-1  (coset 0 = H itself).
-    - The vertices of the cover are pairs (v, i) with v ∈ V(G), i ∈ [0,m).
+    - The vertices of the cover are pairs (v, i) with v in V(G), i in [0,m).
     - (v, i) — (w, j) is an edge of the cover iff (v, w) is an edge of G
       and  i · label(v,w) = j,  where the label acts on cosets by right
       multiplication.
@@ -538,10 +538,10 @@ def covering_graph(
     graph : nx.Graph
         A simple, connected, non-empty graph.
     subgroup_words : list of list of int, or None
-        Generators of the subgroup H ⊆ π₁, each expressed as a word in
+        Generators of the subgroup H subset of pi_1, each expressed as a word in
         the internal signed-integer representation used by
         :func:`fundamental_group` — i.e. a list of signed generator
-        indices such as ``[1, -2, 1]`` meaning g₁ g₂⁻¹ g₁.
+        indices such as ``[1, -2, 1]`` meaning g_1 g_2^{-1} g_1.
         Pass ``None`` or ``[]`` to get the *universal cover* (H = trivial
         subgroup), which corresponds to the tree cover when the complex is
         a graph (1-skeleton only) or the simply-connected cover in general.
@@ -552,14 +552,14 @@ def covering_graph(
         Maximum number of cosets to enumerate (default 10000).  If coset
         enumeration exceeds this limit, a :class:`RuntimeError` is raised.
         Use this to prevent infinite loops when the subgroup has infinite
-        index in π₁.
+        index in pi_1.
 
     .. rubric:: Returns
 
     nx.Graph
         The covering graph.  Vertices are labelled as ``(v, i)`` where
         ``v`` is a vertex of *graph* (after integer relabelling) and
-        ``i ∈ [0, m)`` is the coset index.  The graph is simple and
+        ``i in [0, m)`` is the coset index.  The graph is simple and
         undirected.
 
     .. rubric:: Raises
@@ -574,17 +574,17 @@ def covering_graph(
 
     >>> import networkx as nx
     >>> from pycombtop.fundamental_group import fundamental_group, covering_graph
-    >>> # The cycle C4 has π₁ ≅ ℤ.  The trivial-subgroup cover is infinite,
-    >>> # but the subgroup 2ℤ gives a 2-fold cover (another cycle C8).
+    >>> # The cycle C4 has pi_1 is isomorphic to Z.  The trivial-subgroup cover is infinite,
+    >>> # but the subgroup 2Z gives a 2-fold cover (another cycle C8).
     >>> G = nx.cycle_graph(4)
     >>> rec = fundamental_group(G)
-    >>> rec.rank       # one generator, no relators → π₁ ≅ ℤ
+    >>> rec.rank       # one generator, no relators -> pi_1 is isomorphic to Z
     1
-    >>> # subgroup generated by g₁² (word [1,1]):
+    >>> # subgroup generated by g_1² (word [1,1]):
     >>> cover = covering_graph(G, [[1, 1]], rec=rec)
     >>> cover.order()
     8
-    >>> # The trivial group subgroup (H = π₁ itself) gives a 1-fold cover = G itself:
+    >>> # The trivial group subgroup (H = pi_1 itself) gives a 1-fold cover = G itself:
     >>> cover1 = covering_graph(G, [[1]], rec=rec)
     >>> cover1.order()
     4
@@ -595,19 +595,19 @@ def covering_graph(
     graph = nx.convert_node_labels_to_integers(graph)
 
     # ------------------------------------------------------------------
-    # Build the coset table for H via Todd–Coxeter on the word labels.
+    # Build the coset table for H via Todd-Coxeter on the word labels.
     # We implement a self-contained coset enumeration so as not to depend
     # on sympy's FpGroup coset machinery being available for arbitrary
     # infinite groups.
     #
-    # Generators of π₁ are indexed 1..ngens (positive = generator,
+    # Generators of pi_1 are indexed 1..ngens (positive = generator,
     # negative = inverse).  We work with right cosets of H.
     # ------------------------------------------------------------------
 
     ngens = rec.rank
 
     if ngens == 0:
-        # π₁ is trivial → only one coset → cover = graph itself
+        # pi_1 is trivial -> only one coset -> cover = graph itself
         cover = nx.Graph()
         for v in graph.nodes():
             cover.add_node((v, 0))
@@ -620,11 +620,11 @@ def covering_graph(
         subgroup_words = []
 
     # ------------------------------------------------------------------
-    # Todd–Coxeter coset enumeration (right cosets of H in π₁).
+    # Todd-Coxeter coset enumeration (right cosets of H in pi_1).
     #
     # State:
     #   coset_table[c][g]  = d  means  coset c · g = coset d
-    #                          (g runs over ±1 .. ±ngens, stored as
+    #                          (g runs over +-1 .. +-ngens, stored as
     #                           index 0..2*ngens-1)
     #   A value of -1 means "unknown".
     #
@@ -671,11 +671,11 @@ def covering_graph(
 
     # Subgroup generators: for each word w in subgroup_words,
     # the coset 0 must be fixed: 0 · w = 0.
-    # Also, relators of π₁ must fix every coset.
+    # Also, relators of pi_1 must fix every coset.
 
     relators: list[list[int]] = rec.relators  # words in signed-int form
 
-    # We run HLT (Haselgrove–Leech–Thomas) style.
+    # We run HLT (Haselgrove-Leech-Thomas) style.
 
     def _scan_and_fill(coset: int, word: list[int]) -> None:
         """Scan *word* from both ends; define new cosets as needed (HLT)."""

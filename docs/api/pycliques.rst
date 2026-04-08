@@ -14,10 +14,28 @@ Cliques
    :show-inheritance:
    :member-order: bysource
 
+Clockwork
+---------
+
+.. automodule:: pycliques.clockwork
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :member-order: bysource
+
 Coaffinations
 -------------
 
 .. automodule:: pycliques.coaffinations
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :member-order: bysource
+
+Cutpoints
+---------
+
+.. automodule:: pycliques.cutpoints
    :members:
    :undoc-members:
    :show-inheritance:

@@ -195,7 +195,7 @@ class SimplicialComplex:
         """Return the link of vertex *x* in the complex.
 
         The link consists of all simplices *s* such that *s* does not contain
-        *x* but *s* ∪ {*x*} is a simplex of the complex.
+        *x* but s union {x} is a simplex of the complex.
 
         .. rubric:: Examples
 

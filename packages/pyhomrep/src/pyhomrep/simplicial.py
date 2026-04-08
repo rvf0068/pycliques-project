@@ -198,7 +198,7 @@ def representate_in_simplex(
 
 
 def matrix_symmetric_representate(sc: SimplicialComplex, p: int) -> Matrix | None:
-    """Return the matrix of the boundary operator ∂_p: C_p → C_{p-1}.
+    """Return the matrix of the boundary operator d_p: C_p -> C_{p-1}.
 
     The boundary operator is represented as a matrix with respect to the
     standard bases of C_p and C_{p-1}.
@@ -268,7 +268,7 @@ def matrix_symmetric_representate(sc: SimplicialComplex, p: int) -> Matrix | Non
 def kernel_boundary_op(sc: SimplicialComplex, p: int) -> list[PChain] | None:
     """Compute a basis for the kernel of the boundary operator (cycles).
 
-    The kernel ker(∂_p) ⊆ C_p(K) is the group of p-cycles Z_p(K).
+    The kernel ker(d_p) in C_p(K) is the group of p-cycles Z_p(K).
 
     .. rubric:: Parameters
 
@@ -315,7 +315,7 @@ def kernel_boundary_op(sc: SimplicialComplex, p: int) -> list[PChain] | None:
 def image_boundary_op(sc: SimplicialComplex, p: int) -> list[PChain] | None:
     """Compute a basis for the image of the boundary operator (boundaries).
 
-    The image im(∂_p) ⊆ C_{p-1}(K) is the group of (p-1)-boundaries B_{p-1}(K).
+    The image im(d_p) in C_{p-1}(K) is the group of (p-1)-boundaries B_{p-1}(K).
 
     .. rubric:: Parameters
 
@@ -554,7 +554,7 @@ def decompose_into_irreducibles(
 
     dict
         A dictionary mapping dimensions p to dictionaries of irreducible
-        multiplicities indexed by partitions λ ⊢ n.
+        multiplicities indexed by partitions of n.
 
     .. rubric:: Examples
 
