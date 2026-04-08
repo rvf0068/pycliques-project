@@ -574,8 +574,8 @@ def covering_graph(
 
     >>> import networkx as nx
     >>> from pycombtop.fundamental_group import fundamental_group, covering_graph
-    >>> # The cycle C4 has pi_1 is isomorphic to Z.  The trivial-subgroup cover is infinite,
-    >>> # but the subgroup 2Z gives a 2-fold cover (another cycle C8).
+    >>> # The cycle C4 has pi_1 is isomorphic to Z.  The trivial-subgroup cover is
+    >>> # infinite, but the subgroup 2Z gives a 2-fold cover (another cycle C8).
     >>> G = nx.cycle_graph(4)
     >>> rec = fundamental_group(G)
     >>> rec.rank       # one generator, no relators -> pi_1 is isomorphic to Z
