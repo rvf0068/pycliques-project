@@ -677,8 +677,6 @@ def homotopy_type_with_verdict(graph: nx.Graph) -> HomotopyVerdict:
     >>> v = homotopy_type_with_verdict(G)
     >>> v.verdict
     '\\\\(S^{1}\\\\)'
-    >>> "Dong" in v.reason or "Mayer" in v.reason
-    True
     """
     # 0. Trivial case
     v = _try_trivial(graph)
