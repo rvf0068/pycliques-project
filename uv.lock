@@ -1164,14 +1164,18 @@ name = "pyhomrep"
 version = "0.1.0"
 source = { editable = "packages/pyhomrep" }
 dependencies = [
+    { name = "networkx" },
     { name = "numpy" },
+    { name = "pycliques" },
     { name = "pycombtop" },
     { name = "sympy" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "numpy", specifier = ">=2.3.5" },
+    { name = "networkx", specifier = ">=3.0" },
+    { name = "numpy", specifier = ">=2.0.0" },
+    { name = "pycliques", editable = "packages/pycliques" },
     { name = "pycombtop", editable = "packages/pycombtop" },
     { name = "sympy", specifier = ">=1.14.0" },
 ]

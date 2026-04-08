@@ -45,3 +45,11 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = ["tests.*", "*/tests/*"]
 disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = ["pyhomrep.*"]
+# pyhomrep uses sympy which has incomplete type stubs
+# and complex return types that are difficult to type precisely
+warn_return_any = false
+disallow_untyped_defs = false
+disable_error_code = ["union-attr", "arg-type", "index", "list-item", "assignment"]
