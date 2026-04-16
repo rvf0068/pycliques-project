@@ -2,7 +2,22 @@
 
 __version__ = "0.1.0"
 
-from .cliques import Clique, clique_graph, homotopy_clique_graph
+from .cliques import Clique, NodeH, clique_graph, homotopy_clique_graph
+from .clockwork import (
+    ClockworkGraph,
+    ClockworkStructure,
+    clockwork_graph,
+    core,
+    crown,
+    crown_general,
+    has_induced_4cycle,
+    is_clique_divergent_clockwork,
+    is_complete_graph,
+    recognize_as_clockwork_graph,
+    recognize_clockwork,
+    remove_dominated_vertices,
+    segmented_sum,
+)
 from .coaffinations import CoaffinePair, automorphisms, coaffinations
 from .cutpoints import (
     cutpoint_edge_contractions,
@@ -71,8 +86,23 @@ __all__ = [
     "__version__",
     # cliques
     "Clique",
+    "NodeH",
     "clique_graph",
     "homotopy_clique_graph",
+    # clockwork
+    "ClockworkGraph",
+    "ClockworkStructure",
+    "clockwork_graph",
+    "core",
+    "crown",
+    "crown_general",
+    "has_induced_4cycle",
+    "is_clique_divergent_clockwork",
+    "is_complete_graph",
+    "recognize_as_clockwork_graph",
+    "recognize_clockwork",
+    "remove_dominated_vertices",
+    "segmented_sum",
     # coaffinations
     "CoaffinePair",
     "automorphisms",
