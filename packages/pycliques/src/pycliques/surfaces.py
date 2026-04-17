@@ -58,7 +58,7 @@ def is_path(graph: nx.Graph) -> bool:
     return nx.is_tree(graph) and len(leaves) == 2
 
 
-def open_neighborhood(graph: nx.Graph, v: int) -> nx.Graph:
+def open_neighborhood(graph: nx.Graph, v) -> nx.Graph:
     """Return the subgraph induced by the neighbors of ``v``.
 
     .. rubric:: Examples

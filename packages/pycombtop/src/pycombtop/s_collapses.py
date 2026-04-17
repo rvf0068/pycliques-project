@@ -12,6 +12,8 @@ clique complex.
 from __future__ import annotations
 
 import copy
+from collections.abc import Hashable
+from typing import cast
 
 import networkx as nx
 from pycliques.dominated import is_dismantlable
@@ -22,7 +24,7 @@ from pycliques.surfaces import open_neighborhood
 # ---------------------------------------------------------------------------
 
 
-def is_s_dismantlable_vertex(graph: nx.Graph, v: int) -> bool:
+def is_s_dismantlable_vertex(graph: nx.Graph, v: Hashable) -> bool:
     """Return whether vertex *v* is s-dismantlable in *graph*.
 
     A vertex is s-dismantlable when its open neighbourhood is a
@@ -32,7 +34,7 @@ def is_s_dismantlable_vertex(graph: nx.Graph, v: int) -> bool:
 
     graph : networkx.Graph
         Input graph.
-    v : int
+    v
         Vertex to test.
 
     .. rubric:: Returns
@@ -53,7 +55,7 @@ def is_s_dismantlable_vertex(graph: nx.Graph, v: int) -> bool:
     return is_dismantlable(neigh)
 
 
-def has_s_dismantlable_vertex(graph: nx.Graph) -> int | None:
+def has_s_dismantlable_vertex(graph: nx.Graph) -> Hashable | None:
     """Return an s-dismantlable vertex of *graph*, or ``None``.
 
     .. rubric:: Examples
@@ -65,7 +67,7 @@ def has_s_dismantlable_vertex(graph: nx.Graph) -> int | None:
     """
     for v in graph.nodes():
         if is_s_dismantlable_vertex(graph, v):
-            return int(v)
+            return cast(Hashable, v)
     return None
 
 
@@ -128,7 +130,7 @@ def complete_s_collapse(graph: nx.Graph) -> nx.Graph:
 # ---------------------------------------------------------------------------
 
 
-def is_s_dismantlable_edge(graph: nx.Graph, e: tuple[int, int]) -> bool:
+def is_s_dismantlable_edge(graph: nx.Graph, e: tuple[Hashable, Hashable]) -> bool:
     """Return whether edge *e* is s-dismantlable in *graph*.
 
     An edge is s-dismantlable when the subgraph induced by the common
@@ -147,7 +149,7 @@ def is_s_dismantlable_edge(graph: nx.Graph, e: tuple[int, int]) -> bool:
     return is_dismantlable(inter)
 
 
-def has_s_dismantlable_edge(graph: nx.Graph) -> tuple[int, int] | None:
+def has_s_dismantlable_edge(graph: nx.Graph) -> tuple[Hashable, Hashable] | None:
     """Return an s-dismantlable edge of *graph*, or ``None``.
 
     .. rubric:: Examples
@@ -161,7 +163,7 @@ def has_s_dismantlable_edge(graph: nx.Graph) -> tuple[int, int] | None:
     """
     for e in graph.edges():
         if is_s_dismantlable_edge(graph, e):
-            return (int(e[0]), int(e[1]))
+            return cast(tuple[Hashable, Hashable], e)
     return None
 
 
