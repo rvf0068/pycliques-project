@@ -22,10 +22,6 @@ class Clique(frozenset):
         >>> from pycliques import Clique
         >>> Clique({1, 2, 3})
         {1, 2, 3}
-
-    Empty cliques render as ``{}``, which keeps doctest outputs short and lets
-    documentation examples double as regression tests::
-
         >>> Clique([])
         {}
     """
@@ -73,7 +69,7 @@ def clique_graph(graph: nx.Graph, bound: int | float = math.inf) -> nx.Graph | N
     """
     it_cliques = nx.find_cliques(graph)
     cliques = []
-    K = nx.Graph()
+    clique_graph = nx.Graph()
     while True:
         try:
             clique = next(it_cliques)
@@ -82,16 +78,16 @@ def clique_graph(graph: nx.Graph, bound: int | float = math.inf) -> nx.Graph | N
                 return None
         except StopIteration:
             break
-    K.add_nodes_from(cliques)
+    clique_graph.add_nodes_from(cliques)
 
     # Fast edge generation: group cliques by the vertices they contain
     for v in graph:
         # Find all cliques containing this vertex
         cliques_with_v = [c for c in cliques if v in c]
         # Link all of them together in the clique graph
-        K.add_edges_from(itertools.combinations(cliques_with_v, 2))
+        clique_graph.add_edges_from(itertools.combinations(cliques_with_v, 2))
 
-    return K
+    return clique_graph
 
 
 def homotopy_clique_graph(graph: nx.Graph) -> nx.Graph:
