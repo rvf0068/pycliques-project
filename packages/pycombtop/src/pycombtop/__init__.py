@@ -46,7 +46,9 @@ from .simplex import (
     bounded_degree_complex,
     clique_complex,
     complex_of_forests,
+    directed_neighborhood_complex,
     is_oriented_simplex,
+    neighborhood_complex,
     nerve_of_cliques,
     nerve_of_sets,
     oriented_complex,
@@ -67,6 +69,8 @@ __all__ = [
     "is_oriented_simplex",
     "oriented_complex",
     "complex_of_forests",
+    "neighborhood_complex",
+    "directed_neighborhood_complex",
     # fundamental_group
     "FundamentalRecord",
     "covering_graph",

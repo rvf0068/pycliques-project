@@ -569,3 +569,65 @@ def complex_of_forests(
         return nx.is_forest(subgraph) and maxd <= max_deg
 
     return SimplicialComplex(graph.nodes(), function=_is_forest)
+
+
+def neighborhood_complex(graph: nx.Graph) -> SimplicialComplex:
+    """Return the neighborhood complex of *graph* as defined by Lovász.
+
+    The neighborhood complex has the vertices of *graph* as its vertex set.
+    The simplices are the subsets of vertices that share a common neighbor,
+    i.e., subsets ``s`` such that there exists a vertex ``v`` adjacent to
+    every vertex in ``s``.  The facets are exactly the open neighborhoods
+    ``N(v)`` for each vertex ``v``.
+
+    .. rubric:: Examples
+
+    >>> import networkx as nx
+    >>> from pycombtop import neighborhood_complex
+    >>> nc = neighborhood_complex(nx.cycle_graph(5))
+    >>> nc.dimension()
+    1
+    >>> nc = neighborhood_complex(nx.complete_graph(4))
+    >>> nc.dimension()
+    2
+    """
+    facets = [Simplex(graph.neighbors(v)) for v in graph.nodes()]
+    facets = [f for f in facets if f]  # drop empty neighborhoods
+    return SimplicialComplex(graph.nodes(), facet_set=facets)
+
+
+def directed_neighborhood_complex(
+    digraph: nx.DiGraph, use_out_neighborhood: bool = False
+) -> SimplicialComplex:
+    """Return the directed neighborhood complex of *digraph*.
+
+    The vertex set is the node set of *digraph*.  By default the facets are
+    the open **in**-neighborhoods ``N⁻(v) = {u : (u, v) ∈ E}`` for each
+    vertex *v*.  When *use_out_neighborhood* is ``True`` the facets are the
+    open **out**-neighborhoods ``N⁺(v) = {u : (v, u) ∈ E}`` instead.
+
+    .. rubric:: Parameters
+
+    digraph : networkx.DiGraph
+        The input directed graph.
+    use_out_neighborhood : bool, optional
+        When ``True``, use out-neighborhoods as facets (default: ``False``).
+
+    .. rubric:: Examples
+
+    >>> import networkx as nx
+    >>> from pycombtop import directed_neighborhood_complex
+    >>> d = nx.DiGraph([(0, 1), (0, 2), (1, 3), (2, 3)])
+    >>> nc = directed_neighborhood_complex(d)
+    >>> nc.dimension()
+    1
+    >>> nc_out = directed_neighborhood_complex(d, use_out_neighborhood=True)
+    >>> nc_out.dimension()
+    1
+    """
+    if use_out_neighborhood:
+        facets = [Simplex(digraph.successors(v)) for v in digraph.nodes()]
+    else:
+        facets = [Simplex(digraph.predecessors(v)) for v in digraph.nodes()]
+    facets = [f for f in facets if f]  # drop empty neighborhoods
+    return SimplicialComplex(digraph.nodes(), facet_set=facets)

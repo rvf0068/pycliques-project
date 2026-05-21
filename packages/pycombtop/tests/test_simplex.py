@@ -7,7 +7,9 @@ from pycombtop import (
     bounded_degree_complex,
     clique_complex,
     complex_of_forests,
+    directed_neighborhood_complex,
     is_oriented_simplex,
+    neighborhood_complex,
     nerve_of_cliques,
     nerve_of_sets,
     oriented_complex,
@@ -303,3 +305,88 @@ def test_complex_of_forests_complete():
     g = nx.complete_graph(3)
     cf = complex_of_forests(g)
     assert cf.dimension() == 1
+
+
+# ---------- neighborhood_complex ----------
+
+
+def test_neighborhood_complex_cycle():
+    """Neighborhood complex of C5 is 1-dimensional (each vertex has 2 neighbors)."""
+    nc = neighborhood_complex(nx.cycle_graph(5))
+    assert nc.dimension() == 1
+
+
+def test_neighborhood_complex_complete():
+    """Neighborhood complex of K4: each N(v) has 3 vertices, giving dim 2."""
+    nc = neighborhood_complex(nx.complete_graph(4))
+    assert nc.dimension() == 2
+
+
+def test_neighborhood_complex_vertex_set():
+    """Neighborhood complex preserves the graph's vertex set."""
+    g = nx.cycle_graph(4)
+    nc = neighborhood_complex(g)
+    assert nc.vertex_set == set(g.nodes())
+
+
+def test_neighborhood_complex_facets_are_neighborhoods():
+    """Each facet of the neighborhood complex is a neighborhood of some vertex."""
+    g = nx.path_graph(4)
+    nc = neighborhood_complex(g)
+    expected = {frozenset(g.neighbors(v)) for v in g.nodes() if list(g.neighbors(v))}
+    assert {frozenset(f) for f in nc.facet_set} == expected
+
+
+def test_neighborhood_complex_no_edges():
+    """Graph with no edges yields an empty neighborhood complex."""
+    g = nx.empty_graph(3)
+    nc = neighborhood_complex(g)
+    assert nc.dimension() == -1
+
+
+# ---------- directed_neighborhood_complex ----------
+
+
+def test_directed_neighborhood_complex_in():
+    """In-neighborhood complex: facets are in-neighborhoods of each vertex."""
+    d = nx.DiGraph([(0, 1), (0, 2), (1, 3), (2, 3)])
+    nc = directed_neighborhood_complex(d)
+    assert nc.dimension() == 1
+
+
+def test_directed_neighborhood_complex_out():
+    """Out-neighborhood complex: facets are out-neighborhoods of each vertex."""
+    d = nx.DiGraph([(0, 1), (0, 2), (1, 3), (2, 3)])
+    nc = directed_neighborhood_complex(d, use_out_neighborhood=True)
+    assert nc.dimension() == 1
+
+
+def test_directed_neighborhood_complex_in_facets():
+    """In-neighborhoods of a path digraph are singletons."""
+    d = nx.DiGraph([(0, 1), (1, 2)])
+    nc = directed_neighborhood_complex(d)
+    # N⁻(1)={0}, N⁻(2)={1}; N⁻(0)={} is dropped
+    assert nc.dimension() == 0
+
+
+def test_directed_neighborhood_complex_out_facets():
+    """Out-neighborhoods of a path digraph are singletons."""
+    d = nx.DiGraph([(0, 1), (1, 2)])
+    nc = directed_neighborhood_complex(d, use_out_neighborhood=True)
+    # N⁺(0)={1}, N⁺(1)={2}; N⁺(2)={} is dropped
+    assert nc.dimension() == 0
+
+
+def test_directed_neighborhood_complex_vertex_set():
+    """Directed neighborhood complex preserves the digraph's node set."""
+    d = nx.DiGraph([(0, 1), (1, 2)])
+    nc = directed_neighborhood_complex(d)
+    assert nc.vertex_set == set(d.nodes())
+
+
+def test_directed_neighborhood_complex_no_edges():
+    """Digraph with no edges yields an empty directed neighborhood complex."""
+    d = nx.DiGraph()
+    d.add_nodes_from([0, 1, 2])
+    nc = directed_neighborhood_complex(d)
+    assert nc.dimension() == -1
