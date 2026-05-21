@@ -91,7 +91,8 @@ def find_dominated_vertex(graph: nx.Graph) -> Hashable | None:
 
 
 def remove_dominated_vertex(graph: nx.Graph) -> nx.Graph:
-    """Return a copy of ``graph`` with one dominated vertex removed.
+    """Return a copy of ``graph`` with one dominated vertex removed,
+    if such vertex exists. Otherwise, return the same graph.
 
     .. rubric:: Examples
 
@@ -143,6 +144,11 @@ def pared_graph(graph: nx.Graph) -> nx.Graph:
     The operation keeps a representative from each twin class and removes any
     representative that is strictly dominated by another vertex outside its
     class.
+
+    This was defined in [Prisner92]_.
+
+     .. [Prisner92] Prisner, E. (1992). Convergence of iterated clique graphs.
+          Discrete Mathematics, 103(2), 199-207.
 
     .. rubric:: Examples
 
