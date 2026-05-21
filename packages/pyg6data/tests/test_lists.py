@@ -1,6 +1,12 @@
 import networkx as nx
 import pytest
-from pyg6data.lists import graph_generator, list_graphs, small_torsion_graphs
+from pyg6data.lists import (
+    cubic_graph_generator,
+    graph_generator,
+    list_cubic_graphs,
+    list_graphs,
+    small_torsion_graphs,
+)
 
 
 def test_graph_generator_valid_input():
@@ -52,3 +58,51 @@ def test_graph_generator_non_gzip():
     assert len(graphs) > 0
     assert all(isinstance(g, nx.Graph) for g in graphs)
     assert all(g.number_of_nodes() == 5 for g in graphs)
+
+
+# ---------- Tests for cubic graph functions ----------
+
+
+def test_cubic_graph_generator_valid_input():
+    """Test that the cubic generator yields valid cubic connected graphs."""
+    gen = cubic_graph_generator(n=8)
+    first_graph = next(gen)
+
+    assert isinstance(first_graph, nx.Graph)
+    assert first_graph.number_of_nodes() == 8
+    assert nx.is_connected(first_graph)
+    assert all(d == 3 for _, d in first_graph.degree())
+
+
+def test_cubic_graph_generator_invalid_input():
+    """Test that asking for an unavailable order raises a ValueError."""
+    with pytest.raises(ValueError, match="is not available"):
+        list(cubic_graph_generator(n=7))
+
+
+def test_list_cubic_graphs_known_count_n8():
+    """Verify the exact count of cubic connected graphs on 8 vertices."""
+    # There are exactly 5 cubic connected graphs on 8 vertices (OEIS A002851)
+    graphs = list_cubic_graphs(n=8)
+
+    assert isinstance(graphs, list)
+    assert len(graphs) == 5
+    assert all(isinstance(g, nx.Graph) for g in graphs)
+
+
+def test_list_cubic_graphs_known_count_n10():
+    """Verify the exact count of cubic connected graphs on 10 vertices."""
+    # There are exactly 19 cubic connected graphs on 10 vertices (OEIS A002851)
+    graphs = list_cubic_graphs(n=10)
+
+    assert len(graphs) == 19
+
+
+def test_cubic_graph_generator_gzip():
+    """Test the gzip file path for cubic graphs (e.g., cub18.g6.gz)."""
+    gen = cubic_graph_generator(n=18)
+    first_graph = next(gen)
+
+    assert isinstance(first_graph, nx.Graph)
+    assert first_graph.number_of_nodes() == 18
+    assert all(d == 3 for _, d in first_graph.degree())

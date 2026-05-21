@@ -30,6 +30,21 @@ _dict_connected = {
     10: "graph10c.g6.gz",
 }
 
+# Cubic connected graphs obtained from the House of Graphs database:
+# https://houseofgraphs.org/
+# Citation: K. Coolsaet, S. D'hondt and J. Goedgebeur, House of Graphs 2.0:
+# A database of interesting graphs and more, Discrete Applied Mathematics,
+# 325:97-107, 2023. Available at https://houseofgraphs.org
+_dict_cubic = {
+    8: "cub08.g6",
+    10: "cub10.g6",
+    12: "cub12.g6",
+    14: "cub14.g6",
+    16: "cub16.g6",
+    18: "cub18.g6.gz",
+    20: "cub20.g6.gz",
+}
+
 
 def _get_data_file_path(filename: str) -> resources.abc.Traversable:
     """Helper function to resolve the modern path to a package data file."""
@@ -97,3 +112,76 @@ def small_torsion_graphs() -> list[nx.Graph]:
                     nx.from_graph6_bytes(graph_string.encode("utf-8"))
                 )
     return list_of_graphs
+
+
+def cubic_graph_generator(n: int) -> Iterator[nx.Graph]:
+    """Yields cubic connected graphs of a given order from House of Graphs data.
+
+    Data obtained from the House of Graphs database
+    (https://houseofgraphs.org/).
+
+    .. rubric:: Parameters
+
+    n : int
+        Order of the graphs (number of nodes). Must be an even number
+        between 8 and 20.
+
+    .. rubric:: Yields
+
+    networkx.Graph
+        A cubic connected NetworkX graph of order ``n``.
+
+    .. rubric:: Raises
+
+    ValueError
+        If the requested order ``n`` is not available.
+
+    .. rubric:: Notes
+
+    Citation: K. Coolsaet, S. D'hondt and J. Goedgebeur, House of Graphs
+    2.0: A database of interesting graphs and more, *Discrete Applied
+    Mathematics*, 325:97-107, 2023. Available at https://houseofgraphs.org
+    """
+    if n not in _dict_cubic:
+        msg = f"Cubic graph data for n={n} is not available."
+        raise ValueError(msg)
+
+    filename = _dict_cubic[n]
+    file_path = _get_data_file_path(filename)
+
+    if filename.endswith(".gz"):
+        with file_path.open("rb") as raw_file:
+            with gzip.open(raw_file, "rt", encoding="utf-8") as graph_file:
+                for graph_string in graph_file:
+                    graph_string = graph_string.strip()
+                    if graph_string:
+                        yield nx.from_graph6_bytes(graph_string.encode("utf-8"))
+    else:
+        with file_path.open("r", encoding="utf-8") as graph_file:
+            for graph_string in graph_file:
+                graph_string = graph_string.strip()
+                if graph_string:
+                    yield nx.from_graph6_bytes(graph_string.encode("utf-8"))
+
+
+def list_cubic_graphs(n: int) -> list[nx.Graph]:
+    """List of cubic connected graphs of a given order, from House of Graphs data.
+
+    .. rubric:: Parameters
+
+    n : int
+        Order of the graphs (number of nodes). Must be an even number
+        between 8 and 20.
+
+    .. rubric:: Returns
+
+    list[networkx.Graph]
+        All cubic connected graphs of order ``n``.
+
+    .. rubric:: Notes
+
+    Citation: K. Coolsaet, S. D'hondt and J. Goedgebeur, House of Graphs
+    2.0: A database of interesting graphs and more, *Discrete Applied
+    Mathematics*, 325:97-107, 2023. Available at https://houseofgraphs.org
+    """
+    return list(cubic_graph_generator(n))
