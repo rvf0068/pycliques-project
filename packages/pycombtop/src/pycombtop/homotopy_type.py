@@ -328,7 +328,7 @@ def betti_numbers_sc(s_complex: SimplicialComplex) -> list[int]:
     dim = max((len(f) - 1 for f in s_complex.facet_set), default=-1)
     if dim < 0:
         return []
-    numbers = [mc.betti_number(i) for i in range(dim + 1)]
+    numbers = [int(mc.betti_number(i)) for i in range(dim + 1)]
     numbers[0] -= 1  # reduced beta_0
     return _simplify_betti_list(numbers)
 
@@ -338,7 +338,7 @@ def betti_numbers_graph(graph: nx.Graph) -> list[int]:
     simplices = [tuple(c) for c in nx.find_cliques(graph)]
     mc = mogutda.SimplicialComplex(simplices=simplices)
     dim = max((len(s) - 1 for s in simplices), default=-1)
-    numbers = [mc.betti_number(i) for i in range(dim + 1)]
+    numbers = [int(mc.betti_number(i)) for i in range(dim + 1)]
     numbers[0] -= 1
     return _simplify_betti_list(numbers)
 
