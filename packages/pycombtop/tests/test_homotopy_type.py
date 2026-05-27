@@ -210,6 +210,14 @@ def test_path_graph_contractible():
     assert v.verdict == "Contractible"
 
 
+def test_two_isolated_vertices_s0():
+    """Two isolated vertices (graph atlas #2) have homotopy type S^0."""
+    g = nx.graph_atlas_g()[2]
+    v = homotopy_type_with_verdict(g)
+    assert "S^{0}" in v.verdict
+    assert v.is_exact is True
+
+
 # ---------- homotopy_type_sc_with_verdict ----------
 
 

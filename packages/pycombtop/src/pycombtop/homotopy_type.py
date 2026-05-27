@@ -326,6 +326,8 @@ def betti_numbers_sc(s_complex: SimplicialComplex) -> list[int]:
     simplices = [tuple(c) for c in s_complex.facet_set]
     mc = mogutda.SimplicialComplex(simplices=simplices)
     dim = max((len(f) - 1 for f in s_complex.facet_set), default=-1)
+    if dim < 0:
+        return []
     numbers = [mc.betti_number(i) for i in range(dim + 1)]
     numbers[0] -= 1  # reduced beta_0
     return _simplify_betti_list(numbers)
@@ -484,6 +486,9 @@ def _try_star_cluster(graph: nx.Graph) -> HomotopyVerdict | None:
     st = star(ig, vertex)
     sc = star_cluster(ig, cg[vertex])
     inter = collapse(intersection_complex(st, sc))
+    # empty intersection means the decomposition is not applicable
+    if not inter.vertex_set:
+        return None
     # check vertex decomposability of intersection
     if not is_vertex_decomposable(inter):
         return None
