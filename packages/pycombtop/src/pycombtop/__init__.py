@@ -11,6 +11,7 @@ from .fundamental_group import (
     fundamental_group,
     fundamental_group_as_permutation_group,
 )
+from .hom_complex import graph_homomorphisms, hom_graph
 
 # homotopy_type
 from .homotopy_type import (
@@ -100,4 +101,7 @@ __all__ = [
     "is_s_dismantlable_vertex",
     "remove_s_dismantlable_edge",
     "remove_s_dismantlable_vertex",
+    # hom_complex
+    "graph_homomorphisms",
+    "hom_graph",
 ]
