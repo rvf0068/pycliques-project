@@ -602,9 +602,9 @@ def directed_neighborhood_complex(
     """Return the directed neighborhood complex of *digraph*.
 
     The vertex set is the node set of *digraph*.  By default the facets are
-    the open **in**-neighborhoods ``N⁻(v) = {u : (u, v) ∈ E}`` for each
+    the open **in**-neighborhoods ``N^-(v) = {u : (u, v) in E}`` for each
     vertex *v*.  When *use_out_neighborhood* is ``True`` the facets are the
-    open **out**-neighborhoods ``N⁺(v) = {u : (v, u) ∈ E}`` instead.
+    open **out**-neighborhoods ``N^+(v) = {u : (v, u) in E}`` instead.
 
     .. rubric:: Parameters
 

@@ -716,12 +716,12 @@ def recognize_clockwork(
     s = len(B_segs_raw)
 
     if s < 3:
-        return False, (f"Only {s} crown segment(s) — need s >= 3.")
+        return False, (f"Only {s} crown segment(s) -- need s >= 3.")
 
     for i, bs in enumerate(B_segs_raw):
         if len(bs) < 2:
             return False, (
-                f"Crown segment {i} has {len(bs)} vertex — violates B1 (need >= 2)."
+                f"Crown segment {i} has {len(bs)} vertex -- violates B1 (need >= 2)."
             )
         if not is_complete_graph(G, bs):
             return False, (f"Crown segment {i} is not a clique.")
@@ -768,7 +768,7 @@ def recognize_clockwork(
             return False, (
                 f"Edges between crown segments {i} and "
                 f"{(i + 1) % s} are not a perfect "
-                f"matching — violates B2."
+                f"matching -- violates B2."
             )
 
     # Step 3. Core segments.

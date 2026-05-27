@@ -119,7 +119,7 @@ def hom_graph(g: nx.Graph, h: nx.Graph) -> nx.Graph:
         >>> result.number_of_edges()
         1
 
-    When *G* is a single edge and *H* is also a single edge (K₂), only
+    When *G* is a single edge and *H* is also a single edge (K_2), only
     two homomorphisms exist and they are not adjacent::
 
         >>> G = nx.path_graph(2)

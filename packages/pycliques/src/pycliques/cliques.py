@@ -107,7 +107,7 @@ def homotopy_clique_graph(graph: nx.Graph) -> nx.Graph:
 
     This is the operator :math:`H` defined in [Larrion08]_.
 
-     .. [Larrion08] F. Larrion, M. A. Pizana and R. Villarroel-Flores. Posets,
+     .. [Larrion08] F. Larrión, M. A. Pizaña and R. Villarroel-Flores. Posets,
          clique graphs and their homotopy type. European Journal of
          Combinatorics, 29(1), (2008) pp. 334-342.
 
