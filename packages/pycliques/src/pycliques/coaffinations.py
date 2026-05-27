@@ -1,7 +1,7 @@
 r"""
 A *coaffination* of a graph :math:`G` is an automorphism
 :math:`\sigma\colon G\to G` such that the distance from
-:math:`\sigma(x)` to :math:`x` is at least 2 for each vertex
+:math:`\sigma(x)` to :math:`x` is at least 2 for each vertex
 :math:`x`.
 """
 
@@ -11,6 +11,7 @@ import math
 from collections.abc import Hashable, Iterator
 
 import networkx as nx
+from grandiso import find_motifs_iter
 from networkx.algorithms import isomorphism
 
 from .cliques import Clique, clique_graph
@@ -139,3 +140,109 @@ def coaffinations(graph: nx.Graph, k: int) -> Iterator[dict[int, int]]:
                 break
         else:
             yield auto
+
+
+def is_coaffine_map(
+    small_pair: CoaffinePair,
+    large_pair: CoaffinePair,
+    mono: dict[Hashable, Hashable],
+) -> bool:
+    """Return ``True`` if *mono* is a coaffine map from *small_pair* to *large_pair*.
+
+    A graph monomorphism ``f: G -> H`` is *coaffine* with respect to coaffine
+    pairs ``(G, s)`` and ``(H, t)`` when it satisfies the equivariance
+    condition ``f(s(v)) = t(f(v))`` for every vertex ``v`` in ``G``.
+
+    .. rubric:: Parameters
+
+    small_pair : CoaffinePair
+        The domain pair ``(G, s)``.
+    large_pair : CoaffinePair
+        The codomain pair ``(H, t)``.
+    mono : dict
+        A monomorphism mapping vertices of ``G`` to vertices of ``H``.
+
+    .. rubric:: Returns
+
+    bool
+        ``True`` if the equivariance condition holds for every vertex,
+        ``False`` otherwise.
+
+    .. rubric:: Examples
+
+    >>> import networkx as nx
+    >>> from pycliques import CoaffinePair, is_coaffine_map
+    >>> g = nx.cycle_graph(4)
+    >>> sigma = {0: 2, 1: 3, 2: 0, 3: 1}
+    >>> pair = CoaffinePair(g, sigma)
+    >>> is_coaffine_map(pair, pair, sigma)
+    True
+    >>> other = CoaffinePair(g, {0: 3, 1: 0, 2: 1, 3: 2})
+    >>> is_coaffine_map(pair, other, {0: 0, 1: 1, 2: 2, 3: 3})
+    False
+
+    """
+    sigma = small_pair.coaffination
+    tau = large_pair.coaffination
+    return all(mono[sigma[v]] == tau[mono[v]] for v in small_pair.graph)
+
+
+def coaffine_monomorphism(
+    large_pair: CoaffinePair,
+    small_pair: CoaffinePair,
+    algorithm: str = "GM",
+) -> dict[Hashable, Hashable] | bool:
+    """Find a coaffine monomorphism from *small_pair* to *large_pair*.
+
+    Searches for a graph monomorphism ``f: G -> H`` (where ``G`` is the graph
+    of *small_pair* and ``H`` is the graph of *large_pair*) that is equivariant
+    with respect to the stored coaffinations, i.e. satisfies
+    ``f(s(v)) = t(f(v))`` for every vertex ``v`` in ``G``.
+
+    .. rubric:: Parameters
+
+    large_pair : CoaffinePair
+        The codomain coaffine pair ``(H, t)``.
+    small_pair : CoaffinePair
+        The domain coaffine pair ``(G, s)``.
+    algorithm : str, optional
+        Subgraph search backend.  ``"GM"`` (default) uses NetworkX's
+        :class:`~networkx.algorithms.isomorphism.GraphMatcher`;
+        ``"Grandiso"`` uses :func:`grandiso.find_motifs_iter`.
+
+    .. rubric:: Returns
+
+    dict | False
+        A dict mapping each vertex of ``G`` to a vertex of ``H`` when a
+        coaffine monomorphism is found, or ``False`` when none exists.
+
+    .. rubric:: Examples
+
+    >>> import networkx as nx
+    >>> from pycliques import CoaffinePair, coaffine_monomorphism
+    >>> g = nx.cycle_graph(4)
+    >>> sigma = {0: 2, 1: 3, 2: 0, 3: 1}
+    >>> pair = CoaffinePair(g, sigma)
+    >>> f = coaffine_monomorphism(pair, pair)
+    >>> f is not False
+    True
+    >>> from pycliques import is_coaffine_map
+    >>> is_coaffine_map(pair, pair, f)
+    True
+
+    """
+    g1 = small_pair.graph
+    g2 = large_pair.graph
+    if algorithm == "GM":
+        gm = isomorphism.GraphMatcher(g2, g1)
+        the_iter = gm.subgraph_monomorphisms_iter()
+    elif algorithm == "Grandiso":
+        the_iter = find_motifs_iter(g1, g2)
+    else:
+        raise ValueError(f"Unknown algorithm: {algorithm!r}")
+    for mono in the_iter:
+        if algorithm == "GM":
+            mono = {v: k for k, v in mono.items()}
+        if is_coaffine_map(small_pair, large_pair, mono) is True:
+            return mono
+    return False

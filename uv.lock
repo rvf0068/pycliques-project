@@ -725,6 +725,15 @@ wheels = [
 ]
 
 [[package]]
+name = "grandiso"
+version = "2.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "networkx" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/65/c6/27400e2d81bd769ebe65c695cead44c8efb55ac3769826a01c9223d65709/grandiso-2.2.0.tar.gz", hash = "sha256:66f292d27328e13122065c7905ad0ac79c4649f69a35e7b98a3631654a0bf77c", size = 16277, upload-time = "2024-02-13T16:21:18.053Z" }
+
+[[package]]
 name = "h11"
 version = "0.16.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2054,6 +2063,7 @@ name = "pycliques"
 version = "0.1.0"
 source = { editable = "packages/pycliques" }
 dependencies = [
+    { name = "grandiso" },
     { name = "networkx" },
     { name = "rich" },
 ]
@@ -2065,6 +2075,7 @@ data = [
 
 [package.metadata]
 requires-dist = [
+    { name = "grandiso", specifier = ">=2.2.0" },
     { name = "networkx", specifier = ">=3.6" },
     { name = "pyg6data", marker = "extra == 'data'", editable = "packages/pyg6data" },
     { name = "rich" },

@@ -18,7 +18,13 @@ from .clockwork import (
     remove_dominated_vertices,
     segmented_sum,
 )
-from .coaffinations import CoaffinePair, automorphisms, coaffinations
+from .coaffinations import (
+    CoaffinePair,
+    automorphisms,
+    coaffinations,
+    coaffine_monomorphism,
+    is_coaffine_map,
+)
 from .cutpoints import (
     cutpoint_edge_contractions,
     cutpoint_edge_removals,
@@ -107,6 +113,8 @@ __all__ = [
     "CoaffinePair",
     "automorphisms",
     "coaffinations",
+    "coaffine_monomorphism",
+    "is_coaffine_map",
     # cutpoints
     "cutpoint_edge_contractions",
     "cutpoint_edge_removals",
