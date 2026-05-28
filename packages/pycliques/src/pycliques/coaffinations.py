@@ -244,5 +244,5 @@ def coaffine_monomorphism(
         if algorithm == "GM":
             mono = {v: k for k, v in mono.items()}
         if is_coaffine_map(small_pair, large_pair, mono) is True:
-            return mono
+            return dict(mono)
     return False

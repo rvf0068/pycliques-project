@@ -55,10 +55,10 @@ def test_is_coaffine_map_identity_sigma_is_coaffine():
 
 
 def test_is_coaffine_map_identity_map_not_coaffine():
-    """The identity map is not coaffine when the two pairs have different coaffinations."""
+    """The identity map is not coaffine when pairs have different coaffinations."""
     g = nx.cycle_graph(4)
     sigma = {0: 2, 1: 3, 2: 0, 3: 1}  # antipodal flip
-    tau = {0: 1, 1: 2, 2: 3, 3: 0}   # rotation by 1 (different coaffination)
+    tau = {0: 1, 1: 2, 2: 3, 3: 0}  # rotation by 1 (different coaffination)
     small_pair = CoaffinePair(g, sigma)
     large_pair = CoaffinePair(g, tau)
     identity = {v: v for v in g}
