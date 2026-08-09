@@ -8,6 +8,7 @@ from pycombtop import (
     clique_complex,
     complex_of_forests,
     directed_neighborhood_complex,
+    dong_matching,
     is_oriented_simplex,
     neighborhood_complex,
     nerve_of_cliques,
@@ -181,7 +182,7 @@ def test_all_simplices():
 def test_dong_matching():
     """Dong matching returns a subset of all simplices."""
     sc = SimplicialComplex({0, 1}, facet_set=[{0, 1}])
-    critical = sc.dong_matching(order_function=sorted)
+    critical = dong_matching(sc, order_function=sorted)
     assert critical.issubset(sc.all_simplices())
 
 

@@ -300,51 +300,55 @@ class SimplicialComplex:
             all_simplices_set.update(subset_generator)
         return {Simplex(s) for s in all_simplices_set}
 
-    def dong_matching(
-        self, order_function: Callable[[set], list] = list
-    ) -> set[Simplex]:
-        """Return the critical simplices under Dong's matching.
-
-        The matching pairs simplices with their unions with a vertex according
-        to the vertex ordering given by *order_function*.  The returned set
-        contains exactly the unmatched (critical) simplices.
-
-        .. rubric:: Parameters
-
-        order_function : callable, optional
-            A function that converts the vertex set into an ordered list
-            (default: ``list``).
-
-        .. rubric:: Returns
-
-        set of :class:`Simplex`
-            The unmatched (critical) simplices.
-
-        .. rubric:: Examples
-
-        >>> from pycombtop import SimplicialComplex
-        >>> sc = SimplicialComplex({0, 1}, facet_set=[{0, 1}])
-        >>> critical = sc.dong_matching(order_function=sorted)
-        >>> len(critical) % 2  # critical simplices are not paired
-        0
-        """
-        matched = set()
-        vertices = order_function(self.vertex_set)
-
-        for vertex in vertices:
-            the_link = self.link(vertex)
-            link_simplices = the_link.all_simplices()
-
-            for s in link_simplices:
-                s_plus_v = Simplex(s | {vertex})
-                if (s not in matched) and (s_plus_v not in matched):
-                    matched.add(s)
-                    matched.add(s_plus_v)
-
-        return self.all_simplices() - matched
-
 
 # --- Module Functions ---
+
+
+def dong_matching(
+    s_complex: SimplicialComplex,
+    order_function: Callable[[set], list] = list,
+) -> set[Simplex]:
+    """Return the critical simplices of *s_complex* under Dong's matching.
+
+    The matching pairs simplices with their unions with a vertex according
+    to the vertex ordering given by *order_function*.  The returned set
+    contains exactly the unmatched (critical) simplices.
+
+    .. rubric:: Parameters
+
+    s_complex : :class:`SimplicialComplex`
+        The complex on which to run the matching.
+    order_function : callable, optional
+        A function that converts the vertex set into an ordered list
+        (default: ``list``).
+
+    .. rubric:: Returns
+
+    set of :class:`Simplex`
+        The unmatched (critical) simplices.
+
+    .. rubric:: Examples
+
+    >>> from pycombtop import SimplicialComplex, dong_matching
+    >>> sc = SimplicialComplex({0, 1}, facet_set=[{0, 1}])
+    >>> critical = dong_matching(sc, order_function=sorted)
+    >>> len(critical) % 2  # critical simplices are not paired
+    0
+    """
+    matched: set[Simplex] = set()
+    vertices = order_function(s_complex.vertex_set)
+
+    for vertex in vertices:
+        the_link = s_complex.link(vertex)
+        link_simplices = the_link.all_simplices()
+
+        for s in link_simplices:
+            s_plus_v = Simplex(s | {vertex})
+            if (s not in matched) and (s_plus_v not in matched):
+                matched.add(s)
+                matched.add(s_plus_v)
+
+    return s_complex.all_simplices() - matched
 
 
 def all_subsets(the_set: set) -> Generator[Simplex]:

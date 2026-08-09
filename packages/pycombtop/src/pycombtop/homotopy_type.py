@@ -39,7 +39,7 @@ from pycliques.surfaces import open_neighborhood
 from sympy import Add, Mul, Poly, symbols
 
 from .s_collapses import complete_s_collapse, complete_s_collapse_edges
-from .simplex import Simplex, SimplicialComplex, clique_complex
+from .simplex import Simplex, SimplicialComplex, clique_complex, dong_matching
 
 # ---------------------------------------------------------------------------
 # Theorem citations
@@ -415,7 +415,7 @@ def _try_dong(
     """Try Dong matching (up to 7 attempts with random vertex orderings)."""
     collapsed = collapse(s_complex)
     # deterministic first pass
-    w = _read_dong(collapsed.dong_matching())
+    w = _read_dong(dong_matching(collapsed))
     if w is not None:
         reason = Theorem.DONG_MATCHING
         if extra_reasons:
@@ -423,7 +423,7 @@ def _try_dong(
         return HomotopyVerdict(wedge=w, reason=reason)
     # randomised passes
     for _ in range(6):
-        w = _read_dong(collapsed.dong_matching(order_function=_shuff))
+        w = _read_dong(dong_matching(collapsed, order_function=_shuff))
         if w is not None:
             reason = Theorem.DONG_MATCHING
             if extra_reasons:
