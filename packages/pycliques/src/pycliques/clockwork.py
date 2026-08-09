@@ -187,14 +187,14 @@ def core(
             list(
                 range(
                     sum(segments[:seg]),
-                    sum(segments[: (seg + 1)]),
+                    sum(segments[:(seg + 1)]),
                 )
             )
         )
         for i in range(segments[seg]):
             curr_vertex = sum(segments[:seg]) + i
             if seg < len(segments) - 1:
-                start_next = sum(segments[: (seg + 1)])
+                start_next = sum(segments[:(seg + 1)])
             else:
                 start_next = 0
             for j in range(neig_segments[seg][i]):
