@@ -11,7 +11,6 @@ from enum import Enum, auto
 from pathlib import Path
 
 import networkx as nx
-from pyg6data.lists import _dict_connected, _get_data_file_path
 from rich.logging import RichHandler
 
 from pycliques import __version__
@@ -430,6 +429,8 @@ def _setup_logging(loglevel: int):
 
 def _main(args: list[str]):
     """Run the small-graph classification from parsed CLI arguments."""
+    from pyg6data.lists import _dict_connected, _get_data_file_path
+
     parsed_args = _parse_args(args)
     _setup_logging(parsed_args.loglevel)
 
