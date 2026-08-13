@@ -53,17 +53,18 @@ class Simplex(frozenset):
 
 
 class SimplicialComplex:
-    """A simplicial complex over a finite vertex set.
+    """A simplicial complex over a finite base set.
 
-    A :class:`SimplicialComplex` is composed of a set of vertices and a set of
-    simplices (of type :class:`Simplex`), which correspond to subsets of the
-    vertex set.  It can be constructed either from an explicit set of facets or
-    from a membership function that decides which subsets are simplices.
+    A :class:`SimplicialComplex` is composed of a base set of points and a set
+    of simplices (of type :class:`Simplex`), which correspond to subsets of the
+    base set.  The *vertex set* is the subset of the base set whose singletons
+    are simplices.  It can be constructed either from an explicit set of facets
+    or from a membership function that decides which subsets are simplices.
 
     .. rubric:: Parameters
 
-    vertex_set : set
-        The ground set of vertices.
+    base_set : set
+        The ground set of points.
     facet_set : set of sets, optional
         Maximal simplices.  When given, the membership function is derived
         automatically.
@@ -89,11 +90,11 @@ class SimplicialComplex:
 
     def __init__(
         self,
-        vertex_set: Iterable,
+        base_set: Iterable,
         facet_set: Iterable | None = None,
         function: Callable[..., bool] | None = None,
     ) -> None:
-        self.vertex_set = set(vertex_set)
+        self.base_set = set(base_set)
 
         # Determine the membership function
         if function is not None:
@@ -119,13 +120,13 @@ class SimplicialComplex:
         This calculates the facet set by finding the maximal subsets
         of vertices that satisfy *self.function*.
         """
-        if self.function(self.vertex_set):
-            return {Simplex(self.vertex_set)}
+        if self.function(self.base_set):
+            return {Simplex(self.base_set)}
 
         facets: set[Simplex] = set()
         # Evaluate subsets lazily to save memory
-        for r in reversed(range(1, len(self.vertex_set) + 1)):
-            for subset in combinations(self.vertex_set, r):
+        for r in reversed(range(1, len(self.base_set) + 1)):
+            for subset in combinations(self.base_set, r):
                 s = Simplex(subset)
                 if self.function(s):
                     # Check if s is already subsumed by a known facet
@@ -134,14 +135,14 @@ class SimplicialComplex:
         return facets
 
     def __repr__(self) -> str:
-        base = f"Simplicial complex with vertex_set {self.vertex_set} "
+        base = f"Simplicial complex with base_set {self.base_set} "
         return base + f"and facets {self.facet_set}."
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, SimplicialComplex):
             return False
 
-        return self.vertex_set == other.vertex_set and self.facet_set == other.facet_set
+        return self.base_set == other.base_set and self.facet_set == other.facet_set
 
     def dimension(self) -> int:
         """Return the dimension of the simplicial complex.
@@ -175,10 +176,10 @@ class SimplicialComplex:
         >>> d = sc.deletion(2)
         >>> d.dimension()
         1
-        >>> 2 in d.vertex_set
+        >>> 2 in d.base_set
         False
         """
-        vertices = self.vertex_set - {x}
+        vertices = self.base_set - {x}
         containing = {f for f in self.facet_set if x in f}
         not_containing = self.facet_set - containing
 
@@ -204,7 +205,7 @@ class SimplicialComplex:
         >>> lk = sc.link(0)
         >>> lk.dimension()
         1
-        >>> 0 in lk.vertex_set
+        >>> 0 in lk.base_set
         False
         """
         containing = {f for f in self.facet_set if x in f}
@@ -233,12 +234,30 @@ class SimplicialComplex:
         def _new_function(s: set) -> bool:
             return self.function(s) and len(s) <= n + 1
 
-        return SimplicialComplex(self.vertex_set, function=_new_function)
+        return SimplicialComplex(self.base_set, function=_new_function)
+
+    @property
+    def vertex_set(self) -> set:
+        """Return the set of actual vertices (0-simplices) of the complex.
+
+        A point *x* in the base set is a vertex when ``{x}`` is a simplex.
+
+        .. rubric:: Examples
+
+        >>> from pycombtop import SimplicialComplex
+        >>> sc = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1}])
+        >>> sc.vertex_set == {0, 1}
+        True
+        >>> sc.base_set == {0, 1, 2}
+        True
+        """
+        return {x for x in self.base_set if self.function({x})}
 
     def one_skeleton_graph(self) -> nx.Graph:
         """Return the 1-skeleton as a :class:`networkx.Graph`.
 
-        Vertices become graph nodes and 1-simplices become edges.
+        Nodes are the actual vertices (0-simplices) and edges are the
+        1-simplices of the complex.
 
         .. rubric:: Examples
 
@@ -250,12 +269,11 @@ class SimplicialComplex:
         >>> g.number_of_edges()
         3
         """
+        vertices = self.vertex_set
         the_graph = nx.Graph()
-        the_graph.add_nodes_from(self.vertex_set)
+        the_graph.add_nodes_from(vertices)
         edges = [
-            (i, j)
-            for (i, j) in combinations(self.vertex_set, 2)
-            if self.function({i, j})
+            (i, j) for (i, j) in combinations(vertices, 2) if self.function({i, j})
         ]
         the_graph.add_edges_from(edges)
         return the_graph
@@ -336,7 +354,7 @@ def dong_matching(
     0
     """
     matched: set[Simplex] = set()
-    vertices = order_function(s_complex.vertex_set)
+    vertices = order_function(s_complex.base_set)
 
     for vertex in vertices:
         the_link = s_complex.link(vertex)

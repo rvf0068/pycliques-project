@@ -58,7 +58,7 @@ def test_complex_from_facets():
     """Build complex from explicit facets."""
     sc = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1, 2}])
     assert sc.dimension() == 2
-    assert sc.vertex_set == {0, 1, 2}
+    assert sc.base_set == {0, 1, 2}
 
 
 def test_complex_from_function():
@@ -95,10 +95,10 @@ def test_complex_not_equal_to_non_complex():
 
 
 def test_complex_repr():
-    """Repr mentions vertex_set and facets."""
+    """Repr mentions base_set and facets."""
     sc = SimplicialComplex({0}, facet_set=[{0}])
     r = repr(sc)
-    assert "vertex_set" in r
+    assert "base_set" in r
     assert "facets" in r
 
 
@@ -109,7 +109,7 @@ def test_deletion():
     """Deleting a vertex removes it and updates facets."""
     sc = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1, 2}])
     d = sc.deletion(2)
-    assert 2 not in d.vertex_set
+    assert 2 not in d.base_set
     assert d.dimension() == 1
 
 
@@ -124,7 +124,7 @@ def test_link():
     """Link of a vertex in a triangle has the opposite edge."""
     sc = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1, 2}])
     lk = sc.link(0)
-    assert 0 not in lk.vertex_set
+    assert 0 not in lk.base_set
     assert lk.dimension() == 1
 
 
@@ -147,6 +147,20 @@ def test_skeleton_zero():
     sc = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1, 2}])
     sk = sc.skeleton(0)
     assert sk.dimension() == 0
+
+
+def test_vertex_set_property():
+    """vertex_set returns only points whose singleton is a simplex."""
+    sc = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1}])
+    assert sc.vertex_set == {0, 1}
+    assert sc.base_set == {0, 1, 2}
+
+
+def test_one_skeleton_graph_uses_vertex_set():
+    """1-skeleton graph nodes are the actual vertices, not the full base set."""
+    sc = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1}])
+    g = sc.one_skeleton_graph()
+    assert set(g.nodes()) == {0, 1}  # 2 is in base_set but not a vertex
 
 
 def test_one_skeleton_graph():
@@ -323,11 +337,11 @@ def test_neighborhood_complex_complete():
     assert nc.dimension() == 2
 
 
-def test_neighborhood_complex_vertex_set():
-    """Neighborhood complex preserves the graph's vertex set."""
+def test_neighborhood_complex_base_set():
+    """Neighborhood complex preserves the graph's base set."""
     g = nx.cycle_graph(4)
     nc = neighborhood_complex(g)
-    assert nc.vertex_set == set(g.nodes())
+    assert nc.base_set == set(g.nodes())
 
 
 def test_neighborhood_complex_facets_are_neighborhoods():
@@ -378,11 +392,11 @@ def test_directed_neighborhood_complex_out_facets():
     assert nc.dimension() == 0
 
 
-def test_directed_neighborhood_complex_vertex_set():
-    """Directed neighborhood complex preserves the digraph's node set."""
+def test_directed_neighborhood_complex_base_set():
+    """Directed neighborhood complex preserves the digraph's base set."""
     d = nx.DiGraph([(0, 1), (1, 2)])
     nc = directed_neighborhood_complex(d)
-    assert nc.vertex_set == set(d.nodes())
+    assert nc.base_set == set(d.nodes())
 
 
 def test_directed_neighborhood_complex_no_edges():
