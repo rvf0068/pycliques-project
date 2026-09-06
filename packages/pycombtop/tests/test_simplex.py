@@ -405,3 +405,132 @@ def test_directed_neighborhood_complex_no_edges():
     d.add_nodes_from([0, 1, 2])
     nc = directed_neighborhood_complex(d)
     assert nc.dimension() == -1
+
+
+# ---------- star / link / antistar of a general simplex ----------
+
+
+def test_star_single_vertex_matches_method():
+    """star(sc, v) agrees with the existing SimplicialComplex.link-adjacent
+    method-based star for a single vertex (backward compatibility)."""
+    from pycombtop import star
+
+    sc = SimplicialComplex({0, 1, 2, 3}, facet_set=[{0, 1, 2}, {0, 3}])
+    st = star(sc, 0)
+    assert st.vertex_set == {0, 1, 2, 3}
+    assert st.facet_set == {Simplex({0, 1, 2}), Simplex({0, 3})}
+
+
+def test_star_of_simplex_multiple_vertices():
+    """star(sc, sigma) with |sigma| > 1 restricts to facets containing sigma."""
+    from pycombtop import star
+
+    sc = SimplicialComplex({0, 1, 2, 3}, facet_set=[{0, 1, 2}, {0, 3}])
+    st = star(sc, {1, 2})
+    assert st.facet_set == {Simplex({0, 1, 2})}
+
+
+def test_star_of_graph_interpreted_as_clique_complex():
+    """star() accepts a networkx graph directly, via its clique complex."""
+    from pycombtop import star
+
+    g = nx.complete_graph(3)
+    st = star(g, 0)
+    assert st.dimension() == 2
+
+
+def test_star_empty_when_sigma_not_a_face():
+    """star() of a simplex not present in the complex is empty."""
+    from pycombtop import star
+
+    sc = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1, 2}])
+    st = star(sc, 99)
+    assert st.facet_set == set()
+
+
+def test_link_single_vertex_matches_method():
+    """link(sc, v) agrees with SimplicialComplex.link for a single vertex."""
+    from pycombtop import link
+
+    sc = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1, 2}])
+    assert link(sc, 0).facet_set == sc.link(0).facet_set
+
+
+def test_link_of_simplex_two_vertices():
+    """link(sc, {u, v}) is order-independent and matches iterated link()."""
+    from pycombtop import link
+
+    sc = SimplicialComplex({0, 1, 2, 3}, facet_set=[{0, 1, 2}, {0, 1, 3}])
+    lk = link(sc, {0, 1})
+    assert sorted(lk.vertex_set) == [2, 3]
+    # order independence: {0,1} vs {1,0}
+    assert link(sc, {1, 0}).facet_set == lk.facet_set
+
+
+def test_link_of_graph_interpreted_as_clique_complex():
+    """link() accepts a networkx graph directly, via its clique complex."""
+    from pycombtop import link
+
+    g = nx.complete_graph(4)
+    lk = link(g, 0)
+    assert sorted(lk.vertex_set) == [1, 2, 3]
+
+
+def test_antistar_keeps_vertices_removes_only_top_simplices():
+    """antistar(sc, sigma) keeps sigma's vertices but drops facets through it
+    (for |sigma| > 1 this is genuinely different from deleting the vertices)."""
+    from pycombtop import antistar
+
+    sc = SimplicialComplex({0, 1, 2, 3, 4}, facet_set=[{0, 1, 2}, {0, 3}, {1, 4}])
+    ast = antistar(sc, {0, 1})
+    assert {0, 1} <= ast.vertex_set
+    assert not ast.function({0, 1, 2})
+    assert ast.function({0, 3})
+    assert ast.function({1, 4})
+
+
+def test_antistar_is_generally_not_flag():
+    """The antistar of a filled triangle's apex, glued to a hollow triangle
+    at one vertex, is a hollow triangle: not the clique complex of any graph,
+    even though the ambient complex was built from explicit facets."""
+    from pycombtop import antistar
+
+    sc = SimplicialComplex(
+        {0, 1, 2, 3, 4},
+        facet_set=[{0, 1, 2}, {2, 3}, {3, 4}, {2, 4}],
+    )
+    ast = antistar(sc, {0})
+    assert sorted(ast.vertex_set) == [1, 2, 3, 4]
+    assert ast.facet_set == {
+        Simplex({1, 2}),
+        Simplex({2, 3}),
+        Simplex({3, 4}),
+        Simplex({2, 4}),
+    }
+    # Non-flag: {2,3,4} form a triangle in the 1-skeleton but the complex
+    # doesn't contain the 2-face {2,3,4} -- building this via graph/clique
+    # tools would silently (and wrongly) fill it in.
+    assert ast.is_clique_complex() is False
+
+
+def test_antistar_can_coincide_with_a_flag_complex():
+    """The antistar of an edge in the boundary of a tetrahedron happens to
+    be flag: both the SC-based and graph-based views must then agree."""
+    from pycombtop import antistar
+
+    sc = SimplicialComplex(
+        {0, 1, 2, 3},
+        facet_set=[{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}],
+    )
+    ast = antistar(sc, {0, 1})
+    assert ast.facet_set == {Simplex({0, 2, 3}), Simplex({1, 2, 3})}
+    assert ast.is_clique_complex() is True
+    assert ast == clique_complex(ast.one_skeleton_graph())
+
+
+def test_antistar_of_single_vertex_is_deletion():
+    """antistar of a lone vertex sigma={v} coincides with graph-style deletion."""
+    from pycombtop import antistar
+
+    sc = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1, 2}])
+    assert antistar(sc, {0}).facet_set == sc.deletion(0).facet_set

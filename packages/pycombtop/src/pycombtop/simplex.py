@@ -653,3 +653,129 @@ def directed_neighborhood_complex(
         facets = [Simplex(digraph.predecessors(v)) for v in digraph.nodes()]
     facets = [f for f in facets if f]  # drop empty neighborhoods
     return SimplicialComplex(digraph.nodes(), facet_set=facets)
+
+
+# ---------------------------------------------------------------------------
+# Star, link and antistar of a general simplex
+# ---------------------------------------------------------------------------
+
+
+def _as_simplicial_complex(
+    complex_or_graph: SimplicialComplex | nx.Graph,
+) -> SimplicialComplex:
+    """Coerce *complex_or_graph* into a :class:`SimplicialComplex`.
+
+    A :class:`networkx.Graph` is interpreted as its clique complex.
+    """
+    if isinstance(complex_or_graph, SimplicialComplex):
+        return complex_or_graph
+    return clique_complex(complex_or_graph)
+
+
+def _sigma_to_simplex(sigma) -> Simplex:
+    """Normalize *sigma* (a single vertex or a set of vertices) to a Simplex."""
+    if isinstance(sigma, Simplex):
+        return sigma
+    if isinstance(sigma, (frozenset, set, tuple, list)):
+        return Simplex(sigma)
+    return Simplex({sigma})
+
+
+def star(complex_or_graph: SimplicialComplex | nx.Graph, sigma) -> SimplicialComplex:
+    """Return the closed star of the simplex *sigma*.
+
+    ``st(sigma) = {tau in complex : sigma union tau is a simplex}``, realized
+    here as the union of every facet that contains *sigma*.  *sigma* may be a
+    single vertex or a set of vertices; *complex_or_graph* may be a
+    :class:`SimplicialComplex` or a :class:`networkx.Graph` (interpreted as
+    its clique complex).
+
+    .. rubric:: Examples
+
+    >>> from pycombtop import SimplicialComplex, star
+    >>> sc = SimplicialComplex({0, 1, 2, 3}, facet_set=[{0, 1, 2}, {0, 3}])
+    >>> sorted(star(sc, 0).vertex_set)
+    [0, 1, 2, 3]
+    >>> sorted(star(sc, {1, 2}).vertex_set)
+    [0, 1, 2]
+    """
+    sc = _as_simplicial_complex(complex_or_graph)
+    sigma = _sigma_to_simplex(sigma)
+    facets = {f for f in sc.facet_set if sigma <= f}
+    if not facets:
+        return SimplicialComplex(set(), facet_set=set())
+    vertices = set.union(*(set(s) for s in facets))
+    return SimplicialComplex(vertices, facet_set=facets)
+
+
+def link(complex_or_graph: SimplicialComplex | nx.Graph, sigma) -> SimplicialComplex:
+    """Return the link of the simplex *sigma*.
+
+    ``lk(sigma) = {tau in complex : tau disjoint from sigma, tau union sigma
+    in complex}``.  *sigma* may be a single vertex or a set of vertices, and
+    is computed by iterating :meth:`SimplicialComplex.link` over the
+    vertices of *sigma* (the result does not depend on the order).
+    *complex_or_graph* may be a :class:`SimplicialComplex` or a
+    :class:`networkx.Graph` (interpreted as its clique complex).
+
+    .. rubric:: Examples
+
+    >>> from pycombtop import SimplicialComplex, link
+    >>> sc = SimplicialComplex({0, 1, 2, 3}, facet_set=[{0, 1, 2}, {0, 1, 3}])
+    >>> sorted(link(sc, {0, 1}).vertex_set)
+    [2, 3]
+    """
+    sc = _as_simplicial_complex(complex_or_graph)
+    sigma = _sigma_to_simplex(sigma)
+    result = sc
+    for v in sigma:
+        result = result.link(v)
+    return result
+
+
+def antistar(
+    complex_or_graph: SimplicialComplex | nx.Graph, sigma
+) -> SimplicialComplex:
+    """Return the antistar of the simplex *sigma*.
+
+    ``ast-bar(sigma) = {tau in complex : sigma not subset of tau}``.  This
+    keeps every vertex of the ambient complex and removes only the top
+    simplices that pass through *sigma* -- it is **not** the same as
+    deleting *sigma*'s vertices.
+
+    .. rubric:: Care point
+
+    The antistar is generally **not flag** (not the clique complex of any
+    graph), even when the ambient complex is.  It is therefore always built
+    as a genuine :class:`SimplicialComplex` via the membership-function
+    constructor rather than via any graph-based (flag) shortcut; building it
+    from graph tools can silently produce a wrong answer.  Use
+    :func:`~pycombtop.homotopy_type.homotopy_type_sc_with_verdict` (not
+    :func:`~pycombtop.homotopy_type.homotopy_type_with_verdict`) to compute
+    its homotopy type.
+
+    .. rubric:: Examples
+
+    A hollow triangle glued to a filled one at a single vertex: the antistar
+    of the filled triangle's apex is the hollow triangle, which is not flag
+    (its 1-skeleton has a triangle that isn't a 2-simplex of the complex).
+
+    >>> from pycombtop import SimplicialComplex, antistar
+    >>> sc = SimplicialComplex(
+    ...     {0, 1, 2, 3, 4},
+    ...     facet_set=[{0, 1, 2}, {2, 3}, {3, 4}, {2, 4}],
+    ... )
+    >>> ast = antistar(sc, {0})
+    >>> ast.is_clique_complex()
+    False
+    >>> sorted(ast.vertex_set)
+    [1, 2, 3, 4]
+    """
+    sc = _as_simplicial_complex(complex_or_graph)
+    sigma = _sigma_to_simplex(sigma)
+
+    def _member(s) -> bool:
+        s = Simplex(s)
+        return sc.function(s) and not sigma <= s
+
+    return SimplicialComplex(sc.base_set, function=_member)

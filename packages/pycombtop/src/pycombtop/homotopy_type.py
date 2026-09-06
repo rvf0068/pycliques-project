@@ -39,7 +39,7 @@ from pycliques.surfaces import open_neighborhood
 from sympy import Add, Mul, Poly, symbols
 
 from .s_collapses import complete_s_collapse, complete_s_collapse_edges
-from .simplex import Simplex, SimplicialComplex, clique_complex, dong_matching
+from .simplex import Simplex, SimplicialComplex, clique_complex, dong_matching, star
 
 # ---------------------------------------------------------------------------
 # Theorem citations
@@ -392,6 +392,38 @@ def is_vertex_decomposable(s_complex: SimplicialComplex) -> bool:
         ):
             return True
     return False
+
+
+def is_contractible_via_flag_apex(h: SimplicialComplex | nx.Graph) -> bool:
+    """Return ``True`` if *h* is trivially contractible because it is a cone.
+
+    A complex is a cone when some vertex (an "apex") belongs to every facet
+    -- equivalently, for a :class:`networkx.Graph` interpreted as its clique
+    complex, some vertex is adjacent to every other vertex (a universal
+    vertex). This is a strictly weaker diagnostic than full contractibility:
+    many complexes that arise as vertex links (e.g. in
+    :func:`~pycombtop.simplex.link`) are contractible for more general
+    reasons and will return ``False`` here even though they are, in fact,
+    contractible. Useful to distinguish "trivially a cone" from
+    "contractible via more general means" when inspecting links by hand.
+
+    .. rubric:: Examples
+
+    >>> import networkx as nx
+    >>> from pycombtop.homotopy_type import is_contractible_via_flag_apex
+    >>> is_contractible_via_flag_apex(nx.star_graph(3))
+    True
+    >>> is_contractible_via_flag_apex(nx.cycle_graph(5))
+    False
+    """
+    if isinstance(h, nx.Graph):
+        n = h.number_of_nodes()
+        if n <= 1:
+            return True
+        return any(h.degree(v) == n - 1 for v in h.nodes())
+    if not h.facet_set:
+        return True
+    return any(all(v in f for f in h.facet_set) for v in h.vertex_set)
 
 
 # ---------------------------------------------------------------------------
@@ -783,14 +815,11 @@ def homotopy_type_large_graph(graph: nx.Graph, bound: int = 100) -> HomotopyVerd
 # ---------------------------------------------------------------------------
 # Star / star-cluster / intersection helpers (used by _try_star_cluster above
 # and also useful as public utilities)
+#
+# `star` (used below) is re-exported here from `.simplex`, which is where
+# the general (any-simplex, graph-or-complex) implementation lives, together
+# with `link` and `antistar`.
 # ---------------------------------------------------------------------------
-
-
-def star(s_complex: SimplicialComplex, vertex) -> SimplicialComplex:
-    """Return the star of *vertex* in *s_complex*."""
-    facets = {f for f in s_complex.facet_set if vertex in f}
-    vertices = set.union(*(set(s) for s in facets))
-    return SimplicialComplex(vertices, facet_set=facets)
 
 
 def star_cluster(s_complex: SimplicialComplex, simplex) -> SimplicialComplex:

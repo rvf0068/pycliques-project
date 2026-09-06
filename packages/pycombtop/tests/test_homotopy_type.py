@@ -348,3 +348,89 @@ def test_verdict_wedge_field():
     v = homotopy_type_with_verdict(g)
     assert isinstance(v.wedge, WedgeOfSpheres)
     assert 1 in v.wedge.spheres
+
+
+# ---------- is_contractible_via_flag_apex ----------
+
+
+def test_is_contractible_via_flag_apex_star_graph_true():
+    """A star graph has a universal vertex (the center): trivially a cone."""
+    from pycombtop.homotopy_type import is_contractible_via_flag_apex
+
+    assert is_contractible_via_flag_apex(nx.star_graph(4)) is True
+
+
+def test_is_contractible_via_flag_apex_cycle_false():
+    """C5 is contractible? No -- it's S^1, and has no universal vertex either."""
+    from pycombtop.homotopy_type import is_contractible_via_flag_apex
+
+    assert is_contractible_via_flag_apex(nx.cycle_graph(5)) is False
+
+
+def test_is_contractible_via_flag_apex_single_vertex():
+    """A single vertex is trivially a cone (on the empty complex)."""
+    from pycombtop.homotopy_type import is_contractible_via_flag_apex
+
+    assert is_contractible_via_flag_apex(nx.empty_graph(1)) is True
+
+
+def test_is_contractible_via_flag_apex_disconnected_but_contractible_case():
+    """A vertex dominating everything is a cone even if the link looks
+    disconnected at first glance (distinguishes 'trivially a cone' from
+    'contractible via more general means')."""
+    from pycombtop.homotopy_type import is_contractible_via_flag_apex
+
+    # Two disjoint edges plus a vertex adjacent to all four endpoints: the
+    # complex is a cone from the apex, even though removing the apex leaves
+    # a disconnected graph.
+    g = nx.Graph([(0, 1), (2, 3), (4, 0), (4, 1), (4, 2), (4, 3)])
+    assert is_contractible_via_flag_apex(g) is True
+
+
+def test_is_contractible_via_flag_apex_on_simplicial_complex():
+    """Works on a SimplicialComplex directly, not just a networkx graph."""
+    from pycombtop import SimplicialComplex
+    from pycombtop.homotopy_type import is_contractible_via_flag_apex
+
+    sc = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1}, {0, 2}])
+    assert is_contractible_via_flag_apex(sc) is True
+    sc_no_apex = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1}, {1, 2}, {0, 2}])
+    assert is_contractible_via_flag_apex(sc_no_apex) is False
+
+
+# ---------- link/antistar homotopy pushout (Priority 1c) ----------
+
+
+def test_antistar_matches_whole_complex_when_link_contractible():
+    """When lk(sigma) is contractible, the whole complex is homotopy
+    equivalent to its antistar -- checked here on a complex where the
+    antistar is genuinely not flag (see test_simplex.py for the structural
+    check), using the SC-based homotopy-type path throughout."""
+    from pycombtop import SimplicialComplex, antistar, link
+
+    sc = SimplicialComplex(
+        {0, 1, 2, 3, 4},
+        facet_set=[{0, 1, 2}, {2, 3}, {3, 4}, {2, 4}],
+    )
+    lk = link(sc, {0})
+    assert homotopy_type_sc_with_verdict(lk).wedge.is_contractible()
+
+    whole = homotopy_type_sc_with_verdict(sc)
+    ast = homotopy_type_sc_with_verdict(antistar(sc, {0}))
+    assert whole.wedge == ast.wedge
+
+
+def test_antistar_matches_graph_view_when_flag():
+    """When the antistar happens to be flag, the SC-based path and the plain
+    graph-based path (via its 1-skeleton) must agree."""
+    from pycombtop import SimplicialComplex, antistar
+
+    sc = SimplicialComplex(
+        {0, 1, 2, 3},
+        facet_set=[{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}],
+    )
+    ast = antistar(sc, {0, 1})
+    assert ast.is_clique_complex() is True
+    sc_verdict = homotopy_type_sc_with_verdict(ast)
+    graph_verdict = homotopy_type_with_verdict(ast.one_skeleton_graph())
+    assert sc_verdict.wedge == graph_verdict.wedge
