@@ -427,6 +427,9 @@ def relative_betti_numbers(
     base_set = set().union(*(set(f) for f in facets))
     big_complex = SimplicialComplex(base_set, facet_set=facets)
     all_simplices = big_complex.all_simplices()
+    vertex_order = {
+        vertex: index for index, vertex in enumerate(sorted(base_set, key=repr))
+    }
 
     by_dim: dict[int, list[Simplex]] = defaultdict(list)
     for sigma in all_simplices:
@@ -449,7 +452,7 @@ def relative_betti_numbers(
         row_index = {sigma: i for i, sigma in enumerate(rows)}
 
         for j, sigma in enumerate(cols):
-            ordered = tuple(sorted(sigma))
+            ordered = tuple(sorted(sigma, key=vertex_order.__getitem__))
             for k in range(len(ordered)):
                 face = Simplex(ordered[:k] + ordered[k + 1 :])
                 if face in row_index:
