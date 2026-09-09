@@ -398,15 +398,15 @@ def test_is_contractible_via_flag_apex_on_simplicial_complex():
     assert is_contractible_via_flag_apex(sc_no_apex) is False
 
 
-# ---------- link/antistar homotopy pushout (Priority 1c) ----------
+# ---------- link/deletion homotopy pushout (Priority 1c) ----------
 
 
-def test_antistar_matches_whole_complex_when_link_contractible():
+def test_deletion_matches_whole_complex_when_link_contractible():
     """When lk(sigma) is contractible, the whole complex is homotopy
-    equivalent to its antistar -- checked here on a complex where the
-    antistar is genuinely not flag (see test_simplex.py for the structural
+    equivalent to its deletion -- checked here on a complex where the
+    deletion is genuinely not flag (see test_simplex.py for the structural
     check), using the SC-based homotopy-type path throughout."""
-    from pycombtop import SimplicialComplex, antistar, link
+    from pycombtop import SimplicialComplex, deletion, link
 
     sc = SimplicialComplex(
         {0, 1, 2, 3, 4},
@@ -416,21 +416,21 @@ def test_antistar_matches_whole_complex_when_link_contractible():
     assert homotopy_type_sc_with_verdict(lk).wedge.is_contractible()
 
     whole = homotopy_type_sc_with_verdict(sc)
-    ast = homotopy_type_sc_with_verdict(antistar(sc, {0}))
-    assert whole.wedge == ast.wedge
+    d = homotopy_type_sc_with_verdict(deletion(sc, {0}))
+    assert whole.wedge == d.wedge
 
 
-def test_antistar_matches_graph_view_when_flag():
-    """When the antistar happens to be flag, the SC-based path and the plain
+def test_deletion_matches_graph_view_when_flag():
+    """When the deletion happens to be flag, the SC-based path and the plain
     graph-based path (via its 1-skeleton) must agree."""
-    from pycombtop import SimplicialComplex, antistar
+    from pycombtop import SimplicialComplex, deletion
 
     sc = SimplicialComplex(
         {0, 1, 2, 3},
         facet_set=[{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}],
     )
-    ast = antistar(sc, {0, 1})
-    assert ast.is_clique_complex() is True
-    sc_verdict = homotopy_type_sc_with_verdict(ast)
-    graph_verdict = homotopy_type_with_verdict(ast.one_skeleton_graph())
+    d = deletion(sc, {0, 1})
+    assert d.is_clique_complex() is True
+    sc_verdict = homotopy_type_sc_with_verdict(d)
+    graph_verdict = homotopy_type_with_verdict(d.one_skeleton_graph())
     assert sc_verdict.wedge == graph_verdict.wedge

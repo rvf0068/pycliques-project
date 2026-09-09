@@ -818,7 +818,7 @@ def homotopy_type_large_graph(graph: nx.Graph, bound: int = 100) -> HomotopyVerd
 #
 # `star` (used below) is re-exported here from `.simplex`, which is where
 # the general (any-simplex, graph-or-complex) implementation lives, together
-# with `link` and `antistar`.
+# with `link` and `deletion`.
 # ---------------------------------------------------------------------------
 
 

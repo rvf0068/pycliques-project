@@ -736,7 +736,7 @@ def directed_neighborhood_complex(
 
 
 # ---------------------------------------------------------------------------
-# Star, link and antistar of a general simplex
+# Star, link and deletion of a general simplex
 # ---------------------------------------------------------------------------
 
 
@@ -813,21 +813,26 @@ def link(complex_or_graph: SimplicialComplex | nx.Graph, sigma) -> SimplicialCom
     return result
 
 
-def antistar(
+def deletion(
     complex_or_graph: SimplicialComplex | nx.Graph, sigma
 ) -> SimplicialComplex:
-    """Return the antistar of the simplex *sigma*.
+    """Return the deletion of the simplex *sigma* from the ambient complex.
 
-    ``ast-bar(sigma) = {tau in complex : sigma not subset of tau}``.  This
+    ``deletion(sigma) = {tau in complex : sigma not subset of tau}``.  This
     keeps every vertex of the ambient complex and removes only the top
     simplices that pass through *sigma* -- it is **not** the same as
     deleting *sigma*'s vertices.
 
+    This operation is the simplicial-complex analogue of removing the closed
+    star of a simplex while keeping the ambient vertex set unchanged.  It is a
+    general-purpose construction used when one wants to remove all faces that
+    contain *sigma* without changing the underlying vertex set.
+
     .. rubric:: Care point
 
-    The antistar is generally **not flag** (not the clique complex of any
-    graph), even when the ambient complex is.  It is therefore always built
-    as a genuine :class:`SimplicialComplex` via the membership-function
+    The deletion is generally **not flag** (not the clique complex of any
+    graph), even when the ambient complex is.  It is therefore always built as
+    a genuine :class:`SimplicialComplex` via the membership-function
     constructor rather than via any graph-based (flag) shortcut; building it
     from graph tools can silently produce a wrong answer.  Use
     :func:`~pycombtop.homotopy_type.homotopy_type_sc_with_verdict` (not
@@ -836,19 +841,19 @@ def antistar(
 
     .. rubric:: Examples
 
-    A hollow triangle glued to a filled one at a single vertex: the antistar
+    A hollow triangle glued to a filled one at a single vertex: the deletion
     of the filled triangle's apex is the hollow triangle, which is not flag
     (its 1-skeleton has a triangle that isn't a 2-simplex of the complex).
 
-    >>> from pycombtop import SimplicialComplex, antistar
+    >>> from pycombtop import SimplicialComplex, deletion
     >>> sc = SimplicialComplex(
     ...     {0, 1, 2, 3, 4},
     ...     facet_set=[{0, 1, 2}, {2, 3}, {3, 4}, {2, 4}],
     ... )
-    >>> ast = antistar(sc, {0})
-    >>> ast.is_clique_complex()
+    >>> d = deletion(sc, {0})
+    >>> d.is_clique_complex()
     False
-    >>> sorted(ast.vertex_set)
+    >>> sorted(d.vertex_set)
     [1, 2, 3, 4]
     """
     sc = _as_simplicial_complex(complex_or_graph)

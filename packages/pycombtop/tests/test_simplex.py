@@ -431,7 +431,7 @@ def test_directed_neighborhood_complex_no_edges():
     assert nc.dimension() == -1
 
 
-# ---------- star / link / antistar of a general simplex ----------
+# ---------- star / link / deletion of a general simplex ----------
 
 
 def test_star_single_vertex_matches_method():
@@ -500,32 +500,32 @@ def test_link_of_graph_interpreted_as_clique_complex():
     assert sorted(lk.vertex_set) == [1, 2, 3]
 
 
-def test_antistar_keeps_vertices_removes_only_top_simplices():
-    """antistar(sc, sigma) keeps sigma's vertices but drops facets through it
+def test_deletion_keeps_vertices_removes_only_top_simplices():
+    """deletion(sc, sigma) keeps sigma's vertices but drops facets through it
     (for |sigma| > 1 this is genuinely different from deleting the vertices)."""
-    from pycombtop import antistar
+    from pycombtop import deletion
 
     sc = SimplicialComplex({0, 1, 2, 3, 4}, facet_set=[{0, 1, 2}, {0, 3}, {1, 4}])
-    ast = antistar(sc, {0, 1})
-    assert {0, 1} <= ast.vertex_set
-    assert not ast.function({0, 1, 2})
-    assert ast.function({0, 3})
-    assert ast.function({1, 4})
+    d = deletion(sc, {0, 1})
+    assert {0, 1} <= d.vertex_set
+    assert not d.function({0, 1, 2})
+    assert d.function({0, 3})
+    assert d.function({1, 4})
 
 
-def test_antistar_is_generally_not_flag():
-    """The antistar of a filled triangle's apex, glued to a hollow triangle
+def test_deletion_is_generally_not_flag():
+    """The deletion of a filled triangle's apex, glued to a hollow triangle
     at one vertex, is a hollow triangle: not the clique complex of any graph,
     even though the ambient complex was built from explicit facets."""
-    from pycombtop import antistar
+    from pycombtop import deletion
 
     sc = SimplicialComplex(
         {0, 1, 2, 3, 4},
         facet_set=[{0, 1, 2}, {2, 3}, {3, 4}, {2, 4}],
     )
-    ast = antistar(sc, {0})
-    assert sorted(ast.vertex_set) == [1, 2, 3, 4]
-    assert ast.facet_set == {
+    d = deletion(sc, {0})
+    assert sorted(d.vertex_set) == [1, 2, 3, 4]
+    assert d.facet_set == {
         Simplex({1, 2}),
         Simplex({2, 3}),
         Simplex({3, 4}),
@@ -534,27 +534,27 @@ def test_antistar_is_generally_not_flag():
     # Non-flag: {2,3,4} form a triangle in the 1-skeleton but the complex
     # doesn't contain the 2-face {2,3,4} -- building this via graph/clique
     # tools would silently (and wrongly) fill it in.
-    assert ast.is_clique_complex() is False
+    assert d.is_clique_complex() is False
 
 
-def test_antistar_can_coincide_with_a_flag_complex():
-    """The antistar of an edge in the boundary of a tetrahedron happens to
+def test_deletion_can_coincide_with_a_flag_complex():
+    """The deletion of an edge in the boundary of a tetrahedron happens to
     be flag: both the SC-based and graph-based views must then agree."""
-    from pycombtop import antistar
+    from pycombtop import deletion
 
     sc = SimplicialComplex(
         {0, 1, 2, 3},
         facet_set=[{0, 1, 2}, {0, 1, 3}, {0, 2, 3}, {1, 2, 3}],
     )
-    ast = antistar(sc, {0, 1})
-    assert ast.facet_set == {Simplex({0, 2, 3}), Simplex({1, 2, 3})}
-    assert ast.is_clique_complex() is True
-    assert ast == clique_complex(ast.one_skeleton_graph())
+    d = deletion(sc, {0, 1})
+    assert d.facet_set == {Simplex({0, 2, 3}), Simplex({1, 2, 3})}
+    assert d.is_clique_complex() is True
+    assert d == clique_complex(d.one_skeleton_graph())
 
 
-def test_antistar_of_single_vertex_is_deletion():
-    """antistar of a lone vertex sigma={v} coincides with graph-style deletion."""
-    from pycombtop import antistar
+def test_deletion_of_single_vertex_is_deletion():
+    """Deletion of a lone vertex sigma={v} coincides with graph-style deletion."""
+    from pycombtop import deletion
 
     sc = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1, 2}])
-    assert antistar(sc, {0}).facet_set == sc.deletion(0).facet_set
+    assert deletion(sc, {0}).facet_set == sc.deletion(0).facet_set
