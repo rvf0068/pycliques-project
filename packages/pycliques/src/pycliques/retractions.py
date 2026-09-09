@@ -369,12 +369,46 @@ def _find_special_octahedra(
     return False, None
 
 
-def special_octahedra(graph: nx.Graph) -> bool:
-    """Check for retractions to special octahedra in the graph.
+def is_O3_free(graph: nx.Graph) -> bool:
+    """Return whether *graph* contains no induced octahedron :math:`O_3`.
 
-    This works by finding mutually disjoint edges in the complement graph
-    with no cross-edges between them, which correspond to induced
-    octahedra in the original graph.
+    This is the plain induced-subgraph check.  It is intentionally a thin
+    wrapper around :func:`has_induced` and ``octahedron(3)``; it is the
+    correct API for the question "Does *graph* contain an induced octahedron?"
+
+    .. rubric:: Parameters
+
+    graph : networkx.Graph
+        Input graph.
+
+    .. rubric:: Returns
+
+    bool
+        ``True`` if the graph has no induced :math:`O_3`.
+
+    .. rubric:: Examples
+
+    >>> import networkx as nx
+    >>> from pycliques.named import octahedron
+    >>> from pycliques.retractions import is_O3_free
+    >>> is_O3_free(nx.octahedral_graph())
+    False
+    >>> is_O3_free(nx.complete_graph(4))
+    True
+    """
+    return not has_induced(graph, octahedron(3))
+
+
+def special_octahedra(graph: nx.Graph) -> bool:
+    """Check for the stricter *special* octahedron condition.
+
+    Warning:
+        This is not the same as testing whether ``graph`` has an induced
+        octahedron :math:`O_3`.  It is a stricter divergence/retraction-oriented
+        property tailored to the special-octahedra arguments in this project:
+        it looks for an induced :math:`O_n` with at least one triangle also
+        maximal in the whole host graph.  Use :func:`is_O3_free` for the plain
+        "no induced :math:`O_3`" test.
 
     .. rubric:: Parameters
 

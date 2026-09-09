@@ -8,6 +8,7 @@ from pycliques.retractions import (
     has_induced,
     invert_dict,
     is_map,
+    is_O3_free,
     retraction,
     retracts,
     retracts_to,
@@ -101,6 +102,14 @@ def test_special_octahedra_on_cycle():
 def test_special_octahedra_on_complete_graph():
     # K4 has no induced octahedron
     assert special_octahedra(nx.complete_graph(4)) is False
+
+
+def test_is_o3_free_detects_induced_octahedron():
+    """The plain induced-octahedron check should disagree with the stricter
+    special case.
+    """
+    assert is_O3_free(nx.octahedral_graph()) is False
+    assert is_O3_free(nx.complete_graph(4)) is True
 
 
 def test_is_maximal_clique_true():
