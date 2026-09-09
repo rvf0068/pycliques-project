@@ -104,6 +104,10 @@ class Theorem:
         "Graph too large for combinatorial homotopy-type methods; "
         "reduced Betti numbers computed via mogutda."
     )
+    LIMIT_EXCEEDED = (
+        "Homotopy-type computation skipped because a configured size limit "
+        "was exceeded."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -229,19 +233,29 @@ class HomotopyVerdict:
     is_exact : bool
         ``True`` when the verdict is provably the correct homotopy type.
         ``False`` when only Betti numbers could be computed.
+    is_limited : bool
+        ``True`` when computation was skipped because a configured size limit
+        was exceeded. A limited result is inconclusive, not contractible.
     """
 
     wedge: WedgeOfSpheres
     reason: str
     is_exact: bool = True
+    is_limited: bool = False
 
     @property
     def verdict(self) -> str:
         """A human-readable (LaTeX-compatible) string for the homotopy type."""
+        if self.is_limited:
+            return "Too large to check"
         return self.wedge.to_latex()
 
     def __str__(self) -> str:  # pragma: no cover
-        exact_tag = "" if self.is_exact else " [Betti numbers only]"
+        exact_tag = ""
+        if self.is_limited:
+            exact_tag = " [inconclusive]"
+        elif not self.is_exact:
+            exact_tag = " [Betti numbers only]"
         return f"{self.verdict}{exact_tag}  ({self.reason})"
 
 
@@ -259,6 +273,34 @@ def _simplify_graph_ht(graph: nx.Graph) -> nx.Graph:
 
 def _shuff(lst: set) -> list:
     return random.sample(list(lst), len(lst))
+
+
+def _too_large_simplicial_complex(
+    s_complex: SimplicialComplex,
+    max_vertices: int | None,
+    max_simplices: int | None,
+) -> bool:
+    """Return whether a complex exceeds either configured size limit."""
+    if max_vertices is not None and len(s_complex.vertex_set) > max_vertices:
+        return True
+    if max_simplices is None:
+        return False
+    simplex_count = 0
+    for facet in s_complex.facet_set:
+        simplex_count += 2 ** len(facet)
+        if simplex_count > max_simplices:
+            return True
+    return False
+
+
+def _limited_verdict() -> HomotopyVerdict:
+    """Return the standard inconclusive result for a size-limited input."""
+    return HomotopyVerdict(
+        wedge=WedgeOfSpheres.contractible(),
+        reason=Theorem.LIMIT_EXCEEDED,
+        is_exact=False,
+        is_limited=True,
+    )
 
 
 # --- Simplicial-complex collapse (elementary collapses) ---
@@ -647,16 +689,22 @@ def _try_special_vertex_sc(
 
 def homotopy_type_sc_with_verdict(
     s_complex: SimplicialComplex,
+    max_vertices: int | None = None,
+    max_simplices: int | None = None,
 ) -> HomotopyVerdict:
     """Compute the homotopy type of a simplicial complex *s_complex*.
 
     Tries strategies in order and returns the first :class:`HomotopyVerdict`
     that succeeds.  The *reason* field identifies the theorem used.
 
-    Parameters
-    ----------
-    s_complex:
-        A :class:`~pycliques.simplicial.SimplicialComplex`.
+    .. rubric:: Parameters
+
+    s_complex : SimplicialComplex
+        Complex to analyze.
+    max_vertices : int, optional
+        Abort before analysis when the complex has more vertices than this.
+    max_simplices : int, optional
+        Abort before analysis when the complex has more simplices than this.
 
     Returns
     -------
@@ -666,6 +714,9 @@ def homotopy_type_sc_with_verdict(
         *is_exact* is ``False`` only when no topological shortcut was
         found and only Betti numbers are returned.
     """
+    if _too_large_simplicial_complex(s_complex, max_vertices, max_simplices):
+        return _limited_verdict()
+
     # 1. Dong matching on original complex
     v = _try_dong(s_complex)
     if v:
@@ -690,13 +741,22 @@ def homotopy_type_sc_with_verdict(
     )
 
 
-def homotopy_type_with_verdict(graph: nx.Graph) -> HomotopyVerdict:
+def homotopy_type_with_verdict(
+    graph: nx.Graph,
+    max_vertices: int | None = None,
+    max_simplices: int | None = None,
+) -> HomotopyVerdict:
     """Compute the homotopy type of the clique complex of *graph*.
 
     .. rubric:: Parameters
 
     graph : networkx.Graph
         A NetworkX graph.
+    max_vertices : int, optional
+        Abort before analysis when the graph has more vertices than this.
+    max_simplices : int, optional
+        Abort before analysis when its clique complex has more simplices than
+        this. This requires constructing the clique complex once.
 
     .. rubric:: Returns
 
@@ -708,6 +768,7 @@ def homotopy_type_with_verdict(graph: nx.Graph) -> HomotopyVerdict:
         * ``is_exact`` - ``False`` when only Betti numbers were computed.
 
     .. rubric:: Examples
+
     >>> import networkx as nx
     >>> from pycombtop.homotopy_type import homotopy_type_with_verdict
     >>> G = nx.cycle_graph(5)
@@ -715,6 +776,13 @@ def homotopy_type_with_verdict(graph: nx.Graph) -> HomotopyVerdict:
     >>> v.verdict
     '\\\\(S^{1}\\\\)'
     """
+    if max_vertices is not None and graph.number_of_nodes() > max_vertices:
+        return _limited_verdict()
+    if max_simplices is not None:
+        simplex_complex = clique_complex(graph)
+        if _too_large_simplicial_complex(simplex_complex, max_vertices, max_simplices):
+            return _limited_verdict()
+
     # 0. Trivial case
     v = _try_trivial(graph)
     if v:

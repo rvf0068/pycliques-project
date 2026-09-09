@@ -92,6 +92,16 @@ print(len(graphs))               # 112
 for g in graph_generator(9):
     if g.order() == 9:
         pass  # process without loading all ~261 000 graphs at once
+
+# Run a filter/evaluator census with an atomic, resumable checkpoint
+from pyg6data.census import run_graph_census
+
+records = run_graph_census(
+    6,
+    lambda g: g.number_of_edges() > 5,
+    lambda g: g.number_of_edges(),
+    checkpoint="census.json",
+)
 ```
 
 ---
@@ -102,7 +112,9 @@ Combinatorial topology tools for graphs and simplicial complexes:
 
 - `SimplicialComplex` / `Simplex` — core data structures
 - `clique_complex` — build the clique complex of a graph
-- `homotopy_type_with_verdict` — determine the homotopy type of a graph's clique complex
+- `homotopy_type_with_verdict` — determine the homotopy type of a graph's clique
+    complex, with optional vertex/simplex limits that return explicit
+    inconclusive results
 - `fundamental_group` — compute the fundamental group (algorithm from Rees & Soicher, *J. Symbolic Comp.* 29, 2000)
 - `complete_s_collapse` — strong collapses
 - `hom_graph` / `graph_homomorphisms` — Hom complexes

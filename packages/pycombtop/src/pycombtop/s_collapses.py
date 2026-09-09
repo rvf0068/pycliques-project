@@ -11,7 +11,6 @@ clique complex.
 
 from __future__ import annotations
 
-import copy
 from collections.abc import Hashable
 from typing import cast
 
@@ -85,7 +84,7 @@ def remove_s_dismantlable_vertex(graph: nx.Graph) -> nx.Graph:
     >>> g.order()
     3
     """
-    graph_aux = copy.deepcopy(graph)
+    graph_aux = graph.copy()
     v = has_s_dismantlable_vertex(graph)
     if v is not None:
         graph_aux.remove_node(v)
@@ -117,7 +116,7 @@ def complete_s_collapse(graph: nx.Graph) -> nx.Graph:
     >>> g.order()
     4
     """
-    graph_aux = copy.deepcopy(graph)
+    graph_aux = graph.copy()
     while True:
         n = graph_aux.order()
         graph_aux = remove_s_dismantlable_vertex(graph_aux)
@@ -181,7 +180,7 @@ def remove_s_dismantlable_edge(graph: nx.Graph) -> nx.Graph:
     >>> g.size()
     2
     """
-    graph_aux = copy.deepcopy(graph)
+    graph_aux = graph.copy()
     e = has_s_dismantlable_edge(graph)
     if e is not None:
         graph_aux.remove_edge(*e)
@@ -211,7 +210,7 @@ def complete_s_collapse_edges(graph: nx.Graph) -> nx.Graph:
     >>> g.size()
     3
     """
-    graph_aux = copy.deepcopy(graph)
+    graph_aux = graph.copy()
     while True:
         n = graph_aux.size()
         graph_aux = remove_s_dismantlable_edge(graph_aux)

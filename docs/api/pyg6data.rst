@@ -14,6 +14,15 @@ Lists
    :show-inheritance:
    :member-order: bysource
 
+Census
+------
+
+.. automodule:: pyg6data.census
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :member-order: bysource
+
 CLI
 ---
 

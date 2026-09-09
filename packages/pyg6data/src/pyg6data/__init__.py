@@ -2,6 +2,7 @@
 
 __version__ = "0.1.0"
 
+from .census import run_graph_census
 from .lists import (
     cubic_graph_generator,
     digraph_generator,
@@ -15,6 +16,7 @@ from .lists import (
 
 __all__ = [
     "__version__",
+    "run_graph_census",
     "cubic_graph_generator",
     "digraph_generator",
     "graph_generator",

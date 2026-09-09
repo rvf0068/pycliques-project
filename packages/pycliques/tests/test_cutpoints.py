@@ -101,6 +101,14 @@ def test_cutpoint_reductions_yields_from_both():
     assert len(all_reductions) == len(removals) + len(contractions)
 
 
+def test_cutpoint_reductions_accepts_frozen_subgraph_view():
+    """Cutpoint reductions do not mutate a frozen input view."""
+    host = nx.path_graph(5)
+    view = host.subgraph([0, 1, 2, 3])
+    list(cutpoint_reductions(view))
+    assert host.number_of_nodes() == 5
+
+
 def test_reduction_retracts_to_path():
     """A bridge-of-two-C5s reduction yields C_5, which retracts to C_5."""
     assert reduction_retracts_to(_bridge_of_two_c5(), nx.cycle_graph(5)) is True

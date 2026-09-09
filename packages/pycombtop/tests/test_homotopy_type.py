@@ -218,6 +218,21 @@ def test_two_isolated_vertices_s0():
     assert v.is_exact is True
 
 
+def test_homotopy_type_vertex_limit_is_inconclusive():
+    """A configured vertex limit must not be reported as contractibility."""
+    verdict = homotopy_type_with_verdict(nx.complete_graph(4), max_vertices=3)
+    assert verdict.is_limited is True
+    assert verdict.is_exact is False
+    assert verdict.verdict == "Too large to check"
+
+
+def test_homotopy_type_simplex_limit_is_inconclusive():
+    """A configured simplex limit applies to the clique complex."""
+    verdict = homotopy_type_with_verdict(nx.complete_graph(4), max_simplices=10)
+    assert verdict.is_limited is True
+    assert verdict.verdict == "Too large to check"
+
+
 # ---------- homotopy_type_sc_with_verdict ----------
 
 
@@ -227,6 +242,14 @@ def test_sc_simplex_contractible():
     v = homotopy_type_sc_with_verdict(sc)
     assert v.verdict == "Contractible"
     assert v.is_exact is True
+
+
+def test_sc_simplex_limit_is_inconclusive():
+    """Simplicial-complex limits are checked before homotopy strategies."""
+    sc = SimplicialComplex({0, 1, 2}, facet_set={Simplex({0, 1, 2})})
+    verdict = homotopy_type_sc_with_verdict(sc, max_simplices=3)
+    assert verdict.is_limited is True
+    assert verdict.verdict == "Too large to check"
 
 
 def test_sc_boundary_triangle():

@@ -68,6 +68,15 @@ def test_complete_collapse_complete_graph():
     assert g.order() == 1
 
 
+def test_complete_collapse_accepts_frozen_subgraph_view():
+    """Graph simplification copies a frozen subgraph before mutating it."""
+    host = nx.complete_graph(5)
+    view = host.subgraph([0, 1, 2, 3])
+    result = complete_s_collapse(view)
+    assert result.order() == 1
+    assert host.number_of_nodes() == 5
+
+
 def test_complete_collapse_cycle_6():
     """C_6 cannot be reduced (no s-dismantlable vertices)."""
     g = complete_s_collapse(nx.cycle_graph(6))
