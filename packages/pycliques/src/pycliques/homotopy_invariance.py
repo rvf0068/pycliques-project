@@ -1,6 +1,6 @@
 r"""Machinery for attacking :math:`G \simeq K(G)` ("G is good") conjectures.
 
-This module collects four related pieces of machinery that recurred, ad hoc,
+This module collects five related pieces of machinery that recurred, ad hoc,
 across a research session working on open conjectures about the clique graph
 operator :math:`K`. They all share the same underlying objects: completes of
 :math:`K(G)` (pairwise-intersecting sets of cliques of :math:`G`), and their
@@ -24,7 +24,7 @@ and :mod:`pycliques.cliques`.
 from __future__ import annotations
 
 import itertools
-from collections.abc import Hashable, Iterable, Iterator
+from collections.abc import Callable, Hashable, Iterable, Iterator
 
 import networkx as nx
 
@@ -399,6 +399,143 @@ def witnesses_and_extension(
     ]
     q_star = next(q for q in nx.find_cliques(graph) if set(witnesses) <= set(q))
     return witnesses, q_star
+
+
+# ---------------------------------------------------------------------------
+# Priority 4. Discrete Morse matchings on upward-closed bad-face families
+# ---------------------------------------------------------------------------
+
+
+def discrete_morse_matching(
+    faces: Iterable[Iterable[Hashable]],
+    is_bad: Callable[[frozenset], bool],
+    ground_set: Iterable[Hashable] | None = None,
+) -> set[tuple[frozenset, frozenset]]:
+    """Construct an acyclic matching on an upward-closed face family.
+
+    The matching pairs a bad face ``X`` with ``X | {v}`` whenever both are
+    bad, processing vertices in a fixed order. Both members are marked as
+    matched at the same time, so the result is a genuine reciprocal matching
+    rather than independent choices made by each face. The standard staged
+    vertex ordering makes the resulting matching acyclic when ``is_bad`` is
+    upward-closed.
+
+    .. rubric:: Parameters
+
+    faces : iterable[iterable]
+        The finite face family to match. Each face is normalized to a
+        ``frozenset`` and must contain every candidate pair member.
+    is_bad : callable
+        Predicate identifying the upward-closed subfamily being matched.
+    ground_set : iterable, optional
+        Vertex order used for toggles. By default, vertices are collected
+        from *faces* using their iteration order.
+
+    .. rubric:: Returns
+
+    set[tuple[frozenset, frozenset]]
+        Pairs ``(lower, upper)`` with ``lower < upper`` in the face poset.
+
+    .. rubric:: Examples
+
+    >>> from pycliques.homotopy_invariance import discrete_morse_matching
+    >>> faces = [frozenset(s) for s in ({1}, {2}, {1, 2})]
+    >>> discrete_morse_matching(faces, lambda s: len(s) >= 1)
+    {(frozenset({1}), frozenset({1, 2}))}
+    """
+    face_set = {frozenset(face) for face in faces}
+    vertices = (
+        list(ground_set)
+        if ground_set is not None
+        else list(dict.fromkeys(vertex for face in face_set for vertex in face))
+    )
+    bad_faces = {face for face in face_set if is_bad(face)}
+    matched: set[frozenset] = set()
+    result: set[tuple[frozenset, frozenset]] = set()
+
+    for vertex in vertices:
+        for lower in sorted(
+            bad_faces - matched, key=lambda face: (len(face), repr(face))
+        ):
+            if vertex in lower:
+                continue
+            upper = lower | {vertex}
+            if upper in bad_faces and upper not in matched:
+                result.add((lower, upper))
+                matched.add(lower)
+                matched.add(upper)
+    if not verify_discrete_morse_matching(face_set, result, is_bad):
+        raise RuntimeError("discrete Morse matching verification failed")
+    return result
+
+
+def verify_discrete_morse_matching(
+    faces: Iterable[Iterable[Hashable]],
+    matching: Iterable[tuple[Iterable[Hashable], Iterable[Hashable]]],
+    is_bad: Callable[[frozenset], bool],
+) -> bool:
+    """Independently verify reciprocity and acyclicity of a matching.
+
+    The verifier rebuilds the Hasse diagram of the supplied face family,
+    reverses exactly the claimed matching edges, and checks that the result is
+    acyclic. It returns ``False`` for malformed, non-reciprocal, duplicated,
+    or non-bad pairs instead of trusting the matching construction.
+
+    .. rubric:: Parameters
+
+    faces : iterable[iterable]
+        Finite face family containing all matching pairs.
+    matching : iterable[tuple[iterable, iterable]]
+        Claimed ``(lower, upper)`` pairs.
+    is_bad : callable
+        Predicate identifying the faces eligible for matching.
+
+    .. rubric:: Returns
+
+    bool
+        ``True`` exactly when the matching is a valid acyclic matching on the
+        bad faces in *faces*.
+
+    .. rubric:: Examples
+
+    >>> from pycliques.homotopy_invariance import (
+    ...     discrete_morse_matching, verify_discrete_morse_matching)
+    >>> faces = [frozenset(s) for s in ({1}, {2}, {1, 2})]
+    >>> matching = discrete_morse_matching(faces, lambda s: len(s) >= 1)
+    >>> verify_discrete_morse_matching(faces, matching, lambda s: len(s) >= 1)
+    True
+    """
+    face_set = {frozenset(face) for face in faces}
+    normalized = [(frozenset(lower), frozenset(upper)) for lower, upper in matching]
+    matched_faces: set[frozenset] = set()
+    directed = nx.DiGraph()
+    directed.add_nodes_from(face_set)
+
+    for face in face_set:
+        for vertex in face:
+            lower = face - {vertex}
+            if lower in face_set:
+                directed.add_edge(lower, face)
+
+    for lower, upper in normalized:
+        if (
+            lower not in face_set
+            or upper not in face_set
+            or not is_bad(lower)
+            or not is_bad(upper)
+            or not lower < upper
+            or len(upper) != len(lower) + 1
+            or lower in matched_faces
+            or upper in matched_faces
+        ):
+            return False
+        matched_faces.update((lower, upper))
+        if not directed.has_edge(lower, upper):
+            return False
+        directed.remove_edge(lower, upper)
+        directed.add_edge(upper, lower)
+
+    return bool(nx.is_directed_acyclic_graph(directed))
 
 
 # ---------------------------------------------------------------------------

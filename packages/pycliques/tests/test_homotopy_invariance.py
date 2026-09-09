@@ -5,6 +5,7 @@ from pycliques.homotopy_invariance import (
     completes_of_size,
     completes_with_empty_intersection,
     delta_of_clique_set,
+    discrete_morse_matching,
     h_closure,
     has_center_at_all,
     is_center,
@@ -12,6 +13,7 @@ from pycliques.homotopy_invariance import (
     neckties,
     theorem11_hypothesis_holds,
     theorem15_hypothesis_holds,
+    verify_discrete_morse_matching,
     witnesses_and_extension,
 )
 from pycliques.named import (
@@ -305,6 +307,53 @@ def test_theorem15_hypothesis_size_cap_inconclusive():
     holds, hx = theorem15_hypothesis_holds(FIXTURE_2(), size_cap=1)
     assert holds is None
     assert hx is not None
+
+
+# ---------- 1e: discrete Morse matching ----------
+
+
+def _bad_complete_faces(graph):
+    """Return all bad completes of the graph's clique graph."""
+    kg = clique_graph(graph)
+    return [
+        frozenset(complete)
+        for complete in nx.enumerate_all_cliques(kg)
+        if not set.intersection(*(set(clique) for clique in complete))
+    ], kg
+
+
+def test_discrete_morse_matching_is_reciprocal_and_acyclic():
+    """The staged matcher returns a matching accepted by its verifier."""
+    faces = [frozenset(face) for face in ({1}, {2}, {1, 2})]
+    matching = discrete_morse_matching(faces, lambda face: len(face) >= 1)
+    assert matching == {(frozenset({1}), frozenset({1, 2}))}
+    assert verify_discrete_morse_matching(faces, matching, lambda face: len(face) >= 1)
+
+
+def test_verify_discrete_morse_matching_rejects_shared_faces():
+    """The verifier rejects a claimed matching that reuses a face."""
+    faces = [frozenset(face) for face in (set(), {1}, {2}, {1, 2})]
+    matching = {
+        (frozenset(), frozenset({1})),
+        (frozenset({1}), frozenset({1, 2})),
+    }
+    assert not verify_discrete_morse_matching(faces, matching, lambda _: True)
+
+
+def test_discrete_morse_matching_handles_collapse_obstruction_fixture():
+    """Fixture 2 receives a valid matching despite elementary collapse failure."""
+    faces, kg = _bad_complete_faces(FIXTURE_2())
+    matching = discrete_morse_matching(
+        faces,
+        lambda complete: not set.intersection(*(set(clique) for clique in complete)),
+        ground_set=kg.nodes(),
+    )
+    assert matching
+    assert verify_discrete_morse_matching(
+        faces,
+        matching,
+        lambda complete: not set.intersection(*(set(clique) for clique in complete)),
+    )
 
 
 def test_smallest_non_clique_helly_graph_has_k4_clique_graph():

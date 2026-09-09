@@ -58,6 +58,7 @@ from .homotopy_invariance import (
     completes_of_size,
     completes_with_empty_intersection,
     delta_of_clique_set,
+    discrete_morse_matching,
     h_closure,
     has_center_at_all,
     is_center,
@@ -65,6 +66,7 @@ from .homotopy_invariance import (
     neckties,
     theorem11_hypothesis_holds,
     theorem15_hypothesis_holds,
+    verify_discrete_morse_matching,
     witnesses_and_extension,
 )
 from .named import (
@@ -161,6 +163,7 @@ __all__ = [
     "completes_of_size",
     "completes_with_empty_intersection",
     "delta_of_clique_set",
+    "discrete_morse_matching",
     "h_closure",
     "has_center_at_all",
     "is_center",
@@ -168,6 +171,7 @@ __all__ = [
     "neckties",
     "theorem11_hypothesis_holds",
     "theorem15_hypothesis_holds",
+    "verify_discrete_morse_matching",
     "witnesses_and_extension",
     # named
     "collapse_obstruction_fixture",
