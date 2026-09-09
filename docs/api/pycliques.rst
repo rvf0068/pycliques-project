@@ -59,6 +59,15 @@ Helly
    :show-inheritance:
    :member-order: bysource
 
+Homotopy Invariance
+-------------------
+
+.. automodule:: pycliques.homotopy_invariance
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :member-order: bysource
+
 Named
 -----
 
