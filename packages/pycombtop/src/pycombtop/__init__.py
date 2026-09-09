@@ -57,6 +57,7 @@ from .simplex import (
     nerve_of_cliques,
     nerve_of_sets,
     oriented_complex,
+    relative_betti_numbers,
 )
 
 # Explicitly declare the public API.
@@ -79,6 +80,7 @@ __all__ = [
     "directed_neighborhood_complex",
     "link",
     "antistar",
+    "relative_betti_numbers",
     # fundamental_group
     "FundamentalRecord",
     "covering_graph",

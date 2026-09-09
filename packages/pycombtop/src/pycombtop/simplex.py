@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import math
+from collections import defaultdict
 from collections.abc import Callable, Generator, Iterable
 from functools import reduce
 from itertools import chain, combinations
 
 import networkx as nx
+import numpy as np
 from networkx.algorithms import tournament
 
 
@@ -389,6 +391,84 @@ def all_subsets(the_set: set) -> Generator[Simplex]:
     )
     for x in subsets:
         yield Simplex(x)
+
+
+def relative_betti_numbers(
+    big_complex_maximal_faces: Iterable[Iterable],
+    small_complex_membership_test: Callable[[Iterable], bool],
+) -> dict[int, int]:
+    """Return the relative Betti numbers of a finite simplicial pair (big, small).
+
+    The ambient complex is given by its maximal faces, and the subcomplex is
+    described by a predicate ``small_complex_membership_test(sigma)``.  The
+    relative chain groups are generated from simplices of the ambient complex
+    that are not in the subcomplex; boundary terms that land in the subcomplex
+    are projected to zero.
+
+    .. rubric:: Parameters
+
+    big_complex_maximal_faces : iterable
+        Iterable of maximal simplices of the ambient complex, each a set-like
+        object such as a set, tuple, or frozenset.
+    small_complex_membership_test : callable
+        Predicate that returns ``True`` exactly when a simplex lies in the
+        subcomplex.
+
+    .. rubric:: Returns
+
+    dict[int, int]
+        A dictionary mapping each nonnegative degree *d* to the *d*-th Betti
+        number of the relative complex ``(big, small)``.
+    """
+    facets = [Simplex(f) for f in big_complex_maximal_faces]
+    if not facets:
+        return {}
+
+    base_set = set().union(*(set(f) for f in facets))
+    big_complex = SimplicialComplex(base_set, facet_set=facets)
+    all_simplices = big_complex.all_simplices()
+
+    by_dim: dict[int, list[Simplex]] = defaultdict(list)
+    for sigma in all_simplices:
+        if small_complex_membership_test(sigma):
+            continue
+        by_dim[sigma.dimension()].append(sigma)
+
+    if not by_dim:
+        return {}
+
+    max_dim = max(by_dim)
+
+    def boundary_matrix(d: int) -> np.ndarray:
+        cols = by_dim.get(d, [])
+        rows = by_dim.get(d - 1, [])
+        if not cols or not rows:
+            return np.zeros((0, len(cols)), dtype=float)
+
+        matrix = np.zeros((len(rows), len(cols)), dtype=float)
+        row_index = {sigma: i for i, sigma in enumerate(rows)}
+
+        for j, sigma in enumerate(cols):
+            ordered = tuple(sorted(sigma))
+            for k in range(len(ordered)):
+                face = Simplex(ordered[:k] + ordered[k + 1 :])
+                if face in row_index:
+                    matrix[row_index[face], j] += (-1) ** k
+
+        return matrix
+
+    bettis: dict[int, int] = {}
+    for d in range(max_dim + 1):
+        current = by_dim.get(d, [])
+        if not current:
+            continue
+        d_matrix = boundary_matrix(d)
+        next_matrix = boundary_matrix(d + 1)
+        rank_d = int(np.linalg.matrix_rank(d_matrix)) if d_matrix.size else 0
+        rank_next = int(np.linalg.matrix_rank(next_matrix)) if next_matrix.size else 0
+        bettis[d] = len(current) - rank_d - rank_next
+
+    return bettis
 
 
 def nerve_of_sets(sets: Iterable[set | frozenset]) -> SimplicialComplex:

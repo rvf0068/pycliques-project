@@ -14,6 +14,7 @@ from pycombtop import (
     nerve_of_cliques,
     nerve_of_sets,
     oriented_complex,
+    relative_betti_numbers,
 )
 
 # ---------- Simplex tests ----------
@@ -214,6 +215,29 @@ def test_all_subsets_single():
     """Single-element set has one subset."""
     subs = list(all_subsets({42}))
     assert len(subs) == 1
+
+
+def test_relative_betti_numbers_of_triangle_mod_empty_is_zero():
+    """A contractible big complex has trivial relative homology when the
+    small complex is empty.
+    """
+
+    def small(s):
+        return False
+
+    bettis = relative_betti_numbers([{0, 1, 2}], small)
+    assert all(b == 0 for b in bettis.values())
+
+
+def test_relative_betti_numbers_of_circle_mod_point_has_h1_one():
+    """The boundary of a triangle relative to one vertex has H_1 ≅ Q."""
+    big = [{0, 1}, {1, 2}, {0, 2}]
+
+    def small(s):
+        return set(s) <= {0}
+
+    bettis = relative_betti_numbers(big, small)
+    assert bettis.get(1, 0) == 1
 
 
 def test_nerve_of_sets():
