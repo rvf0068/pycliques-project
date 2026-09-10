@@ -74,7 +74,7 @@ def _(pair: CoaffinePair, bound: int | float = math.inf) -> CoaffinePair | None:
     return CoaffinePair(kg, coaf_k)
 
 
-def automorphisms(graph: nx.Graph) -> Iterator[dict[int, int]]:
+def automorphisms(graph: nx.Graph) -> Iterator[dict[Hashable, Hashable]]:
     """Yield every automorphism of ``graph`` as a dict mapping.
 
     .. rubric:: Parameters
@@ -84,7 +84,7 @@ def automorphisms(graph: nx.Graph) -> Iterator[dict[int, int]]:
 
     .. rubric:: Yields
 
-    dict[int, int]
+    dict[Hashable, Hashable]
         A mapping that maps vertices according to an automorphism.
 
     .. rubric:: Examples
@@ -104,7 +104,7 @@ def automorphisms(graph: nx.Graph) -> Iterator[dict[int, int]]:
     yield from GM.subgraph_isomorphisms_iter()
 
 
-def coaffinations(graph: nx.Graph, k: int) -> Iterator[dict[int, int]]:
+def coaffinations(graph: nx.Graph, k: int) -> Iterator[dict[Hashable, Hashable]]:
     """Yield automorphisms that map a vertex outside its closed neighborhood.
 
     .. rubric:: Parameters
@@ -116,7 +116,7 @@ def coaffinations(graph: nx.Graph, k: int) -> Iterator[dict[int, int]]:
 
     .. rubric:: Yields
 
-    dict[int, int]
+    dict[Hashable, Hashable]
         A coaffination that satisfies the distance constraint.
 
     .. rubric:: Examples

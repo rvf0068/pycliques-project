@@ -16,12 +16,33 @@ def test_automorphisms_cycle_graph_has_six():
     assert all(set(auto.keys()) == set(graph.nodes) for auto in autos)
 
 
+def test_automorphisms_preserve_mixed_hashable_labels():
+    graph = nx.cycle_graph(["alice", 7, ("carol", 1), "dave"])
+
+    autos = list(automorphisms(graph))
+
+    assert len(autos) == 8
+    assert all(set(auto) == set(graph) for auto in autos)
+    assert all(set(auto.values()) == set(graph) for auto in autos)
+
+
 def test_coaffinations_enforce_minimum_distance():
     graph = nx.octahedral_graph()
     coafs = list(coaffinations(graph, 2))
     assert len(coafs) == 1
     mapping = coafs[0]
     assert all(graph.degree[v] == graph.degree[mapping[v]] for v in graph)
+
+
+def test_coaffinations_preserve_mixed_hashable_labels():
+    graph = nx.cycle_graph(["alice", 7, ("carol", 1), "dave"])
+
+    coafs = list(coaffinations(graph, 2))
+
+    assert len(coafs) == 1
+    assert set(coafs[0]) == set(graph)
+    assert set(coafs[0].values()) == set(graph)
+    assert all(nx.shortest_path_length(graph, v, coafs[0][v]) >= 2 for v in graph)
 
 
 def test_clique_graph_supports_coaffine_pair():
@@ -31,6 +52,25 @@ def test_clique_graph_supports_coaffine_pair():
     assert isinstance(result, CoaffinePair)
     assert result.graph.number_of_nodes() == 4
     assert set(result.coaffination.keys()) == set(result.graph.nodes)
+
+
+def test_clique_graph_coaffine_pair_preserves_mixed_labels():
+    labels = ["alice", 7, ("carol", 1), "dave"]
+    graph = nx.cycle_graph(labels)
+    sigma = dict(zip(labels, [7, ("carol", 1), "dave", "alice"], strict=True))
+    pair = CoaffinePair(graph, sigma)
+
+    result = clique_graph(pair)
+
+    assert isinstance(result, CoaffinePair)
+    assert set(result.graph) == {
+        frozenset({"alice", 7}),
+        frozenset({7, ("carol", 1)}),
+        frozenset({("carol", 1), "dave"}),
+        frozenset({"dave", "alice"}),
+    }
+    assert set(result.coaffination) == set(result.graph)
+    assert set(result.coaffination.values()) == set(result.graph)
 
 
 def test_clique_graph_coaffine_pair_bound_exceeded():
@@ -79,6 +119,21 @@ def test_is_coaffine_map_between_distinct_pairs():
     # Embedding: 0->0, 1->2, 2->4, 3->6  (every other node of C8)
     mono = {0: 0, 1: 2, 2: 4, 3: 6}
     assert is_coaffine_map(small_pair, large_pair, mono) is True
+
+
+def test_coaffine_maps_preserve_mixed_hashable_labels():
+    labels = ["alice", 7, ("carol", 1), "dave"]
+    graph = nx.cycle_graph(labels)
+    sigma = dict(zip(labels, [7, ("carol", 1), "dave", "alice"], strict=True))
+    pair = CoaffinePair(graph, sigma)
+
+    assert is_coaffine_map(pair, pair, sigma)
+    for algorithm in ("GM", "Grandiso"):
+        mono = coaffine_monomorphism(pair, pair, algorithm=algorithm)
+        assert mono is not False
+        assert set(mono) == set(labels)
+        assert set(mono.values()) == set(labels)
+        assert is_coaffine_map(pair, pair, mono)
 
 
 # ---------------------------------------------------------------------------
