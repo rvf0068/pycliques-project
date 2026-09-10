@@ -75,7 +75,7 @@ from .named import (
     dominated_vertex_free_non_helly,
     graph_suspension,
     octahedron,
-    snub_dysphenoid,
+    snub_disphenoid,
     suspension_of_cycle,
 )
 from .retractions import (
@@ -181,7 +181,7 @@ __all__ = [
     "dominated_vertex_free_non_helly",
     "graph_suspension",
     "octahedron",
-    "snub_dysphenoid",
+    "snub_disphenoid",
     "suspension_of_cycle",
     # retractions
     "dict_to_tuple",

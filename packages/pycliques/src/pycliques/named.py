@@ -112,18 +112,18 @@ def octahedron(n: int) -> nx.Graph:
     return nx.complement(nx.disjoint_union_all(edges))
 
 
-def snub_dysphenoid() -> nx.Graph:
-    """Return the snub dysphenoid graph.
+def snub_disphenoid() -> nx.Graph:
+    """Return the snub disphenoid graph.
 
     .. rubric:: Returns
 
     networkx.Graph
-        The snub dysphenoid on 8 vertices.
+        The snub disphenoid on 8 vertices.
 
     .. rubric:: Examples
 
-    >>> from pycliques.named import snub_dysphenoid
-    >>> snub_dysphenoid().number_of_nodes()
+    >>> from pycliques.named import snub_disphenoid
+    >>> snub_disphenoid().number_of_nodes()
     8
     """
     return nx.from_graph6_bytes(bytes("GQyuzw", "utf8"))

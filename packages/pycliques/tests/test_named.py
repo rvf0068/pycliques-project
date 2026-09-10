@@ -3,7 +3,7 @@ from pycliques.named import (
     complement_of_cycle,
     graph_suspension,
     octahedron,
-    snub_dysphenoid,
+    snub_disphenoid,
     suspension_of_cycle,
 )
 
@@ -49,10 +49,10 @@ def test_octahedron_complement_is_disjoint_edges():
     assert all(d == 1 for _, d in comp.degree())
 
 
-def test_snub_dysphenoid_has_8_vertices():
-    g = snub_dysphenoid()
+def test_snub_disphenoid_has_8_vertices():
+    g = snub_disphenoid()
     assert g.number_of_nodes() == 8
 
 
-def test_snub_dysphenoid_is_connected():
-    assert nx.is_connected(snub_dysphenoid())
+def test_snub_disphenoid_is_connected():
+    assert nx.is_connected(snub_disphenoid())
