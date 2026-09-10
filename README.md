@@ -40,12 +40,12 @@ pip install ./packages/pyhomrep
 
 ## pycliques
 
-Tools for studying the **clique graph operator** K(G). Given a graph G, the clique graph K(G) has the cliques of G as vertices, with two cliques adjacent when they share a vertex. The package provides:
-
 **Terminology:** In this project, a *complete* is a mutually adjacent set of
 vertices, and a *clique* is a maximal complete. This follows the clique-graph
 literature; in particular, it differs from the common modern usage in which
 "clique" may mean any complete set.
+
+Tools for studying the **clique graph operator** K(G). Given a graph G, the clique graph K(G) has the cliques of G as vertices, with two cliques adjacent when they share a vertex. The package provides:
 
 - `clique_graph` — compute K(G) with an optional clique-count bound
 - `is_clique_helly` / `is_hereditary_clique_helly` — Helly property tests
