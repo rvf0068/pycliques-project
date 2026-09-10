@@ -128,7 +128,7 @@ def test_special_octahedron_public_api_agrees_with_classifier():
 
 def test_is_eventually_helly_bound_exceeded():
     """When the clique bound is exceeded, is_eventually_helly returns False."""
-    # The octahedral graph is NOT clique-Helly and has 8 maximal cliques.
+    # The octahedral graph is NOT clique-Helly and has 8 cliques.
     # With bound=3, clique_graph will return None.
     assert is_eventually_helly(nx.octahedral_graph(), bound=3) is False
 

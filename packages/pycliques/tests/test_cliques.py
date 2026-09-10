@@ -1,5 +1,6 @@
 import networkx as nx
 from pycliques import Clique, clique_graph, homotopy_clique_graph
+from pycliques.cliques import _cliques_by_vertex
 
 
 def test_clique_creation():
@@ -116,7 +117,7 @@ def test_clique_graph_of_cycle():
 def test_clique_graph_of_path():
     """K(P_n) is isomorphic to P_{n-1} for n >= 2.
 
-    The maximal cliques of a path on n vertices are its n-1 edges.
+    The cliques of a path on n vertices are its n-1 edges.
     """
     for n in range(2, 8):
         kg = clique_graph(nx.path_graph(n))
@@ -130,7 +131,7 @@ def test_clique_graph_of_petersen():
     petersen = nx.petersen_graph()
     kg = clique_graph(petersen)
     assert kg is not None
-    assert kg.number_of_nodes() == 15  # 15 edges, each is a maximal clique
+    assert kg.number_of_nodes() == 15  # 15 edges, each is a clique
     assert all(d == 4 for _, d in kg.degree())  # each edge touches 4 others
 
 
@@ -198,7 +199,7 @@ def test_clique_graph_node_types():
 def test_clique_graph_of_complete_bipartite():
     """K(K_{m,n}) is isomorphic to K_m x K_n (tensor product).
 
-    The maximal cliques of K_{m,n} are its m*n edges, and two clique-nodes
+    The cliques of K_{m,n} are its m*n edges, and two clique-nodes
     are adjacent iff the edges share an endpoint.  This gives the Kronecker /
     tensor product K_m x K_n (also known as the Rook's graph complement).
     We test via the degree sequence.
@@ -213,13 +214,25 @@ def test_clique_graph_of_complete_bipartite():
     assert all(d == expected_degree for _, d in kg.degree())
 
 
-def test_clique_graph_indexes_many_maximal_cliques_structurally():
-    """A graph with many maximal cliques still produces the exact clique graph."""
+def test_clique_graph_indexes_many_cliques_structurally():
+    """A graph with many cliques still produces the exact clique graph."""
     graph = nx.complete_bipartite_graph(5, 5)
+    indexed = _cliques_by_vertex(graph)
     kg = clique_graph(graph)
 
+    assert indexed is not None
+    cliques, cliques_of = indexed
     assert kg is not None
-    assert len(kg) == 25
+    assert len(cliques) == 25
+    assert set(cliques) == set(kg)
+    assert set(cliques_of) == set(graph)
+    assert all(len(vertex_cliques) == 5 for vertex_cliques in cliques_of.values())
+    assert all(
+        clique in cliques_of[vertex]
+        for vertex_cliques in cliques_of.values()
+        for clique in vertex_cliques
+        for vertex in clique
+    )
     assert kg.number_of_edges() == 100
 
 

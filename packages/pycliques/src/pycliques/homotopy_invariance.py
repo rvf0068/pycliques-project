@@ -41,7 +41,7 @@ def completes_with_empty_intersection(
     """Yield every complete of *kg* whose total intersection is empty.
 
     A "complete" of :math:`K(G)` is a set of pairwise-intersecting cliques of
-    :math:`G`, i.e. a clique of the clique graph *kg*. A complete is *bad*
+    :math:`G`, i.e. a complete of the clique graph *kg*. A complete is *bad*
     when the cliques' total intersection is empty.
 
     .. rubric:: Parameters
@@ -91,7 +91,7 @@ def completes_of_size(kg: nx.Graph, k: int) -> Iterator[frozenset]:
     .. rubric:: Returns
 
     Iterator[frozenset]
-        Each size-*k* complete (clique of *kg*).
+        Each size-*k* complete of *kg*.
 
     .. rubric:: Examples
 
@@ -548,12 +548,13 @@ def h_closure(
     kg: nx.Graph,
     all_maximal_cliques_of_kg: Iterable[frozenset],
 ) -> frozenset:
-    """Return :math:`h(X)`: the intersection of every maximal clique of
+    """Return :math:`h(X)`: the intersection of every clique of
     :math:`K(K(G))` containing X.
 
     Defined for a complete :math:`X` of :math:`K(G)` as the intersection of
-    all cliques of :math:`K(K(G))` (i.e. maximal completes of :math:`K(G)`)
-    containing :math:`X`. Idempotent: ``h_closure(h_closure(X, ...), ...)
+    all cliques of :math:`K(K(G))` (that is, maximal completes of
+    :math:`K(G)`) containing :math:`X`. Idempotent:
+    ``h_closure(h_closure(X, ...), ...)
     == h_closure(X, ...)``.
 
     .. rubric:: Parameters
@@ -565,7 +566,7 @@ def h_closure(
         :func:`theorem15_hypothesis_holds`; not otherwise used since
         *all_maximal_cliques_of_kg* already carries the needed information.
     all_maximal_cliques_of_kg : Iterable[frozenset]
-        The maximal cliques of *kg* (e.g. from ``nx.find_cliques(kg)``).
+        The cliques of *kg*, as returned by NetworkX's ``find_cliques``.
 
     .. rubric:: Returns
 
@@ -579,8 +580,8 @@ def h_closure(
     >>> from pycliques.homotopy_invariance import h_closure
     >>> g = nx.complete_graph(4)
     >>> kg = clique_graph(g)
-    >>> all_maximal = [frozenset(c) for c in nx.find_cliques(kg)]
-    >>> h_closure(frozenset(kg.nodes()), kg, all_maximal) == frozenset(kg.nodes())
+    >>> all_cliques = [frozenset(c) for c in nx.find_cliques(kg)]
+    >>> h_closure(frozenset(kg.nodes()), kg, all_cliques) == frozenset(kg.nodes())
     True
     """
     del kg  # unused: kept for API symmetry, see docstring
@@ -629,12 +630,12 @@ def delta_of_clique_set(clique_set: Iterable[frozenset]) -> nx.Graph:
     return delta
 
 
-def _maximal_clique_index(
-    all_maximal: Iterable[frozenset],
+def _clique_index(
+    all_cliques: Iterable[frozenset],
 ) -> dict[Hashable, set[frozenset]]:
-    """Index maximal cliques of kg by the (clique-of-G) nodes they contain."""
+    """Index cliques of kg by the (clique-of-G) nodes they contain."""
     index: dict[Hashable, set[frozenset]] = {}
-    for q in all_maximal:
+    for q in all_cliques:
         for node in q:
             index.setdefault(node, set()).add(q)
     return index
@@ -645,7 +646,7 @@ def _h_closure_indexed(
     index: dict[Hashable, set[frozenset]],
     cache: dict[frozenset, frozenset],
 ) -> frozenset:
-    """Optimized h(X): use a per-node index instead of scanning every maximal clique."""
+    """Optimized h(X): use an index instead of scanning every clique."""
     complete = frozenset(complete)
     cached = cache.get(complete)
     if cached is not None:
@@ -677,9 +678,9 @@ def theorem15_hypothesis_holds(
     is idempotent, the *distinct* values of ``h_closure(X, ...)`` over all
     completes :math:`X` are exactly this set of fixed points, so no separate
     filtering step is needed. To keep the per-complete cost of computing
-    :math:`h` down (a linear scan over every maximal clique, for every one
+    :math:`h` down (a linear scan over every clique, for every one
     of potentially thousands of completes, was the confirmed bottleneck),
-    this indexes maximal cliques by the nodes they contain and memoizes
+    this indexes cliques by the nodes they contain and memoizes
     results, rather than scanning ``all_maximal_cliques_of_kg`` from
     scratch for each complete.
 
@@ -712,7 +713,7 @@ def theorem15_hypothesis_holds(
     kg = clique_graph(graph)
     assert kg is not None
     all_maximal = [frozenset(c) for c in nx.find_cliques(kg)]
-    index = _maximal_clique_index(all_maximal)
+    index = _clique_index(all_maximal)
     cache: dict[frozenset, frozenset] = {}
 
     distinct_h: set[frozenset] = set()

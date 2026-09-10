@@ -251,7 +251,7 @@ def test_h_closure_is_idempotent():
 
 
 def test_h_closure_of_maximal_clique_is_itself():
-    """A maximal clique of kg is already a fixed point of h."""
+    """A clique of kg is already a fixed point of h."""
     kg = clique_graph(octahedron(3))
     all_maximal = [frozenset(c) for c in nx.find_cliques(kg)]
     for q in all_maximal:

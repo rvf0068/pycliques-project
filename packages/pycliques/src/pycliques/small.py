@@ -222,7 +222,7 @@ def classify_clique_behavior(
         Maximum number of iterates to inspect, including the input
         (default: 9).
     bound : int, optional
-        Maximum number of maximal cliques allowed at each iteration
+        Maximum number of cliques allowed at each iteration
         (default: 30).
 
     .. rubric:: Returns

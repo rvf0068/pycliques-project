@@ -149,7 +149,7 @@ def test_is_maximal_clique_false():
 
 def test_is_maximal_clique_edge_in_path():
     g = nx.path_graph(4)  # 0-1-2-3
-    # {0,1} is a maximal clique in a path
+    # {0,1} is a clique in a path
     assert _is_maximal_clique(g, [0, 1]) is True
 
 

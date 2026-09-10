@@ -38,10 +38,10 @@ class Clique(frozenset):
 NodeH: TypeAlias = tuple[Hashable, Clique]
 
 
-def _maximal_cliques_by_vertex(
+def _cliques_by_vertex(
     graph: nx.Graph, bound: int | float = math.inf
 ) -> tuple[list[Clique], dict[Hashable, set[Clique]]] | None:
-    """Return maximal cliques and the input vertices contained in each."""
+    """Return cliques and the input vertices contained in each."""
     cliques: list[Clique] = []
     cliques_of: dict[Hashable, set[Clique]] = {v: set() for v in graph}
 
@@ -63,9 +63,9 @@ def clique_graph(graph: nx.Graph, bound: int | float = math.inf) -> nx.Graph | N
     .. rubric:: Parameters
 
     graph : networkx.Graph
-        Input graph whose maximal cliques become the vertices of the output
-        graph. Two output vertices are adjacent exactly when those maximal
-        cliques intersect.
+        Input graph whose cliques become the vertices of the output graph.
+        Two output vertices are adjacent exactly when those cliques
+        intersect.
     bound : int, optional
         Maximum number of cliques before aborting (default: ``math.inf``).
 
@@ -87,7 +87,7 @@ def clique_graph(graph: nx.Graph, bound: int | float = math.inf) -> nx.Graph | N
     >>> clique_graph(nx.cycle_graph(4), bound=2) is None
     True
     """
-    indexed = _maximal_cliques_by_vertex(graph, bound)
+    indexed = _cliques_by_vertex(graph, bound)
     if indexed is None:
         return None
     cliques, cliques_of = indexed
@@ -140,7 +140,7 @@ def homotopy_clique_graph(graph: nx.Graph) -> nx.Graph:
 
     # 1. Extract cliques and precompute which cliques contain which vertices
     # Using sets for fast intersection later
-    indexed = _maximal_cliques_by_vertex(graph)
+    indexed = _cliques_by_vertex(graph)
     assert indexed is not None
     _, cliques_of = indexed
 
