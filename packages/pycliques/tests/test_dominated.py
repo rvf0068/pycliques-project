@@ -42,6 +42,19 @@ def test_twin_classes_groups_equivalent_vertices():
     assert classes == [[0, 1, 2], [3]]
 
 
+def test_twin_classes_supports_mixed_hashable_labels():
+    graph = nx.Graph()
+    graph.add_edges_from([("a", 42), (42, ("x", 1))])
+
+    classes = twin_classes(graph)
+
+    assert {frozenset(cls) for cls in classes} == {
+        frozenset({"a"}),
+        frozenset({42}),
+        frozenset({("x", 1)}),
+    }
+
+
 def test_pared_graph_removes_dominated_representatives():
     pared = pared_graph(nx.path_graph(4))
     assert set(pared.nodes()) == {1, 2}

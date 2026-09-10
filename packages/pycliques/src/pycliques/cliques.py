@@ -35,7 +35,7 @@ class Clique(frozenset):
             return f"{u}"
 
 
-NodeH: TypeAlias = tuple[int, Clique]
+NodeH: TypeAlias = tuple[Hashable, Clique]
 
 
 @singledispatch
@@ -68,23 +68,24 @@ def clique_graph(graph: nx.Graph, bound: int | float = math.inf) -> nx.Graph | N
     True
     """
     it_cliques = nx.find_cliques(graph)
-    cliques = []
+    cliques: list[Clique] = []
+    cliques_of: dict[Hashable, list[Clique]] = {v: [] for v in graph}
     clique_graph = nx.Graph()
     while True:
         try:
             clique = next(it_cliques)
-            cliques.append(Clique(clique))
+            clique_node = Clique(clique)
+            cliques.append(clique_node)
+            for vertex in clique_node:
+                cliques_of[vertex].append(clique_node)
             if len(cliques) > bound:
                 return None
         except StopIteration:
             break
     clique_graph.add_nodes_from(cliques)
 
-    # Fast edge generation: group cliques by the vertices they contain
-    for v in graph:
-        # Find all cliques containing this vertex
-        cliques_with_v = [c for c in cliques if v in c]
-        # Link all of them together in the clique graph
+    # Link clique vertices that share an input-graph vertex.
+    for cliques_with_v in cliques_of.values():
         clique_graph.add_edges_from(itertools.combinations(cliques_with_v, 2))
 
     return clique_graph

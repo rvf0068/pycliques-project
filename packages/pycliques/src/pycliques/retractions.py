@@ -6,7 +6,7 @@ import argparse
 import itertools
 import logging
 import sys
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Hashable, Iterable, Iterator, Mapping
 from typing import Any
 
 import networkx as nx
@@ -24,17 +24,19 @@ _logger = logging.getLogger(__name__)
 _logger.addHandler(logging.NullHandler())
 
 
-def dict_to_tuple(the_dict: dict) -> tuple:
-    """Convert a dictionary to a sorted tuple of key-value pairs.
+def dict_to_tuple(
+    the_dict: Mapping[Hashable, Any],
+) -> tuple[tuple[Hashable, Any], ...]:
+    """Convert a mapping to a tuple of key-value pairs in iteration order.
 
     .. rubric:: Parameters
 
-    the_dict : dict
-        Dictionary to convert.
+    the_dict : collections.abc.Mapping
+        Mapping to convert. Its iteration order is preserved.
 
     .. rubric:: Returns
 
-    tuple
+    tuple[tuple[Hashable, Any], ...]
         Tuple of ``(key, value)`` pairs.
 
     .. rubric:: Examples
@@ -43,7 +45,6 @@ def dict_to_tuple(the_dict: dict) -> tuple:
     >>> dict_to_tuple({1: 'a', 2: 'b'})
     ((1, 'a'), (2, 'b'))
     """
-    # .items() already yields (key, value) pairs natively
     return tuple(the_dict.items())
 
 

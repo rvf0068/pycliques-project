@@ -21,6 +21,11 @@ def test_dict_to_tuple_preserves_content():
     assert result == ((1, "a"), (2, "b"))
 
 
+def test_dict_to_tuple_preserves_iteration_order():
+    result = dict_to_tuple({3: "c", 1: "a", 2: "b"})
+    assert result == ((3, "c"), (1, "a"), (2, "b"))
+
+
 def test_invert_dict_swaps_keys_and_values():
     assert invert_dict({0: "a", 1: "b"}) == {"a": 0, "b": 1}
 

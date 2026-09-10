@@ -31,6 +31,14 @@ def test_classify_clique_behavior_convergent():
     assert result.bound_exceeded is False
 
 
+def test_eventual_helly_public_api_agrees_with_classifier():
+    """The public Helly search and classifier share the same iteration path."""
+    graph = nx.triangular_lattice_graph(3, 3)
+
+    assert is_eventually_helly(graph)
+    assert classify_clique_behavior(graph).verdict is Verdict.CONVERGENT
+
+
 def test_classify_clique_behavior_bound_exceeded():
     """The public result reports when the clique bound aborts iteration."""
     result = classify_clique_behavior(dominated_vertex_free_non_helly(), bound=3)
@@ -85,6 +93,15 @@ def test_eventually_retracts():
     g = list_graphs(8)[11045]
     assert retracts(g, nx.octahedral_graph()) is False
     assert eventually_retracts_specially(g)
+
+
+def test_special_octahedron_public_api_agrees_with_classifier():
+    """The special-octahedron search agrees with classifier certification."""
+    g = list_graphs(8)[11045]
+
+    assert eventually_retracts_specially(g)
+    result = classify_clique_behavior(g)
+    assert result.verdict is Verdict.DIVERGENT
 
 
 # ---------- Coverage for is_eventually_helly edge cases ----------

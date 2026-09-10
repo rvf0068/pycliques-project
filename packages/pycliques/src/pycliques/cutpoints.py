@@ -22,7 +22,7 @@ _logger = logging.getLogger(__name__)
 _logger.addHandler(logging.NullHandler())
 
 
-def local_cutpoints(graph: nx.Graph) -> Iterator[int]:
+def local_cutpoints(graph: nx.Graph) -> Iterator[Hashable]:
     """Yield the local cutpoints of *graph*.
 
     A vertex *x* is a local cutpoint when its open neighborhood
@@ -82,7 +82,7 @@ def has_local_cutpoints(graph: nx.Graph) -> bool:
     return False
 
 
-def neighborhood_components(graph: nx.Graph, x: int) -> list[set[Hashable]]:
+def neighborhood_components(graph: nx.Graph, x: Hashable) -> list[set[Hashable]]:
     """Return the connected components of the open neighborhood of *x*.
 
     .. rubric:: Parameters

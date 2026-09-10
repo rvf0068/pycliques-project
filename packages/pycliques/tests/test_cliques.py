@@ -142,6 +142,40 @@ def test_clique_graph_of_empty_graph():
     assert kg.number_of_edges() == 0
 
 
+def test_clique_graph_of_disconnected_graph():
+    """Clique vertices are adjacent only when their cliques intersect."""
+    graph = nx.disjoint_union(nx.path_graph(3), nx.complete_graph(3))
+    kg = clique_graph(graph)
+
+    assert kg is not None
+    assert len(kg) == 3
+    assert kg.number_of_edges() == 1
+
+
+def test_clique_graph_of_isolated_vertices():
+    """Each isolated input vertex becomes an isolated clique vertex."""
+    graph = nx.empty_graph(4)
+    kg = clique_graph(graph)
+
+    assert kg is not None
+    assert set(kg) == {Clique({0}), Clique({1}), Clique({2}), Clique({3})}
+    assert kg.number_of_edges() == 0
+
+
+def test_clique_graph_supports_arbitrary_node_labels():
+    """Clique graphs preserve arbitrary hashable input node labels."""
+    graph = nx.Graph()
+    graph.add_edges_from([("u", 42), (42, ("x", 1))])
+    kg = clique_graph(graph)
+
+    assert kg is not None
+    assert set(kg) == {
+        Clique({"u", 42}),
+        Clique({42, ("x", 1)}),
+    }
+    assert kg.number_of_edges() == 1
+
+
 def test_clique_graph_node_types():
     """All nodes of K(G) are Clique instances."""
     for g in [nx.cycle_graph(5), nx.petersen_graph(), nx.octahedral_graph()]:

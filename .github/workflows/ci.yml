@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
         # List your packages here. 
         # Ideally, 'pyg6data' is tested first if others depend on it, 
         # but parallel execution handles this fine.

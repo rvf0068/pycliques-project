@@ -399,19 +399,8 @@ def is_eventually_helly(graph: nx.Graph, tries: int = 8, bound: int = 30) -> boo
     True
 
     """
-    i = 0
-    while not is_clique_helly(graph) and i < tries:
-        i = i + 1
-        graph = clique_graph(graph, bound)
-        if graph is None:
-            return False
-        else:
-            graph = completely_pared_graph(graph)
-    if is_clique_helly(graph):
-        _logger.debug(f"Helly of index {i}")
-        return True
-    else:
-        return False
+    seq = CliqueSequence(graph, bound=bound)
+    return _test_eventually_helly(seq, tries + 1) is not None
 
 
 def eventually_retracts_specially(
@@ -448,16 +437,9 @@ def eventually_retracts_specially(
     True
 
     """
-    g_curr = graph
-    for i in range(tries):
-        if special_octahedra_dimension(g_curr) is not None:
-            _logger.debug(f"Index {i} has induced special octahedra")
-            return True
-        g_curr = clique_graph(g_curr, bound)
-        if g_curr is None:
-            return None
-        g_curr = completely_pared_graph(g_curr)
-    return None
+    seq = CliqueSequence(graph, bound=bound)
+    result = _test_eventually_special_octahedra(seq, tries)
+    return True if result is not None else None
 
 
 def _parse_args(args: list[str]) -> argparse.Namespace:

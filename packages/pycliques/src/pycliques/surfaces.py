@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Hashable
+
 import networkx as nx
 
 
@@ -58,7 +60,7 @@ def is_path(graph: nx.Graph) -> bool:
     return nx.is_tree(graph) and len(leaves) == 2
 
 
-def open_neighborhood(graph: nx.Graph, v) -> nx.Graph:
+def open_neighborhood(graph: nx.Graph, v: Hashable) -> nx.Graph:
     """Return the subgraph induced by the neighbors of ``v``.
 
     .. rubric:: Examples

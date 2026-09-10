@@ -6,7 +6,7 @@ from typing import cast
 import networkx as nx
 
 
-def closed_neighborhood(graph: nx.Graph, v) -> set:
+def closed_neighborhood(graph: nx.Graph, v: Hashable) -> set[Hashable]:
     """Return the closed neighborhood of ``v`` (neighbors plus the vertex).
 
     .. rubric:: Examples
@@ -19,7 +19,7 @@ def closed_neighborhood(graph: nx.Graph, v) -> set:
     return set(graph[v]) | {v}
 
 
-def dominates(graph: nx.Graph, v, w) -> bool:
+def dominates(graph: nx.Graph, v: Hashable, w: Hashable) -> bool:
     """Return True when ``v`` dominates ``w``.
 
     Vertex ``v`` dominates ``w`` if the closed neighborhood of ``w`` is a
@@ -41,8 +41,8 @@ def dominates(graph: nx.Graph, v, w) -> bool:
 
 
 def is_dominated_vertex(
-    graph: nx.Graph, v, return_dominator: bool = False
-) -> bool | tuple[bool, int]:
+    graph: nx.Graph, v: Hashable, return_dominator: bool = False
+) -> bool | tuple[bool, Hashable]:
     """Return whether ``v`` is dominated by some other vertex.
 
     .. rubric:: Examples
@@ -114,7 +114,7 @@ def remove_dominated_vertex(graph: nx.Graph) -> nx.Graph:
         return g1
 
 
-def twin_classes(graph: nx.Graph) -> list[list]:
+def twin_classes(graph: nx.Graph) -> list[list[Hashable]]:
     """Group vertices that share the same closed neighborhood.
 
     .. rubric:: Examples
@@ -126,10 +126,9 @@ def twin_classes(graph: nx.Graph) -> list[list]:
     >>> sorted(sorted(cls) for cls in twin_classes(graph))
     [[0, 1, 2], [3]]
     """
-    neighborhoods: dict[tuple[int, ...], list[int]] = {}
+    neighborhoods: dict[frozenset[Hashable], list[Hashable]] = {}
     for v in graph:
-        # Create a hashable signature for the neighborhood (sorted tuple)
-        nb_signature = tuple(sorted(closed_neighborhood(graph, v)))
+        nb_signature = frozenset(closed_neighborhood(graph, v))
 
         if nb_signature not in neighborhoods:
             neighborhoods[nb_signature] = []
