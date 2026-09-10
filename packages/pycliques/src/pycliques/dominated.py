@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Hashable
-from typing import cast
+from typing import Literal, cast, overload
 
 import networkx as nx
 
@@ -38,6 +38,18 @@ def dominates(graph: nx.Graph, v: Hashable, w: Hashable) -> bool:
     neigh_v = closed_neighborhood(graph, v)
     neigh_w = closed_neighborhood(graph, w)
     return neigh_w.issubset(neigh_v)
+
+
+@overload
+def is_dominated_vertex(
+    graph: nx.Graph, v: Hashable, return_dominator: Literal[True]
+) -> tuple[bool, Hashable]: ...
+
+
+@overload
+def is_dominated_vertex(
+    graph: nx.Graph, v: Hashable, return_dominator: Literal[False] = False
+) -> bool: ...
 
 
 def is_dominated_vertex(
@@ -169,7 +181,7 @@ def pared_graph(graph: nx.Graph) -> nx.Graph:
             # The vertex is dominated; check if it is only dominated by a twin.
             # Since is_dominated_vertex returned True, the call with
             # return_dominator=True is guaranteed to return (True, dominator).
-            _, dominator = is_dominated_vertex(graph, vertex, return_dominator=True)  # type: ignore[misc]
+            _, dominator = is_dominated_vertex(graph, vertex, return_dominator=True)
             neigh_v = closed_neighborhood(graph, vertex)
             neigh_dom = closed_neighborhood(graph, dominator)
             # If neighborhoods match, they are twins -> keep representative

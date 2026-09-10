@@ -17,8 +17,8 @@ from pycliques.retractions import (
 
 
 def test_dict_to_tuple_preserves_content():
-    result = dict_to_tuple({1: "a", 2: "b"})
-    assert result == ((1, "a"), (2, "b"))
+    result = dict_to_tuple({2: "b", 1: "a"})
+    assert result == ((2, "b"), (1, "a"))
 
 
 def test_dict_to_tuple_preserves_iteration_order():

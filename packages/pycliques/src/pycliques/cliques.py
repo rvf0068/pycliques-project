@@ -38,6 +38,24 @@ class Clique(frozenset):
 NodeH: TypeAlias = tuple[Hashable, Clique]
 
 
+def _maximal_cliques_by_vertex(
+    graph: nx.Graph, bound: int | float = math.inf
+) -> tuple[list[Clique], dict[Hashable, set[Clique]]] | None:
+    """Return maximal cliques and the input vertices contained in each."""
+    cliques: list[Clique] = []
+    cliques_of: dict[Hashable, set[Clique]] = {v: set() for v in graph}
+
+    for clique in nx.find_cliques(graph):
+        clique_node = Clique(clique)
+        cliques.append(clique_node)
+        for vertex in clique_node:
+            cliques_of[vertex].add(clique_node)
+        if len(cliques) > bound:
+            return None
+
+    return cliques, cliques_of
+
+
 @singledispatch
 def clique_graph(graph: nx.Graph, bound: int | float = math.inf) -> nx.Graph | None:
     """Produce the clique graph of an undirected NetworkX graph.
@@ -67,21 +85,11 @@ def clique_graph(graph: nx.Graph, bound: int | float = math.inf) -> nx.Graph | N
     >>> clique_graph(nx.cycle_graph(4), bound=2) is None
     True
     """
-    it_cliques = nx.find_cliques(graph)
-    cliques: list[Clique] = []
-    cliques_of: dict[Hashable, list[Clique]] = {v: [] for v in graph}
+    indexed = _maximal_cliques_by_vertex(graph, bound)
+    if indexed is None:
+        return None
+    cliques, cliques_of = indexed
     clique_graph = nx.Graph()
-    while True:
-        try:
-            clique = next(it_cliques)
-            clique_node = Clique(clique)
-            cliques.append(clique_node)
-            for vertex in clique_node:
-                cliques_of[vertex].append(clique_node)
-            if len(cliques) > bound:
-                return None
-        except StopIteration:
-            break
     clique_graph.add_nodes_from(cliques)
 
     # Link clique vertices that share an input-graph vertex.
@@ -129,12 +137,9 @@ def homotopy_clique_graph(graph: nx.Graph) -> nx.Graph:
 
     # 1. Extract cliques and precompute which cliques contain which vertices
     # Using sets for fast intersection later
-    cliques = [Clique(c) for c in nx.find_cliques(graph)]
-    cliques_of: dict[Hashable, set[Clique]] = {v: set() for v in graph}
-
-    for c in cliques:
-        for v in c:
-            cliques_of[v].add(c)
+    indexed = _maximal_cliques_by_vertex(graph)
+    assert indexed is not None
+    _, cliques_of = indexed
 
     # 2. Add nodes and "same-vertex" edges (where v == w)
     for v, v_cliques in cliques_of.items():
