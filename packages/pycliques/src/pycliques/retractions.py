@@ -42,25 +42,29 @@ def dict_to_tuple(
     .. rubric:: Examples
 
     >>> from pycliques.retractions import dict_to_tuple
-    >>> dict_to_tuple({1: 'a', 2: 'b'})
-    ((1, 'a'), (2, 'b'))
+    >>> dict_to_tuple({2: 'b', 1: 'a'})
+    ((2, 'b'), (1, 'a'))
     """
     return tuple(the_dict.items())
 
 
-def invert_dict(the_dict: dict) -> dict:
-    """Invert a dictionary's keys and values.
+def invert_dict(
+    the_dict: Mapping[Hashable, Hashable],
+) -> dict[Hashable, Hashable]:
+    """Invert a mapping whose values are unique.
 
-    Assumes the mapping is bijective (injective).
+    The input must be injective: no two keys may have the same value.
+    Under that assumption, the returned mapping is the inverse on the image
+    of the input.
 
     .. rubric:: Parameters
 
-    the_dict : dict
-        Dictionary whose keys and values will be swapped.
+    the_dict : collections.abc.Mapping
+        Mapping whose keys and values will be swapped.
 
     .. rubric:: Returns
 
-    dict
+    dict[Hashable, Hashable]
         A new dictionary with keys and values exchanged.
 
     .. rubric:: Examples
@@ -99,7 +103,11 @@ def graph_from_gap_adjacency_list(the_list: list[list[int]]) -> nx.Graph:
     return graph
 
 
-def is_map(domain: nx.Graph, codomain: nx.Graph, ismap: dict) -> bool:
+def is_map(
+    domain: nx.Graph,
+    codomain: nx.Graph,
+    ismap: Mapping[Hashable, Hashable],
+) -> bool:
     """Determine whether ``ismap`` defines a graph homomorphism.
 
     It is not required that every vertex in ``domain`` has a value
@@ -139,7 +147,12 @@ def is_map(domain: nx.Graph, codomain: nx.Graph, ismap: dict) -> bool:
     return True
 
 
-def _extension_of_map(large: nx.Graph, small: nx.Graph, mapp: dict, v: Any) -> set:
+def _extension_of_map(
+    large: nx.Graph,
+    small: nx.Graph,
+    mapp: Mapping[Hashable, Hashable],
+    v: Hashable,
+) -> set[Hashable]:
     """Find the set of vertices of `small` that could be images of `v`."""
     common = set(small.nodes())
     for w in set(large[v]).intersection(mapp.keys()):
@@ -148,8 +161,10 @@ def _extension_of_map(large: nx.Graph, small: nx.Graph, mapp: dict, v: Any) -> s
 
 
 def _extend_retraction(
-    large: nx.Graph, small: nx.Graph, state: tuple
-) -> Iterator[tuple]:
+    large: nx.Graph,
+    small: nx.Graph,
+    state: tuple[tuple[Hashable, Hashable], ...],
+) -> Iterator[tuple[tuple[Hashable, Hashable], ...]]:
     """Generator to backtrack and complete a retraction from large to small."""
     ret = dict(state)
     remaining = list(set(large.nodes()) - set(ret.keys()))

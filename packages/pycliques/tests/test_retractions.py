@@ -30,6 +30,12 @@ def test_invert_dict_swaps_keys_and_values():
     assert invert_dict({0: "a", 1: "b"}) == {"a": 0, "b": 1}
 
 
+def test_invert_dict_supports_hashable_node_labels():
+    mapping = {"alice": ("x", 1), "bob": 42}
+
+    assert invert_dict(mapping) == {("x", 1): "alice", 42: "bob"}
+
+
 def test_graph_from_gap_adjacency_list_shifts_indices():
     g = graph_from_gap_adjacency_list([[2], [1]])
     assert sorted(g.edges()) == [(0, 1)]
@@ -49,6 +55,18 @@ def test_is_map_valid_homomorphism():
 def test_is_map_partial_mapping():
     mapping = {0: 0, 1: 1}
     assert is_map(nx.cycle_graph(4), nx.complete_graph(2), mapping)
+
+
+def test_retractions_support_hashable_node_labels():
+    large = nx.path_graph(["alice", "bob", "carol"])
+    small = nx.path_graph(["bob", "carol"])
+
+    result = retracts(large, small)
+
+    assert result is not False
+    retraction_map, inclusion_map = result
+    assert set(retraction_map) == {"alice", "bob", "carol"}
+    assert set(inclusion_map) == {"bob", "carol"}
 
 
 def test_is_map_invalid_homomorphism():

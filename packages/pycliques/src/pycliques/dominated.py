@@ -57,6 +57,9 @@ def is_dominated_vertex(
 ) -> bool | tuple[bool, Hashable]:
     """Return whether ``v`` is dominated by some other vertex.
 
+    When ``return_dominator`` is true, return ``(True, u)`` for a dominator
+    ``u``; otherwise return only the Boolean result.
+
     .. rubric:: Examples
 
     >>> import networkx as nx
@@ -152,9 +155,9 @@ def twin_classes(graph: nx.Graph) -> list[list[Hashable]]:
 def pared_graph(graph: nx.Graph) -> nx.Graph:
     """Return the pared graph (one vertex per twin class, no dominated nodes).
 
-    The operation keeps a representative from each twin class and removes any
-    representative that is strictly dominated by another vertex outside its
-    class.
+    The operation keeps one representative from each twin class and removes
+    representatives that are dominated without being twins. The result is a
+    subgraph of the input graph.
 
     This was defined in [Prisner92]_.
 
@@ -222,6 +225,8 @@ def pared_index(graph: nx.Graph, return_cp: bool = False) -> int | tuple[int, nx
 
 def completely_pared_graph(graph: nx.Graph) -> nx.Graph:
     """Successively remove dominated vertices until reaching a fixed point.
+
+    Return a copy of the resulting graph; the input graph is not modified.
 
     .. rubric:: Examples
 

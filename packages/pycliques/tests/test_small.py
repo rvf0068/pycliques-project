@@ -31,6 +31,16 @@ def test_classify_clique_behavior_convergent():
     assert result.bound_exceeded is False
 
 
+def test_clique_sequence_exposes_read_only_state():
+    """Sequence clients can inspect cache state without private attributes."""
+    seq = CliqueSequence(nx.cycle_graph(4))
+
+    assert seq.graph_count == 1
+    assert seq.exhausted is False
+    assert seq[1] is not None
+    assert seq.graph_count == 2
+
+
 def test_eventual_helly_public_api_agrees_with_classifier():
     """The public Helly search and classifier share the same iteration path."""
     graph = nx.triangular_lattice_graph(3, 3)
@@ -46,6 +56,15 @@ def test_classify_clique_behavior_bound_exceeded():
     assert result.verdict is Verdict.INDETERMINATE
     assert result.bound_exceeded is True
     assert result.reason == "clique count exceeded bound"
+
+
+def test_clique_sequence_reports_bound_exhaustion():
+    """A failed bounded iteration is exposed as sequence exhaustion."""
+    seq = CliqueSequence(nx.octahedral_graph(), bound=3)
+
+    assert seq[1] is None
+    assert seq.exhausted is True
+    assert seq.graph_count == 1
 
 
 def test_classify_clique_behavior_respects_iteration_limit():
@@ -229,3 +248,4 @@ def test_small_main_no_skip_dominated(tmp_path):
     lines = output.read_text().splitlines()
     reducible_lines = [line for line in lines if "REDUCIBLE" in line]
     assert len(reducible_lines) == 0
+    assert all("UNKNOWN" not in line for line in lines)

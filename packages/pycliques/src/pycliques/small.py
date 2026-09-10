@@ -102,6 +102,16 @@ class CliqueSequence:
         self._bound = bound
         self._exhausted = False
 
+    @property
+    def graph_count(self) -> int:
+        """Return the number of iterates currently cached."""
+        return len(self._graphs)
+
+    @property
+    def exhausted(self) -> bool:
+        """Return whether generating another iterate has failed."""
+        return self._exhausted
+
     def __getitem__(self, i: int) -> nx.Graph | None:
         """Return the *i*-th iterated pared clique graph, or ``None``."""
         while len(self._graphs) <= i and not self._exhausted:
@@ -241,9 +251,9 @@ def classify_clique_behavior(
         result = classifier(seq)
         if result is not None:
             verdict, reason = result
-            return CliqueBehavior(verdict, reason, len(seq._graphs), False, pared_graph)
+            return CliqueBehavior(verdict, reason, seq.graph_count, False, pared_graph)
 
-    bound_exceeded = seq._exhausted
+    bound_exceeded = seq.exhausted
     reason = (
         "clique count exceeded bound"
         if bound_exceeded
@@ -252,7 +262,7 @@ def classify_clique_behavior(
     return CliqueBehavior(
         Verdict.INDETERMINATE,
         reason,
-        len(seq._graphs),
+        seq.graph_count,
         bound_exceeded,
         pared_graph,
     )
@@ -622,7 +632,7 @@ def _main(args: list[str]):
                     result = classify_clique_behavior(graph)
                     if _is_known_indeterminate(result.pared_graph, known_indeterminate):
                         further_pared.append((index, result.pared_graph))
-                        verdict_label = "UNKNOWN"
+                        verdict_label = "INDETERMINATE"
                         reason = "reduces to known indeterminate graph"
                     elif result.verdict is Verdict.CONVERGENT:
                         convergent.append(index)
@@ -635,7 +645,7 @@ def _main(args: list[str]):
                     else:
                         further.append(index)
                         further_graphs.append((index, result.pared_graph))
-                        verdict_label = "UNKNOWN"
+                        verdict_label = "INDETERMINATE"
                         reason = result.reason
 
                     if verdict_file is not None:
@@ -648,8 +658,8 @@ def _main(args: list[str]):
     _logger.info(f"Total convergent graphs: {len(convergent)}")
     _logger.info(f"Total divergent graphs: {len(divergent)}")
     _logger.info(f"Total reducible graphs skipped: {len(reducible)}")
-    _logger.info(f"Total graphs reduced to unknown: {len(further_pared)}")
-    _logger.info(f"Total unknown graphs (further study): {len(further)}")
+    _logger.info(f"Total graphs reduced to indeterminate: {len(further_pared)}")
+    _logger.info(f"Total indeterminate graphs (further study): {len(further)}")
 
     if save and further_graphs:
         _save_indeterminate(order, further_graphs, data_dir)

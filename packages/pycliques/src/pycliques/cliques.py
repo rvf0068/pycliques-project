@@ -63,7 +63,9 @@ def clique_graph(graph: nx.Graph, bound: int | float = math.inf) -> nx.Graph | N
     .. rubric:: Parameters
 
     graph : networkx.Graph
-        Input graph whose cliques will become nodes of the output graph.
+        Input graph whose maximal cliques become the vertices of the output
+        graph. Two output vertices are adjacent exactly when those maximal
+        cliques intersect.
     bound : int, optional
         Maximum number of cliques before aborting (default: ``math.inf``).
 
@@ -100,7 +102,7 @@ def clique_graph(graph: nx.Graph, bound: int | float = math.inf) -> nx.Graph | N
 
 
 def homotopy_clique_graph(graph: nx.Graph) -> nx.Graph:
-    """The homotopy clique graph
+    """Produce the homotopy clique graph of an undirected NetworkX graph.
 
     .. rubric:: Parameters
 
@@ -109,8 +111,9 @@ def homotopy_clique_graph(graph: nx.Graph) -> nx.Graph:
 
     .. rubric:: Returns
 
-    NetworkX graph
-        the homotopy clique graph of graph
+    networkx.Graph
+        Graph whose vertices are ``(v, C)`` pairs with ``v`` in a maximal
+        clique ``C`` of *graph*.
 
     .. rubric:: Notes
 

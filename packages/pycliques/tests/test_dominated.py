@@ -55,6 +55,14 @@ def test_twin_classes_supports_mixed_hashable_labels():
     }
 
 
+def test_dominated_operations_support_string_labels():
+    graph = nx.path_graph(["alice", "bob", "carol"])
+
+    assert closed_neighborhood(graph, "alice") == {"alice", "bob"}
+    assert dominates(graph, "bob", "alice")
+    assert find_dominated_vertex(graph) == "alice"
+
+
 def test_pared_graph_removes_dominated_representatives():
     pared = pared_graph(nx.path_graph(4))
     assert set(pared.nodes()) == {1, 2}

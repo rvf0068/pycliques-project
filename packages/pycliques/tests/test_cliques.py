@@ -63,6 +63,17 @@ def test_homotopy_clique_graph_preserves_connectivity_on_path():
     assert nx.is_connected(h_graph)
 
 
+def test_homotopy_clique_graph_supports_hashable_node_labels():
+    """Homotopy clique graph nodes preserve non-integer input labels."""
+    graph = nx.Graph()
+    graph.add_edges_from([("alice", "bob"), ("bob", "carol")])
+
+    h_graph = homotopy_clique_graph(graph)
+
+    assert {vertex for vertex, _ in h_graph} == {"alice", "bob", "carol"}
+    assert all(vertex in clique for vertex, clique in h_graph)
+
+
 # ---------- More thorough clique_graph tests ----------
 
 
@@ -200,6 +211,16 @@ def test_clique_graph_of_complete_bipartite():
     # Each edge shares one endpoint with (m-1)+(n-1) others
     expected_degree = (m - 1) + (n - 1)
     assert all(d == expected_degree for _, d in kg.degree())
+
+
+def test_clique_graph_indexes_many_maximal_cliques_structurally():
+    """A graph with many maximal cliques still produces the exact clique graph."""
+    graph = nx.complete_bipartite_graph(5, 5)
+    kg = clique_graph(graph)
+
+    assert kg is not None
+    assert len(kg) == 25
+    assert kg.number_of_edges() == 100
 
 
 def test_clique_graph_bound_exact():
