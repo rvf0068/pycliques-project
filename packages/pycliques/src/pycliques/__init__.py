@@ -92,8 +92,10 @@ from .retractions import (
     special_octahedra_dimension,
 )
 from .small import (
+    CliqueBehavior,
     CliqueSequence,
     Verdict,
+    classify_clique_behavior,
     eventually_retracts_specially,
     is_eventually_helly,
 )
@@ -194,8 +196,10 @@ __all__ = [
     "special_octahedra",
     "special_octahedra_dimension",
     # small
+    "CliqueBehavior",
     "CliqueSequence",
     "Verdict",
+    "classify_clique_behavior",
     "eventually_retracts_specially",
     "is_eventually_helly",
     # surfaces

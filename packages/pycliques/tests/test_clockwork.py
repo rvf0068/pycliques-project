@@ -19,6 +19,7 @@ from pycliques.clockwork import (
     remove_dominated_vertices,
     segmented_sum,
 )
+from pycliques.small import Verdict, classify_clique_behavior
 
 # -------------------------------------------------------------------
 # Test graph builders (extracted from demo code)
@@ -322,6 +323,17 @@ def test_is_clique_divergent_false():
     G = _build_clockwork_bounded()
     div, _ = is_clique_divergent_clockwork(G)
     assert div is False
+
+
+def test_classify_clique_behavior_clockwork_verdicts():
+    """The public classifier preserves both clockwork verdicts."""
+    divergent = classify_clique_behavior(_build_clockwork_divergent())
+    convergent = classify_clique_behavior(_build_clockwork_bounded())
+
+    assert divergent.verdict is Verdict.DIVERGENT
+    assert divergent.reason == "is clockwork divergent"
+    assert convergent.verdict is Verdict.CONVERGENT
+    assert convergent.reason == "is clockwork convergent"
 
 
 def test_is_clique_divergent_non_clockwork():

@@ -47,6 +47,7 @@ Tools for studying the **clique graph operator** K(G). Given a graph G, the cliq
 - `completely_pared_graph` / `find_dominated_vertex` — graph dismantling
 - `recognize_clockwork` / `is_clique_divergent_clockwork` — clockwork-graph recognition
 - `retracts` / `special_octahedra_dimension` — retraction tests
+- `classify_clique_behavior` — apply the standard convergence/divergence tests to one graph
 - CLI `small-behavior` — classifies all connected graphs of a given order
 
 **Dependencies:** `networkx`, `grandiso`, `rich`  
@@ -56,15 +57,18 @@ Tools for studying the **clique graph operator** K(G). Given a graph G, the cliq
 
 ```python
 import networkx as nx
-from pycliques.cliques import clique_graph
-from pycliques.helly import is_clique_helly
+from pycliques import Verdict, classify_clique_behavior
 
 g = nx.octahedral_graph()
-print(is_clique_helly(g))        # False — not clique-Helly
-kg = clique_graph(g)
-print(kg.order())                # 8  (one vertex per triangle)
-print(is_clique_helly(kg))       # False
+result = classify_clique_behavior(g, tries=9, bound=30)
+print(result.verdict is Verdict.DIVERGENT)  # True
+print(result.reason)  # eventually has a special octahedron (index 0, dimension 3)
 ```
+
+`INDETERMINATE` means that the available sufficient tests did not decide the
+graph within the requested iteration and clique-count limits. Check
+`result.bound_exceeded` to distinguish a clique-count abort from an
+indeterminate result after all requested iterations.
 
 ---
 

@@ -7,6 +7,7 @@ import gzip
 import logging
 import sys
 from collections.abc import Callable
+from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
 
@@ -33,6 +34,38 @@ class Verdict(Enum):
 
     CONVERGENT = auto()
     DIVERGENT = auto()
+    INDETERMINATE = auto()
+
+
+@dataclass(frozen=True)
+class CliqueBehavior:
+    """Result of classifying a graph under clique-graph iteration.
+
+    ``INDETERMINATE`` means that the available sufficient tests did not
+    decide the behavior within the configured limits.  It is not a
+    mathematical assertion that the graph is neither convergent nor
+    divergent.
+
+    .. rubric:: Attributes
+
+    verdict : Verdict
+        The classification supplied by the available tests.
+    reason : str
+        Explanation of the deciding test or why classification was
+        indeterminate.
+    iterations_checked : int
+        Number of iterated clique graphs inspected, including the input.
+    bound_exceeded : bool
+        Whether a clique-graph computation exceeded the clique bound.
+    pared_graph : networkx.Graph
+        Completely pared copy of the input graph used by the classifier.
+    """
+
+    verdict: Verdict
+    reason: str
+    iterations_checked: int
+    bound_exceeded: bool
+    pared_graph: nx.Graph
 
 
 #: Type alias for a classifier function.
@@ -89,9 +122,11 @@ class CliqueSequence:
 _MAX_ITERATIONS = 9
 
 
-def _test_eventually_helly(seq: CliqueSequence) -> ClassifierResult:
+def _test_eventually_helly(
+    seq: CliqueSequence, tries: int
+) -> ClassifierResult:
     """Convergent if some iterate is clique-Helly."""
-    for i in range(_MAX_ITERATIONS):
+    for i in range(tries):
         g = seq[i]
         if g is None:
             return None
@@ -101,22 +136,26 @@ def _test_eventually_helly(seq: CliqueSequence) -> ClassifierResult:
     return None
 
 
-def _test_clockwork(seq: CliqueSequence) -> ClassifierResult:
+def _test_clockwork(seq: CliqueSequence, tries: int) -> ClassifierResult:
     """Check clockwork recognition on seq[0] and seq[1]."""
-    for i in range(2):
+    for i in range(min(2, tries)):
         g = seq[i]
         if g is None:
             return None
         if recognize_clockwork(g)[0]:
-            if is_clique_divergent_clockwork(g):
+            divergent, _ = is_clique_divergent_clockwork(g)
+            if divergent is True:
                 return (Verdict.DIVERGENT, "is clockwork divergent")
-            return (Verdict.CONVERGENT, "is clockwork convergent")
+            if divergent is False:
+                return (Verdict.CONVERGENT, "is clockwork convergent")
     return None
 
 
-def _test_eventually_special_octahedra(seq: CliqueSequence) -> ClassifierResult:
+def _test_eventually_special_octahedra(
+    seq: CliqueSequence, tries: int
+) -> ClassifierResult:
     """Divergent if some iterate contains a special octahedron."""
-    for i in range(_MAX_ITERATIONS):
+    for i in range(tries):
         g = seq[i]
         if g is None:
             return None
@@ -140,6 +179,87 @@ def _make_retraction_test(target: nx.Graph, label: str) -> Classifier:
         return None
 
     return _test
+
+
+def _default_classifiers(tries: int) -> list[Classifier]:
+    """Return the standard ordered suite of clique-behavior tests."""
+    return [
+        lambda seq: _test_clockwork(seq, tries),
+        lambda seq: _test_eventually_helly(seq, tries),
+        lambda seq: _test_eventually_special_octahedra(seq, tries),
+        _make_retraction_test(suspension_of_cycle(5), "retracts to Susp(C_5)"),
+        _make_retraction_test(suspension_of_cycle(6), "retracts to Susp(C_6)"),
+        _make_retraction_test(complement_of_cycle(8), "retracts to Comp(C_8)"),
+    ]
+
+
+def classify_clique_behavior(
+    graph: nx.Graph,
+    *,
+    tries: int = _MAX_ITERATIONS,
+    bound: int = 30,
+) -> CliqueBehavior:
+    """Classify the observed clique behavior of an undirected graph.
+
+    The input is completely pared before its iterated clique graphs are
+    inspected.  The standard test suite certifies convergence through an
+    eventually clique-Helly iterate, and divergence through clockwork,
+    special-octahedron, and known-retraction criteria.
+
+    .. rubric:: Parameters
+
+    graph : networkx.Graph
+        Input graph.
+    tries : int, optional
+        Maximum number of iterates to inspect, including the input
+        (default: 9).
+    bound : int, optional
+        Maximum number of maximal cliques allowed at each iteration
+        (default: 30).
+
+    .. rubric:: Returns
+
+    CliqueBehavior
+        A certified verdict when a sufficient test succeeds; otherwise an
+        indeterminate result.  ``bound_exceeded`` distinguishes an aborted
+        clique-graph computation from exhaustion of ``tries``.
+
+    .. rubric:: Examples
+
+    >>> import networkx as nx
+    >>> from pycliques.small import Verdict, classify_clique_behavior
+    >>> result = classify_clique_behavior(nx.cycle_graph(4))
+    >>> result.verdict is Verdict.CONVERGENT
+    True
+    """
+    if tries < 1:
+        raise ValueError("tries must be at least 1")
+    if bound < 1:
+        raise ValueError("bound must be at least 1")
+
+    pared_graph = completely_pared_graph(graph)
+    seq = CliqueSequence(pared_graph, bound=bound)
+    for classifier in _default_classifiers(tries):
+        result = classifier(seq)
+        if result is not None:
+            verdict, reason = result
+            return CliqueBehavior(
+                verdict, reason, len(seq._graphs), False, pared_graph
+            )
+
+    bound_exceeded = seq._exhausted
+    reason = (
+        "clique count exceeded bound"
+        if bound_exceeded
+        else "behavior is indeterminate under the available tests"
+    )
+    return CliqueBehavior(
+        Verdict.INDETERMINATE,
+        reason,
+        len(seq._graphs),
+        bound_exceeded,
+        pared_graph,
+    )
 
 
 def _make_clique_retraction_test(target: nx.Graph, label: str) -> Classifier:
@@ -459,20 +579,7 @@ def _main(args: list[str]):
         _logger.error("--start must be less than or equal to --end.")
         sys.exit(1)
 
-    # 1. Build the classifier pipeline
     _logger.info("Precomputing target mathematical structures...")
-    classifiers: list[Classifier] = [
-        _test_eventually_helly,
-        _test_clockwork,
-        _test_eventually_special_octahedra,
-        _make_retraction_test(suspension_of_cycle(5), "retracts to Susp(C_5)"),
-        _make_retraction_test(suspension_of_cycle(6), "retracts to Susp(C_6)"),
-        _make_retraction_test(complement_of_cycle(8), "retracts to Comp(C_8)"),
-        # _make_clique_retraction_test(
-        #     complement_of_cycle(10), "clique graph retracts to Comp(C_10)"
-        # ),
-    ]
-
     # Load previously saved indeterminate graphs for smaller orders
     known_indeterminate: dict[int, list[nx.Graph]] = {}
     if lookup:
@@ -534,21 +641,30 @@ def _main(args: list[str]):
                         _logger.debug(f"Graph {index}: has dominated vertices")
                         continue
 
-                    graph = completely_pared_graph(graph)
+                    result = classify_clique_behavior(graph)
+                    if _is_known_indeterminate(
+                        result.pared_graph, known_indeterminate
+                    ):
+                        further_pared.append((index, result.pared_graph))
+                        verdict_label = "UNKNOWN"
+                        reason = "reduces to known indeterminate graph"
+                    elif result.verdict is Verdict.CONVERGENT:
+                        convergent.append(index)
+                        verdict_label = "CONVERGENT"
+                        reason = result.reason
+                    elif result.verdict is Verdict.DIVERGENT:
+                        divergent.append(index)
+                        verdict_label = "DIVERGENT"
+                        reason = result.reason
+                    else:
+                        further.append(index)
+                        further_graphs.append((index, result.pared_graph))
+                        verdict_label = "UNKNOWN"
+                        reason = result.reason
 
-                    behavior = _classify_graph(
-                        graph,
-                        classifiers,
-                        known_indeterminate,
-                        index,
-                        convergent,
-                        divergent,
-                        further,
-                        further_pared,
-                        further_graphs,
-                        verdict_file,
-                    )
-                    _logger.debug(f"Graph {index}: {behavior}")
+                    if verdict_file is not None:
+                        verdict_file.write(f"{index}\t{verdict_label}\t{reason}\n")
+                    _logger.debug(f"Graph {index}: {reason}")
 
     total_processed = len(convergent) + len(divergent) + len(further) + len(reducible)
     _logger.info(f"Analysis Complete! Processed {total_processed} total graphs.")
@@ -561,53 +677,6 @@ def _main(args: list[str]):
 
     if save and further_graphs:
         _save_indeterminate(order, further_graphs, data_dir)
-
-
-def _classify_graph(
-    graph: nx.Graph,
-    classifiers: list[Classifier],
-    known_indeterminate: dict[int, list[nx.Graph]],
-    index: int,
-    convergent: list[int],
-    divergent: list[int],
-    further: list[int],
-    further_pared: list[tuple[int, nx.Graph]],
-    further_graphs: list[tuple[int, nx.Graph]],
-    verdict_file=None,
-) -> str:
-    """Run the classifier pipeline on a single pared graph.
-
-    Returns the behavior description string for logging.
-    If *verdict_file* is not ``None``, writes a tab-separated line
-    ``index\\tverdict\\treason`` for every graph processed.
-    """
-
-    def _write_verdict(verdict_label: str, reason: str) -> None:
-        if verdict_file is not None:
-            verdict_file.write(f"{index}\t{verdict_label}\t{reason}\n")
-
-    if known_indeterminate and _is_known_indeterminate(graph, known_indeterminate):
-        further_pared.append((index, graph))
-        _write_verdict("UNKNOWN", "reduces to known indeterminate graph")
-        return "reduces to known indeterminate graph"
-
-    seq = CliqueSequence(graph)
-    for classifier in classifiers:
-        result = classifier(seq)
-        if result is not None:
-            verdict, behavior = result
-            if verdict is Verdict.CONVERGENT:
-                convergent.append(index)
-                _write_verdict("CONVERGENT", behavior)
-            else:
-                divergent.append(index)
-                _write_verdict("DIVERGENT", behavior)
-            return behavior
-
-    further.append(index)
-    further_graphs.append((index, graph))
-    _write_verdict("UNKNOWN", "has character unknown so far")
-    return "has character unknown so far"
 
 
 def main():  # pragma: no cover

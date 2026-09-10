@@ -1,6 +1,11 @@
 import networkx as nx
 import pytest
-from pycliques.named import complement_of_cycle, suspension_of_cycle
+from pycliques import CliqueBehavior, classify_clique_behavior
+from pycliques.named import (
+    complement_of_cycle,
+    dominated_vertex_free_non_helly,
+    suspension_of_cycle,
+)
 from pycliques.retractions import retracts
 from pycliques.small import (
     CliqueSequence,
@@ -14,6 +19,41 @@ from pyg6data.lists import list_graphs
 
 def test_eventually_helly():
     assert is_eventually_helly(nx.triangular_lattice_graph(4, 4))
+
+
+def test_classify_clique_behavior_convergent():
+    """A clique-Helly graph is classified as convergent."""
+    result = classify_clique_behavior(nx.cycle_graph(4))
+
+    assert isinstance(result, CliqueBehavior)
+    assert result.verdict is Verdict.CONVERGENT
+    assert result.iterations_checked >= 1
+    assert result.bound_exceeded is False
+
+
+def test_classify_clique_behavior_bound_exceeded():
+    """The public result reports when the clique bound aborts iteration."""
+    result = classify_clique_behavior(dominated_vertex_free_non_helly(), bound=3)
+
+    assert result.verdict is Verdict.INDETERMINATE
+    assert result.bound_exceeded is True
+    assert result.reason == "clique count exceeded bound"
+
+
+def test_classify_clique_behavior_respects_iteration_limit():
+    """An exhausted iteration limit is distinct from a clique-bound abort."""
+    result = classify_clique_behavior(dominated_vertex_free_non_helly(), tries=1)
+
+    assert result.verdict is Verdict.INDETERMINATE
+    assert result.iterations_checked == 1
+    assert result.bound_exceeded is False
+
+
+@pytest.mark.parametrize("keyword", ["tries", "bound"])
+def test_classify_clique_behavior_rejects_invalid_limits(keyword):
+    """The public classifier rejects limits that cannot inspect an input graph."""
+    with pytest.raises(ValueError, match=keyword):
+        classify_clique_behavior(nx.cycle_graph(4), **{keyword: 0})
 
 
 def test_eventually_retracts_specially_cycle_is_false():
