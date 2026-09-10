@@ -122,9 +122,7 @@ class CliqueSequence:
 _MAX_ITERATIONS = 9
 
 
-def _test_eventually_helly(
-    seq: CliqueSequence, tries: int
-) -> ClassifierResult:
+def _test_eventually_helly(seq: CliqueSequence, tries: int) -> ClassifierResult:
     """Convergent if some iterate is clique-Helly."""
     for i in range(tries):
         g = seq[i]
@@ -243,9 +241,7 @@ def classify_clique_behavior(
         result = classifier(seq)
         if result is not None:
             verdict, reason = result
-            return CliqueBehavior(
-                verdict, reason, len(seq._graphs), False, pared_graph
-            )
+            return CliqueBehavior(verdict, reason, len(seq._graphs), False, pared_graph)
 
     bound_exceeded = seq._exhausted
     reason = (
@@ -642,9 +638,7 @@ def _main(args: list[str]):
                         continue
 
                     result = classify_clique_behavior(graph)
-                    if _is_known_indeterminate(
-                        result.pared_graph, known_indeterminate
-                    ):
+                    if _is_known_indeterminate(result.pared_graph, known_indeterminate):
                         further_pared.append((index, result.pared_graph))
                         verdict_label = "UNKNOWN"
                         reason = "reduces to known indeterminate graph"
