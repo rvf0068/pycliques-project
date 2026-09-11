@@ -10,6 +10,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
+from typing import cast
 
 import networkx as nx
 from rich.logging import RichHandler
@@ -17,6 +18,7 @@ from rich.logging import RichHandler
 from pycliques import __version__
 from pycliques.cliques import clique_graph
 from pycliques.clockwork import is_clique_divergent_clockwork, recognize_clockwork
+from pycliques.cutpoints import reduction_retracts_to
 from pycliques.dominated import completely_pared_graph, find_dominated_vertex
 from pycliques.helly import is_clique_helly
 from pycliques.named import complement_of_cycle, suspension_of_cycle
@@ -35,6 +37,23 @@ class Verdict(Enum):
     CONVERGENT = auto()
     DIVERGENT = auto()
     INDETERMINATE = auto()
+
+
+class ReferenceStatus(Enum):
+    """Whether a registered reference graph is proved or only conjectured."""
+
+    PROVEN = auto()
+    CONJECTURED = auto()
+
+
+@dataclass(frozen=True)
+class Certificate:
+    """Structured provenance for a classification decision."""
+
+    rule: str
+    target: nx.Graph | None = None
+    target_status: str | None = None
+    map: tuple[dict, dict] | dict | None = None
 
 
 @dataclass(frozen=True)
@@ -59,6 +78,9 @@ class CliqueBehavior:
         Whether a clique-graph computation exceeded the clique bound.
     pared_graph : networkx.Graph
         Completely pared copy of the input graph used by the classifier.
+    certificate : Certificate | None
+        Structured justification for the verdict when the classifier uses a
+        retraction or reduction-based inference rule.
     """
 
     verdict: Verdict
@@ -66,6 +88,7 @@ class CliqueBehavior:
     iterations_checked: int
     bound_exceeded: bool
     pared_graph: nx.Graph
+    certificate: Certificate | None = None
 
 
 #: Type alias for a classifier function.
@@ -130,6 +153,122 @@ class CliqueSequence:
 # ---------------------------------------------------------------------------
 
 _MAX_ITERATIONS = 9
+_REFERENCE_GRAPHS: dict[bytes, tuple[nx.Graph, ReferenceStatus]] = {}
+
+
+def _canonical_reference_key(graph: nx.Graph) -> bytes:
+    """Return a canonical graph6 key for a graph while preserving arbitrary labels."""
+    numbered = nx.convert_node_labels_to_integers(graph)
+    return cast(bytes, nx.to_graph6_bytes(numbered, header=False))
+
+
+def register_reference_graph(
+    graph: nx.Graph, *, status: ReferenceStatus = ReferenceStatus.PROVEN
+) -> None:
+    """Register a graph whose clique behavior is known independently of the classifier.
+
+    The status distinguishes a proven divergent reference graph from a merely
+    conjectured one. The classifier uses the same inference rules for every
+    registered graph, so future reference facts can be added without branching
+    on individual graph names.
+    """
+    _REFERENCE_GRAPHS[_canonical_reference_key(graph)] = (graph.copy(), status)
+
+
+def clear_reference_graphs() -> None:
+    """Clear all registered divergent reference graphs."""
+    _REFERENCE_GRAPHS.clear()
+
+
+def _reference_match(graph: nx.Graph) -> tuple[nx.Graph, ReferenceStatus] | None:
+    """Return the first registered reference graph isomorphic to *graph*, if any."""
+    for ref_graph, status in _REFERENCE_GRAPHS.values():
+        if nx.is_isomorphic(graph, ref_graph):
+            return ref_graph, status
+    return None
+
+
+def _summarize_reference_status(status: ReferenceStatus) -> str:
+    """Render the reference status in the certificate vocabulary used by the API."""
+    if status is ReferenceStatus.PROVEN:
+        return "proven_divergent"
+    return "conjectured_divergent"
+
+
+def _classify_reference_graph(graph: nx.Graph) -> tuple[Verdict, str, Certificate | None] | None:
+    """Classify a graph directly from a registered reference fact, if present."""
+    match = _reference_match(graph)
+    if match is None:
+        return None
+    ref_graph, status = match
+    if status is ReferenceStatus.PROVEN:
+        return (
+            Verdict.DIVERGENT,
+            "registered reference graph is proven clique divergent",
+            Certificate(rule="reference", target=ref_graph, target_status="proven_divergent"),
+        )
+    return (
+        Verdict.INDETERMINATE,
+        "registered reference graph is conjectured clique divergent; conditional on it being clique divergent",
+        Certificate(rule="reference", target=ref_graph, target_status="conjectured_divergent"),
+    )
+
+
+def _classify_reference_dependency(
+    graph: nx.Graph,
+) -> tuple[Verdict, str, Certificate | None] | None:
+    """Return a retraction/reduction certificate when known reference graphs are involved.
+
+    The special reduction criterion is checked before the ordinary retraction
+    relation so that the two mathematically distinct routes remain
+    distinguishable in provenance when both happen to apply.
+    """
+    for ref_graph, status in _REFERENCE_GRAPHS.values():
+        if reduction_retracts_to(graph, ref_graph):
+            if status is ReferenceStatus.PROVEN:
+                return (
+                    Verdict.DIVERGENT,
+                    "reduction_retracts_to to a proven divergent reference graph",
+                    Certificate(
+                        rule="reduction_retracts_to",
+                        target=ref_graph,
+                        target_status="proven_divergent",
+                    ),
+                )
+            return (
+                Verdict.INDETERMINATE,
+                "reduction_retracts_to to a conjectured divergent reference graph; conditional on the target being clique divergent",
+                Certificate(
+                    rule="reduction_retracts_to",
+                    target=ref_graph,
+                    target_status="conjectured_divergent",
+                ),
+            )
+
+        retraction = retracts(graph, ref_graph)
+        if isinstance(retraction, tuple):
+            if status is ReferenceStatus.PROVEN:
+                return (
+                    Verdict.DIVERGENT,
+                    "retracts to a proven divergent reference graph",
+                    Certificate(
+                        rule="retracts",
+                        target=ref_graph,
+                        target_status="proven_divergent",
+                        map=retraction,
+                    ),
+                )
+            return (
+                Verdict.INDETERMINATE,
+                "retracts to a conjectured divergent reference graph; conditional on the target being clique divergent",
+                Certificate(
+                    rule="retracts",
+                    target=ref_graph,
+                    target_status="conjectured_divergent",
+                    map=retraction,
+                ),
+            )
+    return None
 
 
 def _test_eventually_helly(seq: CliqueSequence, tries: int) -> ClassifierResult:
@@ -212,7 +351,18 @@ def classify_clique_behavior(
     The input is completely pared before its iterated clique graphs are
     inspected.  The standard test suite certifies convergence through an
     eventually clique-Helly iterate, and divergence through clockwork,
-    special-octahedron, and known-retraction criteria.
+    special-octahedron, and known-divergence criteria.
+
+    Two distinct inference rules are recognized when a graph can be
+    connected to a known reference graph through a mathematically justified
+    relation:
+
+    * ordinary retraction: ``retracts(G, H)`` and ``H`` is clique divergent;
+    * special reduction/retraction: ``reduction_retracts_to(G, H)`` and
+      ``H`` is clique divergent.
+
+    A conjecturally divergent reference graph yields a conditional
+    ``INDETERMINATE`` result rather than a proof of divergence.
 
     .. rubric:: Parameters
 
@@ -247,11 +397,22 @@ def classify_clique_behavior(
 
     pared_graph = completely_pared_graph(graph)
     seq = CliqueSequence(pared_graph, bound=bound)
+
+    reference_result = _classify_reference_graph(pared_graph)
+    if reference_result is not None:
+        verdict, reason, certificate = reference_result
+        return CliqueBehavior(verdict, reason, seq.graph_count, False, pared_graph, certificate)
+
     for classifier in _default_classifiers(tries):
         result = classifier(seq)
         if result is not None:
             verdict, reason = result
             return CliqueBehavior(verdict, reason, seq.graph_count, False, pared_graph)
+
+    reference_dependency = _classify_reference_dependency(pared_graph)
+    if reference_dependency is not None:
+        verdict, reason, certificate = reference_dependency
+        return CliqueBehavior(verdict, reason, seq.graph_count, False, pared_graph, certificate)
 
     bound_exceeded = seq.exhausted
     reason = (

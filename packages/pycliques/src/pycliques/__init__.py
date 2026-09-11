@@ -92,12 +92,16 @@ from .retractions import (
     special_octahedra_dimension,
 )
 from .small import (
+    Certificate,
     CliqueBehavior,
     CliqueSequence,
+    ReferenceStatus,
     Verdict,
     classify_clique_behavior,
+    clear_reference_graphs,
     eventually_retracts_specially,
     is_eventually_helly,
+    register_reference_graph,
 )
 from .surfaces import (
     is_closed_surface,
@@ -196,12 +200,16 @@ __all__ = [
     "special_octahedra",
     "special_octahedra_dimension",
     # small
+    "Certificate",
     "CliqueBehavior",
     "CliqueSequence",
+    "ReferenceStatus",
     "Verdict",
     "classify_clique_behavior",
+    "clear_reference_graphs",
     "eventually_retracts_specially",
     "is_eventually_helly",
+    "register_reference_graph",
     # surfaces
     "is_closed_surface",
     "is_cycle",

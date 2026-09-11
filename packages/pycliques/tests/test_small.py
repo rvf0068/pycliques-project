@@ -1,18 +1,24 @@
 import networkx as nx
 import pytest
 from pycliques import CliqueBehavior, classify_clique_behavior
+from pycliques.cutpoints import reduction_retracts_to
 from pycliques.named import (
     complement_of_cycle,
     dominated_vertex_free_non_helly,
+    snub_disphenoid,
     suspension_of_cycle,
 )
 from pycliques.retractions import retracts
 from pycliques.small import (
     CliqueSequence,
+    ReferenceStatus,
     Verdict,
+    _classify_reference_dependency,
     _make_clique_retraction_test,
+    clear_reference_graphs,
     eventually_retracts_specially,
     is_eventually_helly,
+    register_reference_graph,
 )
 from pyg6data.lists import list_graphs
 
@@ -237,6 +243,100 @@ def test_small_main_skip_dominated(tmp_path):
     lines = output.read_text().splitlines()
     reducible_lines = [line for line in lines if "REDUCIBLE" in line]
     assert len(reducible_lines) > 0
+
+
+def test_ref_dep_retraction_proven_certificate():
+    """A retraction to a proven divergent reference graph yields
+    a divergent certificate.
+    """
+    clear_reference_graphs()
+    try:
+        h = nx.octahedral_graph()
+        register_reference_graph(h, status=ReferenceStatus.PROVEN)
+
+        result = _classify_reference_dependency(h)
+
+        assert result is not None
+        verdict, reason, certificate = result
+        assert verdict is Verdict.DIVERGENT
+        assert certificate is not None
+        assert certificate.rule == "retracts"
+        assert certificate.target_status == "proven_divergent"
+        assert "proven" in reason.lower()
+    finally:
+        clear_reference_graphs()
+
+
+def test_ref_dep_reduction_proven_certificate():
+    """A cutpoint reduction to a proven divergent reference graph yields
+    the special certificate.
+    """
+    clear_reference_graphs()
+    try:
+        h = nx.octahedral_graph()
+        register_reference_graph(h, status=ReferenceStatus.PROVEN)
+
+        g = nx.from_graph6_bytes(b"FEr^o")
+        assert reduction_retracts_to(g, h) is True
+
+        result = _classify_reference_dependency(g)
+
+        assert result is not None
+        verdict, reason, certificate = result
+        assert verdict is Verdict.DIVERGENT
+        assert certificate is not None
+        assert certificate.rule == "reduction_retracts_to"
+        assert certificate.target_status == "proven_divergent"
+        assert "proven" in reason.lower()
+    finally:
+        clear_reference_graphs()
+
+
+def test_ref_dep_retraction_conjectural_indeterminate():
+    """A conjectural divergent target may only yield a conditional
+    indeterminate verdict.
+    """
+    clear_reference_graphs()
+    try:
+        h = snub_disphenoid()
+        register_reference_graph(h, status=ReferenceStatus.CONJECTURED)
+
+        result = _classify_reference_dependency(h)
+
+        assert result is not None
+        verdict, reason, certificate = result
+        assert verdict is Verdict.INDETERMINATE
+        assert certificate is not None
+        assert certificate.rule == "retracts"
+        assert certificate.target_status == "conjectured_divergent"
+        assert "conditional" in reason.lower()
+    finally:
+        clear_reference_graphs()
+
+
+def test_ref_dep_reduction_conjectural_indeterminate():
+    """A reduction to a conjectural divergent target stays conditionally
+    indeterminate.
+    """
+    clear_reference_graphs()
+    try:
+        h = snub_disphenoid()
+        register_reference_graph(h, status=ReferenceStatus.CONJECTURED)
+
+        g = nx.from_graph6_bytes(b"HCRSv\\}")
+        assert reduction_retracts_to(g, h) is True
+
+        result = _classify_reference_dependency(g)
+
+        assert result is not None
+        verdict, reason, certificate = result
+        assert verdict is Verdict.INDETERMINATE
+        assert certificate is not None
+        assert certificate.rule == "reduction_retracts_to"
+        assert certificate.target_status == "conjectured_divergent"
+        assert "conditional" in reason.lower()
+    finally:
+        clear_reference_graphs()
 
 
 def test_small_main_no_skip_dominated(tmp_path):
