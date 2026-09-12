@@ -18,10 +18,15 @@ from rich.logging import RichHandler
 from pycliques import __version__
 from pycliques.cliques import clique_graph
 from pycliques.clockwork import is_clique_divergent_clockwork, recognize_clockwork
-from pycliques.cutpoints import reduction_retracts_to
+from pycliques.cutpoints import (
+    contract_local_bridge,
+    edges_in_no_triangle,
+    local_bridges,
+    remove_edge_not_in_triangle,
+)
 from pycliques.dominated import completely_pared_graph, find_dominated_vertex
 from pycliques.helly import is_clique_helly
-from pycliques.named import complement_of_cycle, suspension_of_cycle
+from pycliques.named import complement_of_cycle, snub_disphenoid, suspension_of_cycle
 from pycliques.retractions import retracts, special_octahedra_dimension
 
 _logger = logging.getLogger(__name__)
@@ -180,6 +185,17 @@ def clear_reference_graphs() -> None:
     _REFERENCE_GRAPHS.clear()
 
 
+register_reference_graph(
+    snub_disphenoid(),
+    status=ReferenceStatus.CONJECTURED,
+)
+
+register_reference_graph(
+    nx.octahedral_graph(),
+    status=ReferenceStatus.PROVEN,
+)
+
+
 def _reference_match(graph: nx.Graph) -> tuple[nx.Graph, ReferenceStatus] | None:
     """Return the first registered reference graph isomorphic to *graph*, if any."""
     for ref_graph, status in _REFERENCE_GRAPHS.values():
@@ -195,7 +211,9 @@ def _summarize_reference_status(status: ReferenceStatus) -> str:
     return "conjectured_divergent"
 
 
-def _classify_reference_graph(graph: nx.Graph) -> tuple[Verdict, str, Certificate | None] | None:
+def _classify_reference_graph(
+    graph: nx.Graph,
+) -> tuple[Verdict, str, Certificate | None] | None:
     """Classify a graph directly from a registered reference fact, if present."""
     match = _reference_match(graph)
     if match is None:
@@ -205,46 +223,24 @@ def _classify_reference_graph(graph: nx.Graph) -> tuple[Verdict, str, Certificat
         return (
             Verdict.DIVERGENT,
             "registered reference graph is proven clique divergent",
-            Certificate(rule="reference", target=ref_graph, target_status="proven_divergent"),
+            Certificate(
+                rule="reference", target=ref_graph, target_status="proven_divergent"
+            ),
         )
     return (
         Verdict.INDETERMINATE,
         "registered reference graph is conjectured clique divergent; conditional on it being clique divergent",
-        Certificate(rule="reference", target=ref_graph, target_status="conjectured_divergent"),
+        Certificate(
+            rule="reference", target=ref_graph, target_status="conjectured_divergent"
+        ),
     )
 
 
 def _classify_reference_dependency(
     graph: nx.Graph,
 ) -> tuple[Verdict, str, Certificate | None] | None:
-    """Return a retraction/reduction certificate when known reference graphs are involved.
-
-    The special reduction criterion is checked before the ordinary retraction
-    relation so that the two mathematically distinct routes remain
-    distinguishable in provenance when both happen to apply.
-    """
+    """Return a retraction certificate when a known reference graph is involved."""
     for ref_graph, status in _REFERENCE_GRAPHS.values():
-        if reduction_retracts_to(graph, ref_graph):
-            if status is ReferenceStatus.PROVEN:
-                return (
-                    Verdict.DIVERGENT,
-                    "reduction_retracts_to to a proven divergent reference graph",
-                    Certificate(
-                        rule="reduction_retracts_to",
-                        target=ref_graph,
-                        target_status="proven_divergent",
-                    ),
-                )
-            return (
-                Verdict.INDETERMINATE,
-                "reduction_retracts_to to a conjectured divergent reference graph; conditional on the target being clique divergent",
-                Certificate(
-                    rule="reduction_retracts_to",
-                    target=ref_graph,
-                    target_status="conjectured_divergent",
-                ),
-            )
-
         retraction = retracts(graph, ref_graph)
         if isinstance(retraction, tuple):
             if status is ReferenceStatus.PROVEN:
@@ -269,6 +265,142 @@ def _classify_reference_dependency(
                 ),
             )
     return None
+
+
+def _classify_local_bridge(
+    graph: nx.Graph,
+    *,
+    tries: int = _MAX_ITERATIONS,
+    bound: int = 30,
+) -> tuple[Verdict, str, Certificate | None] | None:
+    """Classify clique behavior by contracting local bridges according to Theorem 6.1."""
+    for u, v in local_bridges(graph):
+        h = contract_local_bridge(graph, u, v)
+        h_behavior = classify_clique_behavior(h, tries=tries, bound=bound)
+        if h_behavior.verdict is Verdict.CONVERGENT:
+            return (
+                Verdict.CONVERGENT,
+                "contracting a local bridge yields a convergent graph by Theorem 6.1",
+                Certificate(
+                    rule="local_bridge",
+                    target=h,
+                    target_status="proven_convergent",
+                ),
+            )
+        if h_behavior.verdict is Verdict.DIVERGENT:
+            return (
+                Verdict.DIVERGENT,
+                "contracting a local bridge yields a divergent graph by Theorem 6.1",
+                Certificate(
+                    rule="local_bridge",
+                    target=h,
+                    target_status="proven_divergent",
+                ),
+            )
+        if (
+            h_behavior.certificate is not None
+            and h_behavior.certificate.target_status == "conjectured_divergent"
+        ):
+            return (
+                Verdict.INDETERMINATE,
+                "contracting a local bridge yields a conjectured divergent graph; conditional on the target being clique divergent by Theorem 6.1",
+                Certificate(
+                    rule="local_bridge",
+                    target=h_behavior.certificate.target or h,
+                    target_status="conjectured_divergent",
+                ),
+            )
+    return None
+
+
+def classify_local_bridge(
+    graph: nx.Graph,
+    *,
+    tries: int = _MAX_ITERATIONS,
+    bound: int = 30,
+) -> tuple[Verdict, str, Certificate | None] | None:
+    """Classify clique behavior by contracting local bridges according to Theorem 6.1.
+
+    .. rubric:: Parameters
+
+    graph : networkx.Graph
+        Input graph.
+    tries : int, optional
+        Maximum number of iterates to inspect (default: 9).
+    bound : int, optional
+        Maximum number of cliques allowed at each iteration (default: 30).
+
+    .. rubric:: Returns
+
+    tuple[Verdict, str, Certificate | None] | None
+        A tuple of ``(verdict, reason, certificate)`` if a local bridge exists and
+        the clique behavior of the contracted graph can be classified; ``None``
+        otherwise.
+    """
+    return _classify_local_bridge(graph, tries=tries, bound=bound)
+
+
+def _classify_non_triangle_edge(
+    graph: nx.Graph,
+    *,
+    tries: int = _MAX_ITERATIONS,
+    bound: int = 30,
+) -> tuple[Verdict, str, Certificate | None] | None:
+    """Classify clique behavior by deleting edges in no triangle according to Theorem 6.2."""
+    for u, v in edges_in_no_triangle(graph):
+        h = remove_edge_not_in_triangle(graph, u, v)
+        h_behavior = classify_clique_behavior(h, tries=tries, bound=bound)
+        if h_behavior.verdict is Verdict.DIVERGENT:
+            return (
+                Verdict.DIVERGENT,
+                "deleting an edge in no triangle yields a divergent graph by Theorem 6.2",
+                Certificate(
+                    rule="non_triangle_edge",
+                    target=h,
+                    target_status="proven_divergent",
+                ),
+            )
+        if (
+            h_behavior.certificate is not None
+            and h_behavior.certificate.target_status == "conjectured_divergent"
+        ):
+            return (
+                Verdict.INDETERMINATE,
+                "deleting an edge in no triangle yields a conjectured divergent graph; conditional on the target being clique divergent by Theorem 6.2",
+                Certificate(
+                    rule="non_triangle_edge",
+                    target=h_behavior.certificate.target or h,
+                    target_status="conjectured_divergent",
+                ),
+            )
+    return None
+
+
+def classify_non_triangle_edge(
+    graph: nx.Graph,
+    *,
+    tries: int = _MAX_ITERATIONS,
+    bound: int = 30,
+) -> tuple[Verdict, str, Certificate | None] | None:
+    """Classify clique behavior by deleting edges in no triangle according to Theorem 6.2.
+
+    .. rubric:: Parameters
+
+    graph : networkx.Graph
+        Input graph.
+    tries : int, optional
+        Maximum number of iterates to inspect (default: 9).
+    bound : int, optional
+        Maximum number of cliques allowed at each iteration (default: 30).
+
+    .. rubric:: Returns
+
+    tuple[Verdict, str, Certificate | None] | None
+        A tuple of ``(verdict, reason, certificate)`` if deleting an edge in no
+        triangle yields a divergent (or conjectured divergent) graph; ``None``
+        otherwise.
+    """
+    return _classify_non_triangle_edge(graph, tries=tries, bound=bound)
 
 
 def _test_eventually_helly(seq: CliqueSequence, tries: int) -> ClassifierResult:
@@ -357,9 +489,7 @@ def classify_clique_behavior(
     connected to a known reference graph through a mathematically justified
     relation:
 
-    * ordinary retraction: ``retracts(G, H)`` and ``H`` is clique divergent;
-    * special reduction/retraction: ``reduction_retracts_to(G, H)`` and
-      ``H`` is clique divergent.
+        * ordinary retraction: ``retracts(G, H)`` and ``H`` is clique divergent.
 
     A conjecturally divergent reference graph yields a conditional
     ``INDETERMINATE`` result rather than a proof of divergence.
@@ -401,7 +531,9 @@ def classify_clique_behavior(
     reference_result = _classify_reference_graph(pared_graph)
     if reference_result is not None:
         verdict, reason, certificate = reference_result
-        return CliqueBehavior(verdict, reason, seq.graph_count, False, pared_graph, certificate)
+        return CliqueBehavior(
+            verdict, reason, seq.graph_count, False, pared_graph, certificate
+        )
 
     for classifier in _default_classifiers(tries):
         result = classifier(seq)
@@ -412,7 +544,25 @@ def classify_clique_behavior(
     reference_dependency = _classify_reference_dependency(pared_graph)
     if reference_dependency is not None:
         verdict, reason, certificate = reference_dependency
-        return CliqueBehavior(verdict, reason, seq.graph_count, False, pared_graph, certificate)
+        return CliqueBehavior(
+            verdict, reason, seq.graph_count, False, pared_graph, certificate
+        )
+
+    local_bridge_result = _classify_local_bridge(pared_graph, tries=tries, bound=bound)
+    if local_bridge_result is not None:
+        verdict, reason, certificate = local_bridge_result
+        return CliqueBehavior(
+            verdict, reason, seq.graph_count, False, pared_graph, certificate
+        )
+
+    non_triangle_edge_result = _classify_non_triangle_edge(
+        pared_graph, tries=tries, bound=bound
+    )
+    if non_triangle_edge_result is not None:
+        verdict, reason, certificate = non_triangle_edge_result
+        return CliqueBehavior(
+            verdict, reason, seq.graph_count, False, pared_graph, certificate
+        )
 
     bound_exceeded = seq.exhausted
     reason = (

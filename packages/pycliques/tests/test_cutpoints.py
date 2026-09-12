@@ -1,126 +1,102 @@
 import networkx as nx
+import pytest
 from pycliques.cutpoints import (
-    cutpoint_edge_contractions,
-    cutpoint_edge_removals,
-    cutpoint_reductions,
-    has_local_cutpoints,
-    local_cutpoints,
-    neighborhood_components,
-    reduction_retracts_to,
+    contract_local_bridge,
+    edge_in_triangle,
+    edges_in_no_triangle,
+    is_local_bridge,
+    local_bridge_contractions,
+    local_bridges,
+    non_triangle_edge_removals,
+    remove_edge_not_in_triangle,
 )
 
 
-def test_local_cutpoints_path():
-    """Interior vertices of a path are local cutpoints."""
-    assert sorted(local_cutpoints(nx.path_graph(5))) == [1, 2, 3]
+def test_local_bridge_on_path_and_bridge():
+    graph = nx.path_graph(4)
+
+    assert is_local_bridge(graph, 1, 2)
+    assert is_local_bridge(graph, 0, 1)
 
 
-def test_local_cutpoints_complete_graph():
-    """Complete graphs have no local cutpoints."""
-    assert list(local_cutpoints(nx.complete_graph(5))) == []
+def test_short_alternate_path_is_not_local_bridge():
+    assert not is_local_bridge(nx.cycle_graph(4), 0, 1)
 
 
-def test_local_cutpoints_cycle():
-    """Triangles (K_3) have no local cutpoints, but longer cycles do."""
-    assert list(local_cutpoints(nx.cycle_graph(3))) == []
-    assert len(list(local_cutpoints(nx.cycle_graph(6)))) == 6
+def test_triangle_edge_is_not_local_bridge():
+    assert not is_local_bridge(nx.complete_graph(3), 0, 1)
 
 
-def test_local_cutpoints_single_vertex():
-    """A single vertex has no local cutpoints."""
-    assert list(local_cutpoints(nx.trivial_graph())) == []
+def test_non_edge_is_not_local_bridge():
+    assert not is_local_bridge(nx.path_graph(3), 0, 2)
 
 
-def test_has_local_cutpoints_true():
-    """Path graphs have local cutpoints."""
-    assert has_local_cutpoints(nx.path_graph(4)) is True
+def test_local_bridge_labels_and_contraction():
+    graph = nx.Graph([("left", "right"), ("right", "tail")])
+
+    contracted = contract_local_bridge(graph, "left", "right")
+
+    assert set(contracted) == {"left", "tail"}
+    assert contracted.has_edge("left", "tail")
+    assert set(graph) == {"left", "right", "tail"}
 
 
-def test_has_local_cutpoints_false():
-    """Complete graphs have no local cutpoints."""
-    assert has_local_cutpoints(nx.complete_graph(4)) is False
+def test_local_bridges_and_contractions():
+    graph = nx.path_graph(4)
+
+    assert set(local_bridges(graph)) == {(0, 1), (1, 2), (2, 3)}
+    assert len(list(local_bridge_contractions(graph))) == 3
 
 
-def test_neighborhood_components_path_interior():
-    """Interior vertex of a path has two singleton components."""
-    comps = neighborhood_components(nx.path_graph(5), 2)
-    assert len(comps) == 2
-    assert {frozenset(c) for c in comps} == {frozenset({1}), frozenset({3})}
+def test_contract_local_bridge_rejects_invalid_edges():
+    with pytest.raises(ValueError, match="not an edge"):
+        contract_local_bridge(nx.path_graph(3), 0, 2)
+    with pytest.raises(ValueError, match="not a local bridge"):
+        contract_local_bridge(nx.cycle_graph(4), 0, 1)
 
 
-def test_neighborhood_components_complete_graph():
-    """In a complete graph, N(v) is connected, so one component."""
-    comps = neighborhood_components(nx.complete_graph(5), 0)
-    assert len(comps) == 1
+def test_triangle_edges_are_not_removable():
+    graph = nx.complete_graph(3)
+
+    assert edge_in_triangle(graph, 0, 1)
+    assert list(edges_in_no_triangle(graph)) == []
+    with pytest.raises(ValueError, match="contained in a triangle"):
+        remove_edge_not_in_triangle(graph, 0, 1)
 
 
-def _bridge_of_two_c5() -> nx.Graph:
-    """Two C_5 copies connected by a single bridge edge."""
-    g = nx.Graph()
-    g.add_edges_from([(0, 1), (1, 2), (2, 3), (3, 4), (4, 0)])
-    g.add_edges_from([(5, 6), (6, 7), (7, 8), (8, 9), (9, 5)])
-    g.add_edge(0, 5)
-    return g
+def test_path_edges_are_removable_and_labels_are_preserved():
+    graph = nx.Graph([(("a", 1), ("b", 2)), (("b", 2), ("c", 3))])
+
+    assert not edge_in_triangle(graph, ("a", 1), ("b", 2))
+    assert set(edges_in_no_triangle(graph)) == {
+        (("a", 1), ("b", 2)),
+        (("b", 2), ("c", 3)),
+    }
+    removed = remove_edge_not_in_triangle(graph, ("a", 1), ("b", 2))
+    assert set(removed) == set(graph)
+    assert not removed.has_edge(("a", 1), ("b", 2))
+    assert graph.has_edge(("a", 1), ("b", 2))
 
 
-def test_cutpoint_edge_removals_path():
-    """Edge removal at cutpoints of a bridge graph yields C_5 pieces."""
-    results = list(cutpoint_edge_removals(_bridge_of_two_c5()))
-    assert len(results) > 0
-    for g in results:
-        assert g.order() >= 2
+def test_non_triangle_edge_removals():
+    assert len(list(non_triangle_edge_removals(nx.path_graph(3)))) == 2
 
 
-def test_cutpoint_edge_removals_complete_graph():
-    """Complete graph has no cutpoints, so no reductions."""
-    assert list(cutpoint_edge_removals(nx.complete_graph(4))) == []
+def test_icosahedron_plus_antipodal_edge():
+    graph = nx.icosahedral_graph()
+    antipodes = (0, 3)
+    graph.add_edge(*antipodes)
+
+    assert not edge_in_triangle(graph, *antipodes)
+    removed = remove_edge_not_in_triangle(graph, *antipodes)
+    assert nx.is_isomorphic(removed, nx.icosahedral_graph())
 
 
-def test_cutpoint_edge_contractions_path():
-    """Edge contraction at cutpoints of a bridge graph yields subgraphs."""
-    results = list(cutpoint_edge_contractions(_bridge_of_two_c5()))
-    assert len(results) > 0
+def test_icosahedron_plus_degree_two_vertex():
+    graph = nx.icosahedral_graph()
+    graph.add_edges_from([(12, 0), (12, 3)])
 
-
-def test_cutpoint_edge_contractions_complete_graph():
-    """Complete graph has no cutpoints, so no contractions."""
-    assert list(cutpoint_edge_contractions(nx.complete_graph(4))) == []
-
-
-def test_cutpoint_reductions_complete_graph_empty():
-    """No reductions for a complete graph."""
-    assert list(cutpoint_reductions(nx.complete_graph(4))) == []
-
-
-def test_cutpoint_reductions_yields_from_both():
-    """cutpoint_reductions yields results from both removal and contraction."""
-    g = _bridge_of_two_c5()
-    removals = list(cutpoint_edge_removals(g))
-    contractions = list(cutpoint_edge_contractions(g))
-    all_reductions = list(cutpoint_reductions(g))
-    assert len(all_reductions) == len(removals) + len(contractions)
-
-
-def test_cutpoint_reductions_accepts_frozen_subgraph_view():
-    """Cutpoint reductions do not mutate a frozen input view."""
-    host = nx.path_graph(5)
-    view = host.subgraph([0, 1, 2, 3])
-    list(cutpoint_reductions(view))
-    assert host.number_of_nodes() == 5
-
-
-def test_reduction_retracts_to_path():
-    """A bridge-of-two-C5s reduction yields C_5, which retracts to C_5."""
-    assert reduction_retracts_to(_bridge_of_two_c5(), nx.cycle_graph(5)) is True
-
-
-def test_reduction_retracts_to_false():
-    """Complete graph has no cutpoints, nothing retracts."""
-    assert reduction_retracts_to(nx.complete_graph(4), nx.cycle_graph(4)) is False
-
-
-def test_local_cutpoints_wheel():
-    """Hub of a wheel graph is not a local cutpoint (neighborhood is a cycle)."""
-    w = nx.wheel_graph(5)  # hub is vertex 0
-    cutpts = list(local_cutpoints(w))
-    assert 0 not in cutpts
+    assert not edge_in_triangle(graph, 12, 0)
+    removed = remove_edge_not_in_triangle(graph, 12, 0)
+    assert removed.has_edge(12, 3)
+    assert removed.degree(12) == 1

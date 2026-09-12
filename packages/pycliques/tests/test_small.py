@@ -1,7 +1,6 @@
 import networkx as nx
 import pytest
 from pycliques import CliqueBehavior, classify_clique_behavior
-from pycliques.cutpoints import reduction_retracts_to
 from pycliques.named import (
     complement_of_cycle,
     dominated_vertex_free_non_helly,
@@ -265,31 +264,8 @@ def test_ref_dep_retraction_proven_certificate():
         assert "proven" in reason.lower()
     finally:
         clear_reference_graphs()
-
-
-def test_ref_dep_reduction_proven_certificate():
-    """A cutpoint reduction to a proven divergent reference graph yields
-    the special certificate.
-    """
-    clear_reference_graphs()
-    try:
-        h = nx.octahedral_graph()
-        register_reference_graph(h, status=ReferenceStatus.PROVEN)
-
-        g = nx.from_graph6_bytes(b"FEr^o")
-        assert reduction_retracts_to(g, h) is True
-
-        result = _classify_reference_dependency(g)
-
-        assert result is not None
-        verdict, reason, certificate = result
-        assert verdict is Verdict.DIVERGENT
-        assert certificate is not None
-        assert certificate.rule == "reduction_retracts_to"
-        assert certificate.target_status == "proven_divergent"
-        assert "proven" in reason.lower()
-    finally:
-        clear_reference_graphs()
+        register_reference_graph(snub_disphenoid(), status=ReferenceStatus.CONJECTURED)
+        register_reference_graph(nx.octahedral_graph(), status=ReferenceStatus.PROVEN)
 
 
 def test_ref_dep_retraction_conjectural_indeterminate():
@@ -312,31 +288,8 @@ def test_ref_dep_retraction_conjectural_indeterminate():
         assert "conditional" in reason.lower()
     finally:
         clear_reference_graphs()
-
-
-def test_ref_dep_reduction_conjectural_indeterminate():
-    """A reduction to a conjectural divergent target stays conditionally
-    indeterminate.
-    """
-    clear_reference_graphs()
-    try:
-        h = snub_disphenoid()
-        register_reference_graph(h, status=ReferenceStatus.CONJECTURED)
-
-        g = nx.from_graph6_bytes(b"HCRSv\\}")
-        assert reduction_retracts_to(g, h) is True
-
-        result = _classify_reference_dependency(g)
-
-        assert result is not None
-        verdict, reason, certificate = result
-        assert verdict is Verdict.INDETERMINATE
-        assert certificate is not None
-        assert certificate.rule == "reduction_retracts_to"
-        assert certificate.target_status == "conjectured_divergent"
-        assert "conditional" in reason.lower()
-    finally:
-        clear_reference_graphs()
+        register_reference_graph(snub_disphenoid(), status=ReferenceStatus.CONJECTURED)
+        register_reference_graph(nx.octahedral_graph(), status=ReferenceStatus.PROVEN)
 
 
 def test_small_main_no_skip_dominated(tmp_path):
@@ -349,3 +302,104 @@ def test_small_main_no_skip_dominated(tmp_path):
     reducible_lines = [line for line in lines if "REDUCIBLE" in line]
     assert len(reducible_lines) == 0
     assert all("UNKNOWN" not in line for line in lines)
+
+
+def test_classify_local_bridge_no_local_bridge():
+    """A graph without local bridges returns None from classify_local_bridge."""
+    from pycliques.small import classify_local_bridge
+
+    assert classify_local_bridge(nx.complete_graph(3)) is None
+
+
+def test_classify_local_bridge_divergent():
+    """Contracting a local bridge attached to octahedral graph yields DIVERGENT."""
+    from pycliques import classify_local_bridge
+
+    # Octahedral graph + a leaf node attached by a bridge
+    g = nx.octahedral_graph()
+    g.add_edge(0, "leaf")
+
+    local_res = classify_local_bridge(g)
+    assert local_res is not None
+    verdict, reason, certificate = local_res
+    assert verdict is Verdict.DIVERGENT
+    assert "Theorem 6.1" in reason
+    assert certificate is not None
+    assert certificate.rule == "local_bridge"
+    assert certificate.target_status == "proven_divergent"
+
+
+def test_classify_local_bridge_conjectured_divergent():
+    """Contracting a local bridge attached to snub disphenoid yields
+    INDETERMINATE with conjectured status.
+    """
+    from pycliques import classify_local_bridge
+
+    # Snub disphenoid + a leaf node attached by a bridge
+    g = snub_disphenoid()
+    g.add_edge(0, "leaf")
+
+    local_res = classify_local_bridge(g)
+    assert local_res is not None
+    verdict, reason, certificate = local_res
+    assert verdict is Verdict.INDETERMINATE
+    assert "conjectured" in reason
+    assert "Theorem 6.1" in reason
+    assert certificate is not None
+    assert certificate.rule == "local_bridge"
+    assert certificate.target_status == "conjectured_divergent"
+
+
+def test_classify_non_triangle_edge_none():
+    """A complete graph has no edges in no triangle, returning None."""
+    from pycliques import classify_non_triangle_edge
+
+    assert classify_non_triangle_edge(nx.complete_graph(3)) is None
+
+
+def test_classify_non_triangle_edge_divergent():
+    """Deleting a non-triangle edge that yields a divergent graph certifies
+    divergence.
+    """
+    from pycliques import classify_non_triangle_edge
+
+    o3 = nx.octahedral_graph()
+    g = o3.copy()
+    g.add_edge("x", 0)
+    g.add_edge("y", 3)
+    g.add_edge("x", "y")
+
+    res = classify_non_triangle_edge(g)
+    assert res is not None
+    verdict, reason, certificate = res
+    assert verdict is Verdict.DIVERGENT
+    assert "Theorem 6.2" in reason
+    assert certificate is not None
+    assert certificate.rule == "non_triangle_edge"
+    assert certificate.target_status == "proven_divergent"
+
+
+def test_classify_non_triangle_edge_conjectured_divergent():
+    """Deleting a non-triangle edge that yields a conjectured divergent graph
+    returns INDETERMINATE with conjectured status.
+    """
+    from pycliques import classify_non_triangle_edge
+
+    snub = snub_disphenoid()
+    c5 = nx.cycle_graph(5)
+    c5 = nx.relabel_nodes(c5, {i: 10 + i for i in range(5)})
+
+    g = nx.disjoint_union(snub, c5)
+    g.add_edge(0, "x")
+    g.add_edge(8, "y")
+    g.add_edge("x", "y")
+
+    res = classify_non_triangle_edge(g)
+    assert res is not None
+    verdict, reason, certificate = res
+    assert verdict is Verdict.INDETERMINATE
+    assert "conjectured" in reason
+    assert "Theorem 6.2" in reason
+    assert certificate is not None
+    assert certificate.rule == "non_triangle_edge"
+    assert certificate.target_status == "conjectured_divergent"
