@@ -58,6 +58,7 @@ class Certificate:
     rule: str
     target: nx.Graph | None = None
     target_status: str | None = None
+    target_label: str | None = None
     map: tuple[dict, dict] | dict | None = None
 
 
@@ -158,7 +159,7 @@ class CliqueSequence:
 # ---------------------------------------------------------------------------
 
 _MAX_ITERATIONS = 9
-_REFERENCE_GRAPHS: dict[bytes, tuple[nx.Graph, ReferenceStatus]] = {}
+_REFERENCE_GRAPHS: dict[bytes, tuple[nx.Graph, ReferenceStatus, str | None]] = {}
 
 
 def _canonical_reference_key(graph: nx.Graph) -> bytes:
@@ -168,7 +169,10 @@ def _canonical_reference_key(graph: nx.Graph) -> bytes:
 
 
 def register_reference_graph(
-    graph: nx.Graph, *, status: ReferenceStatus = ReferenceStatus.PROVEN
+    graph: nx.Graph,
+    *,
+    status: ReferenceStatus = ReferenceStatus.PROVEN,
+    label: str | None = None,
 ) -> None:
     """Register a graph whose clique behavior is known independently of the classifier.
 
@@ -176,8 +180,12 @@ def register_reference_graph(
     conjectured one. The classifier uses the same inference rules for every
     registered graph, so future reference facts can be added without branching
     on individual graph names.
+
+    label : str, optional
+        Human-readable identifier for the reference graph, used in certificates
+        and saved indeterminate-file metadata.
     """
-    _REFERENCE_GRAPHS[_canonical_reference_key(graph)] = (graph.copy(), status)
+    _REFERENCE_GRAPHS[_canonical_reference_key(graph)] = (graph.copy(), status, label)
 
 
 def clear_reference_graphs() -> None:
@@ -188,19 +196,23 @@ def clear_reference_graphs() -> None:
 register_reference_graph(
     snub_disphenoid(),
     status=ReferenceStatus.CONJECTURED,
+    label="snub_disphenoid",
 )
 
 register_reference_graph(
     nx.octahedral_graph(),
     status=ReferenceStatus.PROVEN,
+    label="octahedral_graph",
 )
 
 
-def _reference_match(graph: nx.Graph) -> tuple[nx.Graph, ReferenceStatus] | None:
+def _reference_match(
+    graph: nx.Graph,
+) -> tuple[nx.Graph, ReferenceStatus, str | None] | None:
     """Return the first registered reference graph isomorphic to *graph*, if any."""
-    for ref_graph, status in _REFERENCE_GRAPHS.values():
+    for ref_graph, status, label in _REFERENCE_GRAPHS.values():
         if nx.is_isomorphic(graph, ref_graph):
-            return ref_graph, status
+            return ref_graph, status, label
     return None
 
 
@@ -218,20 +230,29 @@ def _classify_reference_graph(
     match = _reference_match(graph)
     if match is None:
         return None
-    ref_graph, status = match
+    ref_graph, status, label = match
     if status is ReferenceStatus.PROVEN:
         return (
             Verdict.DIVERGENT,
             "registered reference graph is proven clique divergent",
             Certificate(
-                rule="reference", target=ref_graph, target_status="proven_divergent"
+                rule="reference",
+                target=ref_graph,
+                target_status="proven_divergent",
+                target_label=label,
             ),
         )
     return (
         Verdict.INDETERMINATE,
-        "registered reference graph is conjectured clique divergent; conditional on it being clique divergent",
+        (
+            "registered reference graph is conjectured clique divergent; "
+            "conditional on it being clique divergent"
+        ),
         Certificate(
-            rule="reference", target=ref_graph, target_status="conjectured_divergent"
+            rule="reference",
+            target=ref_graph,
+            target_status="conjectured_divergent",
+            target_label=label,
         ),
     )
 
@@ -240,7 +261,7 @@ def _classify_reference_dependency(
     graph: nx.Graph,
 ) -> tuple[Verdict, str, Certificate | None] | None:
     """Return a retraction certificate when a known reference graph is involved."""
-    for ref_graph, status in _REFERENCE_GRAPHS.values():
+    for ref_graph, status, label in _REFERENCE_GRAPHS.values():
         retraction = retracts(graph, ref_graph)
         if isinstance(retraction, tuple):
             if status is ReferenceStatus.PROVEN:
@@ -251,16 +272,21 @@ def _classify_reference_dependency(
                         rule="retracts",
                         target=ref_graph,
                         target_status="proven_divergent",
+                        target_label=label,
                         map=retraction,
                     ),
                 )
             return (
                 Verdict.INDETERMINATE,
-                "retracts to a conjectured divergent reference graph; conditional on the target being clique divergent",
+                (
+                    "retracts to a conjectured divergent reference graph; "
+                    "conditional on the target being clique divergent"
+                ),
                 Certificate(
                     rule="retracts",
                     target=ref_graph,
                     target_status="conjectured_divergent",
+                    target_label=label,
                     map=retraction,
                 ),
             )
@@ -273,7 +299,10 @@ def _classify_local_bridge(
     tries: int = _MAX_ITERATIONS,
     bound: int = 30,
 ) -> tuple[Verdict, str, Certificate | None] | None:
-    """Classify clique behavior by contracting local bridges according to Theorem 6.1."""
+    """Classify clique behavior by contracting local bridges.
+
+    The decision uses Theorem 6.1.
+    """
     for u, v in local_bridges(graph):
         h = contract_local_bridge(graph, u, v)
         h_behavior = classify_clique_behavior(h, tries=tries, bound=bound)
@@ -285,6 +314,9 @@ def _classify_local_bridge(
                     rule="local_bridge",
                     target=h,
                     target_status="proven_convergent",
+                    target_label=h_behavior.certificate.target_label
+                    if h_behavior.certificate is not None
+                    else None,
                 ),
             )
         if h_behavior.verdict is Verdict.DIVERGENT:
@@ -295,6 +327,9 @@ def _classify_local_bridge(
                     rule="local_bridge",
                     target=h,
                     target_status="proven_divergent",
+                    target_label=h_behavior.certificate.target_label
+                    if h_behavior.certificate is not None
+                    else None,
                 ),
             )
         if (
@@ -303,11 +338,16 @@ def _classify_local_bridge(
         ):
             return (
                 Verdict.INDETERMINATE,
-                "contracting a local bridge yields a conjectured divergent graph; conditional on the target being clique divergent by Theorem 6.1",
+                (
+                    "contracting a local bridge yields a conjectured divergent "
+                    "graph; conditional on the target being clique divergent "
+                    "by Theorem 6.1"
+                ),
                 Certificate(
                     rule="local_bridge",
                     target=h_behavior.certificate.target or h,
                     target_status="conjectured_divergent",
+                    target_label=h_behavior.certificate.target_label,
                 ),
             )
     return None
@@ -346,18 +386,27 @@ def _classify_non_triangle_edge(
     tries: int = _MAX_ITERATIONS,
     bound: int = 30,
 ) -> tuple[Verdict, str, Certificate | None] | None:
-    """Classify clique behavior by deleting edges in no triangle according to Theorem 6.2."""
+    """Classify clique behavior by deleting edges in no triangle.
+
+    The decision uses Theorem 6.2.
+    """
     for u, v in edges_in_no_triangle(graph):
         h = remove_edge_not_in_triangle(graph, u, v)
         h_behavior = classify_clique_behavior(h, tries=tries, bound=bound)
         if h_behavior.verdict is Verdict.DIVERGENT:
             return (
                 Verdict.DIVERGENT,
-                "deleting an edge in no triangle yields a divergent graph by Theorem 6.2",
+                (
+                    "deleting an edge in no triangle yields a divergent graph "
+                    "by Theorem 6.2"
+                ),
                 Certificate(
                     rule="non_triangle_edge",
                     target=h,
                     target_status="proven_divergent",
+                    target_label=h_behavior.certificate.target_label
+                    if h_behavior.certificate is not None
+                    else None,
                 ),
             )
         if (
@@ -366,11 +415,16 @@ def _classify_non_triangle_edge(
         ):
             return (
                 Verdict.INDETERMINATE,
-                "deleting an edge in no triangle yields a conjectured divergent graph; conditional on the target being clique divergent by Theorem 6.2",
+                (
+                    "deleting an edge in no triangle yields a conjectured "
+                    "divergent graph; conditional on the target being clique "
+                    "divergent by Theorem 6.2"
+                ),
                 Certificate(
                     rule="non_triangle_edge",
                     target=h_behavior.certificate.target or h,
                     target_status="conjectured_divergent",
+                    target_label=h_behavior.certificate.target_label,
                 ),
             )
     return None
@@ -382,7 +436,9 @@ def classify_non_triangle_edge(
     tries: int = _MAX_ITERATIONS,
     bound: int = 30,
 ) -> tuple[Verdict, str, Certificate | None] | None:
-    """Classify clique behavior by deleting edges in no triangle according to Theorem 6.2.
+    """Classify clique behavior by deleting edges in no triangle.
+
+    The decision uses Theorem 6.2.
 
     .. rubric:: Parameters
 
@@ -599,15 +655,24 @@ def _indeterminate_file_path(order: int, data_dir: Path) -> Path:
     return data_dir / f"indeterminate_order_{order}.txt"
 
 
+def _serialize_certificate(certificate: Certificate | None) -> str:
+    """Render certificate metadata for the indeterminate-graphs file."""
+    if certificate is None:
+        return "- - -"
+    target_label = certificate.target_label or "-"
+    target_status = certificate.target_status or "-"
+    return f"{certificate.rule} {target_status} {target_label}"
+
+
 def _save_indeterminate(
     order: int,
-    indeterminate: list[tuple[int, nx.Graph]],
+    indeterminate: list[tuple[int, nx.Graph, Certificate | None]],
     data_dir: Path,
 ) -> None:
     """Save indeterminate pared graphs to a human-readable file.
 
     Each line contains the original graph index, the order of the pared
-    graph, and its graph6 string.
+    graph, its graph6 string, and certificate metadata when available.
 
     If the file already exists, the new results are merged with the
     existing entries.  Duplicate indices are resolved in favour of the
@@ -623,24 +688,27 @@ def _save_indeterminate(
                 stripped = line.strip()
                 if not stripped or stripped.startswith("#"):
                     continue
-                parts = stripped.split(maxsplit=2)
+                parts = stripped.split(maxsplit=5)
                 existing[int(parts[0])] = stripped
         _logger.info(
             f"Found existing file with {len(existing)} entries; merging new results"
         )
 
     # Build lines for the new entries (overwrite any duplicate index).
-    for idx, graph in indeterminate:
+    for idx, graph, certificate in indeterminate:
         g = nx.convert_node_labels_to_integers(graph)
         g6 = nx.to_graph6_bytes(g, header=False).decode("ascii").strip()
-        existing[idx] = f"{idx} {g.order()} {g6}"
+        existing[idx] = f"{idx} {g.order()} {g6} {_serialize_certificate(certificate)}"
 
     # Write everything back sorted by index.
     with path.open("w", encoding="utf-8") as f:
         f.write(
             f"# Indeterminate clique behavior - connected graphs of order {order}\n"
         )
-        f.write("# Format: original_index pared_order graph6\n")
+        f.write(
+            "# Format: original_index pared_order graph6 certificate_rule "
+            "certificate_target_status certificate_target_label\n"
+        )
         for idx in sorted(existing):
             f.write(f"{existing[idx]}\n")
     _logger.info(f"Saved {len(existing)} indeterminate graphs to {path}")
@@ -669,7 +737,7 @@ def _load_indeterminate_graphs(
                 line = line.strip()
                 if not line or line.startswith("#"):
                     continue
-                parts = line.split()
+                parts = line.split(maxsplit=5)
                 g6_str = parts[2]
                 graph = nx.from_graph6_bytes(g6_str.encode("ascii"))
                 n = graph.order()
@@ -887,8 +955,8 @@ def _main(args: list[str]):
     convergent: list[int] = []
     divergent: list[int] = []
     further: list[int] = []
-    further_pared: list[tuple[int, nx.Graph]] = []
-    further_graphs: list[tuple[int, nx.Graph]] = []
+    further_pared: list[tuple[int, nx.Graph, Certificate | None]] = []
+    further_graphs: list[tuple[int, nx.Graph, Certificate | None]] = []
     reducible: list[int] = []
 
     range_msg = ""
@@ -942,7 +1010,12 @@ def _main(args: list[str]):
 
                     result = classify_clique_behavior(graph)
                     if _is_known_indeterminate(result.pared_graph, known_indeterminate):
-                        further_pared.append((index, result.pared_graph))
+                        further_pared.append(
+                            (index, result.pared_graph, result.certificate)
+                        )
+                        further_graphs.append(
+                            (index, result.pared_graph, result.certificate)
+                        )
                         verdict_label = "INDETERMINATE"
                         reason = "reduces to known indeterminate graph"
                     elif result.verdict is Verdict.CONVERGENT:
@@ -955,7 +1028,9 @@ def _main(args: list[str]):
                         reason = result.reason
                     else:
                         further.append(index)
-                        further_graphs.append((index, result.pared_graph))
+                        further_graphs.append(
+                            (index, result.pared_graph, result.certificate)
+                        )
                         verdict_label = "INDETERMINATE"
                         reason = result.reason
 

@@ -251,7 +251,9 @@ def test_ref_dep_retraction_proven_certificate():
     clear_reference_graphs()
     try:
         h = nx.octahedral_graph()
-        register_reference_graph(h, status=ReferenceStatus.PROVEN)
+        register_reference_graph(
+            h, status=ReferenceStatus.PROVEN, label="octahedral_graph"
+        )
 
         result = _classify_reference_dependency(h)
 
@@ -261,11 +263,20 @@ def test_ref_dep_retraction_proven_certificate():
         assert certificate is not None
         assert certificate.rule == "retracts"
         assert certificate.target_status == "proven_divergent"
+        assert certificate.target_label == "octahedral_graph"
         assert "proven" in reason.lower()
     finally:
         clear_reference_graphs()
-        register_reference_graph(snub_disphenoid(), status=ReferenceStatus.CONJECTURED)
-        register_reference_graph(nx.octahedral_graph(), status=ReferenceStatus.PROVEN)
+        register_reference_graph(
+            snub_disphenoid(),
+            status=ReferenceStatus.CONJECTURED,
+            label="snub_disphenoid",
+        )
+        register_reference_graph(
+            nx.octahedral_graph(),
+            status=ReferenceStatus.PROVEN,
+            label="octahedral_graph",
+        )
 
 
 def test_ref_dep_retraction_conjectural_indeterminate():
@@ -275,7 +286,9 @@ def test_ref_dep_retraction_conjectural_indeterminate():
     clear_reference_graphs()
     try:
         h = snub_disphenoid()
-        register_reference_graph(h, status=ReferenceStatus.CONJECTURED)
+        register_reference_graph(
+            h, status=ReferenceStatus.CONJECTURED, label="snub_disphenoid"
+        )
 
         result = _classify_reference_dependency(h)
 
@@ -285,11 +298,20 @@ def test_ref_dep_retraction_conjectural_indeterminate():
         assert certificate is not None
         assert certificate.rule == "retracts"
         assert certificate.target_status == "conjectured_divergent"
+        assert certificate.target_label == "snub_disphenoid"
         assert "conditional" in reason.lower()
     finally:
         clear_reference_graphs()
-        register_reference_graph(snub_disphenoid(), status=ReferenceStatus.CONJECTURED)
-        register_reference_graph(nx.octahedral_graph(), status=ReferenceStatus.PROVEN)
+        register_reference_graph(
+            snub_disphenoid(),
+            status=ReferenceStatus.CONJECTURED,
+            label="snub_disphenoid",
+        )
+        register_reference_graph(
+            nx.octahedral_graph(),
+            status=ReferenceStatus.PROVEN,
+            label="octahedral_graph",
+        )
 
 
 def test_small_main_no_skip_dominated(tmp_path):
@@ -327,6 +349,7 @@ def test_classify_local_bridge_divergent():
     assert certificate is not None
     assert certificate.rule == "local_bridge"
     assert certificate.target_status == "proven_divergent"
+    assert certificate.target_label == "octahedral_graph"
 
 
 def test_classify_local_bridge_conjectured_divergent():
@@ -348,6 +371,7 @@ def test_classify_local_bridge_conjectured_divergent():
     assert certificate is not None
     assert certificate.rule == "local_bridge"
     assert certificate.target_status == "conjectured_divergent"
+    assert certificate.target_label == "snub_disphenoid"
 
 
 def test_classify_non_triangle_edge_none():
@@ -403,3 +427,42 @@ def test_classify_non_triangle_edge_conjectured_divergent():
     assert certificate is not None
     assert certificate.rule == "non_triangle_edge"
     assert certificate.target_status == "conjectured_divergent"
+    assert certificate.target_label == "snub_disphenoid"
+
+
+def test_save_indeterminate_includes_certificate_metadata(tmp_path):
+    """Saved indeterminate rows include certificate metadata when available."""
+    from pycliques.small import _save_indeterminate
+
+    g = nx.disjoint_union(snub_disphenoid(), nx.cycle_graph(5))
+    g.add_edge(0, "x")
+    g.add_edge(8, "y")
+    g.add_edge("x", "y")
+
+    result = classify_clique_behavior(g)
+    assert result.certificate is not None
+
+    _save_indeterminate(9, [(17, result.pared_graph, result.certificate)], tmp_path)
+
+    saved = (tmp_path / "indeterminate_order_9.txt").read_text().splitlines()
+    row = next(line for line in saved if line and not line.startswith("#"))
+    assert "retracts" in row
+    assert "conjectured_divergent" in row
+    assert "snub_disphenoid" in row
+
+
+def test_load_indeterminate_graphs_ignores_certificate_metadata(tmp_path):
+    """Loading indeterminate graphs accepts the extended file format."""
+    from pycliques.small import _load_indeterminate_graphs
+
+    g6 = nx.to_graph6_bytes(nx.path_graph(4), header=False).decode("ascii").strip()
+    path = tmp_path / "indeterminate_order_9.txt"
+    path.write_text(
+        "# Indeterminate clique behavior - connected graphs of order 9\n"
+        "# Format: original_index pared_order graph6 certificate_rule "
+        "certificate_target_status certificate_target_label\n"
+        f"7 4 {g6} retracts conjectured_divergent snub_disphenoid\n"
+    )
+
+    known = _load_indeterminate_graphs(10, tmp_path)
+    assert len(known[4]) == 1
