@@ -28,3 +28,4 @@ build-backend = "hatchling.build"
 [project.scripts]
 find-retractions = "pycliques.retractions:main"
 small-behavior = "pycliques.small:main"
+classify-behavior = "pycliques.behavior:main"

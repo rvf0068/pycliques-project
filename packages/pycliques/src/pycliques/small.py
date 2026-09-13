@@ -126,9 +126,15 @@ class CliqueSequence:
 
     """
 
-    def __init__(self, graph: nx.Graph, bound: int = 30) -> None:
+    def __init__(
+        self,
+        graph: nx.Graph,
+        bound: int = 30,
+        on_iterate: Callable[[int], None] | None = None,
+    ) -> None:
         self._graphs: list[nx.Graph] = [graph]
         self._bound = bound
+        self._on_iterate = on_iterate
         self._exhausted = False
 
     @property
@@ -144,6 +150,8 @@ class CliqueSequence:
     def __getitem__(self, i: int) -> nx.Graph | None:
         """Return the *i*-th iterated pared clique graph, or ``None``."""
         while len(self._graphs) <= i and not self._exhausted:
+            if self._on_iterate is not None:
+                self._on_iterate(len(self._graphs))
             kg = clique_graph(self._graphs[-1], self._bound)
             if kg is None:
                 self._exhausted = True
@@ -534,6 +542,7 @@ def classify_clique_behavior(
     *,
     tries: int = _MAX_ITERATIONS,
     bound: int = 30,
+    on_iterate: Callable[[int], None] | None = None,
 ) -> CliqueBehavior:
     """Classify the observed clique behavior of an undirected graph.
 
@@ -583,7 +592,7 @@ def classify_clique_behavior(
         raise ValueError("bound must be at least 1")
 
     pared_graph = completely_pared_graph(graph)
-    seq = CliqueSequence(pared_graph, bound=bound)
+    seq = CliqueSequence(pared_graph, bound=bound, on_iterate=on_iterate)
 
     reference_result = _classify_reference_graph(pared_graph)
     if reference_result is not None:
