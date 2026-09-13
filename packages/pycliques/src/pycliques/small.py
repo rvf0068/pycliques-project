@@ -871,6 +871,14 @@ def _parse_args(args: list[str]) -> argparse.Namespace:
         default=_DEFAULT_DATA_DIR,
     )
     parser.add_argument(
+        "--bound",
+        dest="bound",
+        help="Maximum number of cliques allowed at each iteration (default: 30)",
+        type=int,
+        default=30,
+        metavar="INT",
+    )
+    parser.add_argument(
         "--start",
         dest="start",
         help="First graph index to process, inclusive (default: 0)",
@@ -929,6 +937,7 @@ def _main(args: list[str]):
     end: int | None = parsed_args.end
     output_file: Path | None = parsed_args.output_file
     skip_dominated: bool = parsed_args.skip_dominated
+    bound: int = parsed_args.bound
 
     if order not in _dict_connected:
         _logger.error(f"Error: Internal data for order {order} not available.")
@@ -1008,7 +1017,7 @@ def _main(args: list[str]):
                         _logger.debug(f"Graph {index}: has dominated vertices")
                         continue
 
-                    result = classify_clique_behavior(graph)
+                    result = classify_clique_behavior(graph, bound=bound)
                     if _is_known_indeterminate(result.pared_graph, known_indeterminate):
                         further_pared.append(
                             (index, result.pared_graph, result.certificate)

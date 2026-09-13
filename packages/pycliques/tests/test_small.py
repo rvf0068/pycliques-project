@@ -157,11 +157,20 @@ def test_eventually_retracts_specially_bound_exceeded():
 
 
 def test_small_parse_args():
-    """_parse_args parses the graph order correctly."""
+    """_parse_args parses the graph order and default bound correctly."""
     from pycliques.small import _parse_args
 
     args = _parse_args(["6"])
     assert args.n == 6
+    assert args.bound == 30
+
+
+def test_small_parse_args_bound():
+    """_parse_args accepts an explicit clique bound."""
+    from pycliques.small import _parse_args
+
+    args = _parse_args(["--bound", "12", "6"])
+    assert args.bound == 12
 
 
 def test_small_parse_args_verbose():
