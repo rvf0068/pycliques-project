@@ -524,6 +524,7 @@ def _default_classifiers(tries: int) -> list[Classifier]:
         lambda seq: _test_eventually_special_octahedra(seq, tries),
         _make_retraction_test(suspension_of_cycle(5), "retracts to Susp(C_5)"),
         _make_retraction_test(suspension_of_cycle(6), "retracts to Susp(C_6)"),
+        _make_retraction_test(suspension_of_cycle(7), "retracts to Susp(C_7)"),
         _make_retraction_test(complement_of_cycle(8), "retracts to Comp(C_8)"),
     ]
 
