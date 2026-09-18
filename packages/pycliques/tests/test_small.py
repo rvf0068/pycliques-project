@@ -459,6 +459,150 @@ def test_classify_non_triangle_edge_conjectured_divergent():
     assert list(nx.common_neighbors(g, *certificate.edge)) == []
 
 
+# ---------------------------------------------------------------------------
+# Inverse cutpoint extension
+# ---------------------------------------------------------------------------
+
+
+def _motivating_example() -> tuple[nx.Graph, nx.Graph]:
+    """Return (g, h) from the inverse-cutpoint-extension motivating example.
+
+    ``g`` is a clockwork graph, known clique divergent.  ``h`` is obtained
+    from ``g`` by identifying two vertices at distance four (add the edge,
+    then contract it); the identified vertex is a local cutpoint of ``h``,
+    but not an ordinary articulation point.
+    """
+    from pycliques.clockwork import clockwork_graph
+
+    g = clockwork_graph(6 * [1], [[0] for _ in range(6)], 2, [0, 1])
+    h = g.copy()
+    h.add_edge(12, 15)
+    h = nx.contracted_edge(h, (12, 15), self_loops=False)
+    return g, h
+
+
+def test_classify_clique_behavior_motivating_example_is_divergent():
+    """The motivating example is classified DIVERGENT via the inverse
+    cutpoint extension, chained with Theorem 6.2 and clockwork recognition.
+    """
+    _, h = _motivating_example()
+
+    result = classify_clique_behavior(h)
+
+    assert result.verdict is Verdict.DIVERGENT
+    assert result.certificate is not None
+    assert result.certificate.rule == "inverse_cutpoint_extension"
+    assert result.certificate.target_status == "proven_divergent"
+
+
+def test_classify_inverse_cutpoint_extension_divergent_directly():
+    """Calling the rule directly finds the same admissible extension."""
+    from pycliques import classify_inverse_cutpoint_extension
+
+    _, h = _motivating_example()
+
+    res = classify_inverse_cutpoint_extension(h)
+    assert res is not None
+    verdict, reason, certificate = res
+    assert verdict is Verdict.DIVERGENT
+    assert "Theorem 6.1" in reason
+    assert "Theorem 6.2" in reason
+    assert certificate is not None
+    assert certificate.rule == "inverse_cutpoint_extension"
+    assert certificate.target_status == "proven_divergent"
+    assert certificate.map is not None
+    assert certificate.map["cutpoint"] == 12
+
+
+def test_classify_clique_behavior_detects_cutpoint_regardless_of_labels():
+    """Relabeling with arbitrary hashables does not affect the classification."""
+    _, h = _motivating_example()
+
+    relabeled = nx.relabel_nodes(
+        h,
+        {n: (str(n), n, "tag") if n != 12 else "special" for n in h.nodes()},
+    )
+
+    result = classify_clique_behavior(relabeled)
+    assert result.verdict is Verdict.DIVERGENT
+    assert result.certificate is not None
+    assert result.certificate.rule == "inverse_cutpoint_extension"
+
+
+def test_classify_inverse_cutpoint_extension_none_without_divergent_target():
+    """A local cutpoint whose only split yields a convergent target returns None."""
+    from pycliques import classify_inverse_cutpoint_extension
+
+    # Two triangles sharing vertex 2; splitting it gives two disjoint
+    # triangles, which is convergent, not divergent.
+    bowtie = nx.Graph([(0, 1), (1, 2), (2, 0), (2, 3), (3, 4), (4, 2)])
+
+    assert classify_inverse_cutpoint_extension(bowtie) is None
+    assert classify_clique_behavior(bowtie).verdict is Verdict.CONVERGENT
+
+
+def test_inverse_cutpoint_extension_rejects_invalid_split():
+    """A split that separates two adjacent neighbors of the cutpoint is
+    rejected and never produces a divergence certificate."""
+    from pycliques.cutpoints import (
+        InverseCutpointExtension,
+        is_admissible_inverse_extension,
+    )
+
+    graph = nx.Graph()
+    graph.add_edges_from([("u", 0), ("u", 3), ("v", 1), ("v", 4), (0, 1), (3, 4)])
+    graph.add_edge("u", "v")
+
+    extension = InverseCutpointExtension(
+        cutpoint=2,
+        u="u",
+        v="v",
+        u_branch=frozenset({0, 3}),
+        v_branch=frozenset({1, 4}),
+        graph=graph,
+    )
+    assert not is_admissible_inverse_extension(extension)
+
+
+def test_classify_inverse_cutpoint_extension_conjectured_divergent():
+    """A split whose target is only conjectured divergent yields a
+    conditional INDETERMINATE result, never a proven DIVERGENT verdict.
+    """
+    from pycliques import classify_inverse_cutpoint_extension
+    from pycliques.cutpoints import contract_local_bridge
+
+    s = snub_disphenoid()
+    branch = s.copy()
+    branch.add_edge(0, "p")
+    branch.add_edge(1, "q")
+    extended = branch.copy()
+    extended.add_edge("p", "q")
+    h = contract_local_bridge(extended, "p", "q")
+
+    res = classify_inverse_cutpoint_extension(h)
+    assert res is not None
+    verdict, reason, certificate = res
+    assert verdict is Verdict.INDETERMINATE
+    assert "conjectured" in reason
+    assert certificate is not None
+    assert certificate.rule == "inverse_cutpoint_extension"
+    assert certificate.target_status == "conjectured_divergent"
+    assert certificate.target_label == "snub_disphenoid"
+
+    # The global classifier must not silently promote this to DIVERGENT.
+    overall = classify_clique_behavior(h)
+    assert overall.verdict is not Verdict.DIVERGENT
+
+
+def test_classify_inverse_cutpoint_extension_respects_budget():
+    """A zero extension budget disables the rule immediately."""
+    from pycliques import classify_inverse_cutpoint_extension
+
+    _, h = _motivating_example()
+
+    assert classify_inverse_cutpoint_extension(h, extension_budget=0) is None
+
+
 def test_save_indeterminate_includes_certificate_metadata(tmp_path):
     """Saved indeterminate rows include certificate metadata when available."""
     from pycliques.small import _save_indeterminate

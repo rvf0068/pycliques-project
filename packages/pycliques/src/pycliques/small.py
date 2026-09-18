@@ -20,7 +20,10 @@ from pycliques.cliques import clique_graph
 from pycliques.clockwork import is_clique_divergent_clockwork, recognize_clockwork
 from pycliques.cutpoints import (
     contract_local_bridge,
+    edge_in_triangle,
     edges_in_no_triangle,
+    inverse_cutpoint_extensions,
+    is_admissible_inverse_extension,
     local_bridges,
     remove_edge_not_in_triangle,
 )
@@ -314,6 +317,7 @@ def _classify_local_bridge(
     *,
     tries: int = _MAX_ITERATIONS,
     bound: int = 30,
+    extension_budget: int = 1,
 ) -> ClassifierResult | None:
     """Classify by Theorem 6.1, or return ``None`` when it proves nothing.
 
@@ -322,7 +326,9 @@ def _classify_local_bridge(
     """
     for u, v in local_bridges(graph):
         h = contract_local_bridge(graph, u, v)
-        h_behavior = classify_clique_behavior(h, tries=tries, bound=bound)
+        h_behavior = classify_clique_behavior(
+            h, tries=tries, bound=bound, extension_budget=extension_budget
+        )
         if h_behavior.verdict is Verdict.CONVERGENT:
             return (
                 Verdict.CONVERGENT,
@@ -405,6 +411,7 @@ def _classify_non_triangle_edge(
     *,
     tries: int = _MAX_ITERATIONS,
     bound: int = 30,
+    extension_budget: int = 1,
 ) -> ClassifierResult | None:
     """Classify by Theorem 6.2, or return ``None`` when it proves nothing.
 
@@ -413,7 +420,9 @@ def _classify_non_triangle_edge(
     """
     for u, v in edges_in_no_triangle(graph):
         h = remove_edge_not_in_triangle(graph, u, v)
-        h_behavior = classify_clique_behavior(h, tries=tries, bound=bound)
+        h_behavior = classify_clique_behavior(
+            h, tries=tries, bound=bound, extension_budget=extension_budget
+        )
         if h_behavior.verdict is Verdict.DIVERGENT:
             return (
                 Verdict.DIVERGENT,
@@ -480,6 +489,140 @@ def classify_non_triangle_edge(
         if this rule establishes no verdict.
     """
     return _classify_non_triangle_edge(graph, tries=tries, bound=bound)
+
+
+def _classify_inverse_cutpoint_extension(
+    graph: nx.Graph,
+    *,
+    tries: int = _MAX_ITERATIONS,
+    bound: int = 30,
+    extension_budget: int = 1,
+    max_candidates: int = 64,
+) -> ClassifierResult | None:
+    """Classify by an inverse cutpoint extension, or return ``None``.
+
+    Searches for a local cutpoint whose admissible split (see
+    :mod:`pycliques.cutpoints`) followed by removing the newly added edge
+    (Theorem 6.2) yields a graph with known clique behavior. The admissible
+    split itself is justified by Theorem 6.1 applied to the constructed
+    edge, not by any additional unverified hypothesis.
+
+    ``extension_budget`` bounds how many times this (expensive) rule may
+    fire along a single recursive classification chain; it is decremented
+    only when this rule itself is applied, not by the cheaper Theorem 6.1 /
+    6.2 rules. A budget of 0 makes this rule return ``None`` immediately.
+    """
+    if extension_budget <= 0:
+        return None
+
+    for extension in inverse_cutpoint_extensions(graph, max_candidates=max_candidates):
+        if not is_admissible_inverse_extension(extension):
+            continue
+        u, v = extension.u, extension.v
+        extended = extension.graph
+        if edge_in_triangle(extended, u, v):
+            continue
+        target = remove_edge_not_in_triangle(extended, u, v)
+        target_behavior = classify_clique_behavior(
+            target,
+            tries=tries,
+            bound=bound,
+            extension_budget=extension_budget - 1,
+        )
+        certificate_map = {
+            "cutpoint": extension.cutpoint,
+            "u": extension.u,
+            "v": extension.v,
+        }
+        if target_behavior.verdict is Verdict.DIVERGENT:
+            return (
+                Verdict.DIVERGENT,
+                (
+                    "an inverse cutpoint extension (Theorem 6.1) followed by "
+                    "deleting the added edge, contained in no triangle "
+                    "(Theorem 6.2), yields a divergent graph"
+                ),
+                Certificate(
+                    rule="inverse_cutpoint_extension",
+                    target=target,
+                    target_status="proven_divergent",
+                    target_label=target_behavior.certificate.target_label
+                    if target_behavior.certificate is not None
+                    else None,
+                    map=certificate_map,
+                    edge=(u, v),
+                ),
+            )
+        if (
+            target_behavior.certificate is not None
+            and target_behavior.certificate.target_status == "conjectured_divergent"
+        ):
+            return (
+                Verdict.INDETERMINATE,
+                (
+                    "an inverse cutpoint extension (Theorem 6.1) followed by "
+                    "deleting the added edge (Theorem 6.2) yields a "
+                    "conjectured divergent graph; conditional on the target "
+                    "being clique divergent"
+                ),
+                Certificate(
+                    rule="inverse_cutpoint_extension",
+                    target=target_behavior.certificate.target or target,
+                    target_status="conjectured_divergent",
+                    target_label=target_behavior.certificate.target_label,
+                    map=certificate_map,
+                    edge=(u, v),
+                ),
+            )
+    return None
+
+
+def classify_inverse_cutpoint_extension(
+    graph: nx.Graph,
+    *,
+    tries: int = _MAX_ITERATIONS,
+    bound: int = 30,
+    extension_budget: int = 1,
+    max_candidates: int = 64,
+) -> ClassifierResult | None:
+    """Classify clique behavior by an inverse cutpoint extension.
+
+    This searches for a local cutpoint of ``graph`` that admits a
+    theorem-valid split into two vertices ``u``, ``v`` joined by a new edge
+    (Theorem 6.1), such that deleting that edge -- contained in no triangle
+    by construction requirements -- yields a graph of known clique behavior
+    (Theorem 6.2). See :mod:`pycliques.cutpoints` for the precise
+    admissibility condition.
+
+    .. rubric:: Parameters
+
+    graph : networkx.Graph
+        Input graph.
+    tries : int, optional
+        Maximum number of iterates to inspect (default: 9).
+    bound : int, optional
+        Maximum number of cliques allowed at each iteration (default: 30).
+    extension_budget : int, optional
+        Maximum number of times this rule may recursively fire along one
+        classification chain (default: 1).
+    max_candidates : int, optional
+        Maximum number of split candidates generated per local cutpoint
+        (default: 64).
+
+    .. rubric:: Returns
+
+    tuple[Verdict, str, Certificate | None] | None
+        A tuple of ``(verdict, reason, certificate)`` if an admissible
+        extension leads to a graph of known clique behavior; ``None`` if
+        this rule establishes no verdict.
+    """
+    return _classify_inverse_cutpoint_extension(
+        graph,
+        tries=tries,
+        bound=bound,
+        extension_budget=extension_budget,
+        max_candidates=max_candidates,
+    )
 
 
 def _test_eventually_helly(seq: CliqueSequence, tries: int) -> ClassifierResult | None:
@@ -558,6 +701,7 @@ def classify_clique_behavior(
     *,
     tries: int = _MAX_ITERATIONS,
     bound: int = 30,
+    extension_budget: int = 1,
 ) -> CliqueBehavior:
     """Classify the observed clique behavior of an undirected graph.
 
@@ -635,7 +779,9 @@ def classify_clique_behavior(
             verdict, reason, seq.graph_count, False, pared_graph, certificate
         )
 
-    local_bridge_result = _classify_local_bridge(pared_graph, tries=tries, bound=bound)
+    local_bridge_result = _classify_local_bridge(
+        pared_graph, tries=tries, bound=bound, extension_budget=extension_budget
+    )
     if local_bridge_result is not None:
         verdict, reason, certificate = local_bridge_result
         return CliqueBehavior(
@@ -643,10 +789,19 @@ def classify_clique_behavior(
         )
 
     non_triangle_edge_result = _classify_non_triangle_edge(
-        pared_graph, tries=tries, bound=bound
+        pared_graph, tries=tries, bound=bound, extension_budget=extension_budget
     )
     if non_triangle_edge_result is not None:
         verdict, reason, certificate = non_triangle_edge_result
+        return CliqueBehavior(
+            verdict, reason, seq.graph_count, False, pared_graph, certificate
+        )
+
+    inverse_extension_result = _classify_inverse_cutpoint_extension(
+        pared_graph, tries=tries, bound=bound, extension_budget=extension_budget
+    )
+    if inverse_extension_result is not None:
+        verdict, reason, certificate = inverse_extension_result
         return CliqueBehavior(
             verdict, reason, seq.graph_count, False, pared_graph, certificate
         )
