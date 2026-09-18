@@ -16,14 +16,18 @@ from pycliques.small import (
     _make_clique_retraction_test,
     clear_reference_graphs,
     eventually_retracts_specially,
-    is_eventually_helly,
     register_reference_graph,
+)
+from pycliques.small import (
+    test_eventually_helly as public_test_eventually_helly,
 )
 from pyg6data.lists import list_graphs
 
 
-def test_eventually_helly():
-    assert is_eventually_helly(nx.triangular_lattice_graph(4, 4))
+def test_eventually_helly_immediately():
+    result = public_test_eventually_helly(nx.cycle_graph(4))
+
+    assert result == (Verdict.CONVERGENT, "is eventually Helly (index 0)", None)
 
 
 def test_classify_clique_behavior_convergent():
@@ -50,7 +54,11 @@ def test_eventual_helly_public_api_agrees_with_classifier():
     """The public Helly search and classifier share the same iteration path."""
     graph = nx.triangular_lattice_graph(3, 3)
 
-    assert is_eventually_helly(graph)
+    assert public_test_eventually_helly(graph) == (
+        Verdict.CONVERGENT,
+        "is eventually Helly (index 1)",
+        None,
+    )
     assert classify_clique_behavior(graph).verdict is Verdict.CONVERGENT
 
 
@@ -128,20 +136,26 @@ def test_special_octahedron_public_api_agrees_with_classifier():
     assert result.verdict is Verdict.DIVERGENT
 
 
-# ---------- Coverage for is_eventually_helly edge cases ----------
+# ---------- Coverage for test_eventually_helly edge cases ----------
 
 
-def test_is_eventually_helly_bound_exceeded():
-    """When the clique bound is exceeded, is_eventually_helly returns False."""
+def test_test_eventually_helly_bound_exceeded():
+    """A clique bound abort produces an indeterminate result."""
     # The octahedral graph is NOT clique-Helly and has 8 cliques.
     # With bound=3, clique_graph will return None.
-    assert is_eventually_helly(nx.octahedral_graph(), bound=3) is False
+    result = public_test_eventually_helly(nx.octahedral_graph(), bound=3)
+
+    assert result[0] is Verdict.INDETERMINATE
+    assert "bound" in result[1]
 
 
-def test_is_eventually_helly_tries_exhausted():
-    """When tries are exhausted without finding a Helly iterate, return False."""
+def test_test_eventually_helly_tries_exhausted():
+    """A finite failure to find a Helly iterate is indeterminate."""
     # With tries=0, the loop never runs.  The octahedral graph is not Helly.
-    assert is_eventually_helly(nx.octahedral_graph(), tries=0) is False
+    result = public_test_eventually_helly(nx.octahedral_graph(), tries=0)
+
+    assert result[0] is Verdict.INDETERMINATE
+    assert "finite tested range" in result[1]
 
 
 # ---------- Coverage for eventually_retracts_specially edge cases ----------
@@ -359,6 +373,7 @@ def test_classify_local_bridge_divergent():
     assert certificate.rule == "local_bridge"
     assert certificate.target_status == "proven_divergent"
     assert certificate.target_label == "octahedral_graph"
+    assert certificate.edge == (0, "leaf")
 
 
 def test_classify_local_bridge_conjectured_divergent():
@@ -381,6 +396,7 @@ def test_classify_local_bridge_conjectured_divergent():
     assert certificate.rule == "local_bridge"
     assert certificate.target_status == "conjectured_divergent"
     assert certificate.target_label == "snub_disphenoid"
+    assert certificate.edge == (0, "leaf")
 
 
 def test_classify_non_triangle_edge_none():
@@ -410,6 +426,8 @@ def test_classify_non_triangle_edge_divergent():
     assert certificate is not None
     assert certificate.rule == "non_triangle_edge"
     assert certificate.target_status == "proven_divergent"
+    assert certificate.edge is not None
+    assert list(nx.common_neighbors(g, *certificate.edge)) == []
 
 
 def test_classify_non_triangle_edge_conjectured_divergent():
@@ -437,6 +455,8 @@ def test_classify_non_triangle_edge_conjectured_divergent():
     assert certificate.rule == "non_triangle_edge"
     assert certificate.target_status == "conjectured_divergent"
     assert certificate.target_label == "snub_disphenoid"
+    assert certificate.edge is not None
+    assert list(nx.common_neighbors(g, *certificate.edge)) == []
 
 
 def test_save_indeterminate_includes_certificate_metadata(tmp_path):

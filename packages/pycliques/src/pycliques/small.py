@@ -6,7 +6,7 @@ import argparse
 import gzip
 import logging
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Hashable
 from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
@@ -53,13 +53,19 @@ class ReferenceStatus(Enum):
 
 @dataclass(frozen=True)
 class Certificate:
-    """Structured provenance for a classification decision."""
+    """Structured provenance for a classification decision.
+
+    An inference rule returns ``None`` when it establishes no verdict.  An
+    ``INDETERMINATE`` result is reserved for a conditional conclusion or for
+    the global classifier after all applicable rules have been exhausted.
+    """
 
     rule: str
     target: nx.Graph | None = None
     target_status: str | None = None
     target_label: str | None = None
     map: tuple[dict, dict] | dict | None = None
+    edge: tuple[Hashable, Hashable] | None = None
 
 
 @dataclass(frozen=True)
@@ -70,6 +76,11 @@ class CliqueBehavior:
     decide the behavior within the configured limits.  It is not a
     mathematical assertion that the graph is neither convergent nor
     divergent.
+
+    Individual inference rules return ``None`` when they establish no
+    verdict.  ``INDETERMINATE`` is returned by the global classifier only
+    after the applicable rules have been exhausted, or when a conclusion is
+    explicitly conditional on a conjecture.
 
     .. rubric:: Attributes
 
@@ -85,8 +96,8 @@ class CliqueBehavior:
     pared_graph : networkx.Graph
         Completely pared copy of the input graph used by the classifier.
     certificate : Certificate | None
-        Structured justification for the verdict when the classifier uses a
-        retraction or reduction-based inference rule.
+        Structured justification for the inference rule that established the
+        verdict, when available.
     """
 
     verdict: Verdict
@@ -97,9 +108,10 @@ class CliqueBehavior:
     certificate: Certificate | None = None
 
 
-#: Type alias for a classifier function.
-ClassifierResult = tuple[Verdict, str] | None
-Classifier = Callable[["CliqueSequence"], ClassifierResult]
+#: Type alias for one inference rule's result.
+ClassifierResult = tuple[Verdict, str, Certificate | None]
+#: Type alias for an inference rule. ``None`` means this rule proved nothing.
+Classifier = Callable[["CliqueSequence"], ClassifierResult | None]
 
 
 class CliqueSequence:
@@ -225,7 +237,7 @@ def _summarize_reference_status(status: ReferenceStatus) -> str:
 
 def _classify_reference_graph(
     graph: nx.Graph,
-) -> tuple[Verdict, str, Certificate | None] | None:
+) -> ClassifierResult | None:
     """Classify a graph directly from a registered reference fact, if present."""
     match = _reference_match(graph)
     if match is None:
@@ -259,8 +271,12 @@ def _classify_reference_graph(
 
 def _classify_reference_dependency(
     graph: nx.Graph,
-) -> tuple[Verdict, str, Certificate | None] | None:
-    """Return a retraction certificate when a known reference graph is involved."""
+) -> ClassifierResult | None:
+    """Classify by a reference-dependent retraction, or return ``None``.
+
+    ``None`` means this inference rule did not establish a verdict; it does
+    not make the overall graph indeterminate.
+    """
     for ref_graph, status, label in _REFERENCE_GRAPHS.values():
         retraction = retracts(graph, ref_graph)
         if isinstance(retraction, tuple):
@@ -298,10 +314,11 @@ def _classify_local_bridge(
     *,
     tries: int = _MAX_ITERATIONS,
     bound: int = 30,
-) -> tuple[Verdict, str, Certificate | None] | None:
-    """Classify clique behavior by contracting local bridges.
+) -> ClassifierResult | None:
+    """Classify by Theorem 6.1, or return ``None`` when it proves nothing.
 
-    The decision uses Theorem 6.1.
+    A successful certificate records the contracted edge.  Failure to classify
+    a contracted target falls through to the next inference rule.
     """
     for u, v in local_bridges(graph):
         h = contract_local_bridge(graph, u, v)
@@ -317,6 +334,7 @@ def _classify_local_bridge(
                     target_label=h_behavior.certificate.target_label
                     if h_behavior.certificate is not None
                     else None,
+                    edge=(u, v),
                 ),
             )
         if h_behavior.verdict is Verdict.DIVERGENT:
@@ -330,6 +348,7 @@ def _classify_local_bridge(
                     target_label=h_behavior.certificate.target_label
                     if h_behavior.certificate is not None
                     else None,
+                    edge=(u, v),
                 ),
             )
         if (
@@ -348,6 +367,7 @@ def _classify_local_bridge(
                     target=h_behavior.certificate.target or h,
                     target_status="conjectured_divergent",
                     target_label=h_behavior.certificate.target_label,
+                    edge=(u, v),
                 ),
             )
     return None
@@ -358,7 +378,7 @@ def classify_local_bridge(
     *,
     tries: int = _MAX_ITERATIONS,
     bound: int = 30,
-) -> tuple[Verdict, str, Certificate | None] | None:
+) -> ClassifierResult | None:
     """Classify clique behavior by contracting local bridges according to Theorem 6.1.
 
     .. rubric:: Parameters
@@ -373,9 +393,9 @@ def classify_local_bridge(
     .. rubric:: Returns
 
     tuple[Verdict, str, Certificate | None] | None
-        A tuple of ``(verdict, reason, certificate)`` if a local bridge exists and
-        the clique behavior of the contracted graph can be classified; ``None``
-        otherwise.
+        A tuple of ``(verdict, reason, certificate)`` if a local bridge exists
+        and the contracted graph can be classified; ``None`` if this rule
+        establishes no verdict.
     """
     return _classify_local_bridge(graph, tries=tries, bound=bound)
 
@@ -385,10 +405,11 @@ def _classify_non_triangle_edge(
     *,
     tries: int = _MAX_ITERATIONS,
     bound: int = 30,
-) -> tuple[Verdict, str, Certificate | None] | None:
-    """Classify clique behavior by deleting edges in no triangle.
+) -> ClassifierResult | None:
+    """Classify by Theorem 6.2, or return ``None`` when it proves nothing.
 
-    The decision uses Theorem 6.2.
+    A successful certificate records the deleted edge.  Failure to classify a
+    deleted-edge target falls through to the next inference rule.
     """
     for u, v in edges_in_no_triangle(graph):
         h = remove_edge_not_in_triangle(graph, u, v)
@@ -407,6 +428,7 @@ def _classify_non_triangle_edge(
                     target_label=h_behavior.certificate.target_label
                     if h_behavior.certificate is not None
                     else None,
+                    edge=(u, v),
                 ),
             )
         if (
@@ -425,6 +447,7 @@ def _classify_non_triangle_edge(
                     target=h_behavior.certificate.target or h,
                     target_status="conjectured_divergent",
                     target_label=h_behavior.certificate.target_label,
+                    edge=(u, v),
                 ),
             )
     return None
@@ -435,7 +458,7 @@ def classify_non_triangle_edge(
     *,
     tries: int = _MAX_ITERATIONS,
     bound: int = 30,
-) -> tuple[Verdict, str, Certificate | None] | None:
+) -> ClassifierResult | None:
     """Classify clique behavior by deleting edges in no triangle.
 
     The decision uses Theorem 6.2.
@@ -454,25 +477,25 @@ def classify_non_triangle_edge(
     tuple[Verdict, str, Certificate | None] | None
         A tuple of ``(verdict, reason, certificate)`` if deleting an edge in no
         triangle yields a divergent (or conjectured divergent) graph; ``None``
-        otherwise.
+        if this rule establishes no verdict.
     """
     return _classify_non_triangle_edge(graph, tries=tries, bound=bound)
 
 
-def _test_eventually_helly(seq: CliqueSequence, tries: int) -> ClassifierResult:
-    """Convergent if some iterate is clique-Helly."""
+def _test_eventually_helly(seq: CliqueSequence, tries: int) -> ClassifierResult | None:
+    """Return convergence if some iterate is clique-Helly, else ``None``."""
     for i in range(tries):
         g = seq[i]
         if g is None:
             return None
         if is_clique_helly(g):
             _logger.debug(f"Helly of index {i}")
-            return (Verdict.CONVERGENT, f"is eventually Helly (index {i})")
+            return (Verdict.CONVERGENT, f"is eventually Helly (index {i})", None)
     return None
 
 
-def _test_clockwork(seq: CliqueSequence, tries: int) -> ClassifierResult:
-    """Check clockwork recognition on seq[0] and seq[1]."""
+def _test_clockwork(seq: CliqueSequence, tries: int) -> ClassifierResult | None:
+    """Return a clockwork verdict, or ``None`` if this rule proves nothing."""
     for i in range(min(2, tries)):
         g = seq[i]
         if g is None:
@@ -480,16 +503,16 @@ def _test_clockwork(seq: CliqueSequence, tries: int) -> ClassifierResult:
         if recognize_clockwork(g)[0]:
             divergent, _ = is_clique_divergent_clockwork(g)
             if divergent is True:
-                return (Verdict.DIVERGENT, "is clockwork divergent")
+                return (Verdict.DIVERGENT, "is clockwork divergent", None)
             if divergent is False:
-                return (Verdict.CONVERGENT, "is clockwork convergent")
+                return (Verdict.CONVERGENT, "is clockwork convergent", None)
     return None
 
 
 def _test_eventually_special_octahedra(
     seq: CliqueSequence, tries: int
-) -> ClassifierResult:
-    """Divergent if some iterate contains a special octahedron."""
+) -> ClassifierResult | None:
+    """Return divergence if found, or ``None`` if this rule proves nothing."""
     for i in range(tries):
         g = seq[i]
         if g is None:
@@ -500,6 +523,7 @@ def _test_eventually_special_octahedra(
             return (
                 Verdict.DIVERGENT,
                 f"eventually has a special octahedron (index {i}, dimension {dim})",
+                None,
             )
     return None
 
@@ -507,10 +531,10 @@ def _test_eventually_special_octahedra(
 def _make_retraction_test(target: nx.Graph, label: str) -> Classifier:
     """Return a classifier that checks whether ``seq[0]`` retracts to *target*."""
 
-    def _test(seq: CliqueSequence) -> ClassifierResult:
+    def _test(seq: CliqueSequence) -> ClassifierResult | None:
         g = seq[0]
         if g is not None and retracts(g, target):
-            return (Verdict.DIVERGENT, label)
+            return (Verdict.DIVERGENT, label, None)
         return None
 
     return _test
@@ -550,6 +574,10 @@ def classify_clique_behavior(
 
     A conjecturally divergent reference graph yields a conditional
     ``INDETERMINATE`` result rather than a proof of divergence.
+
+    Each inference rule returns ``None`` when it establishes no verdict, so
+    the pipeline continues.  The final ``INDETERMINATE`` result means that
+    the available rules were exhausted without a definitive conclusion.
 
     .. rubric:: Parameters
 
@@ -595,8 +623,10 @@ def classify_clique_behavior(
     for classifier in _default_classifiers(tries):
         result = classifier(seq)
         if result is not None:
-            verdict, reason = result
-            return CliqueBehavior(verdict, reason, seq.graph_count, False, pared_graph)
+            verdict, reason, certificate = result
+            return CliqueBehavior(
+                verdict, reason, seq.graph_count, False, pared_graph, certificate
+            )
 
     reference_dependency = _classify_reference_dependency(pared_graph)
     if reference_dependency is not None:
@@ -639,10 +669,10 @@ def classify_clique_behavior(
 def _make_clique_retraction_test(target: nx.Graph, label: str) -> Classifier:
     """Return a classifier that checks whether ``seq[1]`` retracts to *target*."""
 
-    def _test(seq: CliqueSequence) -> ClassifierResult:
+    def _test(seq: CliqueSequence) -> ClassifierResult | None:
         g = seq[1]
         if g is not None and retracts(g, target):
-            return (Verdict.DIVERGENT, label)
+            return (Verdict.DIVERGENT, label, None)
         return None
 
     return _test
@@ -757,11 +787,17 @@ def _is_known_indeterminate(
     return any(nx.is_isomorphic(graph, c) for c in candidates)
 
 
-def is_eventually_helly(graph: nx.Graph, tries: int = 8, bound: int = 30) -> bool:
-    """Return whether ``graph`` is eventually clique-Helly.
+def test_eventually_helly(
+    graph: nx.Graph, tries: int = 8, bound: int = 30
+) -> ClassifierResult:
+    """Test whether a finite range of iterates contains a clique-Helly graph.
+
+    Finding a clique-Helly iterate establishes eventual clique-Helly behavior.
+    Failure to find one in the finite tested range is inconclusive and returns
+    ``Verdict.INDETERMINATE``.
 
     Starting from ``graph``, repeatedly compute the completely-pared clique
-    graph. Return ``True`` as soon as one iterate is clique-Helly.
+    graph. Return a convergent result as soon as one iterate is clique-Helly.
 
     .. rubric:: Parameters
 
@@ -774,23 +810,37 @@ def is_eventually_helly(graph: nx.Graph, tries: int = 8, bound: int = 30) -> boo
 
     .. rubric:: Returns
 
-    bool
-        ``True`` if an iterated clique graph within ``tries`` steps is
-        clique-Helly, ``False`` otherwise.
+    ClassifierResult
+        A convergent result if an iterated clique graph within ``tries`` steps
+        is clique-Helly. Otherwise, an indeterminate result; the reason
+        identifies bound exhaustion when applicable.
 
     .. rubric:: Examples
 
     >>> import networkx as nx
     >>> from pycliques.helly import is_clique_helly
-    >>> from pycliques.small import is_eventually_helly
+    >>> from pycliques.small import Verdict, test_eventually_helly
     >>> is_clique_helly(nx.triangular_lattice_graph(3,3))
     False
-    >>> is_eventually_helly(nx.triangular_lattice_graph(3,3))
+    >>> test_eventually_helly(nx.triangular_lattice_graph(3,3))[0] is Verdict.CONVERGENT
     True
 
     """
     seq = CliqueSequence(graph, bound=bound)
-    return _test_eventually_helly(seq, tries + 1) is not None
+    result = _test_eventually_helly(seq, tries + 1)
+    if result is not None:
+        return result
+    if seq.exhausted:
+        return (
+            Verdict.INDETERMINATE,
+            "clique count exceeded bound before finding a clique-Helly iterate",
+            None,
+        )
+    return (
+        Verdict.INDETERMINATE,
+        "no clique-Helly iterate found in the finite tested range",
+        None,
+    )
 
 
 def eventually_retracts_specially(

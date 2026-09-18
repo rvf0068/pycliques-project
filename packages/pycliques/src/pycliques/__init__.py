@@ -103,8 +103,8 @@ from .small import (
     classify_non_triangle_edge,
     clear_reference_graphs,
     eventually_retracts_specially,
-    is_eventually_helly,
     register_reference_graph,
+    test_eventually_helly,
 )
 from .surfaces import (
     is_closed_surface,
@@ -214,7 +214,7 @@ __all__ = [
     "classify_non_triangle_edge",
     "clear_reference_graphs",
     "eventually_retracts_specially",
-    "is_eventually_helly",
+    "test_eventually_helly",
     "register_reference_graph",
     # surfaces
     "is_closed_surface",
