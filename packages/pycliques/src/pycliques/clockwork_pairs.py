@@ -14,7 +14,13 @@ rank divergence of :math:`B`.
 Theorem 3.1 of the same paper states that the clockwork graph
 :math:`R_{2m}^n` (see :func:`r_clock`), together with its canonical
 automorphism :math:`\sigma` (see :func:`canonical_clockwork_coaffination`), is
-:math:`(m+1)`-coaffine and rank divergent.
+:math:`(m+1)`-coaffine and rank divergent.  The paper defines :math:`R_{2m}^n`
+-- and therefore asserts Theorem 3.1 -- only for :math:`m\geq 2`; a classifier
+search based on this theorem must never use ``m == 1`` (radius 2), since
+Theorem 3.1 gives no rank-divergence guarantee in that case.  (This module's
+low-level constructors accept ``m == 1`` anyway, since the construction
+itself and its ``(m+1)``-coaffinity are well defined there too; it is only
+the rank-divergence conclusion of Theorem 3.1 that requires ``m >= 2``.)
 
 Combining the two results:
 
@@ -56,6 +62,12 @@ __all__ = [
 
 def r_clock(m: int, n: int) -> nx.Graph:
     r"""Return the clockwork graph :math:`R_{2m}^n` of Theorem 3.1.
+
+    The paper defines :math:`R_{2m}^n` only for ``m >= 2``; Theorem 3.1's
+    rank-divergence conclusion is only asserted in that range.  ``m == 1``
+    is accepted here as a general construction convenience (it is still an
+    ``(m + 1)``-coaffine automorphic graph), but must not be treated as a
+    rank-divergent Theorem 3.1 source.
 
     .. rubric:: Parameters
 

@@ -642,36 +642,36 @@ def _clockwork_source_order(m: int, n: int) -> int:
     return 4 * m + 2 * m * (n + 1)
 
 
-def _classify_clockwork_pair_map(
-    graph: nx.Graph,
+def _find_clockwork_pair_certificate(
+    target_graph: nx.Graph,
     *,
-    max_m: int = 3,
-    max_n: int = 3,
-    max_coaffinations: int = 20,
-    max_source_order: int = 40,
-) -> ClassifierResult | None:
-    """Classify by Theorem 2.6 applied to Theorem 3.1, or return ``None``.
+    max_m: int,
+    max_n: int,
+    max_coaffinations: int,
+    max_source_order: int,
+) -> tuple[int, int, int, CoaffinePair, dict, dict] | None:
+    """Search for a Theorem 2.6 clockwork pair map into *target_graph*.
 
-    Searches for an admissible graph morphism of coaffine pairs
-    ``f: (R_{2m}^n, sigma) -> (graph, tau)`` for some ``m`` in
-    ``1 .. max_m``, ``n`` in ``0 .. max_n``, and involutive
-    ``(m + 1)``-coaffination ``tau`` of ``graph``.  By Theorem 3.1,
-    ``R_{2m}^n`` is ``(m + 1)``-coaffine and rank divergent; by Theorem 2.6,
-    an admissible morphism to ``(graph, tau)`` transfers rank divergence to
-    ``graph``, and rank divergence implies clique divergence.
+    Tries every ``m`` in ``2 .. max_m``; for each, collects up to
+    ``max_coaffinations`` involutive ``(m + 1)``-coaffinations of
+    ``target_graph``, then tries every ``n`` in ``0 .. max_n`` (subject to
+    ``max_source_order``) against each candidate coaffination.
 
-    A failed search establishes nothing: it is not evidence that ``graph``
-    is convergent, nor that it lacks a suitable coaffination.
+    ``m == 1`` (radius 2) is never tried: Theorem 3.1 only certifies that
+    ``R_{2m}^n`` is rank divergent for ``m >= 2``, so a 1- or 2-coaffination
+    target would not be backed by that theorem's hypothesis.
 
-    ``max_coaffinations`` bounds, for each ``m``, the number of candidate
-    target coaffinations examined (shared across every ``n`` tried for that
-    ``m``).  ``max_source_order`` stops increasing ``n`` once ``R_{2m}^n``
-    would exceed that many vertices.
+    .. rubric:: Returns
+
+    tuple[int, int, int, CoaffinePair, dict, dict] | None
+        ``(m, n, radius, source_pair, tau, f)`` for the first admissible
+        map found, or ``None`` if none exists within the configured
+        bounds.
     """
-    for m in range(1, max_m + 1):
+    for m in range(2, max_m + 1):
         radius = m + 1
         candidate_taus = []
-        for tau in candidate_target_coaffinations(graph, radius):
+        for tau in candidate_target_coaffinations(target_graph, radius):
             candidate_taus.append(tau)
             if len(candidate_taus) >= max_coaffinations:
                 break
@@ -682,30 +682,120 @@ def _classify_clockwork_pair_map(
                 break
             source_pair = clockwork_coaffine_pair(m, n)
             for tau in candidate_taus:
-                target_pair = CoaffinePair(graph, tau)
+                target_pair = CoaffinePair(target_graph, tau)
                 f = find_pair_morphism(source_pair, target_pair)
                 if f is not None:
-                    return (
-                        Verdict.DIVERGENT,
-                        (
-                            f"admits a map of coaffine pairs from R_{{{2 * m}}}^"
-                            f"{{{n}}} (Theorem 3.1) yielding rank divergence "
-                            "transferred by Theorem 2.6"
-                        ),
-                        Certificate(
-                            rule="theorem_2_6_clockwork_pair_map",
-                            target=graph,
-                            target_status="proven_divergent",
-                            map=f,
-                            m=m,
-                            n=n,
-                            radius=radius,
-                            source=source_pair.graph,
-                            source_coaffination=source_pair.coaffination,
-                            target_coaffination=tau,
-                        ),
-                    )
+                    return (m, n, radius, source_pair, tau, f)
     return None
+
+
+def _classify_clockwork_pair_map(
+    graph: nx.Graph,
+    *,
+    max_m: int = 3,
+    max_n: int = 3,
+    max_coaffinations: int = 20,
+    max_source_order: int = 40,
+    bound: int = 30,
+) -> ClassifierResult | None:
+    """Classify by Theorem 2.6 applied to Theorem 3.1, or return ``None``.
+
+    Searches for an admissible graph morphism of coaffine pairs
+    ``f: (R_{2m}^n, sigma) -> (graph, tau)`` for some ``m`` in
+    ``2 .. max_m``, ``n`` in ``0 .. max_n``, and involutive
+    ``(m + 1)``-coaffination ``tau`` of ``graph``.  By Theorem 3.1,
+    ``R_{2m}^n`` is ``(m + 1)``-coaffine and rank divergent for ``m >= 2``;
+    by Theorem 2.6, an admissible morphism to ``(graph, tau)`` transfers
+    rank divergence to ``graph``, and rank divergence implies clique
+    divergence.  ``m == 1`` (radius 2) is never searched: Theorem 3.1 does
+    not certify rank divergence of ``R_2^n``, so a 1- or 2-coaffination
+    target would not be a sound certificate.
+
+    If this direct search fails, ``K(graph)`` is computed (respecting
+    ``bound``, exactly as :class:`CliqueSequence` would) and the same
+    bounded search is retried with ``K(graph)`` as the target.  A
+    successful map into ``K(graph)`` still certifies divergence of
+    ``graph``: rank divergence of an iterated clique graph implies rank
+    divergence -- and hence clique divergence -- of the original graph.
+    This is essential for examples such as the icosahedron, whose own
+    clockwork pair map search fails but whose clique graph admits one.
+
+    A failed search establishes nothing: it is not evidence that ``graph``
+    is convergent, nor that it lacks a suitable coaffination.  If
+    ``K(graph)`` cannot be computed within ``bound``, this rule returns
+    ``None`` rather than treating that as a negative result.
+
+    ``max_coaffinations`` bounds, for each ``m``, the number of candidate
+    target coaffinations examined (shared across every ``n`` tried for that
+    ``m``).  ``max_source_order`` stops increasing ``n`` once ``R_{2m}^n``
+    would exceed that many vertices.  These bounds apply identically to the
+    direct search and to the ``K(graph)`` search.
+    """
+    direct = _find_clockwork_pair_certificate(
+        graph,
+        max_m=max_m,
+        max_n=max_n,
+        max_coaffinations=max_coaffinations,
+        max_source_order=max_source_order,
+    )
+    if direct is not None:
+        m, n, radius, source_pair, tau, f = direct
+        return (
+            Verdict.DIVERGENT,
+            (
+                f"admits a map of coaffine pairs from R_{{{2 * m}}}^"
+                f"{{{n}}} (Theorem 3.1) yielding rank divergence "
+                "transferred by Theorem 2.6"
+            ),
+            Certificate(
+                rule="theorem_2_6_clockwork_pair_map",
+                target=graph,
+                target_status="proven_divergent",
+                map=f,
+                m=m,
+                n=n,
+                radius=radius,
+                source=source_pair.graph,
+                source_coaffination=source_pair.coaffination,
+                target_coaffination=tau,
+            ),
+        )
+
+    kg = clique_graph(graph, bound)
+    if kg is None:
+        return None
+
+    via_clique_graph = _find_clockwork_pair_certificate(
+        kg,
+        max_m=max_m,
+        max_n=max_n,
+        max_coaffinations=max_coaffinations,
+        max_source_order=max_source_order,
+    )
+    if via_clique_graph is None:
+        return None
+    m, n, radius, source_pair, tau, f = via_clique_graph
+    return (
+        Verdict.DIVERGENT,
+        (
+            f"admits a map of coaffine pairs from R_{{{2 * m}}}^{{{n}}} "
+            "(Theorem 3.1) into K(graph), yielding rank divergence of "
+            "K(graph) by Theorem 2.6, hence rank divergence -- and clique "
+            "divergence -- of the original graph"
+        ),
+        Certificate(
+            rule="theorem_2_6_clockwork_pair_map_clique_graph",
+            target=kg,
+            target_status="proven_divergent",
+            map=f,
+            m=m,
+            n=n,
+            radius=radius,
+            source=source_pair.graph,
+            source_coaffination=source_pair.coaffination,
+            target_coaffination=tau,
+        ),
+    )
 
 
 def classify_clockwork_pair_map(
@@ -715,6 +805,7 @@ def classify_clockwork_pair_map(
     max_n: int = 3,
     max_coaffinations: int = 20,
     max_source_order: int = 40,
+    bound: int = 30,
 ) -> ClassifierResult | None:
     """Classify clique behavior by a map of coaffine pairs (Theorems 2.6, 3.1).
 
@@ -725,16 +816,29 @@ def classify_clockwork_pair_map(
     (:func:`pycliques.clockwork_pairs.clockwork_coaffine_pair`).
 
     :math:`R_{2m}^n` is :math:`(m+1)`-coaffine and rank divergent by Theorem
-    3.1.  An admissible morphism of coaffine pairs transfers rank divergence
-    from the domain to the codomain by Theorem 2.6, and rank divergence
-    implies clique divergence.
+    3.1 for :math:`m \geq 2`.  An admissible morphism of coaffine pairs
+    transfers rank divergence from the domain to the codomain by Theorem
+    2.6, and rank divergence implies clique divergence.  ``m == 1`` (radius
+    2) is never searched, since Theorem 3.1 does not certify rank
+    divergence of :math:`R_2^n`.
+
+    When the direct search fails, the same bounded search is retried with
+    ``K(graph)`` as the target (computed subject to ``bound``): a map into
+    ``K(graph)`` still certifies that ``graph`` is rank -- and hence clique
+    -- divergent, since rank divergence of an iterated clique graph implies
+    rank divergence of the original graph.  This second attempt is what
+    lets this rule classify e.g. ``networkx.icosahedral_graph()``, whose
+    own clockwork pair map search fails while its clique graph's succeeds.
 
     .. rubric:: Parameters
 
     graph : networkx.Graph
         Input graph.
     max_m : int, optional
-        Maximum clockwork parameter ``m`` to try (default: 3).
+        Maximum clockwork parameter ``m`` to try (default: 3).  Values of
+        ``m`` below 2 (radius below 3) are never tried, regardless of this
+        bound, since Theorem 3.1 only certifies rank divergence of
+        ``R_{2m}^n`` for ``m >= 2``.
     max_n : int, optional
         Maximum clockwork parameter ``n`` to try (default: 3).
     max_coaffinations : int, optional
@@ -742,14 +846,19 @@ def classify_clockwork_pair_map(
         (default: 20).
     max_source_order : int, optional
         Maximum order of ``R_{2m}^n`` to construct (default: 40).
+    bound : int, optional
+        Maximum number of cliques allowed when computing ``K(graph)``
+        (default: 30).  If exceeded, this rule returns ``None`` instead of
+        attempting the ``K(graph)`` search.
 
     .. rubric:: Returns
 
     tuple[Verdict, str, Certificate | None] | None
         A tuple of ``(Verdict.DIVERGENT, reason, certificate)`` if an
-        admissible map of coaffine pairs is found within the configured
-        bounds; ``None`` if this rule establishes no verdict.  This rule
-        never returns ``Verdict.CONVERGENT``.
+        admissible map of coaffine pairs is found -- into ``graph`` itself
+        or into ``K(graph)`` -- within the configured bounds; ``None`` if
+        this rule establishes no verdict.  This rule never returns
+        ``Verdict.CONVERGENT``.
     """
     return _classify_clockwork_pair_map(
         graph,
@@ -757,6 +866,7 @@ def classify_clockwork_pair_map(
         max_n=max_n,
         max_coaffinations=max_coaffinations,
         max_source_order=max_source_order,
+        bound=bound,
     )
 
 
@@ -942,7 +1052,7 @@ def classify_clique_behavior(
             verdict, reason, seq.graph_count, False, pared_graph, certificate
         )
 
-    clockwork_pair_map_result = _classify_clockwork_pair_map(pared_graph)
+    clockwork_pair_map_result = _classify_clockwork_pair_map(pared_graph, bound=bound)
     if clockwork_pair_map_result is not None:
         verdict, reason, certificate = clockwork_pair_map_result
         return CliqueBehavior(

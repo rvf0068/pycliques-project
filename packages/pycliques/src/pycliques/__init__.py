@@ -18,13 +18,6 @@ from .clockwork import (
     remove_dominated_vertices,
     segmented_sum,
 )
-from .clockwork_pairs import (
-    candidate_target_coaffinations,
-    canonical_clockwork_coaffination,
-    clockwork_coaffine_pair,
-    find_pair_morphism,
-    r_clock,
-)
 from .coaffinations import (
     CoaffinePair,
     automorphisms,
@@ -112,7 +105,6 @@ from .small import (
     ReferenceStatus,
     Verdict,
     classify_clique_behavior,
-    classify_clockwork_pair_map,
     classify_inverse_cutpoint_extension,
     classify_local_bridge,
     classify_non_triangle_edge,
@@ -151,12 +143,6 @@ __all__ = [
     "recognize_clockwork",
     "remove_dominated_vertices",
     "segmented_sum",
-    # clockwork_pairs
-    "candidate_target_coaffinations",
-    "canonical_clockwork_coaffination",
-    "clockwork_coaffine_pair",
-    "find_pair_morphism",
-    "r_clock",
     # coaffinations
     "CoaffinePair",
     "automorphisms",
@@ -237,7 +223,6 @@ __all__ = [
     "ReferenceStatus",
     "Verdict",
     "classify_clique_behavior",
-    "classify_clockwork_pair_map",
     "classify_inverse_cutpoint_extension",
     "classify_local_bridge",
     "classify_non_triangle_edge",
