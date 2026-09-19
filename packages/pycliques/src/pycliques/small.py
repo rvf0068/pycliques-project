@@ -18,6 +18,12 @@ from rich.logging import RichHandler
 from pycliques import __version__
 from pycliques.cliques import clique_graph
 from pycliques.clockwork import is_clique_divergent_clockwork, recognize_clockwork
+from pycliques.clockwork_pairs import (
+    candidate_target_coaffinations,
+    clockwork_coaffine_pair,
+    find_pair_morphism,
+)
+from pycliques.coaffinations import CoaffinePair
 from pycliques.cutpoints import (
     contract_local_bridge,
     edge_in_triangle,
@@ -69,6 +75,12 @@ class Certificate:
     target_label: str | None = None
     map: tuple[dict, dict] | dict | None = None
     edge: tuple[Hashable, Hashable] | None = None
+    m: int | None = None
+    n: int | None = None
+    radius: int | None = None
+    source: nx.Graph | None = None
+    source_coaffination: dict[Hashable, Hashable] | None = None
+    target_coaffination: dict[Hashable, Hashable] | None = None
 
 
 @dataclass(frozen=True)
@@ -625,6 +637,129 @@ def classify_inverse_cutpoint_extension(
     )
 
 
+def _clockwork_source_order(m: int, n: int) -> int:
+    """Return the order of R_{2m}^n without constructing the graph."""
+    return 4 * m + 2 * m * (n + 1)
+
+
+def _classify_clockwork_pair_map(
+    graph: nx.Graph,
+    *,
+    max_m: int = 3,
+    max_n: int = 3,
+    max_coaffinations: int = 20,
+    max_source_order: int = 40,
+) -> ClassifierResult | None:
+    """Classify by Theorem 2.6 applied to Theorem 3.1, or return ``None``.
+
+    Searches for an admissible graph morphism of coaffine pairs
+    ``f: (R_{2m}^n, sigma) -> (graph, tau)`` for some ``m`` in
+    ``1 .. max_m``, ``n`` in ``0 .. max_n``, and involutive
+    ``(m + 1)``-coaffination ``tau`` of ``graph``.  By Theorem 3.1,
+    ``R_{2m}^n`` is ``(m + 1)``-coaffine and rank divergent; by Theorem 2.6,
+    an admissible morphism to ``(graph, tau)`` transfers rank divergence to
+    ``graph``, and rank divergence implies clique divergence.
+
+    A failed search establishes nothing: it is not evidence that ``graph``
+    is convergent, nor that it lacks a suitable coaffination.
+
+    ``max_coaffinations`` bounds, for each ``m``, the number of candidate
+    target coaffinations examined (shared across every ``n`` tried for that
+    ``m``).  ``max_source_order`` stops increasing ``n`` once ``R_{2m}^n``
+    would exceed that many vertices.
+    """
+    for m in range(1, max_m + 1):
+        radius = m + 1
+        candidate_taus = []
+        for tau in candidate_target_coaffinations(graph, radius):
+            candidate_taus.append(tau)
+            if len(candidate_taus) >= max_coaffinations:
+                break
+        if not candidate_taus:
+            continue
+        for n in range(0, max_n + 1):
+            if _clockwork_source_order(m, n) > max_source_order:
+                break
+            source_pair = clockwork_coaffine_pair(m, n)
+            for tau in candidate_taus:
+                target_pair = CoaffinePair(graph, tau)
+                f = find_pair_morphism(source_pair, target_pair)
+                if f is not None:
+                    return (
+                        Verdict.DIVERGENT,
+                        (
+                            f"admits a map of coaffine pairs from R_{{{2 * m}}}^"
+                            f"{{{n}}} (Theorem 3.1) yielding rank divergence "
+                            "transferred by Theorem 2.6"
+                        ),
+                        Certificate(
+                            rule="theorem_2_6_clockwork_pair_map",
+                            target=graph,
+                            target_status="proven_divergent",
+                            map=f,
+                            m=m,
+                            n=n,
+                            radius=radius,
+                            source=source_pair.graph,
+                            source_coaffination=source_pair.coaffination,
+                            target_coaffination=tau,
+                        ),
+                    )
+    return None
+
+
+def classify_clockwork_pair_map(
+    graph: nx.Graph,
+    *,
+    max_m: int = 3,
+    max_n: int = 3,
+    max_coaffinations: int = 20,
+    max_source_order: int = 40,
+) -> ClassifierResult | None:
+    """Classify clique behavior by a map of coaffine pairs (Theorems 2.6, 3.1).
+
+    Searches for an integer ``m``, an integer ``n``, an involutive
+    ``(m + 1)``-coaffination ``tau`` of ``graph``, and an admissible graph
+    morphism ``f: (R_{2m}^n, sigma) -> (graph, tau)`` where ``sigma`` is the
+    canonical coaffination of the clockwork graph :math:`R_{2m}^n`
+    (:func:`pycliques.clockwork_pairs.clockwork_coaffine_pair`).
+
+    :math:`R_{2m}^n` is :math:`(m+1)`-coaffine and rank divergent by Theorem
+    3.1.  An admissible morphism of coaffine pairs transfers rank divergence
+    from the domain to the codomain by Theorem 2.6, and rank divergence
+    implies clique divergence.
+
+    .. rubric:: Parameters
+
+    graph : networkx.Graph
+        Input graph.
+    max_m : int, optional
+        Maximum clockwork parameter ``m`` to try (default: 3).
+    max_n : int, optional
+        Maximum clockwork parameter ``n`` to try (default: 3).
+    max_coaffinations : int, optional
+        Maximum number of candidate target coaffinations examined per ``m``
+        (default: 20).
+    max_source_order : int, optional
+        Maximum order of ``R_{2m}^n`` to construct (default: 40).
+
+    .. rubric:: Returns
+
+    tuple[Verdict, str, Certificate | None] | None
+        A tuple of ``(Verdict.DIVERGENT, reason, certificate)`` if an
+        admissible map of coaffine pairs is found within the configured
+        bounds; ``None`` if this rule establishes no verdict.  This rule
+        never returns ``Verdict.CONVERGENT``.
+    """
+    return _classify_clockwork_pair_map(
+        graph,
+        max_m=max_m,
+        max_n=max_n,
+        max_coaffinations=max_coaffinations,
+        max_source_order=max_source_order,
+    )
+
+
 def _test_eventually_helly(seq: CliqueSequence, tries: int) -> ClassifierResult | None:
     """Return convergence if some iterate is clique-Helly, else ``None``."""
     for i in range(tries):
@@ -710,14 +845,14 @@ def classify_clique_behavior(
     eventually clique-Helly iterate, and divergence through clockwork,
     special-octahedron, and known-divergence criteria.
 
-    Two distinct inference rules are recognized when a graph can be
-    connected to a known reference graph through a mathematically justified
-    relation:
-
-        * ordinary retraction: ``retracts(G, H)`` and ``H`` is clique divergent.
-
-    A conjecturally divergent reference graph yields a conditional
-    ``INDETERMINATE`` result rather than a proof of divergence.
+    The classifier applies a sequence of mathematically justified
+    inference rules. These include retraction to registered reference
+    graphs, Theorem 6.1 local-bridge contractions, Theorem 6.2
+    deletion of edges contained in no triangle, and theorem-motivated
+    inverse cutpoint extensions. Each rule returns None when it
+    establishes no verdict, allowing the pipeline to continue. A
+    conjecturally divergent reference produces a conditional
+    INDETERMINATE result rather than a proof of divergence.
 
     Each inference rule returns ``None`` when it establishes no verdict, so
     the pipeline continues.  The final ``INDETERMINATE`` result means that
@@ -748,6 +883,7 @@ def classify_clique_behavior(
     >>> result = classify_clique_behavior(nx.cycle_graph(4))
     >>> result.verdict is Verdict.CONVERGENT
     True
+
     """
     if tries < 1:
         raise ValueError("tries must be at least 1")
@@ -802,6 +938,13 @@ def classify_clique_behavior(
     )
     if inverse_extension_result is not None:
         verdict, reason, certificate = inverse_extension_result
+        return CliqueBehavior(
+            verdict, reason, seq.graph_count, False, pared_graph, certificate
+        )
+
+    clockwork_pair_map_result = _classify_clockwork_pair_map(pared_graph)
+    if clockwork_pair_map_result is not None:
+        verdict, reason, certificate = clockwork_pair_map_result
         return CliqueBehavior(
             verdict, reason, seq.graph_count, False, pared_graph, certificate
         )
