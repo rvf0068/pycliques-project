@@ -950,6 +950,13 @@ def classify_clique_behavior(
 ) -> CliqueBehavior:
     """Classify the observed clique behavior of an undirected graph.
 
+    This is the *fast pass*: it deliberately excludes the expensive
+    Theorem 2.6 / coaffination search
+    (:func:`classify_clockwork_pair_map`).  A graph left ``INDETERMINATE``
+    by this fast pass may still be classifiable by that separate, more
+    expensive rule; see :func:`classify_clique_behavior_with_theorem_2_6`
+    to run both stages together.
+
     The input is completely pared before its iterated clique graphs are
     inspected.  The standard test suite certifies convergence through an
     eventually clique-Helly iterate, and divergence through clockwork,
@@ -966,7 +973,9 @@ def classify_clique_behavior(
 
     Each inference rule returns ``None`` when it establishes no verdict, so
     the pipeline continues.  The final ``INDETERMINATE`` result means that
-    the available rules were exhausted without a definitive conclusion.
+    the available (fast) rules were exhausted without a definitive
+    conclusion -- it is not evidence about what the (unrun) Theorem 2.6
+    search would find.
 
     .. rubric:: Parameters
 
@@ -1052,13 +1061,6 @@ def classify_clique_behavior(
             verdict, reason, seq.graph_count, False, pared_graph, certificate
         )
 
-    clockwork_pair_map_result = _classify_clockwork_pair_map(pared_graph, bound=bound)
-    if clockwork_pair_map_result is not None:
-        verdict, reason, certificate = clockwork_pair_map_result
-        return CliqueBehavior(
-            verdict, reason, seq.graph_count, False, pared_graph, certificate
-        )
-
     bound_exceeded = seq.exhausted
     reason = (
         "clique count exceeded bound"
@@ -1071,6 +1073,73 @@ def classify_clique_behavior(
         seq.graph_count,
         bound_exceeded,
         pared_graph,
+    )
+
+
+def classify_clique_behavior_with_theorem_2_6(
+    graph: nx.Graph,
+    *,
+    tries: int = _MAX_ITERATIONS,
+    bound: int = 30,
+    extension_budget: int = 1,
+    max_m: int = 3,
+    max_n: int = 3,
+    max_coaffinations: int = 20,
+    max_source_order: int = 40,
+    theorem_2_6_bound: int | None = None,
+) -> CliqueBehavior:
+    """Run the fast pass, then the expensive Theorem 2.6 pass if still unresolved.
+
+    This is the two-stage workflow used by the ``small-behavior-theorem26``
+    CLI: :func:`classify_clique_behavior` (the fast pass) is run first, and
+    :func:`classify_clockwork_pair_map` (the Theorem 2.6 / coaffination
+    search) is only attempted when the fast pass leaves the graph
+    ``INDETERMINATE``.  Graphs already classified as ``CONVERGENT`` or
+    ``DIVERGENT`` never reach the expensive search.
+
+    .. rubric:: Parameters
+
+    graph : networkx.Graph
+        Input graph.
+    tries, bound, extension_budget
+        Forwarded to :func:`classify_clique_behavior`.
+    max_m, max_n, max_coaffinations, max_source_order
+        Forwarded to :func:`classify_clockwork_pair_map`.
+    theorem_2_6_bound : int, optional
+        Clique-graph bound used by the Theorem 2.6 search's ``K(graph)``
+        fallback.  Defaults to ``bound`` when not given.
+
+    .. rubric:: Returns
+
+    CliqueBehavior
+        The fast-pass result unchanged, unless the fast pass was
+        ``INDETERMINATE`` and Theorem 2.6 establishes ``DIVERGENT``.
+    """
+    fast = classify_clique_behavior(
+        graph, tries=tries, bound=bound, extension_budget=extension_budget
+    )
+    if fast.verdict is not Verdict.INDETERMINATE:
+        return fast
+
+    theorem_bound = bound if theorem_2_6_bound is None else theorem_2_6_bound
+    theorem_result = classify_clockwork_pair_map(
+        fast.pared_graph,
+        max_m=max_m,
+        max_n=max_n,
+        max_coaffinations=max_coaffinations,
+        max_source_order=max_source_order,
+        bound=theorem_bound,
+    )
+    if theorem_result is None:
+        return fast
+    verdict, reason, certificate = theorem_result
+    return CliqueBehavior(
+        verdict,
+        reason,
+        fast.iterations_checked,
+        fast.bound_exceeded,
+        fast.pared_graph,
+        certificate,
     )
 
 
@@ -1522,6 +1591,314 @@ def _main(args: list[str]):
 def main():  # pragma: no cover
     """Entry point for the ``clique-behavior`` console script."""
     _main(sys.argv[1:])
+
+
+# ---------------------------------------------------------------------------
+# Second-stage CLI: optional Theorem 2.6 pass over fast-pass INDETERMINATE
+# graphs. See classify_clique_behavior_with_theorem_2_6 for the classifier
+# orchestration; this section only handles CLI parsing, dataset iteration,
+# and reporting.
+# ---------------------------------------------------------------------------
+
+
+def _load_indeterminate_file_entries(
+    order: int, data_dir: Path
+) -> list[tuple[int, nx.Graph]]:
+    """Load ``(index, graph)`` pairs previously saved for *order* by the fast pass."""
+    path = _indeterminate_file_path(order, data_dir)
+    entries: list[tuple[int, nx.Graph]] = []
+    if not path.is_file():
+        return entries
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            parts = stripped.split(maxsplit=5)
+            entries.append(
+                (int(parts[0]), nx.from_graph6_bytes(parts[2].encode("ascii")))
+            )
+    return entries
+
+
+def _run_fast_pass_indeterminate(
+    order: int,
+    *,
+    data_dir: Path,
+    start: int | None,
+    end: int | None,
+    skip_dominated: bool,
+    bound: int,
+) -> tuple[int, int, list[tuple[int, nx.Graph, Certificate | None]]]:
+    """Run the fast pass over the dataset, returning only INDETERMINATE graphs.
+
+    .. rubric:: Returns
+
+    tuple[int, int, list[tuple[int, nx.Graph, Certificate | None]]]
+        ``(convergent_count, divergent_count, indeterminate)`` where
+        ``indeterminate`` holds ``(index, pared_graph, certificate)`` for
+        every graph the fast pass left ``INDETERMINATE``.
+    """
+    from pyg6data.lists import _dict_connected, _get_data_file_path
+
+    data_path = _get_data_file_path(_dict_connected[order])
+    convergent = 0
+    divergent = 0
+    indeterminate: list[tuple[int, nx.Graph, Certificate | None]] = []
+
+    with data_path.open("rb") as raw_file:
+        with gzip.open(raw_file, "rt", encoding="utf-8") as graph_file:
+            for index, line in enumerate(graph_file):
+                if start is not None and index < start:
+                    continue
+                if end is not None and index > end:
+                    break
+                graph = nx.from_graph6_bytes(bytes(line.strip(), "utf-8"))
+                if skip_dominated and find_dominated_vertex(graph) is not None:
+                    continue
+                result = classify_clique_behavior(graph, bound=bound)
+                if result.verdict is Verdict.CONVERGENT:
+                    convergent += 1
+                elif result.verdict is Verdict.DIVERGENT:
+                    divergent += 1
+                else:
+                    indeterminate.append(
+                        (index, result.pared_graph, result.certificate)
+                    )
+
+    return convergent, divergent, indeterminate
+
+
+def _parse_theorem26_args(args: list[str]) -> argparse.Namespace:
+    """Parse command-line arguments for the Theorem 2.6 second-stage script."""
+    parser = argparse.ArgumentParser(
+        description=(
+            "Theorem 2.6 (coaffination) pass over graphs the fast "
+            "small-behavior pass left INDETERMINATE"
+        )
+    )
+    parser.add_argument(
+        "--version", action="version", version=f"pycliques {__version__}"
+    )
+    parser.add_argument(
+        dest="n", help="Order of graphs to consider (e.g., 9)", type=int, metavar="INT"
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        dest="loglevel",
+        help="Set loglevel to DEBUG",
+        action="store_const",
+        const=logging.DEBUG,
+        default=logging.INFO,
+    )
+    parser.add_argument(
+        "--data-dir",
+        dest="data_dir",
+        help="Directory for indeterminate graph files (default: current directory)",
+        type=Path,
+        default=_DEFAULT_DATA_DIR,
+    )
+    parser.add_argument(
+        "--from-indeterminate-file",
+        dest="from_indeterminate_file",
+        help=(
+            "Read candidates from the indeterminate_order_<n> file saved by "
+            "a previous fast pass instead of rerunning it"
+        ),
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
+        "--start",
+        dest="start",
+        help="First graph index to process, inclusive (default: 0)",
+        type=int,
+        default=None,
+        metavar="INT",
+    )
+    parser.add_argument(
+        "--end",
+        dest="end",
+        help="Last graph index to process, inclusive (default: last graph)",
+        type=int,
+        default=None,
+        metavar="INT",
+    )
+    parser.add_argument(
+        "--skip-dominated",
+        dest="skip_dominated",
+        help="Skip graphs that have dominated vertices (default: True)",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    parser.add_argument(
+        "--fast-bound",
+        dest="fast_bound",
+        help="Clique bound used when rerunning the fast pass (default: 30)",
+        type=int,
+        default=30,
+        metavar="INT",
+    )
+    parser.add_argument(
+        "--max-m",
+        dest="max_m",
+        help="Maximum clockwork parameter m to try; radius = m + 1 (default: 3)",
+        type=int,
+        default=3,
+        metavar="INT",
+    )
+    parser.add_argument(
+        "--max-n",
+        dest="max_n",
+        help="Maximum clockwork parameter n to try (default: 3)",
+        type=int,
+        default=3,
+        metavar="INT",
+    )
+    parser.add_argument(
+        "--max-coaffinations",
+        dest="max_coaffinations",
+        help="Maximum candidate target coaffinations examined per m (default: 20)",
+        type=int,
+        default=20,
+        metavar="INT",
+    )
+    parser.add_argument(
+        "--max-source-order",
+        dest="max_source_order",
+        help="Maximum order of R_{2m}^n to construct (default: 40)",
+        type=int,
+        default=40,
+        metavar="INT",
+    )
+    parser.add_argument(
+        "--bound",
+        dest="bound",
+        help=(
+            "Clique bound for the K(graph) fallback used by the Theorem 2.6 "
+            "search (default: 30)"
+        ),
+        type=int,
+        default=30,
+        metavar="INT",
+    )
+    parser.add_argument(
+        "--output-file",
+        dest="output_file",
+        help=(
+            "Write one verdict line per graph to this file. "
+            "Format: index TAB verdict TAB reason"
+        ),
+        type=Path,
+        default=None,
+        metavar="FILE",
+    )
+    parser.add_argument(
+        "--no-save",
+        dest="save",
+        help="Do not save the remaining indeterminate graphs to file",
+        action="store_false",
+        default=True,
+    )
+    return parser.parse_args(args)
+
+
+def _main_theorem26(args: list[str]):
+    """Run the Theorem 2.6 pass over fast-pass INDETERMINATE graphs."""
+    parsed_args = _parse_theorem26_args(args)
+    _setup_logging(parsed_args.loglevel)
+
+    order = parsed_args.n
+    data_dir: Path = parsed_args.data_dir
+
+    if parsed_args.start is not None and parsed_args.start < 0:
+        _logger.error("--start must be a non-negative integer.")
+        sys.exit(1)
+    if parsed_args.end is not None and parsed_args.end < 0:
+        _logger.error("--end must be a non-negative integer.")
+        sys.exit(1)
+    if (
+        parsed_args.start is not None
+        and parsed_args.end is not None
+        and parsed_args.start > parsed_args.end
+    ):
+        _logger.error("--start must be less than or equal to --end.")
+        sys.exit(1)
+
+    candidates: list[tuple[int, nx.Graph, Certificate | None]]
+    if parsed_args.from_indeterminate_file:
+        entries = _load_indeterminate_file_entries(order, data_dir)
+        candidates = [(idx, graph, None) for idx, graph in entries]
+        fast_convergent = fast_divergent = None
+    else:
+        from pyg6data.lists import _dict_connected
+
+        if order not in _dict_connected:
+            _logger.error(f"Error: Internal data for order {order} not available.")
+            sys.exit(1)
+        _logger.info("Running fast pass to collect INDETERMINATE graphs...")
+        fast_convergent, fast_divergent, candidates = _run_fast_pass_indeterminate(
+            order,
+            data_dir=data_dir,
+            start=parsed_args.start,
+            end=parsed_args.end,
+            skip_dominated=parsed_args.skip_dominated,
+            bound=parsed_args.fast_bound,
+        )
+
+    _logger.info("Fast pass:")
+    _logger.info(f"    convergent:    {fast_convergent}")
+    _logger.info(f"    divergent:     {fast_divergent}")
+    _logger.info(f"    indeterminate: {len(candidates)}")
+
+    newly_divergent: list[tuple[int, nx.Graph, Certificate | None]] = []
+    still_indeterminate: list[tuple[int, nx.Graph, Certificate | None]] = []
+
+    import contextlib
+
+    output_ctx = (
+        open(parsed_args.output_file, "w", encoding="utf-8")  # noqa: WPS515
+        if parsed_args.output_file is not None
+        else contextlib.nullcontext()
+    )
+
+    with output_ctx as verdict_file:
+        if verdict_file is not None:
+            verdict_file.write("# index\tverdict\treason\n")
+
+        for idx, graph, _fast_certificate in candidates:
+            theorem_result = classify_clockwork_pair_map(
+                graph,
+                max_m=parsed_args.max_m,
+                max_n=parsed_args.max_n,
+                max_coaffinations=parsed_args.max_coaffinations,
+                max_source_order=parsed_args.max_source_order,
+                bound=parsed_args.bound,
+            )
+            if theorem_result is not None:
+                _verdict, reason, certificate = theorem_result
+                newly_divergent.append((idx, graph, certificate))
+                if verdict_file is not None:
+                    verdict_file.write(f"{idx}\tDIVERGENT\t{reason}\n")
+            else:
+                still_indeterminate.append((idx, graph, None))
+                if verdict_file is not None:
+                    verdict_file.write(
+                        f"{idx}\tINDETERMINATE\tunresolved by Theorem 2.6\n"
+                    )
+
+    _logger.info("Theorem 2.6:")
+    _logger.info(f"    newly divergent:         {len(newly_divergent)}")
+    _logger.info(f"    remaining indeterminate: {len(still_indeterminate)}")
+
+    if parsed_args.save and still_indeterminate:
+        _save_indeterminate(order, still_indeterminate, data_dir)
+
+
+def main_theorem26():  # pragma: no cover
+    """Entry point for the ``small-behavior-theorem26`` console script."""
+    _main_theorem26(sys.argv[1:])
 
 
 if __name__ == "__main__":  # pragma: no cover

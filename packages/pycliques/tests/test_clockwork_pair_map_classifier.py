@@ -9,6 +9,7 @@ from pycliques.small import (
     _classify_clockwork_pair_map,
     _find_clockwork_pair_certificate,
     classify_clique_behavior,
+    classify_clique_behavior_with_theorem_2_6,
     classify_clockwork_pair_map,
 )
 
@@ -130,7 +131,11 @@ def test_classify_clockwork_pair_map_returns_none_when_no_certificate():
 def test_classify_clique_behavior_uses_clockwork_pair_map_certificate():
     kg = clique_graph(nx.icosahedral_graph())
 
-    result = classify_clique_behavior(kg)
+    # The fast pass alone must not invoke Theorem 2.6.
+    fast_result = classify_clique_behavior(kg)
+    assert fast_result.verdict is Verdict.INDETERMINATE
+
+    result = classify_clique_behavior_with_theorem_2_6(kg)
 
     assert result.verdict is Verdict.DIVERGENT
     assert result.certificate is not None
@@ -193,7 +198,7 @@ def test_icosahedron_is_divergent_via_its_clique_graph():
         is None
     )
 
-    result = classify_clique_behavior(g)
+    result = classify_clique_behavior_with_theorem_2_6(g)
 
     assert result.verdict is Verdict.DIVERGENT
     assert result.certificate is not None
@@ -264,7 +269,7 @@ def test_clique_graph_extension_works_with_arbitrary_hashable_labels():
     g = nx.icosahedral_graph()
     g = nx.relabel_nodes(g, {i: f"v{i}" for i in g.nodes()})
 
-    result = classify_clique_behavior(g)
+    result = classify_clique_behavior_with_theorem_2_6(g)
 
     assert result.verdict is Verdict.DIVERGENT
     assert result.certificate is not None
