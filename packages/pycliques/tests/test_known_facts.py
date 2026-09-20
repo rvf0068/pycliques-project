@@ -44,7 +44,7 @@ def test_suspension_of_c5_iterates_have_expected_types():
 def test_suspension_of_c5_is_good_and_clique_divergent():
     """Goodness and clique divergence are independent properties."""
     classifier = _make_clique_retraction_test(
-        nx.complement(nx.cycle_graph(10)), "retracts to Comp(C_10)"
+        nx.complement(nx.cycle_graph(10)), "clique graph retracts to Comp(C_10)"
     )
     result = classifier(CliqueSequence(suspension_of_cycle(5)))
     assert result is not None

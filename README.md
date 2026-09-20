@@ -85,6 +85,16 @@ graph within the requested iteration and clique-count limits. Check
 `result.bound_exceeded` to distinguish a clique-count abort from an
 indeterminate result after all requested iterations.
 
+### Theorem 4.6 fast criterion
+
+The fast classifier also applies Theorem 4.6: if
+`S = H * complement(K_2)`, where `H` is connected and admits a 2-coaffination,
+then `S` is expansive and therefore clique divergent. The implementation looks
+for two nonadjacent universal vertices whose deletion leaves a connected base
+graph, then reuses the general `coaffinations(H, 2)` machinery. It does not
+search arbitrary induced subgraphs or require the coaffination to be an
+involution. A clique is understood here as a maximal complete subgraph.
+
 ### Two-level classification: fast pass vs. Theorem 2.6
 
 `classify_clique_behavior` (and the `small-behavior` CLI) is the **fast
@@ -108,8 +118,20 @@ graphs the fast pass left `INDETERMINATE`:
 
 ```bash
 uv run small-behavior 9                       # fast pass; saves INDETERMINATE graphs
+uv run small-behavior 9 --from-indeterminate-file --bound 60
+                                                # recheck saved graphs with a larger bound
+uv run small-behavior 9 --from-indeterminate-file \
+  --exclude-conjectured-divergent
+                        # leave conjectured-divergent rows untouched
 uv run small-behavior-theorem26 9 --max-m 3   # Theorem 2.6 pass on the unresolved graphs
 ```
+
+The fast CLI's `--from-indeterminate-file` mode reads the saved
+`indeterminate_order_<n>.txt` file, applies the default fast-pass tests again,
+and rewrites the file with only graphs that remain `INDETERMINATE`. Use
+`--no-save` to inspect the results without updating the file.
+With `--exclude-conjectured-divergent`, rows carrying a saved
+`conjectured_divergent` certificate are preserved without being re-tested.
 
 The `small-behavior-theorem26` CLI exposes `--max-m`, `--max-n`,
 `--max-coaffinations`, `--max-source-order`, and `--bound` so that

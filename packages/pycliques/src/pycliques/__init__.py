@@ -113,6 +113,7 @@ from .small import (
     clear_reference_graphs,
     eventually_retracts_specially,
     register_reference_graph,
+    suspension_bases,
     test_eventually_helly,
 )
 from .surfaces import (
@@ -234,6 +235,7 @@ __all__ = [
     "eventually_retracts_specially",
     "test_eventually_helly",
     "register_reference_graph",
+    "suspension_bases",
     # surfaces
     "is_closed_surface",
     "is_cycle",

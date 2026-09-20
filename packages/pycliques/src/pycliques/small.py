@@ -6,9 +6,10 @@ import argparse
 import gzip
 import logging
 import sys
-from collections.abc import Callable, Hashable
+from collections.abc import Callable, Hashable, Iterator
 from dataclasses import dataclass
 from enum import Enum, auto
+from itertools import combinations
 from pathlib import Path
 from typing import cast
 
@@ -23,7 +24,7 @@ from pycliques.clockwork_pairs import (
     clockwork_coaffine_pair,
     find_pair_morphism,
 )
-from pycliques.coaffinations import CoaffinePair
+from pycliques.coaffinations import CoaffinePair, coaffinations
 from pycliques.cutpoints import (
     contract_local_bridge,
     edge_in_triangle,
@@ -81,6 +82,9 @@ class Certificate:
     source: nx.Graph | None = None
     source_coaffination: dict[Hashable, Hashable] | None = None
     target_coaffination: dict[Hashable, Hashable] | None = None
+    suspension_vertices: tuple[Hashable, Hashable] | None = None
+    base_graph: nx.Graph | None = None
+    base_coaffination: dict[Hashable, Hashable] | None = None
 
 
 @dataclass(frozen=True)
@@ -127,6 +131,56 @@ class CliqueBehavior:
 ClassifierResult = tuple[Verdict, str, Certificate | None]
 #: Type alias for an inference rule. ``None`` means this rule proved nothing.
 Classifier = Callable[["CliqueSequence"], ClassifierResult | None]
+
+
+def suspension_bases(
+    graph: nx.Graph,
+) -> Iterator[tuple[Hashable, Hashable, nx.Graph]]:
+    """Yield connected bases of genuine suspension decompositions.
+
+    A yielded pair ``(u, v, H)`` satisfies
+    ``graph = H * complement(K_2)`` structurally: ``u`` and ``v`` are
+    nonadjacent, universal outside the pair, and deleting them leaves the
+    connected graph ``H``.  The vertices may have arbitrary hashable labels.
+    """
+    vertices = set(graph)
+    for u, v in combinations(vertices, 2):
+        if graph.has_edge(u, v):
+            continue
+        base_vertices = vertices - {u, v}
+        if set(graph.neighbors(u)) != base_vertices:
+            continue
+        if set(graph.neighbors(v)) != base_vertices:
+            continue
+        base = graph.subgraph(base_vertices).copy()
+        if base.number_of_nodes() > 0 and nx.is_connected(base):
+            yield u, v, base
+
+
+def _classify_suspension_2_coaffination(
+    graph: nx.Graph,
+) -> ClassifierResult | None:
+    """Apply Theorem 4.6 to a suspension with a 2-coaffine base."""
+    for u, v, base in suspension_bases(graph):
+        for tau in coaffinations(base, 2):
+            return (
+                Verdict.DIVERGENT,
+                (
+                    "Theorem 4.6: graph is the suspension of a connected graph "
+                    "H admitting a 2-coaffination; hence it is expansive and "
+                    "therefore clique divergent"
+                ),
+                Certificate(
+                    rule="theorem_4_6_suspension_2_coaffination",
+                    target=graph,
+                    target_status="proven_divergent",
+                    suspension_vertices=(u, v),
+                    base_graph=base,
+                    base_coaffination=tau,
+                    radius=2,
+                ),
+            )
+    return None
 
 
 class CliqueSequence:
@@ -928,9 +982,21 @@ def _make_retraction_test(target: nx.Graph, label: str) -> Classifier:
     return _test
 
 
+def _make_clique_retraction_test(target: nx.Graph, label: str) -> Classifier:
+    """Return a classifier that checks whether ``seq[1]`` retracts to *target*."""
+
+    def _test(seq: CliqueSequence) -> ClassifierResult | None:
+        g = seq[1]
+        if g is not None and retracts(g, target):
+            return (Verdict.DIVERGENT, label, None)
+        return None
+
+    return _test
+
+
 def _default_classifiers(tries: int) -> list[Classifier]:
     """Return the standard ordered suite of clique-behavior tests."""
-    return [
+    classifiers = [
         lambda seq: _test_clockwork(seq, tries),
         lambda seq: _test_eventually_helly(seq, tries),
         lambda seq: _test_eventually_special_octahedra(seq, tries),
@@ -938,7 +1004,16 @@ def _default_classifiers(tries: int) -> list[Classifier]:
         _make_retraction_test(suspension_of_cycle(6), "retracts to Susp(C_6)"),
         _make_retraction_test(suspension_of_cycle(7), "retracts to Susp(C_7)"),
         _make_retraction_test(complement_of_cycle(8), "retracts to Comp(C_8)"),
+        _make_retraction_test(complement_of_cycle(10), "retracts to Comp(C_10)"),
     ]
+    # Only examine seq[1] when tries allows a second iterate.
+    # if tries >= 2:
+    #     classifiers.append(
+    #         _make_clique_retraction_test(
+    #             complement_of_cycle(10), "clique graph retracts to Comp(C_10)"
+    #         )
+    #     )
+    return classifiers
 
 
 def classify_clique_behavior(
@@ -1061,6 +1136,13 @@ def classify_clique_behavior(
             verdict, reason, seq.graph_count, False, pared_graph, certificate
         )
 
+    theorem_4_6_result = _classify_suspension_2_coaffination(graph)
+    if theorem_4_6_result is not None:
+        verdict, reason, certificate = theorem_4_6_result
+        return CliqueBehavior(
+            verdict, reason, seq.graph_count, False, pared_graph, certificate
+        )
+
     bound_exceeded = seq.exhausted
     reason = (
         "clique count exceeded bound"
@@ -1143,18 +1225,6 @@ def classify_clique_behavior_with_theorem_2_6(
     )
 
 
-def _make_clique_retraction_test(target: nx.Graph, label: str) -> Classifier:
-    """Return a classifier that checks whether ``seq[1]`` retracts to *target*."""
-
-    def _test(seq: CliqueSequence) -> ClassifierResult | None:
-        g = seq[1]
-        if g is not None and retracts(g, target):
-            return (Verdict.DIVERGENT, label, None)
-        return None
-
-    return _test
-
-
 _DEFAULT_DATA_DIR = Path(".")
 
 
@@ -1176,6 +1246,8 @@ def _save_indeterminate(
     order: int,
     indeterminate: list[tuple[int, nx.Graph, Certificate | None]],
     data_dir: Path,
+    *,
+    replace: bool = False,
 ) -> None:
     """Save indeterminate pared graphs to a human-readable file.
 
@@ -1184,13 +1256,15 @@ def _save_indeterminate(
 
     If the file already exists, the new results are merged with the
     existing entries.  Duplicate indices are resolved in favour of the
-    new run so that re-processing a range always updates the record.
+    new run so that re-processing a range always updates the record.  When
+    ``replace`` is true, the file is replaced by exactly the supplied
+    indeterminate entries.
     """
     path = _indeterminate_file_path(order, data_dir)
 
     # Load existing entries keyed by original index.
     existing: dict[int, str] = {}
-    if path.is_file():
+    if path.is_file() and not replace:
         with path.open("r", encoding="utf-8") as f:
             for line in f:
                 stripped = line.strip()
@@ -1220,6 +1294,22 @@ def _save_indeterminate(
         for idx in sorted(existing):
             f.write(f"{existing[idx]}\n")
     _logger.info(f"Saved {len(existing)} indeterminate graphs to {path}")
+
+
+def _recheck_indeterminate_file(
+    entries: list[tuple[int, nx.Graph]],
+    bound: int,
+) -> list[tuple[int, nx.Graph, Certificate | None]]:
+    """Re-run the default classifier on graphs saved as indeterminate."""
+    still_indeterminate: list[tuple[int, nx.Graph, Certificate | None]] = []
+    for index, graph in entries:
+        result = classify_clique_behavior(graph, bound=bound)
+        if result.verdict is Verdict.INDETERMINATE:
+            still_indeterminate.append((index, result.pared_graph, result.certificate))
+        else:
+            _logger.debug("Graph %s is now %s", index, result.verdict.name)
+
+    return still_indeterminate
 
 
 def _load_indeterminate_graphs(
@@ -1392,6 +1482,26 @@ def _parse_args(args: list[str]) -> argparse.Namespace:
         default=True,
     )
     parser.add_argument(
+        "--from-indeterminate-file",
+        dest="from_indeterminate_file",
+        help=(
+            "Read graphs from indeterminate_order_<n>.txt, re-run the default "
+            "tests, and remove graphs that are resolved"
+        ),
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
+        "--exclude-conjectured-divergent",
+        dest="exclude_conjectured_divergent",
+        help=(
+            "In --from-indeterminate-file mode, do not re-run graphs whose "
+            "saved certificate marks them conjectured divergent"
+        ),
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
         "--data-dir",
         dest="data_dir",
         help="Directory for indeterminate graph files (default: current directory)",
@@ -1482,6 +1592,46 @@ def _main(args: list[str]):
     if start is not None and end is not None and start > end:
         _logger.error("--start must be less than or equal to --end.")
         sys.exit(1)
+
+    if parsed_args.from_indeterminate_file:
+        entries_with_metadata = _load_indeterminate_file_entries_with_metadata(
+            order, data_dir
+        )
+        entries = [
+            (index, graph)
+            for index, graph, certificate in entries_with_metadata
+            if not (
+                parsed_args.exclude_conjectured_divergent
+                and certificate is not None
+                and certificate.target_status == "conjectured_divergent"
+            )
+        ]
+        excluded: list[tuple[int, nx.Graph, Certificate | None]] = [
+            (index, graph, certificate)
+            for index, graph, certificate in entries_with_metadata
+            if parsed_args.exclude_conjectured_divergent
+            and certificate is not None
+            and certificate.target_status == "conjectured_divergent"
+        ]
+        _logger.info(
+            "Rechecking %s graphs from %s...",
+            len(entries),
+            _indeterminate_file_path(order, data_dir),
+        )
+        still_indeterminate = _recheck_indeterminate_file(entries, bound)
+        if save:
+            _save_indeterminate(
+                order,
+                still_indeterminate + excluded,
+                data_dir,
+                replace=True,
+            )
+        _logger.info(
+            "Recheck complete: %s remain indeterminate, %s resolved.",
+            len(still_indeterminate),
+            len(entries) - len(still_indeterminate),
+        )
+        return
 
     _logger.info("Precomputing target mathematical structures...")
     # Load previously saved indeterminate graphs for smaller orders
@@ -1605,8 +1755,20 @@ def _load_indeterminate_file_entries(
     order: int, data_dir: Path
 ) -> list[tuple[int, nx.Graph]]:
     """Load ``(index, graph)`` pairs previously saved for *order* by the fast pass."""
+    return [
+        (index, graph)
+        for index, graph, _certificate in (
+            _load_indeterminate_file_entries_with_metadata(order, data_dir)
+        )
+    ]
+
+
+def _load_indeterminate_file_entries_with_metadata(
+    order: int, data_dir: Path
+) -> list[tuple[int, nx.Graph, Certificate | None]]:
+    """Load saved indeterminate entries together with certificate metadata."""
     path = _indeterminate_file_path(order, data_dir)
-    entries: list[tuple[int, nx.Graph]] = []
+    entries: list[tuple[int, nx.Graph, Certificate | None]] = []
     if not path.is_file():
         return entries
     with path.open("r", encoding="utf-8") as f:
@@ -1615,8 +1777,19 @@ def _load_indeterminate_file_entries(
             if not stripped or stripped.startswith("#"):
                 continue
             parts = stripped.split(maxsplit=5)
+            certificate = None
+            if len(parts) >= 6 and parts[3] != "-":
+                certificate = Certificate(
+                    rule=parts[3],
+                    target_status=None if parts[4] == "-" else parts[4],
+                    target_label=None if parts[5] == "-" else parts[5],
+                )
             entries.append(
-                (int(parts[0]), nx.from_graph6_bytes(parts[2].encode("ascii")))
+                (
+                    int(parts[0]),
+                    nx.from_graph6_bytes(parts[2].encode("ascii")),
+                    certificate,
+                )
             )
     return entries
 
