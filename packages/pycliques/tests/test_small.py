@@ -157,10 +157,9 @@ def test_theorem_4_6_checks_multiple_suspension_pairs(monkeypatch):
     monkeypatch.setattr(
         small,
         "suspension_bases",
-        lambda _graph: iter(
-            [("a", "b", first_base), ("c", "d", second_base)]
-        ),
+        lambda _graph: iter([("a", "b", first_base), ("c", "d", second_base)]),
     )
+
     def fake_coaffinations(base, radius):
         return iter([tau]) if base is second_base else iter(())
 
