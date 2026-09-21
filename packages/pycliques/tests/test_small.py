@@ -824,14 +824,11 @@ def test_small_main_rechecks_and_removes_resolved_indeterminate_graphs(
     assert len(rows) == 1
     assert rows[0].split()[0] == "7"
     assert any(
-        "Graph 3 is now CONVERGENT: fake" in record.message
-        for record in caplog.records
+        "Graph 3 is now CONVERGENT: fake" in record.message for record in caplog.records
     )
 
 
-def test_small_main_recheck_preserves_saved_conjectured_metadata(
-    monkeypatch, tmp_path
-):
+def test_small_main_recheck_preserves_saved_conjectured_metadata(monkeypatch, tmp_path):
     """An unresolved second pass retains the row's conjectured certificate."""
     import pycliques.small as small
     from pycliques.small import Certificate, _main, _save_indeterminate
@@ -868,9 +865,7 @@ def test_small_main_recheck_preserves_saved_conjectured_metadata(
     assert "retracts conjectured_divergent snub_disphenoid" in row
 
 
-def test_small_main_clique_retraction_pass_removes_resolved_graph(
-    caplog, tmp_path
-):
+def test_small_main_clique_retraction_pass_removes_resolved_graph(caplog, tmp_path):
     """The subsequent retraction pass removes graphs resolved by seq[1]."""
     import logging
 
