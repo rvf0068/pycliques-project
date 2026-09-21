@@ -317,6 +317,14 @@ def test_small_parse_args_from_indeterminate_file():
     assert args.from_indeterminate_file is True
 
 
+def test_small_parse_args_check_clique_retraction():
+    """_parse_args accepts the subsequent clique-retraction pass flag."""
+    from pycliques.small import _parse_args
+
+    args = _parse_args(["--check-clique-retraction", "9"])
+    assert args.check_clique_retraction is True
+
+
 def test_small_parse_args_exclude_conjectured_divergent():
     """_parse_args accepts the conjectured-divergent filter flag."""
     from pycliques.small import _parse_args
@@ -780,9 +788,11 @@ def test_load_indeterminate_graphs_ignores_certificate_metadata(tmp_path):
 
 
 def test_small_main_rechecks_and_removes_resolved_indeterminate_graphs(
-    monkeypatch, tmp_path
+    caplog, monkeypatch, tmp_path
 ):
     """The file second pass rewrites the file with unresolved graphs only."""
+    import logging
+
     import pycliques.small as small
     from pycliques.small import _main, _save_indeterminate
 
@@ -803,6 +813,7 @@ def test_small_main_rechecks_and_removes_resolved_indeterminate_graphs(
         return CliqueBehavior(verdict, "fake", 1, False, graph)
 
     monkeypatch.setattr(small, "classify_clique_behavior", fake_classify)
+    caplog.set_level(logging.INFO, logger=small.__name__)
     _main(["9", "--from-indeterminate-file", "--data-dir", str(tmp_path)])
 
     rows = [
@@ -812,6 +823,81 @@ def test_small_main_rechecks_and_removes_resolved_indeterminate_graphs(
     ]
     assert len(rows) == 1
     assert rows[0].split()[0] == "7"
+    assert any(
+        "Graph 3 is now CONVERGENT: fake" in record.message
+        for record in caplog.records
+    )
+
+
+def test_small_main_recheck_preserves_saved_conjectured_metadata(
+    monkeypatch, tmp_path
+):
+    """An unresolved second pass retains the row's conjectured certificate."""
+    import pycliques.small as small
+    from pycliques.small import Certificate, _main, _save_indeterminate
+
+    _save_indeterminate(
+        9,
+        [
+            (
+                7,
+                nx.cycle_graph(5),
+                Certificate(
+                    rule="retracts",
+                    target_status="conjectured_divergent",
+                    target_label="snub_disphenoid",
+                ),
+            )
+        ],
+        tmp_path,
+    )
+
+    def fake_classify(graph, *, bound):
+        return CliqueBehavior(
+            Verdict.INDETERMINATE, "still unresolved", 1, False, graph
+        )
+
+    monkeypatch.setattr(small, "classify_clique_behavior", fake_classify)
+    _main(["9", "--from-indeterminate-file", "--data-dir", str(tmp_path)])
+
+    row = next(
+        line
+        for line in (tmp_path / "indeterminate_order_9.txt").read_text().splitlines()
+        if line and not line.startswith("#")
+    )
+    assert "retracts conjectured_divergent snub_disphenoid" in row
+
+
+def test_small_main_clique_retraction_pass_removes_resolved_graph(
+    caplog, tmp_path
+):
+    """The subsequent retraction pass removes graphs resolved by seq[1]."""
+    import logging
+
+    import pycliques.small as small
+    from pycliques.named import suspension_of_cycle
+    from pycliques.small import _main, _save_indeterminate
+
+    _save_indeterminate(9, [(17, suspension_of_cycle(5), None)], tmp_path)
+    caplog.set_level(logging.INFO, logger=small.__name__)
+
+    _main(
+        [
+            "9",
+            "--from-indeterminate-file",
+            "--check-clique-retraction",
+            "--data-dir",
+            str(tmp_path),
+        ]
+    )
+
+    rows = [
+        line
+        for line in (tmp_path / "indeterminate_order_9.txt").read_text().splitlines()
+        if line and not line.startswith("#")
+    ]
+    assert rows == []
+    assert any("Studying graph 17" in record.message for record in caplog.records)
 
 
 def test_small_main_excludes_conjectured_divergent_from_recheck(monkeypatch, tmp_path):

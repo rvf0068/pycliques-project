@@ -1004,15 +1004,7 @@ def _default_classifiers(tries: int) -> list[Classifier]:
         _make_retraction_test(suspension_of_cycle(6), "retracts to Susp(C_6)"),
         _make_retraction_test(suspension_of_cycle(7), "retracts to Susp(C_7)"),
         _make_retraction_test(complement_of_cycle(8), "retracts to Comp(C_8)"),
-        _make_retraction_test(complement_of_cycle(10), "retracts to Comp(C_10)"),
     ]
-    # Only examine seq[1] when tries allows a second iterate.
-    # if tries >= 2:
-    #     classifiers.append(
-    #         _make_clique_retraction_test(
-    #             complement_of_cycle(10), "clique graph retracts to Comp(C_10)"
-    #         )
-    #     )
     return classifiers
 
 
@@ -1094,6 +1086,13 @@ def classify_clique_behavior(
             verdict, reason, seq.graph_count, False, pared_graph, certificate
         )
 
+    theorem_4_6_result = _classify_suspension_2_coaffination(graph)
+    if theorem_4_6_result is not None:
+        verdict, reason, certificate = theorem_4_6_result
+        return CliqueBehavior(
+            verdict, reason, seq.graph_count, False, pared_graph, certificate
+        )
+
     for classifier in _default_classifiers(tries):
         result = classifier(seq)
         if result is not None:
@@ -1132,13 +1131,6 @@ def classify_clique_behavior(
     )
     if inverse_extension_result is not None:
         verdict, reason, certificate = inverse_extension_result
-        return CliqueBehavior(
-            verdict, reason, seq.graph_count, False, pared_graph, certificate
-        )
-
-    theorem_4_6_result = _classify_suspension_2_coaffination(graph)
-    if theorem_4_6_result is not None:
-        verdict, reason, certificate = theorem_4_6_result
         return CliqueBehavior(
             verdict, reason, seq.graph_count, False, pared_graph, certificate
         )
@@ -1296,18 +1288,48 @@ def _save_indeterminate(
     _logger.info(f"Saved {len(existing)} indeterminate graphs to {path}")
 
 
+def _graph6_string(graph: nx.Graph) -> str:
+    """Return a graph6 string after normalizing arbitrary node labels."""
+    numbered = nx.convert_node_labels_to_integers(graph)
+    return cast(
+        str, nx.to_graph6_bytes(numbered, header=False).decode("ascii").strip()
+    )
+
+
 def _recheck_indeterminate_file(
-    entries: list[tuple[int, nx.Graph]],
+    entries: list[tuple[int, nx.Graph, Certificate | None]],
     bound: int,
+    classifier: Classifier | None = None,
 ) -> list[tuple[int, nx.Graph, Certificate | None]]:
-    """Re-run the default classifier on graphs saved as indeterminate."""
+    """Re-run a classifier on graphs saved as indeterminate."""
     still_indeterminate: list[tuple[int, nx.Graph, Certificate | None]] = []
-    for index, graph in entries:
-        result = classify_clique_behavior(graph, bound=bound)
-        if result.verdict is Verdict.INDETERMINATE:
-            still_indeterminate.append((index, result.pared_graph, result.certificate))
+    for index, graph, saved_certificate in entries:
+        _logger.info("Studying graph %s (%s)", index, _graph6_string(graph))
+        if classifier is None:
+            behavior = classify_clique_behavior(graph, bound=bound)
+            if behavior.verdict is Verdict.INDETERMINATE:
+                still_indeterminate.append(
+                    (
+                        index,
+                        behavior.pared_graph,
+                        behavior.certificate or saved_certificate,
+                    )
+                )
+            else:
+                _logger.info(
+                    "Graph %s is now %s: %s",
+                    index,
+                    behavior.verdict.name,
+                    behavior.reason,
+                )
         else:
-            _logger.debug("Graph %s is now %s", index, result.verdict.name)
+            sequence = CliqueSequence(graph, bound=bound)
+            rule_result = classifier(sequence)
+            if rule_result is None:
+                still_indeterminate.append((index, graph, saved_certificate))
+            else:
+                verdict, reason, certificate = rule_result
+                _logger.info("Graph %s is now %s: %s", index, verdict.name, reason)
 
     return still_indeterminate
 
@@ -1502,6 +1524,16 @@ def _parse_args(args: list[str]) -> argparse.Namespace:
         default=False,
     )
     parser.add_argument(
+        "--check-clique-retraction",
+        dest="check_clique_retraction",
+        help=(
+            "In --from-indeterminate-file mode, run the seq[1] retraction "
+            "test to complement(C_10)"
+        ),
+        action="store_true",
+        default=False,
+    )
+    parser.add_argument(
         "--data-dir",
         dest="data_dir",
         help="Directory for indeterminate graph files (default: current directory)",
@@ -1598,7 +1630,7 @@ def _main(args: list[str]):
             order, data_dir
         )
         entries = [
-            (index, graph)
+            (index, graph, certificate)
             for index, graph, certificate in entries_with_metadata
             if not (
                 parsed_args.exclude_conjectured_divergent
@@ -1618,7 +1650,15 @@ def _main(args: list[str]):
             len(entries),
             _indeterminate_file_path(order, data_dir),
         )
-        still_indeterminate = _recheck_indeterminate_file(entries, bound)
+        recheck_classifier = None
+        if parsed_args.check_clique_retraction:
+            recheck_classifier = _make_clique_retraction_test(
+                complement_of_cycle(10),
+                "clique graph retracts to Comp(C_10)",
+            )
+        still_indeterminate = _recheck_indeterminate_file(
+            entries, bound, classifier=recheck_classifier
+        )
         if save:
             _save_indeterminate(
                 order,

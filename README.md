@@ -123,6 +123,9 @@ uv run small-behavior 9 --from-indeterminate-file --bound 60
 uv run small-behavior 9 --from-indeterminate-file \
   --exclude-conjectured-divergent
                         # leave conjectured-divergent rows untouched
+uv run small-behavior 9 --from-indeterminate-file \
+  --check-clique-retraction
+                        # run the seq[1] Comp(C_10) retraction pass
 uv run small-behavior-theorem26 9 --max-m 3   # Theorem 2.6 pass on the unresolved graphs
 ```
 
@@ -132,6 +135,10 @@ and rewrites the file with only graphs that remain `INDETERMINATE`. Use
 `--no-save` to inspect the results without updating the file.
 With `--exclude-conjectured-divergent`, rows carrying a saved
 `conjectured_divergent` certificate are preserved without being re-tested.
+With `--check-clique-retraction`, the pass runs
+`_make_clique_retraction_test(complement_of_cycle(10), ...)` on each saved
+graph and removes rows whose clique graph retracts to `Comp(C_10)`. Each
+studied row is logged at INFO level with its original index and graph6 string.
 
 The `small-behavior-theorem26` CLI exposes `--max-m`, `--max-n`,
 `--max-coaffinations`, `--max-source-order`, and `--bound` so that
