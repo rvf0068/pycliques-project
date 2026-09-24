@@ -75,7 +75,7 @@ def is_dominated_vertex(
     neigh_v = closed_neighborhood(graph, v)
     deg_v = graph.degree(v)
 
-    candidates = [u for u in graph[v] if graph.degree(u) >= deg_v]
+    candidates = [u for u in graph[v] if u != v and graph.degree(u) >= deg_v]
 
     for u in candidates:
         if neigh_v.issubset(closed_neighborhood(graph, u)):

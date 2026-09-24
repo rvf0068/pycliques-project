@@ -1,4 +1,5 @@
 import networkx as nx
+import pycliques.small as small
 import pytest
 from pycliques import CliqueBehavior, classify_clique_behavior
 from pycliques.named import (
@@ -13,17 +14,23 @@ from pycliques.small import (
     ReferenceStatus,
     Verdict,
     _classify_reference_dependency,
+    _classify_suspension_2_coaffination,
     _make_clique_retraction_test,
     clear_reference_graphs,
     eventually_retracts_specially,
-    is_eventually_helly,
     register_reference_graph,
+    suspension_bases,
+)
+from pycliques.small import (
+    test_eventually_helly as public_test_eventually_helly,
 )
 from pyg6data.lists import list_graphs
 
 
-def test_eventually_helly():
-    assert is_eventually_helly(nx.triangular_lattice_graph(4, 4))
+def test_eventually_helly_immediately():
+    result = public_test_eventually_helly(nx.cycle_graph(4))
+
+    assert result == (Verdict.CONVERGENT, "is eventually Helly (index 0)", None)
 
 
 def test_classify_clique_behavior_convergent():
@@ -46,11 +53,134 @@ def test_clique_sequence_exposes_read_only_state():
     assert seq.graph_count == 2
 
 
+def _labelled_suspension(base: nx.Graph) -> nx.Graph:
+    """Build a suspension while preserving the base graph's labels."""
+    graph = base.copy()
+    graph.add_nodes_from(["u", "v"])
+    for vertex in base:
+        graph.add_edge("u", vertex)
+        graph.add_edge("v", vertex)
+    return graph
+
+
+def test_suspension_bases_detects_connected_base_with_arbitrary_labels():
+    """Structural suspension detection does not require integer labels."""
+    labels = [("x", 1), ("x", 2), 7, "a", "b", ("z", 0)]
+    base = nx.cycle_graph(labels)
+    graph = _labelled_suspension(base)
+
+    found = list(suspension_bases(graph))
+
+    assert len(found) == 1
+    u, v, detected_base = found[0]
+    assert {u, v} == {"u", "v"}
+    assert set(detected_base) == set(base)
+    assert set(detected_base.edges()) == set(base.edges())
+
+
+def test_theorem_4_6_accepts_noninvolutive_exact_2_coaffination(monkeypatch):
+    """Theorem 4.6 accepts a radius-2 automorphism without requiring involution."""
+    base = nx.cycle_graph(6)
+    graph = _labelled_suspension(base)
+    tau = {vertex: (vertex + 2) % 6 for vertex in base}
+
+    monkeypatch.setattr(small, "coaffinations", lambda _graph, radius: iter([tau]))
+    result = _classify_suspension_2_coaffination(graph)
+
+    assert result is not None
+    verdict, reason, certificate = result
+    assert verdict is Verdict.DIVERGENT
+    assert "Theorem 4.6" in reason
+    assert certificate is not None
+    assert certificate.rule == "theorem_4_6_suspension_2_coaffination"
+    assert certificate.target_status == "proven_divergent"
+    assert certificate.radius == 2
+    assert certificate.suspension_vertices is not None
+    assert set(certificate.suspension_vertices) == {"u", "v"}
+    assert certificate.base_graph is not None
+    assert nx.is_isomorphic(certificate.base_graph, base)
+    assert certificate.base_coaffination == tau
+    assert all(
+        nx.shortest_path_length(base, vertex, tau[vertex]) >= 2 for vertex in base
+    )
+    assert any(tau[tau[vertex]] != vertex for vertex in base)
+
+
+def test_classify_clique_behavior_uses_theorem_4_6_certificate():
+    """The fast classifier applies Theorem 4.6 before pared-graph rules."""
+    base = nx.cycle_graph(6)
+    result = classify_clique_behavior(_labelled_suspension(base))
+
+    assert result.verdict is Verdict.DIVERGENT
+    assert result.certificate is not None
+    assert result.certificate.rule == "theorem_4_6_suspension_2_coaffination"
+
+
+def test_suspension_bases_require_connected_base():
+    """A disconnected base is not a Theorem 4.6 suspension candidate."""
+    base = nx.disjoint_union(nx.cycle_graph(4), nx.cycle_graph(4))
+    graph = _labelled_suspension(base)
+
+    assert list(suspension_bases(graph)) == []
+    assert _classify_suspension_2_coaffination(graph) is None
+
+
+def test_theorem_4_6_rejects_connected_base_without_2_coaffination():
+    """A genuine suspension without a 2-coaffination does not trigger."""
+    graph = _labelled_suspension(nx.path_graph(4))
+
+    assert list(suspension_bases(graph))
+    assert _classify_suspension_2_coaffination(graph) is None
+
+
+@pytest.mark.parametrize(
+    "graph",
+    [
+        nx.star_graph(3),
+        nx.complete_graph(4),
+        nx.cycle_graph(5),
+        nx.cycle_graph(4),
+    ],
+)
+def test_suspension_bases_reject_false_candidates(graph):
+    """Universal, adjacent, nonuniversal, and disconnected pairs are rejected."""
+    assert list(suspension_bases(graph)) == []
+
+
+def test_theorem_4_6_checks_multiple_suspension_pairs(monkeypatch):
+    """The classifier continues after a valid pair whose base has no coaffination."""
+    graph = nx.empty_graph(1)
+    first_base = nx.path_graph(4)
+    second_base = nx.cycle_graph(6)
+    tau = {vertex: (vertex + 2) % 6 for vertex in second_base}
+
+    monkeypatch.setattr(
+        small,
+        "suspension_bases",
+        lambda _graph: iter([("a", "b", first_base), ("c", "d", second_base)]),
+    )
+
+    def fake_coaffinations(base, radius):
+        return iter([tau]) if base is second_base else iter(())
+
+    monkeypatch.setattr(small, "coaffinations", fake_coaffinations)
+
+    result = _classify_suspension_2_coaffination(graph)
+
+    assert result is not None
+    assert result[2] is not None
+    assert result[2].suspension_vertices == ("c", "d")
+
+
 def test_eventual_helly_public_api_agrees_with_classifier():
     """The public Helly search and classifier share the same iteration path."""
     graph = nx.triangular_lattice_graph(3, 3)
 
-    assert is_eventually_helly(graph)
+    assert public_test_eventually_helly(graph) == (
+        Verdict.CONVERGENT,
+        "is eventually Helly (index 1)",
+        None,
+    )
     assert classify_clique_behavior(graph).verdict is Verdict.CONVERGENT
 
 
@@ -128,20 +258,26 @@ def test_special_octahedron_public_api_agrees_with_classifier():
     assert result.verdict is Verdict.DIVERGENT
 
 
-# ---------- Coverage for is_eventually_helly edge cases ----------
+# ---------- Coverage for test_eventually_helly edge cases ----------
 
 
-def test_is_eventually_helly_bound_exceeded():
-    """When the clique bound is exceeded, is_eventually_helly returns False."""
+def test_test_eventually_helly_bound_exceeded():
+    """A clique bound abort produces an indeterminate result."""
     # The octahedral graph is NOT clique-Helly and has 8 cliques.
     # With bound=3, clique_graph will return None.
-    assert is_eventually_helly(nx.octahedral_graph(), bound=3) is False
+    result = public_test_eventually_helly(nx.octahedral_graph(), bound=3)
+
+    assert result[0] is Verdict.INDETERMINATE
+    assert "bound" in result[1]
 
 
-def test_is_eventually_helly_tries_exhausted():
-    """When tries are exhausted without finding a Helly iterate, return False."""
+def test_test_eventually_helly_tries_exhausted():
+    """A finite failure to find a Helly iterate is indeterminate."""
     # With tries=0, the loop never runs.  The octahedral graph is not Helly.
-    assert is_eventually_helly(nx.octahedral_graph(), tries=0) is False
+    result = public_test_eventually_helly(nx.octahedral_graph(), tries=0)
+
+    assert result[0] is Verdict.INDETERMINATE
+    assert "finite tested range" in result[1]
 
 
 # ---------- Coverage for eventually_retracts_specially edge cases ----------
@@ -171,6 +307,30 @@ def test_small_parse_args_bound():
 
     args = _parse_args(["--bound", "12", "6"])
     assert args.bound == 12
+
+
+def test_small_parse_args_from_indeterminate_file():
+    """_parse_args accepts the indeterminate-file second-pass flag."""
+    from pycliques.small import _parse_args
+
+    args = _parse_args(["--from-indeterminate-file", "9"])
+    assert args.from_indeterminate_file is True
+
+
+def test_small_parse_args_check_clique_retraction():
+    """_parse_args accepts the subsequent clique-retraction pass flag."""
+    from pycliques.small import _parse_args
+
+    args = _parse_args(["--check-clique-retraction", "9"])
+    assert args.check_clique_retraction is True
+
+
+def test_small_parse_args_exclude_conjectured_divergent():
+    """_parse_args accepts the conjectured-divergent filter flag."""
+    from pycliques.small import _parse_args
+
+    args = _parse_args(["--exclude-conjectured-divergent", "9"])
+    assert args.exclude_conjectured_divergent is True
 
 
 def test_small_parse_args_verbose():
@@ -359,6 +519,7 @@ def test_classify_local_bridge_divergent():
     assert certificate.rule == "local_bridge"
     assert certificate.target_status == "proven_divergent"
     assert certificate.target_label == "octahedral_graph"
+    assert certificate.edge == (0, "leaf")
 
 
 def test_classify_local_bridge_conjectured_divergent():
@@ -381,6 +542,7 @@ def test_classify_local_bridge_conjectured_divergent():
     assert certificate.rule == "local_bridge"
     assert certificate.target_status == "conjectured_divergent"
     assert certificate.target_label == "snub_disphenoid"
+    assert certificate.edge == (0, "leaf")
 
 
 def test_classify_non_triangle_edge_none():
@@ -410,6 +572,8 @@ def test_classify_non_triangle_edge_divergent():
     assert certificate is not None
     assert certificate.rule == "non_triangle_edge"
     assert certificate.target_status == "proven_divergent"
+    assert certificate.edge is not None
+    assert list(nx.common_neighbors(g, *certificate.edge)) == []
 
 
 def test_classify_non_triangle_edge_conjectured_divergent():
@@ -437,6 +601,152 @@ def test_classify_non_triangle_edge_conjectured_divergent():
     assert certificate.rule == "non_triangle_edge"
     assert certificate.target_status == "conjectured_divergent"
     assert certificate.target_label == "snub_disphenoid"
+    assert certificate.edge is not None
+    assert list(nx.common_neighbors(g, *certificate.edge)) == []
+
+
+# ---------------------------------------------------------------------------
+# Inverse cutpoint extension
+# ---------------------------------------------------------------------------
+
+
+def _motivating_example() -> tuple[nx.Graph, nx.Graph]:
+    """Return (g, h) from the inverse-cutpoint-extension motivating example.
+
+    ``g`` is a clockwork graph, known clique divergent.  ``h`` is obtained
+    from ``g`` by identifying two vertices at distance four (add the edge,
+    then contract it); the identified vertex is a local cutpoint of ``h``,
+    but not an ordinary articulation point.
+    """
+    from pycliques.clockwork import clockwork_graph
+
+    g = clockwork_graph(6 * [1], [[0] for _ in range(6)], 2, [0, 1])
+    h = g.copy()
+    h.add_edge(12, 15)
+    h = nx.contracted_edge(h, (12, 15), self_loops=False)
+    return g, h
+
+
+def test_classify_clique_behavior_motivating_example_is_divergent():
+    """The motivating example is classified DIVERGENT via the inverse
+    cutpoint extension, chained with Theorem 6.2 and clockwork recognition.
+    """
+    _, h = _motivating_example()
+
+    result = classify_clique_behavior(h)
+
+    assert result.verdict is Verdict.DIVERGENT
+    assert result.certificate is not None
+    assert result.certificate.rule == "inverse_cutpoint_extension"
+    assert result.certificate.target_status == "proven_divergent"
+
+
+def test_classify_inverse_cutpoint_extension_divergent_directly():
+    """Calling the rule directly finds the same admissible extension."""
+    from pycliques import classify_inverse_cutpoint_extension
+
+    _, h = _motivating_example()
+
+    res = classify_inverse_cutpoint_extension(h)
+    assert res is not None
+    verdict, reason, certificate = res
+    assert verdict is Verdict.DIVERGENT
+    assert "Theorem 6.1" in reason
+    assert "Theorem 6.2" in reason
+    assert certificate is not None
+    assert certificate.rule == "inverse_cutpoint_extension"
+    assert certificate.target_status == "proven_divergent"
+    assert certificate.map is not None
+    assert certificate.map["cutpoint"] == 12
+
+
+def test_classify_clique_behavior_detects_cutpoint_regardless_of_labels():
+    """Relabeling with arbitrary hashables does not affect the classification."""
+    _, h = _motivating_example()
+
+    relabeled = nx.relabel_nodes(
+        h,
+        {n: (str(n), n, "tag") if n != 12 else "special" for n in h.nodes()},
+    )
+
+    result = classify_clique_behavior(relabeled)
+    assert result.verdict is Verdict.DIVERGENT
+    assert result.certificate is not None
+    assert result.certificate.rule == "inverse_cutpoint_extension"
+
+
+def test_classify_inverse_cutpoint_extension_none_without_divergent_target():
+    """A local cutpoint whose only split yields a convergent target returns None."""
+    from pycliques import classify_inverse_cutpoint_extension
+
+    # Two triangles sharing vertex 2; splitting it gives two disjoint
+    # triangles, which is convergent, not divergent.
+    bowtie = nx.Graph([(0, 1), (1, 2), (2, 0), (2, 3), (3, 4), (4, 2)])
+
+    assert classify_inverse_cutpoint_extension(bowtie) is None
+    assert classify_clique_behavior(bowtie).verdict is Verdict.CONVERGENT
+
+
+def test_inverse_cutpoint_extension_rejects_invalid_split():
+    """A split that separates two adjacent neighbors of the cutpoint is
+    rejected and never produces a divergence certificate."""
+    from pycliques.cutpoints import (
+        InverseCutpointExtension,
+        is_admissible_inverse_extension,
+    )
+
+    graph = nx.Graph()
+    graph.add_edges_from([("u", 0), ("u", 3), ("v", 1), ("v", 4), (0, 1), (3, 4)])
+    graph.add_edge("u", "v")
+
+    extension = InverseCutpointExtension(
+        cutpoint=2,
+        u="u",
+        v="v",
+        u_branch=frozenset({0, 3}),
+        v_branch=frozenset({1, 4}),
+        graph=graph,
+    )
+    assert not is_admissible_inverse_extension(extension)
+
+
+def test_classify_inverse_cutpoint_extension_conjectured_divergent():
+    """A split whose target is only conjectured divergent yields a
+    conditional INDETERMINATE result, never a proven DIVERGENT verdict.
+    """
+    from pycliques import classify_inverse_cutpoint_extension
+    from pycliques.cutpoints import contract_local_bridge
+
+    s = snub_disphenoid()
+    branch = s.copy()
+    branch.add_edge(0, "p")
+    branch.add_edge(1, "q")
+    extended = branch.copy()
+    extended.add_edge("p", "q")
+    h = contract_local_bridge(extended, "p", "q")
+
+    res = classify_inverse_cutpoint_extension(h)
+    assert res is not None
+    verdict, reason, certificate = res
+    assert verdict is Verdict.INDETERMINATE
+    assert "conjectured" in reason
+    assert certificate is not None
+    assert certificate.rule == "inverse_cutpoint_extension"
+    assert certificate.target_status == "conjectured_divergent"
+    assert certificate.target_label == "snub_disphenoid"
+
+    # The global classifier must not silently promote this to DIVERGENT.
+    overall = classify_clique_behavior(h)
+    assert overall.verdict is not Verdict.DIVERGENT
+
+
+def test_classify_inverse_cutpoint_extension_respects_budget():
+    """A zero extension budget disables the rule immediately."""
+    from pycliques import classify_inverse_cutpoint_extension
+
+    _, h = _motivating_example()
+
+    assert classify_inverse_cutpoint_extension(h, extension_budget=0) is None
 
 
 def test_save_indeterminate_includes_certificate_metadata(tmp_path):
@@ -475,3 +785,162 @@ def test_load_indeterminate_graphs_ignores_certificate_metadata(tmp_path):
 
     known = _load_indeterminate_graphs(10, tmp_path)
     assert len(known[4]) == 1
+
+
+def test_small_main_rechecks_and_removes_resolved_indeterminate_graphs(
+    caplog, monkeypatch, tmp_path
+):
+    """The file second pass rewrites the file with unresolved graphs only."""
+    import logging
+
+    import pycliques.small as small
+    from pycliques.small import _main, _save_indeterminate
+
+    convergent = nx.path_graph(4)
+    indeterminate = nx.cycle_graph(5)
+    _save_indeterminate(
+        9,
+        [(3, convergent, None), (7, indeterminate, None)],
+        tmp_path,
+    )
+
+    def fake_classify(graph, *, bound):
+        verdict = (
+            Verdict.CONVERGENT
+            if graph.number_of_edges() == 3
+            else Verdict.INDETERMINATE
+        )
+        return CliqueBehavior(verdict, "fake", 1, False, graph)
+
+    monkeypatch.setattr(small, "classify_clique_behavior", fake_classify)
+    caplog.set_level(logging.INFO, logger=small.__name__)
+    _main(["9", "--from-indeterminate-file", "--data-dir", str(tmp_path)])
+
+    rows = [
+        line
+        for line in (tmp_path / "indeterminate_order_9.txt").read_text().splitlines()
+        if line and not line.startswith("#")
+    ]
+    assert len(rows) == 1
+    assert rows[0].split()[0] == "7"
+    assert any(
+        "Graph 3 is now CONVERGENT: fake" in record.message for record in caplog.records
+    )
+
+
+def test_small_main_recheck_preserves_saved_conjectured_metadata(monkeypatch, tmp_path):
+    """An unresolved second pass retains the row's conjectured certificate."""
+    import pycliques.small as small
+    from pycliques.small import Certificate, _main, _save_indeterminate
+
+    _save_indeterminate(
+        9,
+        [
+            (
+                7,
+                nx.cycle_graph(5),
+                Certificate(
+                    rule="retracts",
+                    target_status="conjectured_divergent",
+                    target_label="snub_disphenoid",
+                ),
+            )
+        ],
+        tmp_path,
+    )
+
+    def fake_classify(graph, *, bound):
+        return CliqueBehavior(
+            Verdict.INDETERMINATE, "still unresolved", 1, False, graph
+        )
+
+    monkeypatch.setattr(small, "classify_clique_behavior", fake_classify)
+    _main(["9", "--from-indeterminate-file", "--data-dir", str(tmp_path)])
+
+    row = next(
+        line
+        for line in (tmp_path / "indeterminate_order_9.txt").read_text().splitlines()
+        if line and not line.startswith("#")
+    )
+    assert "retracts conjectured_divergent snub_disphenoid" in row
+
+
+def test_small_main_clique_retraction_pass_removes_resolved_graph(caplog, tmp_path):
+    """The subsequent retraction pass removes graphs resolved by seq[1]."""
+    import logging
+
+    import pycliques.small as small
+    from pycliques.named import suspension_of_cycle
+    from pycliques.small import _main, _save_indeterminate
+
+    _save_indeterminate(9, [(17, suspension_of_cycle(5), None)], tmp_path)
+    caplog.set_level(logging.INFO, logger=small.__name__)
+
+    _main(
+        [
+            "9",
+            "--from-indeterminate-file",
+            "--check-clique-retraction",
+            "--data-dir",
+            str(tmp_path),
+        ]
+    )
+
+    rows = [
+        line
+        for line in (tmp_path / "indeterminate_order_9.txt").read_text().splitlines()
+        if line and not line.startswith("#")
+    ]
+    assert rows == []
+    assert any("Studying graph 17" in record.message for record in caplog.records)
+
+
+def test_small_main_excludes_conjectured_divergent_from_recheck(monkeypatch, tmp_path):
+    """The conjectured-divergent filter skips testing but preserves rows."""
+    import pycliques.small as small
+    from pycliques.small import Certificate, _main, _save_indeterminate
+
+    ordinary = nx.path_graph(4)
+    conjectured = nx.cycle_graph(5)
+    _save_indeterminate(
+        9,
+        [
+            (3, ordinary, None),
+            (
+                7,
+                conjectured,
+                Certificate(
+                    rule="retracts",
+                    target_status="conjectured_divergent",
+                    target_label="example",
+                ),
+            ),
+        ],
+        tmp_path,
+    )
+
+    tested = []
+
+    def fake_classify(graph, *, bound):
+        tested.append(graph)
+        return CliqueBehavior(Verdict.INDETERMINATE, "fake", 1, False, graph)
+
+    monkeypatch.setattr(small, "classify_clique_behavior", fake_classify)
+    _main(
+        [
+            "9",
+            "--from-indeterminate-file",
+            "--exclude-conjectured-divergent",
+            "--data-dir",
+            str(tmp_path),
+        ]
+    )
+
+    assert len(tested) == 1
+    rows = [
+        line
+        for line in (tmp_path / "indeterminate_order_9.txt").read_text().splitlines()
+        if line and not line.startswith("#")
+    ]
+    assert {row.split()[0] for row in rows} == {"3", "7"}
+    assert "conjectured_divergent" in next(row for row in rows if row.startswith("7 "))

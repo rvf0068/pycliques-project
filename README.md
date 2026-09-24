@@ -52,11 +52,21 @@ Tools for studying the **clique graph operator** K(G). Given a graph G, the cliq
 - `completely_pared_graph` / `find_dominated_vertex` — graph dismantling
 - `recognize_clockwork` / `is_clique_divergent_clockwork` — clockwork-graph recognition
 - `retracts` / `special_octahedra_dimension` — retraction tests
-- `classify_clique_behavior` — apply the standard convergence/divergence tests to one graph
-- CLI `small-behavior` — classifies all connected graphs of a given order
+- `classify_clique_behavior` — apply the fast standard convergence/divergence
+  tests to one graph
+- `classify_clockwork_pair_map` — the separate, more expensive Theorem 2.6 /
+  coaffination search
+- `classify_clique_behavior_with_theorem_2_6` — runs the fast pass, then
+  Theorem 2.6 only if the fast pass left the graph `INDETERMINATE`
+- CLI `small-behavior` — fast classification of all connected graphs of a
+  given order (never runs the Theorem 2.6 search)
+- CLI `small-behavior-theorem26` — optional, more expensive second pass:
+  applies Theorem 2.6 only to graphs the fast pass left `INDETERMINATE`
 
 **Dependencies:** `networkx`, `grandiso`, `rich`  
-**Optional:** `pyg6data` (needed only for the `small-behavior` CLI — install with `pip install "./packages/pycliques[data]"`)
+**Optional:** `pyg6data` (needed only for the `small-behavior` /
+`small-behavior-theorem26` CLIs — install with
+`pip install "./packages/pycliques[data]"`)
 
 ### Example
 
@@ -74,6 +84,67 @@ print(result.reason)  # eventually has a special octahedron (index 0, dimension 
 graph within the requested iteration and clique-count limits. Check
 `result.bound_exceeded` to distinguish a clique-count abort from an
 indeterminate result after all requested iterations.
+
+### Theorem 4.6 fast criterion
+
+The fast classifier also applies Theorem 4.6: if
+`S = H * complement(K_2)`, where `H` is connected and admits a 2-coaffination,
+then `S` is expansive and therefore clique divergent. The implementation looks
+for two nonadjacent universal vertices whose deletion leaves a connected base
+graph, then reuses the general `coaffinations(H, 2)` machinery. It does not
+search arbitrary induced subgraphs or require the coaffination to be an
+involution. A clique is understood here as a maximal complete subgraph.
+
+### Two-level classification: fast pass vs. Theorem 2.6
+
+`classify_clique_behavior` (and the `small-behavior` CLI) is the **fast
+pass**: it applies complete paring, direct reference graphs, clockwork
+criteria, eventual-Helly and special-octahedron tests, fixed retractions,
+reference dependency, Theorem 6.1/6.2 local-bridge and non-triangle-edge
+inference, and inverse cutpoint extension. It deliberately excludes the
+expensive Theorem 2.6 (rank-divergence) coaffination search, so it stays fast
+even for large censuses.
+
+Theorem 2.6 is available as a separate, optional second stage
+(`classify_clockwork_pair_map` / the `small-behavior-theorem26` CLI). It
+searches, in increasing radius order (`r = 3, 4, 5, ...`, i.e. `m = 2, 3, 4,
+...` with `r = m + 1`), for an admissible morphism of coaffine pairs from a
+clockwork graph `R_{2m}^n` into the target graph -- or, failing that, into
+its clique graph `K(G)` (one fallback level only, bounded by the same
+`--bound`/clique-count limit). Because it may enumerate many candidate
+target coaffinations and search several `(m, n)` combinations, this pass can
+be substantially more expensive than the fast pass, so it is run only on
+graphs the fast pass left `INDETERMINATE`:
+
+```bash
+uv run small-behavior 9                       # fast pass; saves INDETERMINATE graphs
+uv run small-behavior 9 --from-indeterminate-file --bound 60
+                                                # recheck saved graphs with a larger bound
+uv run small-behavior 9 --from-indeterminate-file \
+  --exclude-conjectured-divergent
+                        # leave conjectured-divergent rows untouched
+uv run small-behavior 9 --from-indeterminate-file \
+  --check-clique-retraction
+                        # run the seq[1] Comp(C_10) retraction pass
+uv run small-behavior-theorem26 9 --max-m 3   # Theorem 2.6 pass on the unresolved graphs
+```
+
+The fast CLI's `--from-indeterminate-file` mode reads the saved
+`indeterminate_order_<n>.txt` file, applies the default fast-pass tests again,
+and rewrites the file with only graphs that remain `INDETERMINATE`. Use
+`--no-save` to inspect the results without updating the file.
+With `--exclude-conjectured-divergent`, rows carrying a saved
+`conjectured_divergent` certificate are preserved without being re-tested.
+With `--check-clique-retraction`, the pass runs
+`_make_clique_retraction_test(complement_of_cycle(10), ...)` on each saved
+graph and removes rows whose clique graph retracts to `Comp(C_10)`. Each
+studied row is logged at INFO level with its original index and graph6 string.
+
+The `small-behavior-theorem26` CLI exposes `--max-m`, `--max-n`,
+`--max-coaffinations`, `--max-source-order`, and `--bound` so that
+progressively larger computational limits can be tried without modifying
+source code, and `--from-indeterminate-file` to reuse a previously saved
+`indeterminate_order_<n>.txt` file instead of rerunning the fast pass.
 
 ---
 

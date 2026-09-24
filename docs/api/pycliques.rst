@@ -23,6 +23,15 @@ Clockwork
    :show-inheritance:
    :member-order: bysource
 
+Clockwork Pairs
+---------------
+
+.. automodule:: pycliques.clockwork_pairs
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :member-order: bysource
+
 Coaffinations
 -------------
 

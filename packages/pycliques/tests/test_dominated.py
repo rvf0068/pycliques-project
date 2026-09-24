@@ -30,6 +30,25 @@ def test_is_dominated_vertex_can_return_dominator():
     assert not is_dominated_vertex(graph, 2)
 
 
+def test_self_loop_cannot_make_vertex_its_own_dominator():
+    """A self-loop is never evidence that a vertex dominates itself."""
+    graph = nx.Graph()
+    graph.add_edge("v", "v")
+
+    assert is_dominated_vertex(graph, "v") is False
+    assert is_dominated_vertex(graph, "v", return_dominator=True) is False
+
+
+def test_self_loop_does_not_hide_genuine_dominator():
+    """A different vertex can still dominate a looped vertex."""
+    graph = nx.Graph()
+    graph.add_edges_from([("v", "u"), ("v", "v"), ("u", "w"), ("u", "x")])
+
+    result = is_dominated_vertex(graph, "v", return_dominator=True)
+
+    assert result == (True, "u")
+
+
 def test_find_dominated_vertex_handles_none_case():
     assert find_dominated_vertex(nx.path_graph(4)) == 0
     assert find_dominated_vertex(nx.cycle_graph(4)) is None
