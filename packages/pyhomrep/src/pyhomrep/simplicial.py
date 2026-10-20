@@ -570,26 +570,48 @@ def decompose_into_irreducibles(
     >>> result[0][(2, 2)]  # Multiplicity of representation indexed by (2,2)
     1
     """
+    return {k: decompose_p_homology(sc, n, k) for k in range(sc.dimension() + 1)}
+
+
+def decompose_p_homology(sc: SimplicialComplex, n: int, p: int) -> dict[tuple, Any]:
+    """Decompose the p-th homology (over C) into irreducible S_n-modules.
+
+    Only the requested degree is computed. The vertices of *sc* must be
+    ``0, ..., n-1`` and S_n acts by permuting them.
+
+    .. rubric:: Parameters
+
+    sc : SimplicialComplex
+        The simplicial complex with an S_n action.
+    n : int
+        The size of the symmetric group S_n.
+    p : int
+        The homology degree.
+
+    .. rubric:: Returns
+
+    dict
+        Multiplicities of the irreducibles, indexed by partitions of n.
+
+    .. rubric:: Examples
+
+    >>> from pycombtop import clique_complex
+    >>> from pyhomrep.simplicial import decompose_p_homology
+    >>> from pyhomrep.graphs import matching_graph
+    >>> sc = clique_complex(matching_graph(4))
+    >>> decompose_p_homology(sc, 4, 0)[(2, 2)]
+    1
+    """
     w = partitions_list(n)
     M = form_matrix_yt(w)
     card = math.factorial(n)
-    dim = sc.dimension()
-    vec_dic: dict[int, dict[tuple, Any]] = {}
-    for k in range(dim + 1):
-        D: dict[tuple, Any] = {}
-        u: list = []
-        v: list = []
-        for h in w:
-            u.append(character_p_homology(sc, k, make_permutation(h)))
-            v.append(size_conjugacy_class(h, n))
-        for i in range(M.shape[0]):
-            Ip = 0
-            for j in range(M.shape[1]):
-                Ip = Ip + M[i, j] * u[j] * v[j]
-            Ip = Ip / card
-            D[tuple(w[i])] = Ip
-        vec_dic[k] = D
-    return vec_dic
+    u = [character_p_homology(sc, p, make_permutation(h)) for h in w]
+    v = [size_conjugacy_class(h, n) for h in w]
+    D: dict[tuple, Any] = {}
+    for i in range(M.shape[0]):
+        total = sum(M[i, j] * u[j] * v[j] for j in range(M.shape[1]))
+        D[tuple(w[i])] = total / card
+    return D
 
 
 def character_matrix_permutation(
