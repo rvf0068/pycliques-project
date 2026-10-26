@@ -31,7 +31,6 @@ import numpy as np
 from pycombtop import SimplicialComplex
 from sympy import eye
 from sympy.matrices import Matrix, zeros
-from sympy.solvers.solveset import linsolve
 
 from pyhomrep.pchains import PChain
 from pyhomrep.utilities import (
@@ -44,7 +43,6 @@ from pyhomrep.utilities import (
     orientation_function,
     partitions_list,
     permutation_in_simplex_test,
-    reduce_matrix,
     size_conjugacy_class,
 )
 
@@ -265,6 +263,62 @@ def matrix_symmetric_representate(sc: SimplicialComplex, p: int) -> Matrix | Non
             return False
 
 
+def _cache(sc: SimplicialComplex) -> dict:
+    try:
+        return sc.__dict__.setdefault("_pyhomrep_cache", {})
+    except AttributeError:
+        return {}
+
+
+def _chain_data(sc: SimplicialComplex, p: int) -> dict[tuple, int] | None:
+    """Index of the basis p-simplices (None when C_p is zero)."""
+    cache = _cache(sc)
+    key = ("simplices", p)
+    if key not in cache:
+        simplices = p_simplex(sc, p) if 0 <= p <= sc.dimension() else []
+        cache[key] = {s: i for i, s in enumerate(simplices)} or None
+    return cache[key]
+
+
+def _signed_action(sc: SimplicialComplex, p: int, perm: Permutation):
+    """Signed permutation matrix of perm on C_p as (image index, sign) arrays."""
+    index = _chain_data(sc, p)
+    assert index is not None
+    idx = np.zeros(len(index), dtype=int)
+    signs = np.zeros(len(index))
+    for s, i in index.items():
+        image = permutation_in_simplex_test(PChain([s], [1]), perm)
+        ((key, coeff),) = image.dic.items()
+        idx[i] = index[key]
+        signs[i] = coeff
+    return idx, signs
+
+
+def _boundary_basis(sc: SimplicialComplex, p: int, rows: bool) -> np.ndarray:
+    """Orthonormal basis of im d_p (rows=False) or of the row space of d_p."""
+    cache = _cache(sc)
+    key = ("svd", p)
+    if key not in cache:
+        src, tgt = _chain_data(sc, p), _chain_data(sc, p - 1)
+        assert src is not None and tgt is not None
+        D = np.zeros((len(tgt), len(src)))
+        for s, j in src.items():
+            for i in range(len(s)):
+                D[tgt[s[:i] + s[i + 1 :]], j] = (-1) ** i
+        U, sv, Vt = np.linalg.svd(D, full_matrices=False)
+        tol = max(D.shape) * np.finfo(float).eps * (sv[0] if len(sv) else 0)
+        r = int((sv > tol).sum())
+        cache[key] = (U[:, :r], Vt[:r].T)
+    return cache[key][1 if rows else 0]
+
+
+def _trace_on_span(basis: np.ndarray, idx: np.ndarray, signs: np.ndarray) -> float:
+    """Trace of an invariant signed permutation on the span of orthonormal columns."""
+    if basis.shape[1] == 0:
+        return 0.0
+    return float((signs * (basis * basis[idx]).sum(axis=1)).sum())
+
+
 def kernel_boundary_op(sc: SimplicialComplex, p: int) -> list[PChain] | None:
     """Compute a basis for the kernel of the boundary operator (cycles).
 
@@ -383,52 +437,18 @@ def character_kernel(sc: SimplicialComplex, p: int, perm: Permutation) -> Any:
     >>> character_kernel(sc, 0, Permutation())
     6
     """
-    dim = sc.dimension()
-    M = matrix_symmetric_representate(sc, p)
-    if M is None:
+    if p < 0 or p > sc.dimension():
         return 0
-    if p > 0 and (p <= dim):
-        null = nullspace(M)
-        M_mat: list[list] = [
-            [null[j][i] for j in range(len(null))] for i in range(len(null[0]))
-        ]
-        Q = reduce_matrix(Matrix(M_mat))
-        M_work = Q[0] * Matrix(M_mat)
-    elif p == 0:
-        M_work = M
-        null = [[M_work[i, j] for j in range(M.shape[1])] for i in range(M.shape[0])]
-        Q = reduce_matrix(Matrix(M_work))
-        M_work = Q[0] * Matrix(M_work)
-    else:
+    data = _chain_data(sc, p)
+    if data is None:
         return 0
-
-    if all(elem == null[0][0] for elem in null[0]):
-        return 0
-
-    w1: list = []
-    he = basis_group_oriented_p_chains(sc, p)
-    if he is None:
-        return 0
-    for a in range(len(null)):
-        v = PChain([], [])
-        c = 0
-        for j in list(he.dic.keys()):
-            v = v + PChain([j], [null[a][c]])
-            c = c + 1
-        v1 = permutation_in_simplex_test(v, perm)
-        u: list = []
-        for i in he.dic.keys():
-            u.append(np.array([v1.dic.get(i, 0)]))
-        u_mat = Q[0] * Matrix(u)
-        N = np.append(M_work, u_mat, axis=1)
-        N = Matrix(N)
-        w2: list = []
-        for i in tuple(linsolve(N)):
-            for j in i:
-                w2.append(j)
-        w1.append(w2)
-    N = Matrix(w1)
-    return np.trace(N.T)
+    idx, signs = _signed_action(sc, p, perm)
+    total = float(signs[idx == np.arange(len(idx))].sum())
+    if p == 0:
+        return int(round(total))
+    # Z_p = ker d_p, the orthogonal complement of the row space of d_p.
+    rows = _boundary_basis(sc, p, rows=True)
+    return int(round(total - _trace_on_span(rows, idx, signs)))
 
 
 def character_image(sc: SimplicialComplex, p: int, perm: Permutation) -> Any:
@@ -462,43 +482,12 @@ def character_image(sc: SimplicialComplex, p: int, perm: Permutation) -> Any:
     >>> character_image(sc, 1, Permutation())
     9
     """
-    dim = sc.dimension()
-    if p > 0 and (p <= dim):
-        M = matrix_symmetric_representate(sc, p)
-        if M is None:
-            return 0
-        w1: list = []
-        col = columnspace(M)
-        M_mat: list[list] = [
-            [col[j][i] for j in range(len(col))] for i in range(len(col[0]))
-        ]
-        Q = reduce_matrix(Matrix(M_mat))
-        M_work = Q[0] * Matrix(M_mat)
-        he = basis_group_oriented_p_chains(sc, p - 1)
-        if he is None:
-            return 0
-        for a in range(len(col)):
-            v = PChain([], [])
-            c = 0
-            for j in list(he.dic.keys()):
-                v = v + PChain([j], [col[a][c]])
-                c = c + 1
-            v1 = permutation_in_simplex_test(v, perm)
-            u: list = []
-            for i in he.dic.keys():
-                u.append(np.array([v1.dic.get(i, 0)]))
-            u_mat = Q[0] * Matrix(u)
-            N = np.append(M_work, u_mat, axis=1)
-            N = Matrix(N)
-            w2: list = []
-            for i in tuple(linsolve(N)):
-                for j in i:
-                    w2.append(j)
-            w1.append(w2)
-        N = Matrix(w1)
-        return np.trace(N.T)
-    else:
+    if p < 1 or p > sc.dimension():
         return 0
+    if _chain_data(sc, p) is None or _chain_data(sc, p - 1) is None:
+        return 0
+    idx, signs = _signed_action(sc, p - 1, perm)
+    return int(round(_trace_on_span(_boundary_basis(sc, p, rows=False), idx, signs)))
 
 
 def character_p_homology(sc: SimplicialComplex, p: int, perm: Permutation) -> Any:
