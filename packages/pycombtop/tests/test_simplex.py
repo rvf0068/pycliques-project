@@ -1,3 +1,5 @@
+from typing import Literal, cast
+
 import networkx as nx
 from pycombtop import (
     Simplex,
@@ -217,16 +219,14 @@ def test_all_subsets_single():
     assert len(subs) == 1
 
 
-def test_relative_betti_numbers_of_triangle_mod_empty_is_zero():
-    """A contractible big complex has trivial relative homology when the
-    small complex is empty.
-    """
+def test_relative_betti_numbers_of_triangle_mod_empty_has_beta_zero_one():
+    """Ordinary H_0 of a contractible simplex is one-dimensional."""
 
     def small(s):
         return False
 
     bettis = relative_betti_numbers([{0, 1, 2}], small)
-    assert all(b == 0 for b in bettis.values())
+    assert bettis == {0: 1, 1: 0, 2: 0}
 
 
 def test_relative_betti_numbers_of_circle_mod_point_has_h1_one():
@@ -238,6 +238,53 @@ def test_relative_betti_numbers_of_circle_mod_point_has_h1_one():
 
     bettis = relative_betti_numbers(big, small)
     assert bettis.get(1, 0) == 1
+
+
+def test_relative_betti_numbers_exact_and_approximate_modes_agree():
+    big = [{0, 1}, {1, 2}, {0, 2}]
+
+    def small(sigma):
+        return set(sigma) <= {0}
+
+    exact = relative_betti_numbers(big, small)
+    approximate = relative_betti_numbers(big, small, method="approximate")
+
+    assert exact == approximate
+    assert exact[1] == 1
+
+
+def test_relative_betti_numbers_rejects_unknown_method():
+    try:
+        relative_betti_numbers(
+            [{0, 1}],
+            lambda _sigma: False,
+            method=cast(Literal["exact", "approximate"], "mod2"),
+        )
+    except ValueError as error:
+        assert "method" in str(error)
+    else:
+        raise AssertionError("Expected invalid rank method to fail")
+
+
+def test_exact_relative_betti_numbers_ignore_integral_torsion():
+    # The ten-triangle minimal triangulation of RP^2 has H_1 = Z/2,
+    # which contributes no rational Betti number.
+    projective_plane_facets = [
+        {1, 2, 3},
+        {1, 2, 4},
+        {1, 3, 5},
+        {1, 4, 6},
+        {1, 5, 6},
+        {2, 3, 6},
+        {2, 4, 5},
+        {2, 5, 6},
+        {3, 4, 5},
+        {3, 4, 6},
+    ]
+
+    bettis = relative_betti_numbers(projective_plane_facets, lambda _sigma: False)
+
+    assert bettis == {0: 1, 1: 0, 2: 0}
 
 
 def test_nerve_of_sets():

@@ -1,9 +1,17 @@
 """Tests for the homotopy_type module."""
 
+import json
+
 import networkx as nx
+from pycliques import clique_graph, suspension_of_cycle
 from pycombtop import (
+    CollapseStatus,
     Simplex,
     SimplicialComplex,
+    clique_complex,
+    nerve_of_cliques,
+    relative_collapse,
+    verify_relative_collapse,
 )
 from pycombtop.homotopy_type import (
     HomotopyVerdict,
@@ -74,6 +82,81 @@ def test_collapse_boundary_triangle():
     # The boundary of a triangle has the homotopy type of S^1;
     # elementary collapses cannot reduce it to a point.
     assert len(result.vertex_set) >= 2
+
+
+def test_relative_collapse_of_simplex_to_its_base_facet():
+    """The K5 clique complex collapses relative to its K4 subcomplex."""
+    source = clique_complex(nx.complete_graph(5))
+    target = clique_complex(nx.complete_graph(4))
+
+    result = relative_collapse(source, target)
+
+    assert result.status is CollapseStatus.PROVED
+    assert result.pairs
+    assert verify_relative_collapse(source, target, result.pairs)
+    assert json.loads(result.certificate_json())
+
+
+def test_relative_collapse_preserves_target_and_rejects_bad_certificate():
+    source = SimplicialComplex({0, 1}, facet_set=[{0, 1}])
+    target = SimplicialComplex({0}, facet_set=[{0}])
+    result = relative_collapse(source, target)
+
+    assert result.status is CollapseStatus.PROVED
+    assert verify_relative_collapse(source, target, result.pairs)
+    assert not verify_relative_collapse(source, target, [])
+
+
+def test_relative_collapse_reports_inconclusive_for_impossible_target():
+    source = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1}, {1, 2}, {0, 2}])
+    target = SimplicialComplex({0}, facet_set=[{0}])
+
+    result = relative_collapse(source, target)
+
+    assert result.status is CollapseStatus.INCONCLUSIVE
+    assert "non-collapsibility is not established" in result.diagnostics
+
+
+def test_relative_collapse_requires_target_to_be_subcomplex():
+    source = SimplicialComplex({0, 1}, facet_set=[{0, 1}])
+    target = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1, 2}])
+
+    try:
+        relative_collapse(source, target)
+    except ValueError as error:
+        assert "subcomplex" in str(error)
+    else:
+        raise AssertionError("Expected target validation to fail")
+
+
+def test_octahedron_regression_is_not_a_relative_collapse():
+    graph = nx.octahedral_graph()
+    kg = clique_graph(graph)
+    assert kg is not None
+    source = clique_complex(kg)
+    target = nerve_of_cliques(graph)
+
+    source_betti = betti_numbers_sc(source)
+    graph_betti = betti_numbers_sc(clique_complex(graph))
+    result = relative_collapse(source, target, max_states=2_000)
+
+    assert graph_betti == [0, 0, 1]
+    assert source_betti == [0, 0, 0, 1]
+    assert result.status is CollapseStatus.INCONCLUSIVE
+    assert not verify_relative_collapse(source, target, result.pairs)
+
+
+def test_suspension_of_c5_has_verified_relative_collapse():
+    graph = suspension_of_cycle(5)
+    kg = clique_graph(graph)
+    assert kg is not None
+    source = clique_complex(kg)
+    target = nerve_of_cliques(graph)
+
+    result = relative_collapse(source, target)
+
+    assert result.status is CollapseStatus.PROVED
+    assert verify_relative_collapse(source, target, result.pairs)
 
 
 # ---------- is_vertex_decomposable ----------

@@ -76,6 +76,13 @@ from .homotopy_invariance import (
     verify_discrete_morse_matching,
     witnesses_and_extension,
 )
+from .homotopy_research import (
+    EnumerationStatus,
+    HomotopyStructureResult,
+    MissingFaceCertificate,
+    homotopy_structure_certificates,
+    verify_homotopy_structure_certificates,
+)
 from .named import (
     collapse_obstruction_fixture,
     complement_of_cycle,
@@ -199,6 +206,11 @@ __all__ = [
     "theorem15_hypothesis_holds",
     "verify_discrete_morse_matching",
     "witnesses_and_extension",
+    "EnumerationStatus",
+    "HomotopyStructureResult",
+    "MissingFaceCertificate",
+    "homotopy_structure_certificates",
+    "verify_homotopy_structure_certificates",
     # named
     "collapse_obstruction_fixture",
     "complement_of_cycle",

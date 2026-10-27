@@ -339,7 +339,13 @@ def _has_free_face(s_complex: SimplicialComplex) -> Simplex | None:
 
 
 def collapse(s_complex: SimplicialComplex) -> SimplicialComplex:
-    """Collapse *s_complex* by repeated elementary collapses."""
+    """Greedily apply nonrelative elementary collapses to *s_complex*.
+
+    This procedure does not preserve a chosen subcomplex and makes no search
+    over competing collapse choices. If it stops before a point, that only
+    means this greedy procedure found no next free face; it does not establish
+    non-collapsibility.
+    """
     sc = s_complex
     while True:
         if len(sc.vertex_set) in {0, 1}:

@@ -5,10 +5,12 @@ from collections import defaultdict
 from collections.abc import Callable, Generator, Iterable
 from functools import reduce
 from itertools import chain, combinations
+from typing import Literal
 
 import networkx as nx
 import numpy as np
 from networkx.algorithms import tournament
+from sympy import Matrix
 
 
 class Simplex(frozenset):
@@ -396,8 +398,10 @@ def all_subsets(the_set: set) -> Generator[Simplex]:
 def relative_betti_numbers(
     big_complex_maximal_faces: Iterable[Iterable],
     small_complex_membership_test: Callable[[Iterable], bool],
+    *,
+    method: Literal["exact", "approximate"] = "exact",
 ) -> dict[int, int]:
-    """Return the relative Betti numbers of a finite simplicial pair (big, small).
+    """Return relative Betti numbers by exact rational or approximate rank.
 
     The ambient complex is given by its maximal faces, and the subcomplex is
     described by a predicate ``small_complex_membership_test(sigma)``.  The
@@ -413,6 +417,15 @@ def relative_betti_numbers(
     small_complex_membership_test : callable
         Predicate that returns ``True`` exactly when a simplex lies in the
         subcomplex.
+    method : {"exact", "approximate"}
+        ``"exact"`` (the default) computes boundary ranks over :math:`Q` using
+        exact integer matrices. ``"approximate"`` uses floating-point
+        ``numpy.linalg.matrix_rank`` as a fast screening mode.
+
+    Notes
+    -----
+    Rational Betti numbers do not detect torsion in integral homology, and
+    vanishing relative Betti numbers do not imply that the pair collapses.
 
     .. rubric:: Returns
 
@@ -420,6 +433,9 @@ def relative_betti_numbers(
         A dictionary mapping each nonnegative degree *d* to the *d*-th Betti
         number of the relative complex ``(big, small)``.
     """
+    if method not in {"exact", "approximate"}:
+        raise ValueError("method must be 'exact' or 'approximate'")
+
     facets = [Simplex(f) for f in big_complex_maximal_faces]
     if not facets:
         return {}
@@ -433,7 +449,7 @@ def relative_betti_numbers(
 
     by_dim: dict[int, list[Simplex]] = defaultdict(list)
     for sigma in all_simplices:
-        if small_complex_membership_test(sigma):
+        if sigma.dimension() < 0 or small_complex_membership_test(sigma):
             continue
         by_dim[sigma.dimension()].append(sigma)
 
@@ -446,9 +462,9 @@ def relative_betti_numbers(
         cols = by_dim.get(d, [])
         rows = by_dim.get(d - 1, [])
         if not cols or not rows:
-            return np.zeros((0, len(cols)), dtype=float)
+            return np.zeros((0, len(cols)), dtype=int)
 
-        matrix = np.zeros((len(rows), len(cols)), dtype=float)
+        matrix = np.zeros((len(rows), len(cols)), dtype=int)
         row_index = {sigma: i for i, sigma in enumerate(rows)}
 
         for j, sigma in enumerate(cols):
@@ -467,8 +483,16 @@ def relative_betti_numbers(
             continue
         d_matrix = boundary_matrix(d)
         next_matrix = boundary_matrix(d + 1)
-        rank_d = int(np.linalg.matrix_rank(d_matrix)) if d_matrix.size else 0
-        rank_next = int(np.linalg.matrix_rank(next_matrix)) if next_matrix.size else 0
+        if method == "exact":
+            rank_d = int(Matrix(d_matrix.tolist()).rank()) if d_matrix.size else 0
+            rank_next = (
+                int(Matrix(next_matrix.tolist()).rank()) if next_matrix.size else 0
+            )
+        else:
+            rank_d = int(np.linalg.matrix_rank(d_matrix)) if d_matrix.size else 0
+            rank_next = (
+                int(np.linalg.matrix_rank(next_matrix)) if next_matrix.size else 0
+            )
         bettis[d] = len(current) - rank_d - rank_next
 
     return bettis
@@ -525,7 +549,9 @@ def clique_complex(graph: nx.Graph) -> SimplicialComplex:
 def nerve_of_cliques(graph: nx.Graph) -> SimplicialComplex:
     """Return the nerve of the maximal cliques of *graph*.
 
-    Two cliques are connected in the nerve when they share at least one vertex.
+    Pairwise intersection determines the 1-skeleton, but a simplex in the
+    nerve requires a common vertex shared by every participating maximal
+    clique.
 
     .. rubric:: Examples
 

@@ -1,3 +1,5 @@
+from dataclasses import dataclass, replace
+
 import networkx as nx
 from pycliques.cliques import clique_graph
 from pycliques.helly import is_clique_helly
@@ -15,6 +17,11 @@ from pycliques.homotopy_invariance import (
     theorem15_hypothesis_holds,
     verify_discrete_morse_matching,
     witnesses_and_extension,
+)
+from pycliques.homotopy_research import (
+    EnumerationStatus,
+    homotopy_structure_certificates,
+    verify_homotopy_structure_certificates,
 )
 from pycliques.named import (
     collapse_obstruction_fixture,
@@ -91,6 +98,46 @@ def test_neckties_octahedron_are_maximal_bad_completes():
         candidates = set(kg.nodes()) - necktie
         for q in candidates:
             assert not all(kg.has_edge(q, member) for member in necktie)
+
+
+@dataclass(frozen=True)
+class _HashableLabel:
+    value: str
+
+
+def test_homotopy_structure_certificates_support_arbitrary_hashable_labels():
+    graph = nx.octahedral_graph()
+    graph = nx.relabel_nodes(
+        graph, {vertex: _HashableLabel(str(vertex)) for vertex in graph}
+    )
+
+    result = homotopy_structure_certificates(graph)
+
+    assert result.status is EnumerationStatus.COMPLETE
+    assert result.graph6
+    assert result.missing_faces
+    assert result.to_json()
+    assert verify_homotopy_structure_certificates(graph, result)
+    certificate = result.missing_faces[0]
+    invalid_certificate = replace(
+        certificate,
+        witness_vertices=(len(graph) + 1,) * len(certificate.clique_ids),
+    )
+    invalid_result = replace(
+        result,
+        missing_faces=(invalid_certificate, *result.missing_faces[1:]),
+    )
+    assert not verify_homotopy_structure_certificates(graph, invalid_result)
+
+
+def test_homotopy_structure_budget_is_explicitly_inconclusive():
+    graph = nx.octahedral_graph()
+
+    result = homotopy_structure_certificates(graph, max_cliques=1)
+
+    assert result.status is EnumerationStatus.INCONCLUSIVE
+    assert result.explored_cliques == 1
+    assert verify_homotopy_structure_certificates(graph, result)
 
 
 def test_is_center_true_and_false_on_octahedron():

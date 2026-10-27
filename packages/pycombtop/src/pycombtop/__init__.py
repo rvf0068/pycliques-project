@@ -30,6 +30,12 @@ from .homotopy_type import (
     star,
     star_cluster,
 )
+from .relative_collapse import (
+    CollapseResult,
+    CollapseStatus,
+    relative_collapse,
+    verify_relative_collapse,
+)
 from .s_collapses import (
     complete_s_collapse,
     complete_s_collapse_edges,
@@ -114,4 +120,8 @@ __all__ = [
     # hom_complex
     "graph_homomorphisms",
     "hom_graph",
+    "CollapseResult",
+    "CollapseStatus",
+    "relative_collapse",
+    "verify_relative_collapse",
 ]
