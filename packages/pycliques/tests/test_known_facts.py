@@ -4,7 +4,10 @@ import networkx as nx
 from pycliques.cliques import clique_graph
 from pycliques.dominated import find_dominated_vertex
 from pycliques.helly import is_clique_helly
-from pycliques.homotopy_invariance import theorem15_hypothesis_holds
+from pycliques.homotopy_invariance import (
+    delta_of_clique_set,
+    theorem15_hypothesis_holds,
+)
 from pycliques.named import (
     collapse_obstruction_fixture,
     dominated_vertex_free_non_helly,
@@ -84,13 +87,20 @@ def test_fixture_1_has_documented_invariants():
 
 
 def test_fixture_2_has_documented_invariants():
-    """Fixture HUZv~zz carries the O4 obstruction and satisfies Theorem 15."""
+    """Fixture HUZv~zz has an O4 obstruction and a non-flag H1 witness."""
     graph = collapse_obstruction_fixture()
     kg = clique_graph(graph)
     assert graph.order() == 9
     assert kg.order() == 16
     assert has_induced(kg, octahedron(4))
-    assert theorem15_hypothesis_holds(graph)[0] is True
+    holds, witness = theorem15_hypothesis_holds(graph)
+    assert holds is False
+    assert witness is not None
+    delta_h = delta_of_clique_set(witness)
+    h_betti = relative_betti_numbers(
+        delta_h.facet_set, lambda _simplex: False, method="exact"
+    )
+    assert h_betti[1] == 1
 
     relative = relative_betti_numbers(
         nx.find_cliques(kg),

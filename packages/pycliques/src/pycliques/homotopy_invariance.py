@@ -25,10 +25,14 @@ from __future__ import annotations
 
 import itertools
 from collections.abc import Callable, Hashable, Iterable, Iterator
+from typing import TYPE_CHECKING
 
 import networkx as nx
 
 from .cliques import clique_graph
+
+if TYPE_CHECKING:
+    from pycombtop import SimplicialComplex
 
 # ---------------------------------------------------------------------------
 # 1a. Completes of K(G), centers, and neckties (Theorem 11 machinery)
@@ -592,12 +596,12 @@ def h_closure(
     return frozenset.intersection(*containing)
 
 
-def delta_of_clique_set(clique_set: Iterable[frozenset]) -> nx.Graph:
+def delta_of_clique_set(clique_set: Iterable[frozenset]) -> SimplicialComplex:
     """Return :math:`\\Delta(C)`: one full simplex per clique in *clique_set*.
 
-    The result lives on :math:`G`'s vertices (not on cliques): it is the
-    union, over every clique :math:`q` in *clique_set*, of the complete
-    graph on :math:`q`'s vertices.
+    The result is the union, over every clique :math:`q` in *clique_set*, of
+    the full simplex on :math:`q`'s vertices. It need not be flag: faces are
+    included only when they belong to one of the supplied cliques.
 
     .. rubric:: Parameters
 
@@ -606,28 +610,26 @@ def delta_of_clique_set(clique_set: Iterable[frozenset]) -> nx.Graph:
 
     .. rubric:: Returns
 
-    networkx.Graph
-        A graph whose clique complex is :math:`\\Delta(C)`.
+    SimplicialComplex
+        The genuine (possibly non-flag) simplicial complex :math:`\\Delta(C)`.
 
     .. rubric:: Examples
 
     >>> from pycliques.homotopy_invariance import delta_of_clique_set
     >>> d = delta_of_clique_set([frozenset({0, 1, 2})])
-    >>> sorted(d.nodes())
+    >>> sorted(d.vertex_set)
     [0, 1, 2]
-    >>> d.number_of_edges()
-    3
+    >>> len(d.facet_set)
+    1
     """
-    clique_set = list(clique_set)
-    verts: set = set()
-    for q in clique_set:
-        verts |= set(q)
-    delta = nx.Graph()
-    delta.add_nodes_from(verts)
-    for q in clique_set:
-        for u, v in itertools.combinations(q, 2):
-            delta.add_edge(u, v)
-    return delta
+    from pycombtop import Simplex, SimplicialComplex
+
+    generators = {Simplex(clique) for clique in clique_set}
+    facets = {
+        face for face in generators if not any(face < other for other in generators)
+    }
+    vertices = set().union(*(set(face) for face in facets)) if facets else set()
+    return SimplicialComplex(vertices, facet_set=facets)
 
 
 def _clique_index(
@@ -696,10 +698,11 @@ def theorem15_hypothesis_holds(
     .. rubric:: Returns
 
     tuple[bool | None, frozenset | None]
-        ``(True, None)`` if the hypothesis holds for every complete;
-        ``(False, hX)`` if some :math:`\\Delta(h(X))` is provably not
-        contractible; ``(None, hX)`` if *size_cap* caused an early,
-        inconclusive stop.
+        ``(True, None)`` if every relevant complex is proved contractible;
+        ``(False, hX)`` if some :math:`\\Delta(h(X))` is proved
+        noncontractible; ``(None, hX)`` if at least one case is undecided,
+        including a size-limit exit or an inexact computation without a
+        nonzero reduced homology obstruction.
 
     .. rubric:: Examples
 
@@ -708,7 +711,7 @@ def theorem15_hypothesis_holds(
     >>> theorem15_hypothesis_holds(nx.complete_graph(4))
     (True, None)
     """
-    from pycombtop.homotopy_type import homotopy_type_with_verdict
+    from pycombtop.homotopy_type import homotopy_type_sc_with_verdict
 
     kg = clique_graph(graph)
     assert kg is not None
@@ -720,11 +723,32 @@ def theorem15_hypothesis_holds(
     for complete in nx.enumerate_all_cliques(kg):
         distinct_h.add(_h_closure_indexed(complete, index, cache))
 
-    for h_image in distinct_h:
+    vertex_order = {vertex: index for index, vertex in enumerate(graph.nodes())}
+    ordered_h = sorted(
+        distinct_h,
+        key=lambda family: (
+            len(family),
+            tuple(
+                sorted(
+                    tuple(sorted(vertex_order[vertex] for vertex in clique))
+                    for clique in family
+                )
+            ),
+        ),
+    )
+    first_unknown: frozenset | None = None
+    for h_image in ordered_h:
         delta = delta_of_clique_set(h_image)
-        if size_cap is not None and delta.order() > size_cap:
-            return None, h_image
-        verdict = homotopy_type_with_verdict(delta)
-        if not (verdict.is_exact and verdict.wedge.is_contractible()):
+        if size_cap is not None and len(delta.vertex_set) > size_cap:
+            if first_unknown is None:
+                first_unknown = h_image
+            continue
+        verdict = homotopy_type_sc_with_verdict(delta)
+        if verdict.is_exact and not verdict.wedge.is_contractible():
             return False, h_image
-    return True, None
+        if not verdict.is_exact:
+            if not verdict.wedge.is_contractible():
+                return False, h_image
+            if first_unknown is None:
+                first_unknown = h_image
+    return (None, first_unknown) if first_unknown is not None else (True, None)

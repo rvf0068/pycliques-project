@@ -224,15 +224,18 @@ class HomotopyVerdict:
     .. rubric:: Attributes
 
     wedge : WedgeOfSpheres | None
-        The structured homotopy type when known to be a wedge of spheres.
-        ``None`` when only Betti numbers could be computed.
+        For an exact verdict, the established wedge-of-spheres homotopy type.
+        For an inexact verdict, this may contain only the reduced Betti-number
+        vector encoded as sphere counts; it is not then a homotopy
+        decomposition.
     reason : str
         The theorem or sequence of reductions used to establish the
         verdict.  One of the :class:`Theorem` constants, or a
         concatenation of several.
     is_exact : bool
         ``True`` when the verdict is provably the correct homotopy type.
-        ``False`` when only Betti numbers could be computed.
+        ``False`` when only Betti numbers could be computed; in particular,
+        an empty ``wedge`` in that case does not prove contractibility.
     is_limited : bool
         ``True`` when computation was skipped because a configured size limit
         was exceeded. A limited result is inconclusive, not contractible.
@@ -771,7 +774,9 @@ def homotopy_type_with_verdict(
 
         * ``verdict`` - LaTeX string for the homotopy type.
         * ``reason``  - The theorem(s) that justify the verdict.
-        * ``is_exact`` - ``False`` when only Betti numbers were computed.
+        * ``is_exact`` - ``False`` when only Betti numbers were computed; in
+          that case the returned sphere counts are Betti numbers, not a
+          verified wedge-of-spheres decomposition.
 
     .. rubric:: Examples
 

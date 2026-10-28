@@ -29,6 +29,14 @@ from pycliques.named import (
     octahedron,
     suspension_of_cycle,
 )
+from pycombtop import (
+    HomotopyVerdict,
+    Simplex,
+    SimplicialComplex,
+    WedgeOfSpheres,
+    relative_betti_numbers,
+)
+from pycombtop.homotopy_type import betti_numbers_sc
 
 # ---------- Shared fixtures (Priority 6, added early per project instructions) ---
 
@@ -328,17 +336,70 @@ def test_h_closure_of_maximal_clique_is_itself():
         assert h_closure(q, kg, all_maximal) == q
 
 
-def test_delta_of_clique_set_single_clique_is_complete_graph():
-    """Delta of a single clique is the complete graph on its vertices."""
+def test_delta_of_clique_set_single_clique_is_a_full_simplex():
+    """Delta of a single clique has that clique as its only facet."""
     d = delta_of_clique_set([frozenset({0, 1, 2})])
-    assert sorted(d.nodes()) == [0, 1, 2]
-    assert d.number_of_edges() == 3
+    assert d.vertex_set == {0, 1, 2}
+    assert d.facet_set == {Simplex({0, 1, 2})}
+    assert (
+        d.all_simplices()
+        == SimplicialComplex({0, 1, 2}, facet_set=[{0, 1, 2}]).all_simplices()
+    )
 
 
-def test_delta_of_clique_set_empty_is_empty_graph():
+def test_delta_of_clique_set_empty_is_empty_complex():
     """Delta of an empty clique set has no vertices."""
     d = delta_of_clique_set([])
-    assert d.number_of_nodes() == 0
+    assert not d.vertex_set
+    assert not d.facet_set
+
+
+def test_delta_of_clique_set_preserves_nonflag_triangle_boundary():
+    """Three edge facets remain an unfilled triangle."""
+    d = delta_of_clique_set(
+        [
+            frozenset({0, 1}),
+            frozenset({1, 2}),
+            frozenset({0, 2}),
+        ]
+    )
+    assert d.facet_set == {
+        Simplex({0, 1}),
+        Simplex({1, 2}),
+        Simplex({0, 2}),
+    }
+    assert not d.is_clique_complex()
+    assert betti_numbers_sc(d) == [0, 1]
+
+
+def test_delta_of_h_closed_family_preserves_missing_triangle_face():
+    """The graph6 octahedron example remains the genuine non-flag complex."""
+    graph = nx.from_graph6_bytes(b"EznW")
+    family = frozenset(
+        {
+            frozenset({0, 4, 5}),
+            frozenset({1, 3, 5}),
+            frozenset({2, 3, 4}),
+        }
+    )
+    kg = clique_graph(graph)
+    assert kg is not None
+    assert family <= set(kg)
+    maximal_kg = [frozenset(clique) for clique in nx.find_cliques(kg)]
+    assert h_closure(family, kg, maximal_kg) == family
+
+    delta = delta_of_clique_set(family)
+    expected = SimplicialComplex(
+        set().union(*family), facet_set={Simplex(clique) for clique in family}
+    )
+    assert delta.all_simplices() == expected.all_simplices()
+    assert not delta.is_clique_complex()
+    assert betti_numbers_sc(delta) == [0, 1]
+
+
+def test_delta_of_clique_set_ignores_nonmaximal_generators():
+    delta = delta_of_clique_set([frozenset({0, 1}), frozenset({0})])
+    assert delta.facet_set == {Simplex({0, 1})}
 
 
 def test_theorem15_hypothesis_holds_for_complete_graph():
@@ -363,12 +424,16 @@ def test_theorem15_hypothesis_holds_fixture_1():
     assert holds is True
 
 
-def test_theorem15_hypothesis_holds_fixture_2():
-    """Fixture 2 (HUZv~zz): the sharpest stress test in the whole toolkit.
-    Elementary collapse provably cannot succeed here, yet Theorem 15's
-    hypothesis holds cleanly -- exactly the documented result."""
-    holds, _ = theorem15_hypothesis_holds(FIXTURE_2())
-    assert holds is True
+def test_theorem15_hypothesis_fails_fixture_2_with_nonflag_homology():
+    """The genuine h-closed family has nonzero rational first homology."""
+    holds, witness = theorem15_hypothesis_holds(FIXTURE_2())
+    assert holds is False
+    assert witness is not None
+    delta = delta_of_clique_set(witness)
+    betti_numbers = relative_betti_numbers(
+        delta.facet_set, lambda _face: False, method="exact"
+    )
+    assert betti_numbers[1] == 1
 
 
 def test_theorem15_hypothesis_size_cap_inconclusive():
@@ -377,6 +442,50 @@ def test_theorem15_hypothesis_size_cap_inconclusive():
     holds, hx = theorem15_hypothesis_holds(FIXTURE_2(), size_cap=1)
     assert holds is None
     assert hx is not None
+
+
+def test_theorem15_inexact_contractible_betti_result_is_inconclusive(monkeypatch):
+    """An inexact zero-Betti result does not prove contractibility."""
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
+        lambda _complex: HomotopyVerdict(
+            wedge=WedgeOfSpheres.contractible(),
+            reason="test-only Betti numbers",
+            is_exact=False,
+        ),
+    )
+    holds, witness = theorem15_hypothesis_holds(nx.path_graph(3))
+    assert holds is None
+    assert witness is not None
+
+
+def test_theorem15_inexact_nonzero_betti_result_proves_failure(monkeypatch):
+    """A nonzero reduced Betti number proves noncontractibility."""
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
+        lambda _complex: HomotopyVerdict(
+            wedge=WedgeOfSpheres.sphere(1),
+            reason="test-only nonzero reduced Betti number",
+            is_exact=False,
+        ),
+    )
+    holds, witness = theorem15_hypothesis_holds(nx.path_graph(3))
+    assert holds is False
+    assert witness is not None
+
+
+def test_theorem15_exact_noncontractible_verdict_proves_failure(monkeypatch):
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
+        lambda _complex: HomotopyVerdict(
+            wedge=WedgeOfSpheres.sphere(1),
+            reason="test-only exact homotopy type",
+            is_exact=True,
+        ),
+    )
+    holds, witness = theorem15_hypothesis_holds(nx.path_graph(3))
+    assert holds is False
+    assert witness is not None
 
 
 # ---------- 1e: discrete Morse matching ----------

@@ -206,21 +206,19 @@ def test_clique_graph_node_types():
 
 
 def test_clique_graph_of_complete_bipartite():
-    """K(K_{m,n}) is isomorphic to K_m x K_n (tensor product).
+    """K(K_{m,n}) is isomorphic to the Cartesian product of K_m and K_n.
 
     The cliques of K_{m,n} are its m*n edges, and two clique-nodes
     are adjacent iff the edges share an endpoint.  This gives the Kronecker /
-    tensor product K_m x K_n (also known as the Rook's graph complement).
-    We test via the degree sequence.
+    Cartesian product of K_m and K_n, also known as the rook graph.
     """
     m, n = 3, 4
     g = nx.complete_bipartite_graph(m, n)
     kg = clique_graph(g)
     assert kg is not None
     assert kg.number_of_nodes() == m * n
-    # Each edge shares one endpoint with (m-1)+(n-1) others
-    expected_degree = (m - 1) + (n - 1)
-    assert all(d == expected_degree for _, d in kg.degree())
+    expected = nx.cartesian_product(nx.complete_graph(m), nx.complete_graph(n))
+    assert nx.is_isomorphic(kg, expected)
 
 
 def test_clique_graph_indexes_many_cliques_structurally():
