@@ -46,6 +46,15 @@ def test_clique_graph_bound_returns_none_when_exceeded():
     assert clique_graph(graph, bound=2) is None
 
 
+def test_clique_graph_edge_budget_stops_during_construction():
+    graph = nx.star_graph(4)
+
+    assert clique_graph(graph, max_edges=5) is None
+    result = clique_graph(graph, max_edges=6)
+    assert result is not None
+    assert result.number_of_edges() == 6
+
+
 def test_homotopy_clique_graph_vertex_clique_pairs():
     """Nodes in the homotopy clique graph are (vertex, clique) pairs."""
     graph = nx.path_graph(3)

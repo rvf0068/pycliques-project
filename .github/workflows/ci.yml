@@ -5,6 +5,9 @@ on:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
 
 jobs:
   test:
@@ -53,3 +56,45 @@ jobs:
           files: ./coverage-${{ matrix.package }}.xml
           flags: ${{ matrix.package }}
           fail_ci_if_error: false # Don't break build if Codecov is down
+
+  research:
+    name: Research regression tests (Python 3.11)
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+      - name: Set up Python 3.11
+        run: uv python install 3.11
+      - name: Install Dependencies
+        run: uv sync
+      - name: Run fast research tests
+        run: uv run pytest research/test_homotopy_research.py -m "not slow"
+
+  research-order-eight:
+    name: Order-8 research census (Python 3.11)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+      - name: Set up Python 3.11
+        run: uv python install 3.11
+      - name: Install Dependencies
+        run: uv sync
+      - name: Run order-8 candidate-count regression
+        run: uv run pytest research/test_homotopy_research.py -m slow

@@ -37,6 +37,9 @@ dev = [
 [tool.ruff]
 line-length = 88
 
+[tool.pytest.ini_options]
+markers = ["slow: census-scale research regression tests"]
+
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
 

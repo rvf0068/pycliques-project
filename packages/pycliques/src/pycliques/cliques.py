@@ -57,7 +57,12 @@ def _cliques_by_vertex(
 
 
 @singledispatch
-def clique_graph(graph: nx.Graph, bound: int | float = math.inf) -> nx.Graph | None:
+def clique_graph(
+    graph: nx.Graph,
+    bound: int | float = math.inf,
+    *,
+    max_edges: int | None = None,
+) -> nx.Graph | None:
     """Produce the clique graph of an undirected NetworkX graph.
 
     .. rubric:: Parameters
@@ -68,6 +73,9 @@ def clique_graph(graph: nx.Graph, bound: int | float = math.inf) -> nx.Graph | N
         intersect.
     bound : int, optional
         Maximum number of cliques before aborting (default: ``math.inf``).
+    max_edges : int, optional
+        Maximum number of edges in the output graph. When exceeded, return
+        ``None`` before constructing additional edges. The default is unbounded.
 
     .. rubric:: Returns
 
@@ -87,6 +95,8 @@ def clique_graph(graph: nx.Graph, bound: int | float = math.inf) -> nx.Graph | N
     >>> clique_graph(nx.cycle_graph(4), bound=2) is None
     True
     """
+    if max_edges is not None and max_edges < 0:
+        raise ValueError("max_edges must be nonnegative or None")
     indexed = _cliques_by_vertex(graph, bound)
     if indexed is None:
         return None
@@ -95,8 +105,14 @@ def clique_graph(graph: nx.Graph, bound: int | float = math.inf) -> nx.Graph | N
     clique_graph.add_nodes_from(cliques)
 
     # Link clique vertices that share an input-graph vertex.
+    edge_count = 0
     for cliques_with_v in cliques_of.values():
-        clique_graph.add_edges_from(itertools.combinations(cliques_with_v, 2))
+        for first, second in itertools.combinations(cliques_with_v, 2):
+            if not clique_graph.has_edge(first, second):
+                if max_edges is not None and edge_count >= max_edges:
+                    return None
+                clique_graph.add_edge(first, second)
+                edge_count += 1
 
     return clique_graph
 

@@ -42,7 +42,12 @@ class CoaffinePair:
 
 
 @clique_graph.register
-def _(pair: CoaffinePair, bound: int | float = math.inf) -> CoaffinePair | None:
+def _(
+    pair: CoaffinePair,
+    bound: int | float = math.inf,
+    *,
+    max_edges: int | None = None,
+) -> CoaffinePair | None:
     """Return the clique graph of a :class:`CoaffinePair` as another pair.
 
     .. rubric:: Parameters
@@ -51,6 +56,8 @@ def _(pair: CoaffinePair, bound: int | float = math.inf) -> CoaffinePair | None:
         Pair consisting of the original graph and one of its coaffinations.
     bound : int, optional
         Maximum number of cliques allowed before returning ``None``.
+    max_edges : int, optional
+        Maximum number of edges in the output clique graph.
 
     .. rubric:: Examples
 
@@ -65,7 +72,7 @@ def _(pair: CoaffinePair, bound: int | float = math.inf) -> CoaffinePair | None:
     g = pair.graph
     sigma = pair.coaffination
     # We call the original generic clique_graph logic on the underlying graph
-    kg = clique_graph.registry[object](g, bound)
+    kg = clique_graph.registry[object](g, bound, max_edges=max_edges)
     if kg is None:
         return None
     coaf_k: dict[Hashable, Hashable] = {}

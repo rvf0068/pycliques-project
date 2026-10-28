@@ -11,7 +11,7 @@ from typing import Any
 import networkx as nx
 
 from .cliques import clique_graph
-from .homotopy_invariance import minimal_violation, witnesses_and_extension
+from .homotopy_invariance import witnesses_and_extension
 
 
 class EnumerationStatus(Enum):
@@ -35,7 +35,11 @@ class MissingFaceCertificate:
 
 @dataclass(frozen=True)
 class HomotopyStructureResult:
-    """Graph6-labelled structures and certificates from a bounded search."""
+    """Graph6-labelled structures and certificates from a bounded search.
+
+    ``vertex_labels`` records integer IDs and Python type names for diagnostics;
+    it does not encode arbitrary original objects for reconstruction.
+    """
 
     graph6: str
     vertex_labels: tuple[str, ...]
@@ -46,6 +50,10 @@ class HomotopyStructureResult:
     explored_cliques: int
     status: EnumerationStatus
     diagnostics: str
+    max_cliques: int = 1_000
+    explored_graph_cliques: int = 0
+    max_clique_graph_edges: int = 1_000_000
+    explored_graph_edges: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-ready result with enum values rendered as strings."""
@@ -82,33 +90,68 @@ def _is_complete(graph: nx.Graph, vertices: set[Any]) -> bool:
 
 
 def homotopy_structure_certificates(
-    graph: nx.Graph, *, max_cliques: int = 100_000
+    graph: nx.Graph,
+    *,
+    max_cliques: int = 1_000,
+    max_clique_graph_edges: int = 1_000_000,
 ) -> HomotopyStructureResult:
     """Enumerate minimal missing nerve faces and their incidence structures.
 
-    The budget counts cliques enumerated in K(G). An exhausted budget returns
-    the certificates found so far with ``INCONCLUSIVE`` status.
+    ``max_cliques`` applies separately to maximal cliques of the input and
+    complete candidates in K(G); ``max_clique_graph_edges`` bounds K(G)'s
+    edges. The defaults also bound the quadratic conflict-edge phase. An
+    exhausted budget returns ``INCONCLUSIVE`` without a global
+    minimum-violation claim.
     """
     if max_cliques < 1:
         raise ValueError("max_cliques must be positive")
+    if max_clique_graph_edges < 0:
+        raise ValueError("max_clique_graph_edges must be nonnegative")
 
     source_vertices = list(graph.nodes())
     source_ids = {vertex: index for index, vertex in enumerate(source_vertices)}
-    kg = clique_graph(graph)
+    graph6 = _graph6(graph, source_ids)
+    vertex_labels = tuple(
+        f"{index}:{type(vertex).__module__}.{type(vertex).__qualname__}"
+        for index, vertex in enumerate(source_vertices)
+    )
+    kg = clique_graph(graph, bound=max_cliques, max_edges=max_clique_graph_edges)
     if kg is None:
-        raise RuntimeError("unbounded clique-graph construction unexpectedly failed")
+        explored_input_cliques = 0
+        for _ in nx.find_cliques(graph):
+            explored_input_cliques += 1
+            if explored_input_cliques > max_cliques:
+                break
+        clique_budget_exceeded = explored_input_cliques > max_cliques
+        return HomotopyStructureResult(
+            graph6=graph6,
+            vertex_labels=vertex_labels,
+            clique_labels=(),
+            smallest_violation_ids=None,
+            missing_faces=(),
+            conflict_edges=(),
+            explored_cliques=0,
+            status=EnumerationStatus.INCONCLUSIVE,
+            diagnostics=(
+                "Clique-graph construction stopped after exceeding "
+                f"max_cliques={max_cliques} input cliques."
+                if clique_budget_exceeded
+                else "Clique-graph construction stopped after exceeding "
+                f"max_clique_graph_edges={max_clique_graph_edges}."
+            ),
+            max_cliques=max_cliques,
+            explored_graph_cliques=explored_input_cliques,
+            max_clique_graph_edges=max_clique_graph_edges,
+            explored_graph_edges=(
+                0 if clique_budget_exceeded else max_clique_graph_edges + 1
+            ),
+        )
 
     ordered_cliques = sorted(
         kg.nodes(),
         key=lambda clique: tuple(sorted(source_ids[vertex] for vertex in clique)),
     )
     clique_ids = {clique: index for index, clique in enumerate(ordered_cliques)}
-    smallest_violation = minimal_violation(kg)
-    smallest_violation_ids = (
-        tuple(sorted(clique_ids[clique] for clique in smallest_violation))
-        if smallest_violation is not None
-        else None
-    )
     clique_labels = tuple(
         tuple(sorted(source_ids[vertex] for vertex in clique))
         for clique in ordered_cliques
@@ -218,12 +261,14 @@ def homotopy_structure_certificates(
         if status is EnumerationStatus.COMPLETE
         else f"Stopped after max_cliques={max_cliques}; results may be incomplete."
     )
+    smallest_violation_ids = (
+        certificates[0].clique_ids
+        if status is EnumerationStatus.COMPLETE and certificates
+        else None
+    )
     return HomotopyStructureResult(
-        graph6=_graph6(graph, source_ids),
-        vertex_labels=tuple(
-            f"{index}:{type(vertex).__module__}.{type(vertex).__qualname__}"
-            for index, vertex in enumerate(source_vertices)
-        ),
+        graph6=graph6,
+        vertex_labels=vertex_labels,
         clique_labels=clique_labels,
         smallest_violation_ids=smallest_violation_ids,
         missing_faces=tuple(certificates),
@@ -231,6 +276,10 @@ def homotopy_structure_certificates(
         explored_cliques=explored,
         status=status,
         diagnostics=diagnostics,
+        max_cliques=max_cliques,
+        explored_graph_cliques=len(ordered_cliques),
+        max_clique_graph_edges=max_clique_graph_edges,
+        explored_graph_edges=kg.number_of_edges(),
     )
 
 
@@ -247,10 +296,34 @@ def verify_homotopy_structure_certificates(
         for index, vertex in enumerate(source_vertices)
     ):
         return False
-
-    kg = clique_graph(graph)
-    if kg is None:
+    if result.max_cliques < 1:
         return False
+
+    if result.max_clique_graph_edges < 0:
+        return False
+    kg = clique_graph(
+        graph,
+        bound=result.max_cliques,
+        max_edges=result.max_clique_graph_edges,
+    )
+    if kg is None:
+        explored_input_cliques = 0
+        for _ in nx.find_cliques(graph):
+            explored_input_cliques += 1
+            if explored_input_cliques > result.max_cliques:
+                break
+        clique_budget_exceeded = explored_input_cliques > result.max_cliques
+        return (
+            result.status is EnumerationStatus.INCONCLUSIVE
+            and result.explored_graph_cliques == explored_input_cliques
+            and result.explored_graph_edges
+            == (0 if clique_budget_exceeded else result.max_clique_graph_edges + 1)
+            and result.explored_cliques == 0
+            and not result.clique_labels
+            and result.smallest_violation_ids is None
+            and not result.missing_faces
+            and not result.conflict_edges
+        )
     ordered_cliques = sorted(
         kg.nodes(),
         key=lambda clique: tuple(sorted(source_ids[vertex] for vertex in clique)),
@@ -261,11 +334,19 @@ def verify_homotopy_structure_certificates(
         for clique in ordered_cliques
     ):
         return False
+    if result.explored_graph_cliques != len(ordered_cliques):
+        return False
+    if result.explored_graph_edges != kg.number_of_edges():
+        return False
+    if result.explored_cliques > result.max_cliques:
+        return False
     clique_by_id = dict(enumerate(ordered_cliques))
     expected_conflicts: list[tuple[int, int]] = []
     seen_faces: set[tuple[int, ...]] = set()
     if result.smallest_violation_ids is not None and (
         not result.smallest_violation_ids
+        or result.smallest_violation_ids
+        != tuple(sorted(set(result.smallest_violation_ids)))
         or any(index not in clique_by_id for index in result.smallest_violation_ids)
     ):
         return False
@@ -275,6 +356,7 @@ def verify_homotopy_structure_certificates(
         if (
             not ids
             or len(ids) != len(set(ids))
+            or ids != tuple(sorted(ids))
             or any(index not in clique_by_id for index in ids)
             or ids in seen_faces
         ):
@@ -422,5 +504,15 @@ def verify_homotopy_structure_certificates(
             result.smallest_violation_ids not in returned_faces
         ):
             return False
+        if not expected_faces:
+            return result.smallest_violation_ids is None
+        if result.smallest_violation_ids is None:
+            return False
+        minimum_size = min(map(len, expected_faces))
+        if len(result.smallest_violation_ids) != minimum_size:
+            return False
         return True
-    return True
+    return (
+        result.smallest_violation_ids is None
+        and result.explored_cliques == result.max_cliques
+    )

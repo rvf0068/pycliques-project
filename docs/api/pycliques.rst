@@ -77,6 +77,15 @@ Homotopy Invariance
    :show-inheritance:
    :member-order: bysource
 
+Homotopy Research Certificates
+------------------------------
+
+.. automodule:: pycliques.homotopy_research
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :member-order: bysource
+
 Named
 -----
 

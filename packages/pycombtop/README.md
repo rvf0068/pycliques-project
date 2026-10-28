@@ -30,6 +30,34 @@ relative-collapse certificate when found, and exact rational relative Betti
 numbers when within the simplex budget. Budget-limited searches are explicitly
 reported as `INCONCLUSIVE`, never as non-collapsible.
 
-The saved order-7 and order-8 census files were generated with
-`max_states=250` and `max_simplices=500`; their records preserve those limits
-and report all 853 and 11,117 connected graphs, respectively.
+Order-7 and order-8 census JSON outputs are generated locally and are not
+tracked in the repository. Reproduce the connected, labelled graph datasets
+(considered up to isomorphism by the bundled graph6 data) with:
+
+```sh
+uv run python research/homotopy_census.py 7 --max-states 250 --max-simplices 500 --max-clique-graph-edges 100000
+uv run python research/homotopy_census.py 8 --max-states 250 --max-simplices 500 --max-clique-graph-edges 100000
+```
+
+These process 853 and 11,117 connected graphs, respectively. The graph6 data
+identifies each isomorphism class; `connected=True` is the census assumption.
+Run `make research-test` for fast regressions including the order-7 candidate
+count. The order-8 candidate count is a slower regression available through
+`make research-test-slow`; CI runs it on schedule and manual dispatch.
+
+For larger runs, stream JSONL records and resume safely with unchanged
+parameters:
+
+```sh
+uv run python research/homotopy_census.py 8 --jsonl --output census-order8.jsonl \
+  --max-states 250 --max-simplices 500 --max-clique-graph-edges 100000
+uv run python research/homotopy_census.py 8 --jsonl --resume \
+  --output census-order8.jsonl --max-states 250 --max-simplices 500 \
+  --max-clique-graph-edges 100000
+```
+
+The JSONL header records Python, NetworkX, and package versions plus the order
+and budgets. A separate `.summary.json` file is written when the dataset
+finishes; resume rejects mismatched metadata and duplicate record indices.
+The summary distinguishes a fully enumerated dataset from candidate-filter
+results that were inconclusive for individual graphs.

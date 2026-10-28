@@ -1,5 +1,5 @@
 # Root make targets for the Pycliques monorepo
-.PHONY: help test html pdf clean lint lint-fix typecheck
+.PHONY: help test research-test research-test-slow html pdf clean lint lint-fix typecheck
 .DEFAULT_GOAL := help
 
 help: ## Show this help message
@@ -10,6 +10,12 @@ help: ## Show this help message
 
 test: ## Run tests with pytest against the workspace env
 	uv run pytest --doctest-modules
+
+research-test: ## Run fast research regression tests (includes order 7)
+	uv run pytest research/test_homotopy_research.py -m "not slow"
+
+research-test-slow: ## Run the scheduled order-8 research regression test
+	uv run pytest research/test_homotopy_research.py -m slow
 
 lint: ## Run ruff linter and formatter check
 	uv run ruff check packages/

@@ -136,7 +136,30 @@ def test_homotopy_structure_budget_is_explicitly_inconclusive():
     result = homotopy_structure_certificates(graph, max_cliques=1)
 
     assert result.status is EnumerationStatus.INCONCLUSIVE
-    assert result.explored_cliques == 1
+    assert result.explored_cliques == 0
+    assert result.explored_graph_cliques == 2
+    assert verify_homotopy_structure_certificates(graph, result)
+
+
+def test_homotopy_structure_edge_budget_is_inconclusive():
+    graph = nx.octahedral_graph()
+
+    result = homotopy_structure_certificates(
+        graph, max_cliques=100, max_clique_graph_edges=0
+    )
+
+    assert result.status is EnumerationStatus.INCONCLUSIVE
+    assert result.explored_graph_cliques == 8
+    assert result.explored_graph_edges == 1
+    assert "max_clique_graph_edges=0" in result.diagnostics
+    assert verify_homotopy_structure_certificates(graph, result)
+
+
+def test_homotopy_structure_without_violations_verifies_none_minimum():
+    graph = nx.complete_graph(4)
+    result = homotopy_structure_certificates(graph)
+
+    assert result.smallest_violation_ids is None
     assert verify_homotopy_structure_certificates(graph, result)
 
 
