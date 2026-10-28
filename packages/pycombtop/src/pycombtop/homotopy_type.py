@@ -233,9 +233,10 @@ class HomotopyVerdict:
         verdict.  One of the :class:`Theorem` constants, or a
         concatenation of several.
     is_exact : bool
-        ``True`` when the verdict is provably the correct homotopy type.
-        ``False`` when only Betti numbers could be computed; in particular,
-        an empty ``wedge`` in that case does not prove contractibility.
+        ``True`` only when the claimed homotopy decomposition is proved.
+        Accurately computed Betti numbers alone do not prove a
+        wedge-of-spheres decomposition; in particular, an empty ``wedge``
+        when ``is_exact`` is false does not prove contractibility.
     is_limited : bool
         ``True`` when computation was skipped because a configured size limit
         was exceeded. A limited result is inconclusive, not contractible.
@@ -606,10 +607,18 @@ def _try_special_neighbourhood(graph: nx.Graph) -> HomotopyVerdict | None:
     v = candidates[0]
     sub = nx.convert_node_labels_to_integers(graph.subgraph(set(graph.nodes()) - {v}))
     inner = homotopy_type_with_verdict(sub)
+    if inner.is_limited:
+        return HomotopyVerdict(
+            wedge=inner.wedge,
+            reason=inner.reason,
+            is_exact=False,
+            is_limited=True,
+        )
     w = inner.wedge.add_spheres(1, 1)
     return HomotopyVerdict(
         wedge=w,
         reason=Theorem.SPECIAL_NEIGHBOURHOOD,
+        is_exact=inner.is_exact,
     )
 
 
@@ -682,11 +691,19 @@ def _try_special_vertex_sc(
         if sc.link(vertex).dimension() == 0:
             deletion = sc.deletion(vertex)
             inner = homotopy_type_sc_with_verdict(deletion)
+            if inner.is_limited:
+                return HomotopyVerdict(
+                    wedge=inner.wedge,
+                    reason=inner.reason,
+                    is_exact=False,
+                    is_limited=True,
+                )
             n_neigh = len(sc.link(vertex).vertex_set)
             w = inner.wedge.add_spheres(1, n_neigh - 1)
             return HomotopyVerdict(
                 wedge=w,
                 reason=Theorem.SPECIAL_VERTEX_SC,
+                is_exact=inner.is_exact,
             )
     return None
 

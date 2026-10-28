@@ -1,6 +1,7 @@
 from dataclasses import dataclass, replace
 
 import networkx as nx
+import pytest
 from pycliques.cliques import clique_graph
 from pycliques.helly import is_clique_helly
 from pycliques.homotopy_invariance import (
@@ -444,6 +445,88 @@ def test_theorem15_hypothesis_size_cap_inconclusive():
     assert hx is not None
 
 
+def test_theorem15_complete_set_budget_stops_enumeration_early(monkeypatch):
+    """A complete-set budget prevents exhaustive enumeration of K(G)."""
+    enumerate_all_cliques = nx.enumerate_all_cliques
+    enumerated = 0
+
+    def tracked_enumeration(graph):
+        nonlocal enumerated
+        for complete in enumerate_all_cliques(graph):
+            enumerated += 1
+            yield complete
+
+    monkeypatch.setattr(nx, "enumerate_all_cliques", tracked_enumeration)
+
+    result = theorem15_hypothesis_holds(
+        nx.star_graph(8),
+        max_complete_sets=3,
+    )
+
+    assert result == (None, None)
+    assert enumerated == 4
+
+
+def test_theorem15_maximal_clique_budget_stops_indexing_early(monkeypatch):
+    """A maximal-clique budget prevents materializing the full index."""
+    clique_graph = nx.complete_bipartite_graph(4, 4)
+    find_cliques = nx.find_cliques
+    indexed = 0
+
+    def tracked_find_cliques(graph):
+        nonlocal indexed
+        for clique in find_cliques(graph):
+            indexed += 1
+            yield clique
+
+    monkeypatch.setattr(
+        "pycliques.homotopy_invariance.clique_graph",
+        lambda *_args, **_kwargs: clique_graph,
+    )
+    monkeypatch.setattr(nx, "find_cliques", tracked_find_cliques)
+
+    def unexpected_enumeration(_graph):
+        raise AssertionError("complete sets must not be enumerated after a budget exit")
+
+    monkeypatch.setattr(nx, "enumerate_all_cliques", unexpected_enumeration)
+
+    assert theorem15_hypothesis_holds(
+        nx.path_graph(3),
+        max_maximal_cliques=2,
+    ) == (None, None)
+    assert indexed == 3
+
+
+@pytest.mark.parametrize(
+    "graph_budget",
+    [
+        "max_clique_graph_vertices",
+        "max_clique_graph_edges",
+    ],
+)
+def test_theorem15_clique_graph_budget_exits_before_enumeration(
+    monkeypatch, graph_budget
+):
+    def unexpected_enumeration(_graph):
+        raise AssertionError("complete sets must not be enumerated after a budget exit")
+
+    monkeypatch.setattr(nx, "enumerate_all_cliques", unexpected_enumeration)
+
+    assert theorem15_hypothesis_holds(
+        nx.path_graph(3),
+        **{graph_budget: 0},
+    ) == (None, None)
+
+
+@pytest.mark.parametrize(
+    "budget_name",
+    ["max_complete_sets", "max_maximal_cliques", "max_clique_graph_vertices"],
+)
+def test_theorem15_rejects_negative_resource_budgets(budget_name):
+    with pytest.raises(ValueError):
+        theorem15_hypothesis_holds(nx.path_graph(3), **{budget_name: -1})
+
+
 def test_theorem15_inexact_contractible_betti_result_is_inconclusive(monkeypatch):
     """An inexact zero-Betti result does not prove contractibility."""
     monkeypatch.setattr(
@@ -455,6 +538,49 @@ def test_theorem15_inexact_contractible_betti_result_is_inconclusive(monkeypatch
         ),
     )
     holds, witness = theorem15_hypothesis_holds(nx.path_graph(3))
+    assert holds is None
+    assert witness is not None
+
+
+def test_theorem15_limited_flag_takes_precedence_over_exactness(monkeypatch):
+    """The limited flag takes precedence over an exactness default."""
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
+        lambda _complex: HomotopyVerdict(
+            wedge=WedgeOfSpheres.contractible(),
+            reason="test resource limit",
+            is_limited=True,
+        ),
+    )
+    holds, witness = theorem15_hypothesis_holds(nx.path_graph(3))
+    assert holds is None
+    assert witness is not None
+
+
+def test_theorem15_recursive_limited_verdict_stays_inconclusive(monkeypatch):
+    """Theorem 15 must preserve an upstream limited placeholder as unknown."""
+    from pycombtop.homotopy_type import _try_special_neighbourhood
+
+    limited = HomotopyVerdict(
+        wedge=WedgeOfSpheres.contractible(),
+        reason="test resource limit",
+        is_exact=False,
+        is_limited=True,
+    )
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_with_verdict",
+        lambda _graph: limited,
+    )
+    recursively_derived = _try_special_neighbourhood(nx.cycle_graph(4))
+    assert recursively_derived is not None
+    assert recursively_derived.is_limited is True
+
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
+        lambda _complex: recursively_derived,
+    )
+    holds, witness = theorem15_hypothesis_holds(nx.path_graph(3))
+
     assert holds is None
     assert witness is not None
 

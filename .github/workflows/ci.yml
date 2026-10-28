@@ -76,7 +76,11 @@ jobs:
       - name: Install Dependencies
         run: uv sync
       - name: Run fast research tests
-        run: uv run pytest research/test_homotopy_research.py -m "not slow"
+        run: |
+          uv run pytest \
+            research/test_homotopy_research.py \
+            research/test_h_operator_census.py \
+            -m "not slow"
 
   research-order-eight:
     name: Order-8 research census (Python 3.11)

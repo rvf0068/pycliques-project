@@ -3,6 +3,7 @@
 import json
 
 import networkx as nx
+import pytest
 from pycliques import clique_graph, suspension_of_cycle
 from pycombtop import (
     CollapseStatus,
@@ -17,6 +18,8 @@ from pycombtop.homotopy_type import (
     HomotopyVerdict,
     Theorem,
     WedgeOfSpheres,
+    _try_special_neighbourhood,
+    _try_special_vertex_sc,
     betti_numbers_graph,
     betti_numbers_sc,
     collapse,
@@ -46,6 +49,101 @@ def test_homotopy_verdict_default_exact():
     w = WedgeOfSpheres.contractible()
     v = HomotopyVerdict(wedge=w, reason="test")
     assert v.is_exact is True
+
+
+@pytest.mark.parametrize("is_exact", [True, False])
+def test_special_neighbourhood_preserves_recursive_exactness(monkeypatch, is_exact):
+    inner = HomotopyVerdict(
+        wedge=WedgeOfSpheres.contractible(),
+        reason="test inner result",
+        is_exact=is_exact,
+    )
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_with_verdict",
+        lambda _graph: inner,
+    )
+
+    verdict = _try_special_neighbourhood(nx.cycle_graph(4))
+
+    assert verdict is not None
+    assert verdict.is_exact is is_exact
+    assert verdict.is_limited is False
+    assert verdict.wedge == WedgeOfSpheres.sphere(1)
+
+
+@pytest.mark.parametrize("is_exact", [True, False])
+def test_special_vertex_sc_preserves_recursive_exactness(monkeypatch, is_exact):
+    cycle = SimplicialComplex(
+        {0, 1, 2, 3},
+        facet_set={
+            Simplex({0, 1}),
+            Simplex({1, 2}),
+            Simplex({2, 3}),
+            Simplex({3, 0}),
+        },
+    )
+    inner = HomotopyVerdict(
+        wedge=WedgeOfSpheres.contractible(),
+        reason="test inner result",
+        is_exact=is_exact,
+    )
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
+        lambda _complex: inner,
+    )
+
+    verdict = _try_special_vertex_sc(cycle)
+
+    assert verdict is not None
+    assert verdict.is_exact is is_exact
+    assert verdict.is_limited is False
+    assert verdict.wedge == WedgeOfSpheres.sphere(1)
+
+
+@pytest.mark.parametrize(
+    ("helper", "input_complex"),
+    [
+        (_try_special_neighbourhood, False),
+        (_try_special_vertex_sc, True),
+    ],
+)
+def test_recursive_special_cases_preserve_limited_verdict(
+    monkeypatch, helper, input_complex
+):
+    inner = HomotopyVerdict(
+        wedge=WedgeOfSpheres.contractible(),
+        reason=Theorem.LIMIT_EXCEEDED,
+        is_exact=False,
+        is_limited=True,
+    )
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_with_verdict",
+        lambda _graph: inner,
+    )
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
+        lambda _complex: inner,
+    )
+    if input_complex:
+        value = SimplicialComplex(
+            {0, 1, 2, 3},
+            facet_set={
+                Simplex({0, 1}),
+                Simplex({1, 2}),
+                Simplex({2, 3}),
+                Simplex({3, 0}),
+            },
+        )
+    else:
+        value = nx.cycle_graph(4)
+
+    verdict = helper(value)
+
+    assert verdict is not None
+    assert verdict.wedge is inner.wedge
+    assert verdict.reason == Theorem.LIMIT_EXCEEDED
+    assert verdict.is_exact is False
+    assert verdict.is_limited is True
 
 
 # ---------- collapse ----------
