@@ -205,7 +205,12 @@ def verify_strong_collapse_certificate(
 
 
 class Theorem57Status(Enum):
-    """Certainty level for the finite Theorem 5.7 hypothesis check."""
+    """Certainty for the Theorem 5.7 sufficient-hypothesis check.
+
+    ``COUNTEREXAMPLE`` means a closed h-image violates the sufficient
+    contractibility hypothesis. It does not assert failure of
+    ``Delta(K^2(H(G))) ~= Delta(G)``.
+    """
 
     PROVED = "proved"
     COUNTEREXAMPLE = "counterexample"
@@ -214,7 +219,12 @@ class Theorem57Status(Enum):
 
 @dataclass(frozen=True)
 class Theorem57Result:
-    """Status and replayable certificates from a Theorem 5.7 check."""
+    """Status and replayable certificates from a Theorem 5.7 check.
+
+    A ``COUNTEREXAMPLE`` status is specifically a counterexample to the
+    sufficient contractibility hypothesis, not to the underlying homotopy
+    equivalence conclusion.
+    """
 
     status: Theorem57Status
     checked_h_images: int
@@ -283,7 +293,7 @@ def theorem57_hypothesis_holds(
 
     certificates: dict[frozenset, tuple[tuple[Hashable, Hashable], ...]] = {}
     first_unknown: frozenset | None = None
-    for h_image in intersections.closed_sets:
+    for checked_count, h_image in enumerate(intersections.closed_sets, start=1):
         facets = tuple(frozenset(clique) for clique in h_image)
         certificate = strong_collapse_certificate(facets)
         if certificate is not None and verify_strong_collapse_certificate(
@@ -305,7 +315,7 @@ def theorem57_hypothesis_holds(
         if noncontractible:
             return Theorem57Result(
                 Theorem57Status.COUNTEREXAMPLE,
-                len(certificates) + 1,
+                checked_count,
                 certificates,
                 witness=h_image,
                 reason="exact rational homology is nonzero in reduced degree",

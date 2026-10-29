@@ -98,6 +98,14 @@ from .named import (
     snub_disphenoid,
     suspension_of_cycle,
 )
+from .octahedral_boolean import (
+    MaximalIntersectingFamilies,
+    OctahedralBooleanModel,
+    OctahedralModelResult,
+    build_octahedral_boolean_model,
+    degree_histogram,
+    enumerate_maximal_intersecting_families,
+)
 from .poset_homotopy import (
     ClosedCliqueIntersections,
     Theorem57Result,
@@ -156,6 +164,12 @@ __all__ = [
     "clique_graph",
     "double_bound_graph",
     "homotopy_clique_graph",
+    "MaximalIntersectingFamilies",
+    "OctahedralBooleanModel",
+    "OctahedralModelResult",
+    "build_octahedral_boolean_model",
+    "degree_histogram",
+    "enumerate_maximal_intersecting_families",
     "ClosedCliqueIntersections",
     "Theorem57Result",
     "Theorem57Status",

@@ -768,6 +768,7 @@ def theorem15_hypothesis_holds(
     )
     if kg is None:
         return None, None
+    distinct_h: set[frozenset]
     if max_complete_sets is None:
         from .poset_homotopy import closed_clique_intersections
 
@@ -791,7 +792,7 @@ def theorem15_hypothesis_holds(
         index = _clique_index(all_maximal)
         cache: dict[frozenset, frozenset] = {}
 
-        distinct_h: set[frozenset] = set()
+        distinct_h = set()
         complete_count = 0
         for complete in nx.enumerate_all_cliques(kg):
             if complete_count >= max_complete_sets:

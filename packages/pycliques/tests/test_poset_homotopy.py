@@ -205,6 +205,51 @@ def test_theorem57_nonzero_exact_homology_is_a_counterexample(monkeypatch):
     assert "exact rational homology" in result.reason
 
 
+def test_theorem57_counterexample_count_includes_earlier_unknown_images(
+    monkeypatch,
+):
+    earlier = frozenset({frozenset({0, 1}), frozenset({1, 2})})
+    obstructed = frozenset({frozenset({3, 4}), frozenset({4, 5}), frozenset({3, 5})})
+    intersections = poset_homotopy.ClosedCliqueIntersections(
+        (earlier, obstructed),
+        is_exact=True,
+    )
+    monkeypatch.setattr(
+        poset_homotopy,
+        "double_bound_graph",
+        lambda *_args, **_kwargs: nx.Graph(),
+    )
+    monkeypatch.setattr(
+        poset_homotopy,
+        "clique_graph",
+        lambda _graph: nx.Graph(),
+    )
+    monkeypatch.setattr(
+        poset_homotopy,
+        "closed_clique_intersections",
+        lambda *_args, **_kwargs: intersections,
+    )
+    monkeypatch.setattr(
+        poset_homotopy,
+        "strong_collapse_certificate",
+        lambda _facets: None,
+    )
+    monkeypatch.setattr(
+        "pycombtop.simplex.relative_betti_numbers",
+        lambda facets, _membership, *, method: (
+            {0: 1}
+            if frozenset(frozenset(face) for face in facets) == earlier
+            else {0: 1, 1: 1}
+        ),
+    )
+
+    result = theorem57_hypothesis_holds(nx.empty_graph(0))
+
+    assert result.status is Theorem57Status.COUNTEREXAMPLE
+    assert result.checked_h_images == 2
+    assert result.witness == obstructed
+
+
 def test_theorem57_o4_certifies_every_closed_h_image():
     graph = octahedron(4)
     double_bound = double_bound_graph(graph)

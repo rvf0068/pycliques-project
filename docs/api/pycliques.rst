@@ -86,6 +86,15 @@ Poset Homotopy
    :show-inheritance:
    :member-order: bysource
 
+Octahedral Boolean Model
+------------------------
+
+.. automodule:: pycliques.octahedral_boolean
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :member-order: bysource
+
 Homotopy Research Certificates
 ------------------------------
 
