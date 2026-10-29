@@ -77,6 +77,15 @@ Homotopy Invariance
    :show-inheritance:
    :member-order: bysource
 
+Poset Homotopy
+--------------
+
+.. automodule:: pycliques.poset_homotopy
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :member-order: bysource
+
 Homotopy Research Certificates
 ------------------------------
 

@@ -522,6 +522,7 @@ def test_theorem15_clique_graph_budget_exits_before_enumeration(
     "budget_name",
     [
         "max_complete_sets",
+        "max_closed_h_images",
         "max_maximal_cliques",
         "max_clique_graph_vertices",
         "max_simplices_per_h_image",
@@ -572,6 +573,22 @@ def test_theorem15_rejects_negative_simplex_budget_before_computation(
             nx.path_graph(3),
             max_simplices_per_h_image=-1,
         )
+
+
+def test_theorem15_default_enumerates_closed_images_not_all_completes(monkeypatch):
+    def unexpected_enumeration(_graph):
+        raise AssertionError("closed-image enumeration must not enumerate completes")
+
+    monkeypatch.setattr(nx, "enumerate_all_cliques", unexpected_enumeration)
+
+    assert theorem15_hypothesis_holds(nx.path_graph(3)) == (True, None)
+
+
+def test_theorem15_closed_image_budget_exits_inconclusively():
+    assert theorem15_hypothesis_holds(
+        nx.path_graph(3),
+        max_closed_h_images=0,
+    ) == (None, None)
 
 
 def test_theorem15_per_image_limited_verdict_is_inconclusive(monkeypatch):

@@ -671,6 +671,7 @@ def theorem15_hypothesis_holds(
     max_clique_graph_edges: int | None = None,
     max_maximal_cliques: int | None = None,
     max_complete_sets: int | None = None,
+    max_closed_h_images: int | None = None,
     max_simplices_per_h_image: int | None = None,
 ) -> tuple[bool | None, frozenset | None]:
     """Check Theorem 15's hypothesis: :math:`\\Delta(h(X))` contractible for every X.
@@ -715,6 +716,10 @@ def theorem15_hypothesis_holds(
         are more, stop at the first excess complete set and return
         inconclusive. This bounds enumeration and the number of distinct
         :math:`h`-images retained.
+    max_closed_h_images : int, optional
+        Maximum number of distinct closed :math:`h`-images to inspect. This
+        bounds the exhaustive intersection-based path used when
+        ``max_complete_sets`` is not supplied.
     max_simplices_per_h_image : int, optional
         Maximum number of distinct simplices in each :math:`\\Delta(h(X))`.
         This is a per-image size guard, not a cumulative work limit or
@@ -747,6 +752,8 @@ def theorem15_hypothesis_holds(
         raise ValueError("max_maximal_cliques must be nonnegative or None")
     if max_complete_sets is not None and max_complete_sets < 0:
         raise ValueError("max_complete_sets must be nonnegative or None")
+    if max_closed_h_images is not None and max_closed_h_images < 0:
+        raise ValueError("max_closed_h_images must be nonnegative or None")
     if max_simplices_per_h_image is not None and max_simplices_per_h_image < 0:
         raise ValueError("max_simplices_per_h_image must be nonnegative or None")
 
@@ -761,21 +768,41 @@ def theorem15_hypothesis_holds(
     )
     if kg is None:
         return None, None
-    all_maximal: list[frozenset] = []
-    for clique in nx.find_cliques(kg):
-        if max_maximal_cliques is not None and len(all_maximal) >= max_maximal_cliques:
-            return None, None
-        all_maximal.append(frozenset(clique))
-    index = _clique_index(all_maximal)
-    cache: dict[frozenset, frozenset] = {}
+    if max_complete_sets is None:
+        from .poset_homotopy import closed_clique_intersections
 
-    distinct_h: set[frozenset] = set()
-    complete_count = 0
-    for complete in nx.enumerate_all_cliques(kg):
-        if max_complete_sets is not None and complete_count >= max_complete_sets:
+        intersections = closed_clique_intersections(
+            kg,
+            max_maximal_cliques=max_maximal_cliques,
+            max_closed_sets=max_closed_h_images,
+        )
+        if not intersections.is_exact:
             return None, None
-        complete_count += 1
-        distinct_h.add(_h_closure_indexed(complete, index, cache))
+        distinct_h = set(intersections.closed_sets)
+    else:
+        all_maximal: list[frozenset] = []
+        for clique in nx.find_cliques(kg):
+            if (
+                max_maximal_cliques is not None
+                and len(all_maximal) >= max_maximal_cliques
+            ):
+                return None, None
+            all_maximal.append(frozenset(clique))
+        index = _clique_index(all_maximal)
+        cache: dict[frozenset, frozenset] = {}
+
+        distinct_h: set[frozenset] = set()
+        complete_count = 0
+        for complete in nx.enumerate_all_cliques(kg):
+            if complete_count >= max_complete_sets:
+                return None, None
+            complete_count += 1
+            distinct_h.add(_h_closure_indexed(complete, index, cache))
+            if (
+                max_closed_h_images is not None
+                and len(distinct_h) > max_closed_h_images
+            ):
+                return None, None
 
     vertex_order = {vertex: index for index, vertex in enumerate(graph.nodes())}
     ordered_h = sorted(

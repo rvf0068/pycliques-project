@@ -2,7 +2,13 @@
 
 __version__ = "0.1.0"
 
-from .cliques import Clique, NodeH, clique_graph, homotopy_clique_graph
+from .cliques import (
+    Clique,
+    NodeH,
+    clique_graph,
+    double_bound_graph,
+    homotopy_clique_graph,
+)
 from .clockwork import (
     ClockworkGraph,
     ClockworkStructure,
@@ -92,6 +98,16 @@ from .named import (
     snub_disphenoid,
     suspension_of_cycle,
 )
+from .poset_homotopy import (
+    ClosedCliqueIntersections,
+    Theorem57Result,
+    Theorem57Status,
+    closed_clique_intersections,
+    h_closure_from_neighbors,
+    strong_collapse_certificate,
+    theorem57_hypothesis_holds,
+    verify_strong_collapse_certificate,
+)
 from .retractions import (
     dict_to_tuple,
     graph_from_gap_adjacency_list,
@@ -138,7 +154,16 @@ __all__ = [
     "Clique",
     "NodeH",
     "clique_graph",
+    "double_bound_graph",
     "homotopy_clique_graph",
+    "ClosedCliqueIntersections",
+    "Theorem57Result",
+    "Theorem57Status",
+    "closed_clique_intersections",
+    "h_closure_from_neighbors",
+    "strong_collapse_certificate",
+    "theorem57_hypothesis_holds",
+    "verify_strong_collapse_certificate",
     # clockwork
     "ClockworkGraph",
     "ClockworkStructure",

@@ -176,6 +176,9 @@ def double_bound_clique_graph(
     return result
 
 
+coatomic_double_bound_graph = double_bound_clique_graph
+
+
 def atlas_graphs(max_order: int = 6) -> Iterator[nx.Graph]:
     """Yield every nonempty graph in NetworkX's atlas through *max_order*."""
     if not 1 <= max_order <= 7:

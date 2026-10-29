@@ -184,3 +184,63 @@ def homotopy_clique_graph(graph: nx.Graph) -> nx.Graph:
         H.add_edges_from(itertools.product(cross_nodes_v, cross_nodes_w))
 
     return H
+
+
+def double_bound_graph(
+    graph: nx.Graph,
+    *,
+    max_faces: int | None = None,
+    max_candidates: int | None = None,
+    max_edges: int | None = None,
+) -> nx.Graph | None:
+    """Build the full double-bound graph ``DB(P(G))``.
+
+    The vertices are all distinct nonempty faces of the clique complex of
+    *graph*. Two faces are adjacent exactly when they intersect and their
+    union is a face. This is the full face-poset construction, not the
+    coatomic compact realization ``DB(P(G)'')``.
+
+    ``max_faces`` bounds the number of distinct face vertices,
+    ``max_candidates`` bounds pairs of faces tested for adjacency, and
+    ``max_edges`` bounds the number of output edges. Exceeding any configured
+    bound returns ``None``; it does not mean the construction is invalid.
+    """
+    for name, value in (
+        ("max_faces", max_faces),
+        ("max_candidates", max_candidates),
+        ("max_edges", max_edges),
+    ):
+        if value is not None and value < 0:
+            raise ValueError(f"{name} must be nonnegative or None")
+
+    vertex_order = {vertex: index for index, vertex in enumerate(graph.nodes())}
+    faces: set[frozenset] = set()
+    for maximal_clique in nx.find_cliques(graph):
+        for size in range(1, len(maximal_clique) + 1):
+            for face in itertools.combinations(maximal_clique, size):
+                faces.add(frozenset(face))
+                if max_faces is not None and len(faces) > max_faces:
+                    return None
+
+    ordered_faces = sorted(
+        faces,
+        key=lambda face: tuple(sorted(vertex_order[vertex] for vertex in face)),
+    )
+    result = nx.Graph()
+    result.add_nodes_from(ordered_faces)
+    candidate_count = 0
+    edge_count = 0
+    for first, second in itertools.combinations(ordered_faces, 2):
+        candidate_count += 1
+        if max_candidates is not None and candidate_count > max_candidates:
+            return None
+        if first.isdisjoint(second):
+            continue
+        union = first | second
+        if not all(graph.has_edge(u, v) for u, v in itertools.combinations(union, 2)):
+            continue
+        if max_edges is not None and edge_count >= max_edges:
+            return None
+        result.add_edge(first, second)
+        edge_count += 1
+    return result
