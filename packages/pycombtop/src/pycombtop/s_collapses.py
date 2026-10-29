@@ -11,8 +11,8 @@ clique complex.
 
 from __future__ import annotations
 
-from collections.abc import Hashable
-from typing import cast
+from collections.abc import Hashable, Sequence
+from typing import Any, cast
 
 import networkx as nx
 from pycliques.dominated import is_dismantlable
@@ -21,6 +21,83 @@ from pycliques.surfaces import open_neighborhood
 # ---------------------------------------------------------------------------
 # Vertex s-collapses
 # ---------------------------------------------------------------------------
+
+
+def dismantling_certificate(
+    graph: nx.Graph,
+) -> tuple[tuple[Hashable, Hashable], ...] | None:
+    """Return a deterministic dominated-vertex sequence to one vertex.
+
+    An empty graph is not dismantlable; a one-vertex graph has the empty
+    certificate. Each pair is ``(removed_vertex, dominator)``.
+    """
+    if graph.number_of_nodes() == 0:
+        return None
+    current = graph.copy()
+    pairs: list[tuple[Hashable, Hashable]] = []
+    while current.number_of_nodes() > 1:
+        found: tuple[Hashable, Hashable] | None = None
+        for removed in current:
+            removed_closed = set(current[removed]) | {removed}
+            for dominator in current[removed]:
+                if dominator == removed:
+                    continue
+                dominator_closed = set(current[dominator]) | {dominator}
+                if removed_closed <= dominator_closed:
+                    found = (removed, dominator)
+                    break
+            if found is not None:
+                break
+        if found is None:
+            return None
+        pairs.append(found)
+        current.remove_node(found[0])
+    return tuple(pairs)
+
+
+def verify_dismantling_certificate(
+    graph: nx.Graph,
+    pairs: Sequence[tuple[Hashable, Hashable]],
+) -> bool:
+    """Replay a dominated-vertex sequence and require exactly one survivor."""
+    if graph.number_of_nodes() == 0:
+        return False
+    current = graph.copy()
+    for pair in pairs:
+        if not isinstance(pair, (tuple, list)) or len(pair) != 2:
+            return False
+        removed, dominator = pair
+        if removed not in current or dominator not in current or removed == dominator:
+            return False
+        if not current.has_edge(removed, dominator):
+            return False
+        removed_closed = set(current[removed]) | {removed}
+        dominator_closed = set(current[dominator]) | {dominator}
+        if not removed_closed <= dominator_closed:
+            return False
+        current.remove_node(removed)
+    return bool(current.number_of_nodes() == 1)
+
+
+def complete_s_collapse_with_certificate(
+    graph: nx.Graph,
+) -> tuple[
+    nx.Graph,
+    tuple[tuple[Hashable, tuple[tuple[Hashable, Hashable], ...]], ...],
+]:
+    """Remove s-dismantlable vertices and retain each local proof."""
+    current = graph.copy()
+    moves: list[tuple[Hashable, tuple[tuple[Hashable, Hashable], ...]]] = []
+    while True:
+        for vertex in current:
+            neighborhood = open_neighborhood(current, vertex)
+            local = dismantling_certificate(neighborhood)
+            if local is not None:
+                moves.append((vertex, local))
+                current.remove_node(vertex)
+                break
+        else:
+            return current, tuple(moves)
 
 
 def is_s_dismantlable_vertex(graph: nx.Graph, v: Hashable) -> bool:
@@ -216,3 +293,59 @@ def complete_s_collapse_edges(graph: nx.Graph) -> nx.Graph:
         graph_aux = remove_s_dismantlable_edge(graph_aux)
         if n == graph_aux.size():
             return graph_aux
+
+
+def complete_s_collapse_edges_with_certificate(
+    graph: nx.Graph,
+) -> tuple[
+    nx.Graph,
+    tuple[tuple[tuple[Hashable, Hashable], tuple[tuple[Hashable, Hashable], ...]], ...],
+]:
+    """Remove s-dismantlable edges and retain each local proof."""
+    current = graph.copy()
+    moves: list[
+        tuple[tuple[Hashable, Hashable], tuple[tuple[Hashable, Hashable], ...]]
+    ] = []
+    while True:
+        for first, second in current.edges():
+            common = set(current[first]) & set(current[second])
+            local_graph = current.subgraph(common).copy()
+            local = dismantling_certificate(local_graph)
+            if local is not None:
+                moves.append(((first, second), local))
+                current.remove_edge(first, second)
+                break
+        else:
+            return current, tuple(moves)
+
+
+def verify_s_collapse_move(
+    graph: nx.Graph,
+    move: dict[str, Any],
+) -> bool:
+    """Check one recorded vertex or edge s-move on the current graph."""
+    try:
+        kind = move["kind"]
+        local_pairs = move["dismantling"]
+        if kind == "vertex":
+            vertex = move["vertex"]
+            if vertex not in graph:
+                return False
+            local = open_neighborhood(graph, vertex)
+            if not verify_dismantling_certificate(local, local_pairs):
+                return False
+            graph.remove_node(vertex)
+            return True
+        if kind == "edge":
+            first, second = move["edge"]
+            if not graph.has_edge(first, second):
+                return False
+            common = set(graph[first]) & set(graph[second])
+            local = graph.subgraph(common).copy()
+            if not verify_dismantling_certificate(local, local_pairs):
+                return False
+            graph.remove_edge(first, second)
+            return True
+    except (KeyError, TypeError, ValueError):
+        return False
+    return False

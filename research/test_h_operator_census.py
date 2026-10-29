@@ -3,16 +3,19 @@ import json
 import networkx as nx
 import pytest
 from pycliques import clique_graph, homotopy_clique_graph
+from pycliques.named import octahedron
 
 from research.h_operator_census import (
     INCONCLUSIVE_BUDGET,
     PROVED_BY_COLLAPSE,
+    PROVED_BY_SPHERE_CERTIFICATE,
     _betti_numbers_mod2,
     analyze_h_operator_graph,
     atlas_graphs,
     double_bound_clique_graph,
     graph6_graphs,
     run_h_operator_census,
+    verify_s_reduction_certificate,
 )
 
 
@@ -127,3 +130,78 @@ def test_census_jsonl_is_resumable_and_records_limits(tmp_path):
     assert first["graphs_processed"] == resumed["graphs_processed"] == 1
     assert metadata["limits"]["max_cliques"] == 10_000
     assert record["result"]["status"] == PROVED_BY_COLLAPSE
+
+
+def test_o4_double_bound_and_second_clique_graph_regression():
+    graph = octahedron(4)
+    homotopy_graph = homotopy_clique_graph(graph)
+    middle = clique_graph(homotopy_graph)
+    compact = double_bound_clique_graph(graph)
+    assert middle is not None
+    assert compact is not None
+    assert (middle.number_of_nodes(), middle.number_of_edges()) == (80, 848)
+    assert nx.is_isomorphic(middle, compact)
+    second = clique_graph(middle)
+    assert second is not None
+    assert (second.number_of_nodes(), second.number_of_edges()) == (192, 6688)
+
+
+def test_o4_sphere_certificate_reduces_and_replays():
+    result = analyze_h_operator_graph(
+        octahedron(4),
+        use_compact_realization=True,
+        enable_sphere_certificate=True,
+        max_simplices=2_500,
+    )
+    assert result["s_reduction_certificate_replayed"] is True
+    assert (result["reduced_core_order"], result["reduced_core_size"]) == (40, 214)
+    assert result["reduced_core_f_vector"] == [40, 214, 348, 174]
+    assert result["sphere_certificate_replayed"] is True
+    assert len(result["s_reduction_certificate"]) == 216
+    assert sum(
+        move["kind"] == "vertex" for move in result["s_reduction_certificate"]
+    ) == 152
+    assert sum(
+        move["kind"] == "edge" for move in result["s_reduction_certificate"]
+    ) == 64
+    assert len(result["sphere_certificate"]["collapse_pairs"]) == 387
+    assert len(result["sphere_certificate"]["deleted_facet"]) == 4
+    assert result["status"] == PROVED_BY_SPHERE_CERTIFICATE
+    json.dumps(result)
+    compact = double_bound_clique_graph(octahedron(4))
+    assert compact is not None
+    second = clique_graph(compact)
+    assert second is not None
+    assert verify_s_reduction_certificate(
+        second, result["s_reduction_certificate"]
+    )
+
+
+def test_o4_certificate_replay_is_invariant_under_input_relabeling():
+    graph = nx.relabel_nodes(octahedron(4), {i: ("vertex", i) for i in range(8)})
+    result = analyze_h_operator_graph(
+        graph,
+        use_compact_realization=True,
+        enable_sphere_certificate=True,
+    )
+    assert result["status"] == PROVED_BY_SPHERE_CERTIFICATE
+    assert result["s_reduction_certificate_replayed"] is True
+    assert result["sphere_certificate_replayed"] is True
+    assert (
+        result["sphere_certificate"]["dimension"]
+        == result["input_sphere_certificate"]["dimension"]
+        == 3
+    )
+
+
+def test_sphere_certificate_budget_is_inconclusive():
+    result = analyze_h_operator_graph(
+        octahedron(4),
+        use_compact_realization=True,
+        enable_sphere_certificate=True,
+        max_s_reduction_moves=0,
+    )
+    assert result["status"] != PROVED_BY_SPHERE_CERTIFICATE
+    assert result["s_reduction_certificate_replayed"] is False
+    assert result["status"] == INCONCLUSIVE_BUDGET
+    assert "max_s_reduction_moves=0" in result["resource_diagnostics"]

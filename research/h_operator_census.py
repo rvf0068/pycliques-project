@@ -20,7 +20,16 @@ from typing import Any
 
 import networkx as nx
 from pycliques import clique_graph, homotopy_clique_graph
-from pycombtop import relative_betti_numbers
+from pycombtop import (
+    CollapseStatus,
+    Simplex,
+    SimplicialComplex,
+    dismantling_certificate,
+    relative_betti_numbers,
+    relative_collapse,
+    verify_relative_collapse,
+    verify_s_collapse_move,
+)
 
 from research.homotopy_census import _bounded_complex, analyze_graph
 
@@ -31,11 +40,62 @@ INCONCLUSIVE_NO_COLLAPSE_CERTIFICATE = "INCONCLUSIVE_NO_COLLAPSE_CERTIFICATE"
 INCONCLUSIVE_HOMOLOGY_MISMATCH_UNCONFIRMED = (
     "INCONCLUSIVE_HOMOLOGY_MISMATCH_UNCONFIRMED"
 )
+PROVED_BY_SPHERE_CERTIFICATE = "PROVED_BY_SPHERE_CERTIFICATE"
 
 
 def _graph6(graph: nx.Graph) -> str:
     encoded: bytes = nx.to_graph6_bytes(graph, nodes=list(graph.nodes()), header=False)
     return encoded.decode("ascii").strip()
+
+
+def _encode_certificate_label(label: Any) -> Any:
+    if isinstance(label, frozenset):
+        return {
+            "$frozenset": [
+                _encode_certificate_label(item)
+                for item in sorted(label, key=repr)
+            ]
+        }
+    if isinstance(label, tuple):
+        return {"$tuple": [_encode_certificate_label(item) for item in label]}
+    if label is None or isinstance(label, (str, int, float, bool)):
+        return label
+    raise TypeError(f"unsupported certificate label type: {type(label).__name__}")
+
+
+def _decode_certificate_label(label: Any) -> Any:
+    if isinstance(label, dict) and set(label) == {"$frozenset"}:
+        return frozenset(
+            _decode_certificate_label(item) for item in label["$frozenset"]
+        )
+    if isinstance(label, dict) and set(label) == {"$tuple"}:
+        return tuple(_decode_certificate_label(item) for item in label["$tuple"])
+    return label
+
+
+def _encode_s_reduction_certificate(
+    moves: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    encoded = []
+    for move in moves:
+        item = {
+            "kind": move["kind"],
+            "dismantling": [
+                [
+                    _encode_certificate_label(removed),
+                    _encode_certificate_label(dominator),
+                ]
+                for removed, dominator in move["dismantling"]
+            ],
+        }
+        if move["kind"] == "vertex":
+            item["vertex"] = _encode_certificate_label(move["vertex"])
+        else:
+            item["edge"] = [
+                _encode_certificate_label(endpoint) for endpoint in move["edge"]
+            ]
+        encoded.append(item)
+    return encoded
 
 
 def _is_complete_face(graph: nx.Graph, face: frozenset) -> bool:
@@ -228,6 +288,206 @@ def _betti_numbers_mod2(graph: nx.Graph, max_simplices: int) -> list[int] | None
     return betti_numbers
 
 
+def _s_reduce_graph(
+    graph: nx.Graph,
+    max_moves: int,
+) -> tuple[nx.Graph, list[dict[str, Any]], bool]:
+    """Run deterministic vertex/edge s-moves to a fixed point."""
+    current = graph.copy()
+    moves: list[dict[str, Any]] = []
+    while True:
+        found_move = False
+        for vertex in current:
+            local = current.subgraph(set(current[vertex])).copy()
+            certificate = dismantling_certificate(local)
+            local_pairs = None if certificate is None else list(certificate)
+            if local_pairs is None:
+                continue
+            if len(moves) >= max_moves:
+                return current, moves, False
+            moves.append(
+                {"kind": "vertex", "vertex": vertex, "dismantling": local_pairs}
+            )
+            current.remove_node(vertex)
+            found_move = True
+            break
+        if found_move:
+            continue
+
+        for first, second in current.edges():
+            common = set(current[first]) & set(current[second])
+            local = current.subgraph(common).copy()
+            certificate = dismantling_certificate(local)
+            local_pairs = None if certificate is None else list(certificate)
+            if local_pairs is None:
+                continue
+            if len(moves) >= max_moves:
+                return current, moves, False
+            moves.append(
+                {
+                    "kind": "edge",
+                    "edge": (first, second),
+                    "dismantling": local_pairs,
+                }
+            )
+            current.remove_edge(first, second)
+            found_move = True
+            break
+        if not found_move:
+            return current, moves, True
+
+
+def verify_s_reduction_certificate(
+    graph: nx.Graph,
+    moves: list[dict[str, Any]],
+    expected_core: nx.Graph | None = None,
+) -> bool:
+    """Replay graph s-moves on the evolving graph and verify the claimed core."""
+    current = graph.copy()
+    decoded_moves = []
+    try:
+        for move in moves:
+            decoded = {
+                "kind": move["kind"],
+                "dismantling": [
+                    (
+                        _decode_certificate_label(removed),
+                        _decode_certificate_label(dominator),
+                    )
+                    for removed, dominator in move["dismantling"]
+                ],
+            }
+            if move["kind"] == "vertex":
+                decoded["vertex"] = _decode_certificate_label(move["vertex"])
+            elif move["kind"] == "edge":
+                decoded["edge"] = tuple(
+                    _decode_certificate_label(endpoint) for endpoint in move["edge"]
+                )
+            else:
+                return False
+            decoded_moves.append(decoded)
+    except (KeyError, TypeError, ValueError):
+        return False
+    for move in decoded_moves:
+        if not verify_s_collapse_move(current, move):
+            return False
+    if expected_core is None:
+        return True
+    return set(current.nodes()) == set(expected_core.nodes()) and {
+        frozenset(edge) for edge in current.edges()
+    } == {frozenset(edge) for edge in expected_core.edges()}
+
+
+def _complex_from_clique_graph(
+    graph: nx.Graph, max_simplices: int
+) -> tuple[SimplicialComplex, set[Simplex]] | None:
+    return _bounded_complex(nx.find_cliques(graph), graph.nodes(), max_simplices)
+
+
+def _sphere_collapse_certificate(
+    complex_: SimplicialComplex,
+    *,
+    max_states: int,
+) -> dict[str, Any] | None:
+    """Find a top-facet deletion whose remaining complex collapses to a point."""
+    facets = list(complex_.facet_set)
+    if not facets or len({len(facet) for facet in facets}) != 1:
+        return None
+    simplices = complex_.all_simplices()
+    if not complex_.base_set:
+        return None
+    ordered_facets = sorted(
+        facets, key=lambda face: tuple(sorted(map(repr, face)))
+    )
+    for deleted_facet in ordered_facets:
+        remaining = simplices - {deleted_facet}
+        maximal = {
+            face
+            for face in remaining
+            if not any(face < other for other in remaining)
+        }
+        source = SimplicialComplex(complex_.base_set, facet_set=maximal)
+        vertices = sorted(
+            (vertex for vertex in complex_.base_set if Simplex({vertex}) in remaining),
+            key=repr,
+        )
+        if not vertices:
+            continue
+        target = SimplicialComplex({vertices[0]}, facet_set=[{vertices[0]}])
+        result = relative_collapse(source, target, max_states=max_states)
+        if (
+            result.status is CollapseStatus.PROVED
+            and verify_relative_collapse(source, target, result.pairs)
+        ):
+            certificate = {
+                "dimension": len(deleted_facet) - 1,
+                "deleted_facet": [
+                    _encode_certificate_label(vertex)
+                    for vertex in sorted(deleted_facet, key=repr)
+                ],
+                "collapse_pairs": [
+                    [
+                        [
+                            _encode_certificate_label(vertex)
+                            for vertex in sorted(free_face, key=repr)
+                        ],
+                        [
+                            _encode_certificate_label(vertex)
+                            for vertex in sorted(coface, key=repr)
+                        ],
+                    ]
+                    for free_face, coface in result.pairs
+                ],
+                "collapse_certificate_replayed": True,
+            }
+            if verify_sphere_collapse_certificate(complex_, certificate):
+                return certificate
+    return None
+
+
+def verify_sphere_collapse_certificate(
+    complex_: SimplicialComplex,
+    certificate: dict[str, Any],
+) -> bool:
+    """Replay a serialized top-facet deletion and collapse-to-a-point proof."""
+    try:
+        facets = list(complex_.facet_set)
+        if not facets or len({len(facet) for facet in facets}) != 1:
+            return False
+        deleted_facet = Simplex(
+            _decode_certificate_label(vertex)
+            for vertex in certificate["deleted_facet"]
+        )
+        if deleted_facet not in complex_.facet_set:
+            return False
+        if certificate["dimension"] != len(deleted_facet) - 1:
+            return False
+        simplices = complex_.all_simplices() - {deleted_facet}
+        maximal = {
+            face
+            for face in simplices
+            if not any(face < other for other in simplices)
+        }
+        source = SimplicialComplex(complex_.base_set, facet_set=maximal)
+        pairs = [
+            (
+                Simplex(_decode_certificate_label(vertex) for vertex in free_face),
+                Simplex(_decode_certificate_label(vertex) for vertex in coface),
+            )
+            for free_face, coface in certificate["collapse_pairs"]
+        ]
+        current_simplices = source.all_simplices()
+        for vertex in complex_.base_set:
+            target = SimplicialComplex({vertex}, facet_set=[{vertex}])
+            if target.all_simplices() <= current_simplices and verify_relative_collapse(
+                source, target, pairs
+            ):
+                return True
+        return False
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
 def analyze_h_operator_graph(
     graph: nx.Graph,
     *,
@@ -237,6 +497,8 @@ def analyze_h_operator_graph(
     max_simplices: int = 2_500,
     max_candidate_faces: int = 100_000,
     use_compact_realization: bool = False,
+    enable_sphere_certificate: bool = False,
+    max_s_reduction_moves: int = 10_000,
 ) -> dict[str, Any]:
     """Analyze the conjecture for one graph without treating search limits as failure.
 
@@ -254,6 +516,8 @@ def analyze_h_operator_graph(
         raise ValueError("max_simplices must be nonnegative")
     if max_candidate_faces < 0:
         raise ValueError("max_candidate_faces must be nonnegative")
+    if max_s_reduction_moves < 0:
+        raise ValueError("max_s_reduction_moves must be nonnegative")
 
     if use_compact_realization:
         h_order, h_size = _homotopy_graph_counts(graph)
@@ -290,6 +554,16 @@ def analyze_h_operator_graph(
         "collapse_pairs": [],
         "collapse_diagnostics": None,
         "collapse_certificate_replayed": False,
+        "s_reduction_certificate": [],
+        "s_reduction_certificate_replayed": False,
+        "reduced_core_order": None,
+        "reduced_core_size": None,
+        "reduced_core_f_vector": None,
+        "sphere_certificate": None,
+        "sphere_search_diagnostics": None,
+        "input_sphere_certificate": None,
+        "input_sphere_search_diagnostics": None,
+        "sphere_certificate_replayed": False,
         "resource_diagnostics": None,
         "status": INCONCLUSIVE_BUDGET,
         "versions": {
@@ -305,6 +579,8 @@ def analyze_h_operator_graph(
             "max_simplices": max_simplices,
             "max_candidate_faces": max_candidate_faces,
             "use_compact_realization": use_compact_realization,
+            "enable_sphere_certificate": enable_sphere_certificate,
+            "max_s_reduction_moves": max_s_reduction_moves,
         },
     }
     if middle is None:
@@ -326,6 +602,74 @@ def analyze_h_operator_graph(
         return base
     base["k2_order"] = k2.number_of_nodes()
     base["k2_size"] = k2.number_of_edges()
+
+    sphere_proof = False
+    if enable_sphere_certificate:
+        reduced, s_moves, reduction_complete = _s_reduce_graph(
+            k2, max_s_reduction_moves
+        )
+        replayed = verify_s_reduction_certificate(k2, s_moves, reduced)
+        base["s_reduction_certificate"] = _encode_s_reduction_certificate(s_moves)
+        base["s_reduction_certificate_replayed"] = replayed and reduction_complete
+        if not reduction_complete:
+            base["resource_diagnostics"] = (
+                f"S-reduction stopped at max_s_reduction_moves="
+                f"{max_s_reduction_moves}; partial certificate retained."
+            )
+        elif not replayed:
+            base["resource_diagnostics"] = (
+                "Generated s-reduction certificate did not replay."
+            )
+        else:
+            base["reduced_core_order"] = reduced.number_of_nodes()
+            base["reduced_core_size"] = reduced.number_of_edges()
+            bounded_core = _complex_from_clique_graph(reduced, max_simplices)
+            if bounded_core is None:
+                base["resource_diagnostics"] = (
+                    "Reduced core simplex enumeration exceeded max_simplices."
+                )
+            else:
+                core_complex, core_simplices = bounded_core
+                base["reduced_core_f_vector"] = [
+                    sum(len(simplex) == dimension + 1 for simplex in core_simplices)
+                    for dimension in range(max(0, core_complex.dimension() + 1))
+                ]
+                sphere_certificate = _sphere_collapse_certificate(
+                    core_complex, max_states=max_states
+                )
+                base["sphere_certificate"] = sphere_certificate
+                if sphere_certificate is None:
+                    base["sphere_search_diagnostics"] = (
+                        "No replayable top-facet deletion collapse was found; "
+                        "this is inconclusive."
+                    )
+                input_complex_result = _complex_from_clique_graph(
+                    graph, max_simplices
+                )
+                input_sphere_certificate = (
+                    None
+                    if input_complex_result is None
+                    else _sphere_collapse_certificate(
+                        input_complex_result[0], max_states=max_states
+                    )
+                )
+                base["input_sphere_certificate"] = input_sphere_certificate
+                if input_sphere_certificate is None:
+                    base["input_sphere_search_diagnostics"] = (
+                        "No replayable top-facet deletion collapse was found "
+                        "for the input complex; this is inconclusive."
+                        if input_complex_result is not None
+                        else "Input complex enumeration exceeded max_simplices."
+                    )
+                if (
+                    sphere_certificate is not None
+                    and input_sphere_certificate is not None
+                    and sphere_certificate["dimension"]
+                    == input_sphere_certificate["dimension"]
+                    and replayed
+                ):
+                    base["sphere_certificate_replayed"] = True
+                    sphere_proof = True
 
     analysis = analyze_graph(
         middle,
@@ -361,10 +705,15 @@ def analyze_h_operator_graph(
             base["status"] = INCONCLUSIVE_HOMOLOGY_MISMATCH_UNCONFIRMED
     elif analysis["collapse_diagnostics"].startswith("Not analyzed:"):
         base["status"] = INCONCLUSIVE_BUDGET
-        base["resource_diagnostics"] = analysis["collapse_diagnostics"]
+        if base["resource_diagnostics"] is None:
+            base["resource_diagnostics"] = analysis["collapse_diagnostics"]
+        else:
+            base["resource_diagnostics"] += f" {analysis['collapse_diagnostics']}"
     else:
         base["status"] = INCONCLUSIVE_NO_COLLAPSE_CERTIFICATE
 
+    if sphere_proof:
+        base["status"] = PROVED_BY_SPHERE_CERTIFICATE
     base["analysis"] = analysis
     return base
 
@@ -381,6 +730,8 @@ def run_h_operator_census(
     max_simplices: int = 2_500,
     max_candidate_faces: int = 100_000,
     use_compact_realization: bool = False,
+    enable_sphere_certificate: bool = False,
+    max_s_reduction_moves: int = 10_000,
 ) -> dict[str, Any]:
     """Run a bounded census and optionally save resumable JSONL records."""
     if max_graphs is not None and max_graphs < 1:
@@ -395,6 +746,8 @@ def run_h_operator_census(
         raise ValueError("max_simplices must be nonnegative")
     if max_candidate_faces < 0:
         raise ValueError("max_candidate_faces must be nonnegative")
+    if max_s_reduction_moves < 0:
+        raise ValueError("max_s_reduction_moves must be nonnegative")
     if resume and output_jsonl is None:
         raise ValueError("resume requires output_jsonl")
 
@@ -409,6 +762,8 @@ def run_h_operator_census(
         "max_simplices": max_simplices,
         "max_candidate_faces": max_candidate_faces,
         "use_compact_realization": use_compact_realization,
+        "enable_sphere_certificate": enable_sphere_certificate,
+        "max_s_reduction_moves": max_s_reduction_moves,
     }
     metadata = {
         "type": "metadata",
@@ -485,6 +840,8 @@ def run_h_operator_census(
                     max_simplices=max_simplices,
                     max_candidate_faces=max_candidate_faces,
                     use_compact_realization=use_compact_realization,
+                    enable_sphere_certificate=enable_sphere_certificate,
+                    max_s_reduction_moves=max_s_reduction_moves,
                 )
                 destination.write(
                     json.dumps(
@@ -514,6 +871,8 @@ def run_h_operator_census(
                     max_simplices=max_simplices,
                     max_candidate_faces=max_candidate_faces,
                     use_compact_realization=use_compact_realization,
+                    enable_sphere_certificate=enable_sphere_certificate,
+                    max_s_reduction_moves=max_s_reduction_moves,
                 ),
             }
 
@@ -526,6 +885,7 @@ def run_h_operator_census(
             INCONCLUSIVE_BUDGET,
             INCONCLUSIVE_NO_COLLAPSE_CERTIFICATE,
             INCONCLUSIVE_HOMOLOGY_MISMATCH_UNCONFIRMED,
+            PROVED_BY_SPHERE_CERTIFICATE,
         )
     }
     return {
@@ -548,6 +908,8 @@ def main() -> None:
     parser.add_argument("--max-simplices", type=int, default=2_500)
     parser.add_argument("--max-candidate-faces", type=int, default=100_000)
     parser.add_argument("--compact", action="store_true")
+    parser.add_argument("--sphere-certificate", action="store_true")
+    parser.add_argument("--max-s-reduction-moves", type=int, default=10_000)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--resume", action="store_true")
     args = parser.parse_args()
@@ -568,6 +930,8 @@ def main() -> None:
         max_simplices=args.max_simplices,
         max_candidate_faces=args.max_candidate_faces,
         use_compact_realization=args.compact,
+        enable_sphere_certificate=args.sphere_certificate,
+        max_s_reduction_moves=args.max_s_reduction_moves,
     )
     print(json.dumps({key: value for key, value in report.items() if key != "results"}))
 

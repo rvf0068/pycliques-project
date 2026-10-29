@@ -39,12 +39,17 @@ from .relative_collapse import (
 from .s_collapses import (
     complete_s_collapse,
     complete_s_collapse_edges,
+    complete_s_collapse_edges_with_certificate,
+    complete_s_collapse_with_certificate,
+    dismantling_certificate,
     has_s_dismantlable_edge,
     has_s_dismantlable_vertex,
     is_s_dismantlable_edge,
     is_s_dismantlable_vertex,
     remove_s_dismantlable_edge,
     remove_s_dismantlable_vertex,
+    verify_dismantling_certificate,
+    verify_s_collapse_move,
 )
 from .simplex import (
     Simplex,
@@ -110,13 +115,18 @@ __all__ = [
     "WedgeOfSpheres",
     # s_collapses
     "complete_s_collapse",
+    "complete_s_collapse_with_certificate",
     "complete_s_collapse_edges",
+    "complete_s_collapse_edges_with_certificate",
+    "dismantling_certificate",
     "has_s_dismantlable_edge",
     "has_s_dismantlable_vertex",
     "is_s_dismantlable_edge",
     "is_s_dismantlable_vertex",
     "remove_s_dismantlable_edge",
     "remove_s_dismantlable_vertex",
+    "verify_dismantling_certificate",
+    "verify_s_collapse_move",
     # hom_complex
     "graph_homomorphisms",
     "hom_graph",
