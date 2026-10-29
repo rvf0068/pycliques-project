@@ -520,18 +520,95 @@ def test_theorem15_clique_graph_budget_exits_before_enumeration(
 
 @pytest.mark.parametrize(
     "budget_name",
-    ["max_complete_sets", "max_maximal_cliques", "max_clique_graph_vertices"],
+    [
+        "max_complete_sets",
+        "max_maximal_cliques",
+        "max_clique_graph_vertices",
+        "max_simplices_per_h_image",
+    ],
 )
 def test_theorem15_rejects_negative_resource_budgets(budget_name):
     with pytest.raises(ValueError):
         theorem15_hypothesis_holds(nx.path_graph(3), **{budget_name: -1})
 
 
+def test_theorem15_forwards_per_image_simplex_budget(monkeypatch):
+    observed = {}
+
+    def fake_homotopy_type(s_complex, *, max_simplices=None):
+        observed["complex"] = s_complex
+        observed["max_simplices"] = max_simplices
+        return HomotopyVerdict(
+            wedge=WedgeOfSpheres.contractible(),
+            reason="test contractible result",
+        )
+
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
+        fake_homotopy_type,
+    )
+
+    assert theorem15_hypothesis_holds(
+        nx.path_graph(3),
+        max_simplices_per_h_image=13,
+    ) == (True, None)
+    assert isinstance(observed["complex"], SimplicialComplex)
+    assert observed["max_simplices"] == 13
+
+
+def test_theorem15_rejects_negative_simplex_budget_before_computation(
+    monkeypatch,
+):
+    def unexpected_computation(*_args, **_kwargs):
+        raise AssertionError("invalid budgets must be rejected before computation")
+
+    monkeypatch.setattr(
+        "pycliques.homotopy_invariance.clique_graph",
+        unexpected_computation,
+    )
+
+    with pytest.raises(ValueError, match="max_simplices_per_h_image"):
+        theorem15_hypothesis_holds(
+            nx.path_graph(3),
+            max_simplices_per_h_image=-1,
+        )
+
+
+def test_theorem15_per_image_limited_verdict_is_inconclusive(monkeypatch):
+    limited = HomotopyVerdict(
+        wedge=WedgeOfSpheres.contractible(),
+        reason="test resource limit",
+        is_exact=False,
+        is_limited=True,
+    )
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
+        lambda _complex, *, max_simplices=None: limited,
+    )
+
+    holds, witness = theorem15_hypothesis_holds(
+        nx.path_graph(3),
+        max_simplices_per_h_image=0,
+    )
+
+    assert holds is None
+    assert witness is not None
+
+
+def test_theorem15_large_simplex_budget_preserves_unlimited_result():
+    graph = nx.path_graph(3)
+
+    assert theorem15_hypothesis_holds(
+        graph,
+        max_simplices_per_h_image=10_000,
+    ) == theorem15_hypothesis_holds(graph)
+
+
 def test_theorem15_inexact_contractible_betti_result_is_inconclusive(monkeypatch):
     """An inexact zero-Betti result does not prove contractibility."""
     monkeypatch.setattr(
         "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
-        lambda _complex: HomotopyVerdict(
+        lambda _complex, *, max_simplices=None: HomotopyVerdict(
             wedge=WedgeOfSpheres.contractible(),
             reason="test-only Betti numbers",
             is_exact=False,
@@ -546,7 +623,7 @@ def test_theorem15_limited_flag_takes_precedence_over_exactness(monkeypatch):
     """The limited flag takes precedence over an exactness default."""
     monkeypatch.setattr(
         "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
-        lambda _complex: HomotopyVerdict(
+        lambda _complex, *, max_simplices=None: HomotopyVerdict(
             wedge=WedgeOfSpheres.contractible(),
             reason="test resource limit",
             is_limited=True,
@@ -577,7 +654,7 @@ def test_theorem15_recursive_limited_verdict_stays_inconclusive(monkeypatch):
 
     monkeypatch.setattr(
         "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
-        lambda _complex: recursively_derived,
+        lambda _complex, *, max_simplices=None: recursively_derived,
     )
     holds, witness = theorem15_hypothesis_holds(nx.path_graph(3))
 
@@ -589,7 +666,7 @@ def test_theorem15_inexact_nonzero_betti_result_proves_failure(monkeypatch):
     """A nonzero reduced Betti number proves noncontractibility."""
     monkeypatch.setattr(
         "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
-        lambda _complex: HomotopyVerdict(
+        lambda _complex, *, max_simplices=None: HomotopyVerdict(
             wedge=WedgeOfSpheres.sphere(1),
             reason="test-only nonzero reduced Betti number",
             is_exact=False,
@@ -603,7 +680,7 @@ def test_theorem15_inexact_nonzero_betti_result_proves_failure(monkeypatch):
 def test_theorem15_exact_noncontractible_verdict_proves_failure(monkeypatch):
     monkeypatch.setattr(
         "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
-        lambda _complex: HomotopyVerdict(
+        lambda _complex, *, max_simplices=None: HomotopyVerdict(
             wedge=WedgeOfSpheres.sphere(1),
             reason="test-only exact homotopy type",
             is_exact=True,

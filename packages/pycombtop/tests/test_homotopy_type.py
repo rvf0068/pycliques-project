@@ -18,6 +18,7 @@ from pycombtop.homotopy_type import (
     HomotopyVerdict,
     Theorem,
     WedgeOfSpheres,
+    _too_large_simplicial_complex,
     _try_special_neighbourhood,
     _try_special_vertex_sc,
     betti_numbers_graph,
@@ -431,6 +432,52 @@ def test_sc_simplex_limit_is_inconclusive():
     verdict = homotopy_type_sc_with_verdict(sc, max_simplices=3)
     assert verdict.is_limited is True
     assert verdict.verdict == "Too large to check"
+
+
+def test_simplex_budget_counts_distinct_faces_of_overlapping_facets():
+    sc = SimplicialComplex(
+        {0, 1, 2, 3},
+        facet_set=[{0, 1, 2}, {0, 1, 3}],
+    )
+
+    assert len(sc.all_simplices()) == 12
+    assert _too_large_simplicial_complex(sc, None, 12) is False
+    assert _too_large_simplicial_complex(sc, None, 11) is True
+
+
+@pytest.mark.parametrize(("budget", "is_limited"), [(7, True), (8, False)])
+def test_simplex_budget_counts_all_faces_of_one_facet(budget, is_limited):
+    sc = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1, 2}])
+
+    assert _too_large_simplicial_complex(sc, None, budget) is is_limited
+
+
+def test_simplex_budget_stops_after_budget_plus_one_distinct_faces(monkeypatch):
+    from itertools import combinations as itertools_combinations
+
+    yielded_faces = 0
+
+    def tracked_combinations(vertices, size):
+        nonlocal yielded_faces
+        for face in itertools_combinations(vertices, size):
+            yielded_faces += 1
+            yield face
+
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.combinations",
+        tracked_combinations,
+    )
+    sc = SimplicialComplex(set(range(8)), facet_set=[set(range(8))])
+
+    assert _too_large_simplicial_complex(sc, None, 2) is True
+    assert yielded_faces == 3
+
+
+def test_simplex_budget_rejects_negative_value():
+    sc = SimplicialComplex({0}, facet_set=[{0}])
+
+    with pytest.raises(ValueError, match="max_simplices"):
+        _too_large_simplicial_complex(sc, None, -1)
 
 
 def test_sc_boundary_triangle():

@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
+from itertools import combinations
 
 import mogutda
 import networkx as nx
@@ -285,15 +286,22 @@ def _too_large_simplicial_complex(
     max_simplices: int | None,
 ) -> bool:
     """Return whether a complex exceeds either configured size limit."""
+    if max_simplices is not None and max_simplices < 0:
+        raise ValueError("max_simplices must be nonnegative or None")
     if max_vertices is not None and len(s_complex.vertex_set) > max_vertices:
         return True
     if max_simplices is None:
         return False
-    simplex_count = 0
+    upper_bound = sum(2 ** len(facet) for facet in s_complex.facet_set)
+    if upper_bound <= max_simplices:
+        return False
+    distinct_faces: set[frozenset] = set()
     for facet in s_complex.facet_set:
-        simplex_count += 2 ** len(facet)
-        if simplex_count > max_simplices:
-            return True
+        for size in range(len(facet) + 1):
+            for face in combinations(facet, size):
+                distinct_faces.add(frozenset(face))
+                if len(distinct_faces) > max_simplices:
+                    return True
     return False
 
 
@@ -730,7 +738,8 @@ def homotopy_type_sc_with_verdict(
     max_vertices : int, optional
         Abort before analysis when the complex has more vertices than this.
     max_simplices : int, optional
-        Abort before analysis when the complex has more simplices than this.
+        Abort before analysis when the complex has more distinct simplices
+        than this. This is a size guard, not a timeout.
 
     Returns
     -------

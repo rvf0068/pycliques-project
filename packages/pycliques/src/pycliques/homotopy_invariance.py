@@ -671,6 +671,7 @@ def theorem15_hypothesis_holds(
     max_clique_graph_edges: int | None = None,
     max_maximal_cliques: int | None = None,
     max_complete_sets: int | None = None,
+    max_simplices_per_h_image: int | None = None,
 ) -> tuple[bool | None, frozenset | None]:
     """Check Theorem 15's hypothesis: :math:`\\Delta(h(X))` contractible for every X.
 
@@ -714,6 +715,11 @@ def theorem15_hypothesis_holds(
         are more, stop at the first excess complete set and return
         inconclusive. This bounds enumeration and the number of distinct
         :math:`h`-images retained.
+    max_simplices_per_h_image : int, optional
+        Maximum number of distinct simplices in each :math:`\\Delta(h(X))`.
+        This is a per-image size guard, not a cumulative work limit or
+        timeout; an over-budget image is inconclusive while other images are
+        still checked.
 
     .. rubric:: Returns
 
@@ -741,6 +747,8 @@ def theorem15_hypothesis_holds(
         raise ValueError("max_maximal_cliques must be nonnegative or None")
     if max_complete_sets is not None and max_complete_sets < 0:
         raise ValueError("max_complete_sets must be nonnegative or None")
+    if max_simplices_per_h_image is not None and max_simplices_per_h_image < 0:
+        raise ValueError("max_simplices_per_h_image must be nonnegative or None")
 
     kg = clique_graph(
         graph,
@@ -789,7 +797,10 @@ def theorem15_hypothesis_holds(
             if first_unknown is None:
                 first_unknown = h_image
             continue
-        verdict = homotopy_type_sc_with_verdict(delta)
+        verdict = homotopy_type_sc_with_verdict(
+            delta,
+            max_simplices=max_simplices_per_h_image,
+        )
         if verdict.is_limited:
             if first_unknown is None:
                 first_unknown = h_image
