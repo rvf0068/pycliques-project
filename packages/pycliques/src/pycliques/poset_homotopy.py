@@ -25,6 +25,149 @@ class ClosedCliqueIntersections:
         return not self.is_exact
 
 
+class ThreeHellyStatus(Enum):
+    """Outcome of the exact four-vertex recognition test for 3-Helly."""
+
+    PROVED = "proved"
+    OBSTRUCTION = "obstruction"
+    INCONCLUSIVE_BUDGET = "inconclusive_budget"
+
+
+@dataclass(frozen=True)
+class ThreeHellyResult:
+    """Auditable outcome of checking whether maximal cliques are 3-Helly."""
+
+    status: ThreeHellyStatus
+    vertex_count: int
+    maximal_cliques_count: int
+    four_sets_checked: int
+    max_maximal_cliques: int | None
+    max_4sets: int | None
+    maximal_cliques_complete: bool = True
+    witness: frozenset[Hashable] | None = None
+    relevant_cliques: tuple[frozenset[Hashable], ...] = ()
+
+
+def maximal_clique_hypergraph_is_3_helly(
+    graph: nx.Graph,
+    *,
+    max_maximal_cliques: int | None = None,
+    max_4sets: int | None = None,
+) -> ThreeHellyResult:
+    """Check the 3-Helly property using the published four-vertex test.
+
+    For each four-set ``W``, the subfamily of maximal cliques meeting ``W``
+    in at least three vertices must be empty or have nonempty total
+    intersection. A clique-enumeration or four-set budget exit is
+    inconclusive; partial clique lists are never used to prove the property.
+    """
+    for name, value in (
+        ("max_maximal_cliques", max_maximal_cliques),
+        ("max_4sets", max_4sets),
+    ):
+        if value is not None and (
+            not isinstance(value, int) or isinstance(value, bool) or value < 0
+        ):
+            raise ValueError(f"{name} must be a nonnegative integer or None")
+
+    vertices = tuple(graph.nodes())
+    vertex_count = len(vertices)
+    if vertex_count < 4:
+        return ThreeHellyResult(
+            ThreeHellyStatus.PROVED,
+            vertex_count,
+            maximal_cliques_count=0,
+            four_sets_checked=0,
+            max_maximal_cliques=max_maximal_cliques,
+            max_4sets=max_4sets,
+        )
+
+    vertex_index = {vertex: index for index, vertex in enumerate(vertices)}
+    clique_masks: list[int] = []
+    for clique in nx.find_cliques(graph):
+        if max_maximal_cliques is not None and len(clique_masks) >= max_maximal_cliques:
+            return ThreeHellyResult(
+                ThreeHellyStatus.INCONCLUSIVE_BUDGET,
+                vertex_count,
+                maximal_cliques_count=len(clique_masks),
+                four_sets_checked=0,
+                max_maximal_cliques=max_maximal_cliques,
+                max_4sets=max_4sets,
+                maximal_cliques_complete=False,
+            )
+        clique_masks.append(sum(1 << vertex_index[vertex] for vertex in clique))
+
+    cliques = tuple(
+        frozenset(
+            vertex for index, vertex in enumerate(vertices) if mask & (1 << index)
+        )
+        for mask in clique_masks
+    )
+    checked = 0
+    for four_indices in combinations(range(vertex_count), 4):
+        if max_4sets is not None and checked >= max_4sets:
+            return ThreeHellyResult(
+                ThreeHellyStatus.INCONCLUSIVE_BUDGET,
+                vertex_count,
+                maximal_cliques_count=len(clique_masks),
+                four_sets_checked=checked,
+                max_maximal_cliques=max_maximal_cliques,
+                max_4sets=max_4sets,
+            )
+        checked += 1
+        four_mask = sum(1 << index for index in four_indices)
+        relevant_indices = [
+            index
+            for index, mask in enumerate(clique_masks)
+            if (mask & four_mask).bit_count() >= 3
+        ]
+        if not relevant_indices:
+            continue
+
+        common_mask = clique_masks[relevant_indices[0]]
+        for index in relevant_indices[1:]:
+            common_mask &= clique_masks[index]
+        if common_mask:
+            continue
+
+        witness = frozenset(vertices[index] for index in four_indices)
+        relevant_cliques = tuple(cliques[index] for index in relevant_indices)
+        direct_relevant = tuple(
+            clique for clique in cliques if len(clique & witness) >= 3
+        )
+        direct_intersection = set.intersection(
+            *(set(clique) for clique in direct_relevant)
+        )
+        if (
+            not witness
+            or len(witness) != 4
+            or direct_relevant != relevant_cliques
+            or direct_intersection
+        ):
+            raise RuntimeError(
+                "four-vertex obstruction failed its direct intersection check"
+            )
+        return ThreeHellyResult(
+            ThreeHellyStatus.OBSTRUCTION,
+            vertex_count,
+            maximal_cliques_count=len(clique_masks),
+            four_sets_checked=checked,
+            max_maximal_cliques=max_maximal_cliques,
+            max_4sets=max_4sets,
+            witness=witness,
+            relevant_cliques=relevant_cliques,
+        )
+
+    return ThreeHellyResult(
+        ThreeHellyStatus.PROVED,
+        vertex_count,
+        maximal_cliques_count=len(clique_masks),
+        four_sets_checked=checked,
+        max_maximal_cliques=max_maximal_cliques,
+        max_4sets=max_4sets,
+    )
+
+
 def h_closure_from_neighbors(
     graph: nx.Graph, complete: Iterable[Hashable]
 ) -> frozenset[Hashable]:

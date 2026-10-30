@@ -3,7 +3,9 @@
 The direct construction is the reference path: M = K(H(G)), followed by the
 existing ``analyze_graph`` certificate search for Delta(K(M)) relative to the
 nerve of M's maximal cliques. ``double_bound_clique_graph`` is an optional,
-bounded realization of the same M using Proposition 7.5.
+bounded realization of the same M using Proposition 7.5. An exact 3-Helly
+recognition test can certify affirmative cases before either route constructs
+an iterated clique graph; pass ``use_3_helly_certificate=False`` to disable it.
 """
 
 from __future__ import annotations
@@ -19,7 +21,12 @@ from pathlib import Path
 from typing import Any
 
 import networkx as nx
-from pycliques import clique_graph, homotopy_clique_graph
+from pycliques import (
+    ThreeHellyStatus,
+    clique_graph,
+    homotopy_clique_graph,
+    maximal_clique_hypergraph_is_3_helly,
+)
 from pycombtop import (
     CollapseStatus,
     Simplex,
@@ -34,6 +41,7 @@ from pycombtop import (
 from research.homotopy_census import _bounded_complex, analyze_graph
 
 PROVED_BY_COLLAPSE = "PROVED_BY_COLLAPSE"
+PROVED_BY_3_HELLY = "PROVED_BY_3_HELLY"
 HOMOLOGY_MISMATCH_COUNTEREXAMPLE = "HOMOLOGY_MISMATCH_COUNTEREXAMPLE"
 INCONCLUSIVE_BUDGET = "INCONCLUSIVE_BUDGET"
 INCONCLUSIVE_NO_COLLAPSE_CERTIFICATE = "INCONCLUSIVE_NO_COLLAPSE_CERTIFICATE"
@@ -499,15 +507,20 @@ def analyze_h_operator_graph(
     max_states: int = 1_000,
     max_simplices: int = 2_500,
     max_candidate_faces: int = 100_000,
+    use_3_helly_certificate: bool = True,
+    max_3helly_4sets: int = 100_000,
     use_compact_realization: bool = False,
     enable_sphere_certificate: bool = False,
     max_s_reduction_moves: int = 10_000,
 ) -> dict[str, Any]:
-    """Analyze the conjecture for one graph without treating search limits as failure.
+    """Analyze one graph without treating search limits as failure.
 
     The compact Proposition 7.5 realization is opt-in. Before enabling it in
     a larger census, cross-check it against ``K(H(G))`` on the desired input
-    class using ``double_bound_clique_graph`` and ``nx.is_isomorphic``.
+    class using ``double_bound_clique_graph`` and ``nx.is_isomorphic``. By
+    default, a complete maximal-clique 3-Helly test returns an affirmative
+    theorem certificate before constructing ``H(G)`` or any clique graph.
+    Disable this shortcut with ``use_3_helly_certificate=False``.
     """
     if max_cliques < 0:
         raise ValueError("max_cliques must be nonnegative")
@@ -519,31 +532,19 @@ def analyze_h_operator_graph(
         raise ValueError("max_simplices must be nonnegative")
     if max_candidate_faces < 0:
         raise ValueError("max_candidate_faces must be nonnegative")
+    if max_3helly_4sets < 0:
+        raise ValueError("max_3helly_4sets must be nonnegative")
     if max_s_reduction_moves < 0:
         raise ValueError("max_s_reduction_moves must be nonnegative")
-
-    if use_compact_realization:
-        h_order, h_size = _homotopy_graph_counts(graph)
-        middle = double_bound_clique_graph(
-            graph,
-            max_faces=max_cliques,
-            max_candidates=max_candidate_faces,
-            max_edges=max_edges,
-        )
-    else:
-        homotopy_graph = homotopy_clique_graph(graph)
-        h_order = homotopy_graph.number_of_nodes()
-        h_size = homotopy_graph.number_of_edges()
-        middle = clique_graph(homotopy_graph, bound=max_cliques, max_edges=max_edges)
 
     base: dict[str, Any] = {
         "graph6": _graph6(graph),
         "order": graph.number_of_nodes(),
         "size": graph.number_of_edges(),
-        "h_order": h_order,
-        "h_size": h_size,
-        "middle_order": None if middle is None else middle.number_of_nodes(),
-        "middle_size": None if middle is None else middle.number_of_edges(),
+        "h_order": None,
+        "h_size": None,
+        "middle_order": None,
+        "middle_size": None,
         "k2_order": None,
         "k2_size": None,
         "betti_field": "rational",
@@ -567,6 +568,8 @@ def analyze_h_operator_graph(
         "input_sphere_certificate": None,
         "input_sphere_search_diagnostics": None,
         "sphere_certificate_replayed": False,
+        "three_helly_audit": None,
+        "analysis": None,
         "resource_diagnostics": None,
         "status": INCONCLUSIVE_BUDGET,
         "versions": {
@@ -581,11 +584,76 @@ def analyze_h_operator_graph(
             "max_states": max_states,
             "max_simplices": max_simplices,
             "max_candidate_faces": max_candidate_faces,
+            "use_3_helly_certificate": use_3_helly_certificate,
+            "max_3helly_4sets": max_3helly_4sets,
             "use_compact_realization": use_compact_realization,
             "enable_sphere_certificate": enable_sphere_certificate,
             "max_s_reduction_moves": max_s_reduction_moves,
         },
     }
+    if use_3_helly_certificate:
+        certificate = maximal_clique_hypergraph_is_3_helly(
+            graph,
+            max_maximal_cliques=max_cliques,
+            max_4sets=max_3helly_4sets,
+        )
+        vertex_indices = {
+            vertex: index for index, vertex in enumerate(graph.nodes())
+        }
+        audit: dict[str, Any] = {
+            "status": certificate.status.value,
+            "exact_test": (
+                certificate.status is not ThreeHellyStatus.INCONCLUSIVE_BUDGET
+            ),
+            "theorem": (
+                "Dourado, Protti, and Szwarcfiter, EJC Dynamic Surveys DS17 "
+                "(2009), Theorem 4.2, DOI 10.37236/38"
+            ),
+            "recognition_test": (
+                "For every four-set W, maximal cliques meeting W in at least "
+                "three vertices have nonempty total intersection, unless "
+                "there are no such cliques."
+            ),
+            "maximal_cliques_count": certificate.maximal_cliques_count,
+            "maximal_cliques_complete": certificate.maximal_cliques_complete,
+            "four_sets_checked": certificate.four_sets_checked,
+            "budgets": {
+                "max_maximal_cliques": certificate.max_maximal_cliques,
+                "max_4sets": certificate.max_4sets,
+            },
+            "witness": None,
+        }
+        if certificate.witness is not None:
+            audit["witness"] = {
+                "vertices": sorted(vertex_indices[v] for v in certificate.witness),
+                "relevant_maximal_cliques": [
+                    sorted(vertex_indices[v] for v in clique)
+                    for clique in certificate.relevant_cliques
+                ],
+            }
+        base["three_helly_audit"] = audit
+        if certificate.status is ThreeHellyStatus.PROVED:
+            base["status"] = PROVED_BY_3_HELLY
+            return base
+
+    if use_compact_realization:
+        h_order, h_size = _homotopy_graph_counts(graph)
+        middle = double_bound_clique_graph(
+            graph,
+            max_faces=max_cliques,
+            max_candidates=max_candidate_faces,
+            max_edges=max_edges,
+        )
+    else:
+        homotopy_graph = homotopy_clique_graph(graph)
+        h_order = homotopy_graph.number_of_nodes()
+        h_size = homotopy_graph.number_of_edges()
+        middle = clique_graph(homotopy_graph, bound=max_cliques, max_edges=max_edges)
+    base["h_order"] = h_order
+    base["h_size"] = h_size
+    base["middle_order"] = None if middle is None else middle.number_of_nodes()
+    base["middle_size"] = None if middle is None else middle.number_of_edges()
+
     if middle is None:
         base["resource_diagnostics"] = (
             "Construction of K(H(G)) exceeded max_cliques/max_edges."
@@ -732,6 +800,8 @@ def run_h_operator_census(
     max_states: int = 1_000,
     max_simplices: int = 2_500,
     max_candidate_faces: int = 100_000,
+    use_3_helly_certificate: bool = True,
+    max_3helly_4sets: int = 100_000,
     use_compact_realization: bool = False,
     enable_sphere_certificate: bool = False,
     max_s_reduction_moves: int = 10_000,
@@ -749,6 +819,8 @@ def run_h_operator_census(
         raise ValueError("max_simplices must be nonnegative")
     if max_candidate_faces < 0:
         raise ValueError("max_candidate_faces must be nonnegative")
+    if max_3helly_4sets < 0:
+        raise ValueError("max_3helly_4sets must be nonnegative")
     if max_s_reduction_moves < 0:
         raise ValueError("max_s_reduction_moves must be nonnegative")
     if resume and output_jsonl is None:
@@ -764,6 +836,8 @@ def run_h_operator_census(
         "max_states": max_states,
         "max_simplices": max_simplices,
         "max_candidate_faces": max_candidate_faces,
+        "use_3_helly_certificate": use_3_helly_certificate,
+        "max_3helly_4sets": max_3helly_4sets,
         "use_compact_realization": use_compact_realization,
         "enable_sphere_certificate": enable_sphere_certificate,
         "max_s_reduction_moves": max_s_reduction_moves,
@@ -842,6 +916,8 @@ def run_h_operator_census(
                     max_states=max_states,
                     max_simplices=max_simplices,
                     max_candidate_faces=max_candidate_faces,
+                    use_3_helly_certificate=use_3_helly_certificate,
+                    max_3helly_4sets=max_3helly_4sets,
                     use_compact_realization=use_compact_realization,
                     enable_sphere_certificate=enable_sphere_certificate,
                     max_s_reduction_moves=max_s_reduction_moves,
@@ -873,6 +949,8 @@ def run_h_operator_census(
                     max_states=max_states,
                     max_simplices=max_simplices,
                     max_candidate_faces=max_candidate_faces,
+                    use_3_helly_certificate=use_3_helly_certificate,
+                    max_3helly_4sets=max_3helly_4sets,
                     use_compact_realization=use_compact_realization,
                     enable_sphere_certificate=enable_sphere_certificate,
                     max_s_reduction_moves=max_s_reduction_moves,
@@ -883,6 +961,7 @@ def run_h_operator_census(
     counts = {
         status: sum(record["status"] == status for record in results)
         for status in (
+            PROVED_BY_3_HELLY,
             PROVED_BY_COLLAPSE,
             HOMOLOGY_MISMATCH_COUNTEREXAMPLE,
             INCONCLUSIVE_BUDGET,
@@ -910,6 +989,14 @@ def main() -> None:
     parser.add_argument("--max-states", type=int, default=1_000)
     parser.add_argument("--max-simplices", type=int, default=2_500)
     parser.add_argument("--max-candidate-faces", type=int, default=100_000)
+    parser.add_argument(
+        "--no-3-helly-certificate",
+        dest="use_3_helly_certificate",
+        action="store_false",
+        help="disable the early affirmative 3-Helly recognition shortcut",
+    )
+    parser.add_argument("--max-3helly-4sets", type=int, default=100_000)
+    parser.set_defaults(use_3_helly_certificate=True)
     parser.add_argument("--compact", action="store_true")
     parser.add_argument("--sphere-certificate", action="store_true")
     parser.add_argument("--max-s-reduction-moves", type=int, default=10_000)
@@ -932,6 +1019,8 @@ def main() -> None:
         max_states=args.max_states,
         max_simplices=args.max_simplices,
         max_candidate_faces=args.max_candidate_faces,
+        use_3_helly_certificate=args.use_3_helly_certificate,
+        max_3helly_4sets=args.max_3helly_4sets,
         use_compact_realization=args.compact,
         enable_sphere_certificate=args.sphere_certificate,
         max_s_reduction_moves=args.max_s_reduction_moves,

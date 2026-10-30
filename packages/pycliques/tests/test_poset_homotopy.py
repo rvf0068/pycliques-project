@@ -1,17 +1,190 @@
+from itertools import combinations
+from math import comb
+
 import networkx as nx
 import pycliques.poset_homotopy as poset_homotopy
 import pytest
 from pycliques import (
     Theorem57Status,
+    ThreeHellyStatus,
     closed_clique_intersections,
     double_bound_graph,
     h_closure_from_neighbors,
+    maximal_clique_hypergraph_is_3_helly,
     strong_collapse_certificate,
     theorem57_hypothesis_holds,
     verify_strong_collapse_certificate,
 )
 from pycliques.cliques import clique_graph
 from pycliques.named import octahedron
+
+
+def test_three_helly_is_trivial_through_three_vertices():
+    graphs = [graph for graph in nx.graph_atlas_g() if graph.number_of_nodes() <= 3]
+    graphs.append(nx.empty_graph(0))
+
+    for graph in graphs:
+        result = maximal_clique_hypergraph_is_3_helly(
+            graph, max_maximal_cliques=0, max_4sets=0
+        )
+        assert result.status is ThreeHellyStatus.PROVED
+        assert result.four_sets_checked == 0
+
+
+@pytest.mark.parametrize(
+    "graph",
+    [
+        nx.complete_graph(6),
+        *(nx.cycle_graph(order) for order in range(4, 9)),
+        *(nx.path_graph(order) for order in range(4, 9)),
+    ],
+)
+def test_three_helly_complete_cycles_and_triangle_free_paths(graph):
+    result = maximal_clique_hypergraph_is_3_helly(graph)
+
+    assert result.status is ThreeHellyStatus.PROVED
+    assert result.four_sets_checked == comb(graph.number_of_nodes(), 4)
+
+
+@pytest.mark.parametrize("dimension", [4, 5])
+def test_octahedra_fail_three_helly_without_claiming_conjecture_failure(dimension):
+    result = maximal_clique_hypergraph_is_3_helly(octahedron(dimension))
+
+    assert result.status is ThreeHellyStatus.OBSTRUCTION
+    assert result.witness is not None
+    assert len(result.witness) == 4
+    assert result.relevant_cliques
+    assert not set.intersection(*(set(clique) for clique in result.relevant_cliques))
+
+
+def test_three_helly_is_stricter_than_edge_intersection_helly():
+    a = {"a", "b"}
+    b = {"c", "d"}
+    c = {"e", "f"}
+    cliques = (
+        a | b | {"p1"},
+        a | c | {"p2"},
+        b | c | {"p3"},
+        a | b | c,
+    )
+    graph = nx.Graph()
+    graph.add_nodes_from(set().union(*cliques))
+    for clique in cliques:
+        graph.add_edges_from(combinations(clique, 2))
+    maximal_cliques = {frozenset(clique) for clique in nx.find_cliques(graph)}
+    assert maximal_cliques == {frozenset(clique) for clique in cliques}
+
+    first_three = cliques[:3]
+    pair_intersections = [
+        first_three[first] & first_three[second]
+        for first, second in combinations(range(3), 2)
+    ]
+    assert all(pair_intersections)
+    assert not set.intersection(*(set(clique) for clique in first_three))
+    result = maximal_clique_hypergraph_is_3_helly(graph)
+    assert result.status is ThreeHellyStatus.PROVED
+
+
+def test_three_helly_recognition_matches_brute_force_on_atlas_through_six():
+    graphs = [
+        graph
+        for graph in nx.graph_atlas_g()
+        if graph.number_of_nodes() > 0 and graph.number_of_nodes() <= 6
+    ]
+    assert len(graphs) == 208
+
+    for graph in graphs:
+        maximal_cliques = [frozenset(clique) for clique in nx.find_cliques(graph)]
+        direct_is_3_helly = True
+        for family_size in range(1, len(maximal_cliques) + 1):
+            for family in combinations(maximal_cliques, family_size):
+                total_intersection = set.intersection(
+                    *(set(clique) for clique in family)
+                )
+                all_small_intersections_nonempty = all(
+                    set.intersection(*(set(clique) for clique in subfamily))
+                    for subfamily_size in range(1, min(3, family_size) + 1)
+                    for subfamily in combinations(family, subfamily_size)
+                )
+                if all_small_intersections_nonempty and not total_intersection:
+                    direct_is_3_helly = False
+                    break
+            if not direct_is_3_helly:
+                break
+
+        result = maximal_clique_hypergraph_is_3_helly(graph)
+        assert (result.status is ThreeHellyStatus.PROVED) is direct_is_3_helly
+
+
+@pytest.mark.parametrize(
+    ("graph", "limits", "expected_status", "expected_checked"),
+    [
+        (
+            nx.complete_graph(4),
+            {"max_maximal_cliques": 0},
+            ThreeHellyStatus.INCONCLUSIVE_BUDGET,
+            0,
+        ),
+        (
+            nx.complete_graph(4),
+            {"max_maximal_cliques": 1},
+            ThreeHellyStatus.PROVED,
+            1,
+        ),
+        (
+            nx.path_graph(4),
+            {"max_4sets": 0},
+            ThreeHellyStatus.INCONCLUSIVE_BUDGET,
+            0,
+        ),
+        (
+            nx.path_graph(4),
+            {"max_4sets": 1},
+            ThreeHellyStatus.PROVED,
+            1,
+        ),
+    ],
+)
+def test_three_helly_budget_boundaries(
+    graph, limits, expected_status, expected_checked
+):
+    result = maximal_clique_hypergraph_is_3_helly(graph, **limits)
+
+    assert result.status is expected_status
+    assert result.four_sets_checked == expected_checked
+
+
+def test_three_helly_requires_complete_maximal_clique_enumeration():
+    result = maximal_clique_hypergraph_is_3_helly(
+        nx.path_graph(4), max_maximal_cliques=1
+    )
+
+    assert result.status is ThreeHellyStatus.INCONCLUSIVE_BUDGET
+    assert result.maximal_cliques_count == 1
+    assert result.four_sets_checked == 0
+
+
+@pytest.mark.parametrize("budget", [-1, 1.5, True])
+def test_three_helly_rejects_invalid_budgets(budget):
+    with pytest.raises(ValueError):
+        maximal_clique_hypergraph_is_3_helly(nx.complete_graph(4), max_4sets=budget)
+
+
+def test_three_helly_supports_noninteger_labels():
+    graph = nx.relabel_nodes(
+        octahedron(4), {vertex: ("vertex", vertex) for vertex in octahedron(4)}
+    )
+
+    result = maximal_clique_hypergraph_is_3_helly(graph)
+
+    assert result.status is ThreeHellyStatus.OBSTRUCTION
+    assert result.witness is not None
+    assert all(isinstance(vertex, tuple) for vertex in result.witness)
+    assert all(
+        isinstance(vertex, tuple)
+        for clique in result.relevant_cliques
+        for vertex in clique
+    )
 
 
 def _direct_h_closure(graph, complete):

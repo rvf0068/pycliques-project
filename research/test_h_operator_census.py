@@ -7,6 +7,7 @@ from pycliques.named import octahedron
 
 from research.h_operator_census import (
     INCONCLUSIVE_BUDGET,
+    PROVED_BY_3_HELLY,
     PROVED_BY_COLLAPSE,
     PROVED_BY_SPHERE_CERTIFICATE,
     _betti_numbers_mod2,
@@ -70,7 +71,9 @@ def test_double_bound_budgets_are_inconclusive():
 
 
 def test_experiment_uses_h_and_k_and_replays_collapse_for_single_vertex():
-    result = analyze_h_operator_graph(nx.empty_graph(1))
+    result = analyze_h_operator_graph(
+        nx.empty_graph(1), use_3_helly_certificate=False
+    )
     assert result["h_order"] == 1
     assert result["middle_order"] == 1
     assert result["k2_order"] == 1
@@ -80,7 +83,9 @@ def test_experiment_uses_h_and_k_and_replays_collapse_for_single_vertex():
 
 
 def test_experiment_budget_exit_is_inconclusive():
-    result = analyze_h_operator_graph(nx.empty_graph(1), max_cliques=0)
+    result = analyze_h_operator_graph(
+        nx.empty_graph(1), max_cliques=0, use_3_helly_certificate=False
+    )
     assert result["status"] == INCONCLUSIVE_BUDGET
     assert result["middle_order"] is None
     assert result["resource_diagnostics"]
@@ -93,8 +98,10 @@ def test_independent_mod2_betti_calculation():
 
 def test_compact_and_reference_experiments_agree_on_sizes_and_homology():
     graph = nx.path_graph(4)
-    reference = analyze_h_operator_graph(graph)
-    compact = analyze_h_operator_graph(graph, use_compact_realization=True)
+    reference = analyze_h_operator_graph(graph, use_3_helly_certificate=False)
+    compact = analyze_h_operator_graph(
+        graph, use_compact_realization=True, use_3_helly_certificate=False
+    )
     for key in (
         "h_order",
         "h_size",
@@ -129,7 +136,59 @@ def test_census_jsonl_is_resumable_and_records_limits(tmp_path):
     record = json.loads(lines[1])
     assert first["graphs_processed"] == resumed["graphs_processed"] == 1
     assert metadata["limits"]["max_cliques"] == 10_000
-    assert record["result"]["status"] == PROVED_BY_COLLAPSE
+    assert record["result"]["status"] == PROVED_BY_3_HELLY
+
+
+def test_three_helly_shortcut_returns_before_constructing_h_or_k(monkeypatch):
+    def unexpected(*_args, **_kwargs):
+        raise AssertionError("the affirmative shortcut should avoid H and K")
+
+    monkeypatch.setattr("research.h_operator_census.homotopy_clique_graph", unexpected)
+    monkeypatch.setattr("research.h_operator_census.clique_graph", unexpected)
+
+    result = analyze_h_operator_graph(nx.complete_graph(4))
+
+    assert result["status"] == PROVED_BY_3_HELLY
+    assert result["h_order"] is None
+    assert result["middle_order"] is None
+    audit = result["three_helly_audit"]
+    assert audit["exact_test"] is True
+    assert audit["maximal_cliques_complete"] is True
+    assert audit["maximal_cliques_count"] == 1
+    assert audit["four_sets_checked"] == 1
+    assert "Theorem 4.2" in audit["theorem"]
+    assert audit["witness"] is None
+
+
+def test_failed_three_helly_test_is_not_a_conjecture_counterexample():
+    result = analyze_h_operator_graph(octahedron(4))
+
+    assert result["three_helly_audit"]["status"] == "obstruction"
+    assert result["three_helly_audit"]["witness"] is not None
+    assert result["status"] not in (
+        PROVED_BY_3_HELLY,
+        "HOMOLOGY_MISMATCH_COUNTEREXAMPLE",
+    )
+    assert result["h_order"] is not None
+
+
+def test_three_helly_inconclusive_budget_does_not_claim_proof():
+    result = analyze_h_operator_graph(nx.path_graph(4), max_3helly_4sets=0)
+
+    assert result["three_helly_audit"]["status"] == "inconclusive_budget"
+    assert result["three_helly_audit"]["exact_test"] is False
+    assert result["status"] != PROVED_BY_3_HELLY
+    assert result["h_order"] is not None
+
+
+def test_three_helly_shortcut_can_be_disabled():
+    result = analyze_h_operator_graph(
+        nx.complete_graph(4), use_3_helly_certificate=False
+    )
+
+    assert result["three_helly_audit"] is None
+    assert result["h_order"] is not None
+    assert result["status"] != PROVED_BY_3_HELLY
 
 
 def test_o4_double_bound_and_second_clique_graph_regression():
