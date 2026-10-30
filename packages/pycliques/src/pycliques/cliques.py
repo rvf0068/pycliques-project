@@ -3,10 +3,12 @@ from __future__ import annotations
 import itertools
 import math
 from collections.abc import Hashable
-from functools import singledispatch
+from functools import lru_cache, singledispatch
 from typing import TypeAlias
 
 import networkx as nx
+
+from .octahedral_boolean import enumerate_maximal_intersecting_families
 
 
 class Clique(frozenset):
@@ -243,4 +245,97 @@ def double_bound_graph(
             return None
         result.add_edge(first, second)
         edge_count += 1
+    return result
+
+
+@lru_cache(maxsize=6)
+def _maximal_intersecting_family_library(n: int) -> tuple[int, ...] | None:
+    """Return canonical maximal intersecting families through rank six."""
+    if n > 6:
+        return None
+    result = enumerate_maximal_intersecting_families(n, max_subset_vertices=63)
+    if not result.is_exact:
+        return None
+    return result.families
+
+
+def clique_graph_of_double_bound(
+    graph: nx.Graph,
+    *,
+    max_vertices: int | None = 10_000,
+    max_edges: int | None = 100_000,
+) -> nx.Graph | None:
+    """Build ``K(DB(P(G)))`` directly from maximal cliques of *graph*.
+
+    This avoids constructing the usually much larger graph ``DB(P(G))``.
+    A vertex is represented by its maximal intersecting family of nonempty
+    faces, and two vertices are adjacent exactly when those families share
+    a face. Families are generated from a cached canonical rank-specific
+    library for supports of size at most six.
+
+    If either output budget is exceeded, or a maximal clique has size greater
+    than six, return ``None`` rather than a partial graph. Set either budget
+    to ``None`` to remove that output limit.
+    """
+    for name, value in (("max_vertices", max_vertices), ("max_edges", max_edges)):
+        if value is not None and (
+            not isinstance(value, int) or isinstance(value, bool) or value < 0
+        ):
+            raise ValueError(f"{name} must be a nonnegative integer or None")
+
+    supports: list[tuple[frozenset, tuple[frozenset, ...]]] = []
+    vertex_count = 0
+    for clique in nx.find_cliques(graph):
+        support = frozenset(clique)
+        family_codes = _maximal_intersecting_family_library(len(support))
+        if family_codes is None:
+            return None
+
+        support_vertices = tuple(support)
+        full_mask = (1 << len(support_vertices)) - 1
+        families = tuple(
+            frozenset(
+                frozenset(
+                    support_vertices[index]
+                    for index in range(len(support_vertices))
+                    if subset_mask & (1 << index)
+                )
+                for subset_mask in range(1, full_mask + 1)
+                if family_code & (1 << subset_mask)
+            )
+            for family_code in family_codes
+        )
+        vertex_count += len(families)
+        if max_vertices is not None and vertex_count > max_vertices:
+            return None
+        supports.append((support, families))
+
+    result = nx.Graph()
+    for _, families in supports:
+        result.add_nodes_from(families)
+
+    edge_count = 0
+    for _, families in supports:
+        support_edges = len(families) * (len(families) - 1) // 2
+        if max_edges is not None and edge_count + support_edges > max_edges:
+            return None
+        result.add_edges_from(itertools.combinations(families, 2))
+        edge_count += support_edges
+
+    for first_index, (first_support, first_families) in enumerate(supports):
+        for second_support, second_families in supports[first_index + 1 :]:
+            common_support = first_support & second_support
+            if not common_support:
+                continue
+            for first_family in first_families:
+                if common_support not in first_family:
+                    continue
+                for second_family in second_families:
+                    if common_support not in second_family:
+                        continue
+                    if max_edges is not None and edge_count >= max_edges:
+                        return None
+                    result.add_edge(first_family, second_family)
+                    edge_count += 1
+
     return result

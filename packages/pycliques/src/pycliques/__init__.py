@@ -6,6 +6,7 @@ from .cliques import (
     Clique,
     NodeH,
     clique_graph,
+    clique_graph_of_double_bound,
     double_bound_graph,
     homotopy_clique_graph,
 )
@@ -108,6 +109,7 @@ from .octahedral_boolean import (
 )
 from .poset_homotopy import (
     ClosedCliqueIntersections,
+    SupportNerveConeCertificate,
     Theorem57Result,
     Theorem57Status,
     ThreeHellyResult,
@@ -116,6 +118,8 @@ from .poset_homotopy import (
     h_closure_from_neighbors,
     maximal_clique_hypergraph_is_3_helly,
     strong_collapse_certificate,
+    support_nerve_cone_certificate,
+    support_nerve_facets,
     theorem57_hypothesis_holds,
     verify_strong_collapse_certificate,
 )
@@ -165,6 +169,7 @@ __all__ = [
     "Clique",
     "NodeH",
     "clique_graph",
+    "clique_graph_of_double_bound",
     "double_bound_graph",
     "homotopy_clique_graph",
     "MaximalIntersectingFamilies",
@@ -176,12 +181,15 @@ __all__ = [
     "ClosedCliqueIntersections",
     "ThreeHellyResult",
     "ThreeHellyStatus",
+    "SupportNerveConeCertificate",
     "Theorem57Result",
     "Theorem57Status",
     "closed_clique_intersections",
     "h_closure_from_neighbors",
     "maximal_clique_hypergraph_is_3_helly",
     "strong_collapse_certificate",
+    "support_nerve_cone_certificate",
+    "support_nerve_facets",
     "theorem57_hypothesis_holds",
     "verify_strong_collapse_certificate",
     # clockwork

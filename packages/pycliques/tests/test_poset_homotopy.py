@@ -7,11 +7,14 @@ import pytest
 from pycliques import (
     Theorem57Status,
     ThreeHellyStatus,
+    clique_graph_of_double_bound,
     closed_clique_intersections,
     double_bound_graph,
     h_closure_from_neighbors,
     maximal_clique_hypergraph_is_3_helly,
     strong_collapse_certificate,
+    support_nerve_cone_certificate,
+    support_nerve_facets,
     theorem57_hypothesis_holds,
     verify_strong_collapse_certificate,
 )
@@ -239,6 +242,77 @@ def test_double_bound_graph_supports_noninteger_labels_and_disconnected_graphs()
     }
 
 
+def test_direct_clique_graph_of_double_bound_matches_explicit_construction():
+    graph = nx.from_graph6_bytes(b"G~]uf?")
+    double_bound = double_bound_graph(graph)
+    assert double_bound is not None
+    expected = clique_graph(double_bound)
+    assert expected is not None
+
+    direct = clique_graph_of_double_bound(graph)
+
+    assert direct is not None
+    assert graph.number_of_edges() == 18
+    assert direct.number_of_nodes() == 60
+    assert set(direct) == set(expected)
+    assert {frozenset(edge) for edge in direct.edges} == {
+        frozenset(edge) for edge in expected.edges
+    }
+
+
+def test_direct_clique_graph_of_double_bound_budgets_are_exact():
+    graph = nx.complete_graph(3)
+
+    assert clique_graph_of_double_bound(graph, max_vertices=2) is None
+    assert clique_graph_of_double_bound(graph, max_edges=0) is None
+    empty_result = clique_graph_of_double_bound(nx.empty_graph(0))
+    assert empty_result is not None
+    assert empty_result.number_of_nodes() == 0
+    assert empty_result.number_of_edges() == 0
+    with pytest.raises(ValueError):
+        clique_graph_of_double_bound(graph, max_vertices=True)
+    with pytest.raises(ValueError):
+        clique_graph_of_double_bound(graph, max_edges=-1)
+
+
+def test_support_nerve_facets_and_cone_certificate():
+    first_support = frozenset({"a", "b"})
+    second_support = frozenset({"b", "c"})
+    family = (
+        (frozenset({"a", "b"}), frozenset({"b"})),
+        (frozenset({"b", "c"}), frozenset({"b"})),
+    )
+
+    facets = support_nerve_facets(family)
+    certificate = support_nerve_cone_certificate(family)
+
+    assert facets == (frozenset({first_support, second_support}),)
+    assert certificate is not None
+    assert certificate.apex_support in {first_support, second_support}
+    assert all(mask & (1 << certificate.apex_index) for mask in certificate.facet_masks)
+    assert certificate.support_order[certificate.apex_index] == certificate.apex_support
+
+
+def test_support_nerve_without_common_apex_is_not_a_certificate():
+    family = (
+        (frozenset({"a", "b"}), frozenset({"a"})),
+        (frozenset({"b", "c"}), frozenset({"c"})),
+    )
+
+    assert set(support_nerve_facets(family)) == {
+        frozenset({frozenset({"a", "b"})}),
+        frozenset({frozenset({"b", "c"})}),
+    }
+    assert support_nerve_cone_certificate(family) is None
+
+
+def test_support_nerve_rejects_invalid_families():
+    with pytest.raises(ValueError):
+        support_nerve_facets(())
+    with pytest.raises(ValueError):
+        support_nerve_facets(((frozenset({"a"}), frozenset({"b"})),))
+
+
 def test_h_closure_from_neighbors_matches_direct_definition_on_atlas():
     graph_count = 0
     complete_count = 0
@@ -336,12 +410,18 @@ def test_strong_collapse_certificate_supports_noninteger_labels():
     assert verify_strong_collapse_certificate(facets, certificate)
 
 
-def test_theorem57_driver_reports_proof_and_replays_certificate():
+def test_theorem57_driver_reports_proof_and_replays_certificate(monkeypatch):
+    monkeypatch.setattr(
+        poset_homotopy,
+        "support_nerve_cone_certificate",
+        lambda _family: None,
+    )
     result = theorem57_hypothesis_holds(nx.empty_graph(1))
 
     assert result.status is Theorem57Status.PROVED
     assert result.checked_h_images == 1
     assert len(result.certificates) == 1
+    assert not result.support_certificates
     for h_image, moves in result.certificates.items():
         facets = tuple(frozenset(clique) for clique in h_image)
         assert verify_strong_collapse_certificate(facets, moves)
@@ -374,6 +454,11 @@ def test_theorem57_nonzero_exact_homology_is_a_counterexample(monkeypatch):
         "clique_graph",
         lambda _graph: intersection_graph,
     )
+    monkeypatch.setattr(
+        poset_homotopy,
+        "support_nerve_cone_certificate",
+        lambda _family: None,
+    )
 
     result = theorem57_hypothesis_holds(nx.empty_graph(0))
 
@@ -400,6 +485,11 @@ def test_theorem57_counterexample_count_includes_earlier_unknown_images(
         poset_homotopy,
         "clique_graph",
         lambda _graph: nx.Graph(),
+    )
+    monkeypatch.setattr(
+        poset_homotopy,
+        "support_nerve_cone_certificate",
+        lambda _family: None,
     )
     monkeypatch.setattr(
         poset_homotopy,
@@ -447,20 +537,33 @@ def test_theorem57_o4_certifies_every_closed_h_image():
 
     assert result.status is Theorem57Status.PROVED
     assert result.checked_h_images == 19040
-    assert len(result.certificates) == 19040
-    for h_image, moves in result.certificates.items():
-        facets = tuple(frozenset(clique) for clique in h_image)
-        assert verify_strong_collapse_certificate(facets, moves)
+    assert len(result.support_certificates) == 19040
+    assert not result.certificates
+    assert (
+        sum(
+            len(certificate.facet_masks) > 1
+            for certificate in result.support_certificates.values()
+        )
+        == 80
+    )
+    for certificate in result.support_certificates.values():
+        assert all(
+            mask & (1 << certificate.apex_index) for mask in certificate.facet_masks
+        )
 
 
 def test_full_double_bound_construction_is_not_coatomic_compact_graph():
-    graph = nx.from_graph6_bytes(b"Gslyf{")
     from research.h_operator_census import double_bound_clique_graph
 
+    graph = nx.from_graph6_bytes(b"G~]uf?")
     full = double_bound_graph(graph)
     coatomic = double_bound_clique_graph(graph)
 
     assert full is not None
+    second_clique_graph = clique_graph(full)
+    assert second_clique_graph is not None
+    assert graph.number_of_edges() == 18
+    assert second_clique_graph.number_of_nodes() == 60
     assert coatomic is not None
     assert full.number_of_nodes() == 47
     assert coatomic.number_of_nodes() == 19

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Hashable, Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from itertools import combinations
 
@@ -286,6 +286,98 @@ def _maximal_nonempty_facets(
     )
 
 
+def _support_nerve_data(
+    family: Iterable[Iterable[Iterable[Hashable]]],
+) -> tuple[tuple[frozenset[Hashable], ...], tuple[int, ...]]:
+    """Return canonical supports and maximal support-incidence bitmasks."""
+    normalized: list[tuple[frozenset[frozenset[Hashable]], int]] = []
+    supports: list[frozenset[Hashable]] = []
+    support_indices: dict[frozenset[Hashable], int] = {}
+    for member in family:
+        faces = frozenset(frozenset(face) for face in member)
+        if not faces or any(not face for face in faces):
+            raise ValueError("each supported family must contain nonempty faces")
+        support = frozenset().union(*faces)
+        if support not in faces:
+            raise ValueError("each supported family must contain its support")
+        support_index = support_indices.get(support)
+        if support_index is None:
+            support_index = len(supports)
+            support_indices[support] = support_index
+            supports.append(support)
+        normalized.append((faces, support_index))
+    if not normalized:
+        raise ValueError("family must contain at least one supported family")
+
+    incidence_masks: dict[frozenset[Hashable], int] = {}
+    for faces, support_index in normalized:
+        support_bit = 1 << support_index
+        for face in faces:
+            incidence_masks[face] = incidence_masks.get(face, 0) | support_bit
+
+    unique_masks = set(incidence_masks.values())
+    maximal_masks = tuple(
+        sorted(
+            mask
+            for mask in unique_masks
+            if not any(mask != other and mask & other == mask for other in unique_masks)
+        )
+    )
+    return tuple(supports), maximal_masks
+
+
+def support_nerve_facets(
+    family: Iterable[Iterable[Iterable[Hashable]]],
+) -> tuple[frozenset[frozenset[Hashable]], ...]:
+    """Return the maximal faces of the support-incidence nerve.
+
+    ``family`` is a nonempty collection of maximal cliques of ``DB(P(G))``.
+    Each member is represented as an iterable of nonempty face-vertices.
+    The supports are recovered as the unions of those faces.
+    """
+    supports, facet_masks = _support_nerve_data(family)
+    return tuple(
+        frozenset(
+            support for index, support in enumerate(supports) if mask & (1 << index)
+        )
+        for mask in facet_masks
+    )
+
+
+@dataclass(frozen=True)
+class SupportNerveConeCertificate:
+    """Replayable support-incidence evidence for a nerve cone point."""
+
+    apex_support: frozenset[Hashable]
+    apex_index: int
+    support_order: tuple[frozenset[Hashable], ...]
+    facet_masks: tuple[int, ...]
+
+
+def support_nerve_cone_certificate(
+    family: Iterable[Iterable[Iterable[Hashable]]],
+) -> SupportNerveConeCertificate | None:
+    """Certify a common apex in every maximal support-nerve face.
+
+    ``None`` means only that this nerve-cone criterion did not prove the
+    Theorem 5.7 hypothesis; callers must retain their other checks.
+    """
+    supports, facet_masks = _support_nerve_data(family)
+    common_mask = (1 << len(supports)) - 1
+    for mask in facet_masks:
+        common_mask &= mask
+    if not common_mask:
+        return None
+
+    apex_index = (common_mask & -common_mask).bit_length() - 1
+    return SupportNerveConeCertificate(
+        apex_support=supports[apex_index],
+        apex_index=apex_index,
+        support_order=supports,
+        facet_masks=facet_masks,
+    )
+
+
 def _dominated_move(
     facets: frozenset[frozenset[Hashable]],
 ) -> tuple[Hashable, Hashable] | None:
@@ -382,6 +474,9 @@ class Theorem57Result:
     certificates: dict[frozenset, tuple[tuple[Hashable, Hashable], ...]]
     witness: frozenset | None = None
     reason: str = ""
+    support_certificates: dict[frozenset, SupportNerveConeCertificate] = field(
+        default_factory=dict
+    )
 
 
 def theorem57_hypothesis_holds(
@@ -443,8 +538,14 @@ def theorem57_hypothesis_holds(
     from pycombtop.simplex import relative_betti_numbers
 
     certificates: dict[frozenset, tuple[tuple[Hashable, Hashable], ...]] = {}
+    support_certificates: dict[frozenset, SupportNerveConeCertificate] = {}
     first_unknown: frozenset | None = None
     for checked_count, h_image in enumerate(intersections.closed_sets, start=1):
+        support_certificate = support_nerve_cone_certificate(h_image)
+        if support_certificate is not None:
+            support_certificates[h_image] = support_certificate
+            continue
+
         facets = tuple(frozenset(clique) for clique in h_image)
         certificate = strong_collapse_certificate(facets)
         if certificate is not None and verify_strong_collapse_certificate(
@@ -470,6 +571,7 @@ def theorem57_hypothesis_holds(
                 certificates,
                 witness=h_image,
                 reason="exact rational homology is nonzero in reduced degree",
+                support_certificates=support_certificates,
             )
         if first_unknown is None:
             first_unknown = h_image
@@ -481,11 +583,16 @@ def theorem57_hypothesis_holds(
             certificates,
             witness=first_unknown,
             reason="no strong-collapse certificate; vanishing homology is not proof",
+            support_certificates=support_certificates,
         )
 
     return Theorem57Result(
         Theorem57Status.PROVED,
         len(intersections.closed_sets),
         certificates,
-        reason="every closed h-image has a verified strong-collapse certificate",
+        reason=(
+            "every closed h-image has a support-nerve cone or "
+            "verified strong-collapse certificate"
+        ),
+        support_certificates=support_certificates,
     )
