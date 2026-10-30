@@ -676,6 +676,105 @@ def test_theorem57_direct_mode_preserves_closure_budget_semantics():
     assert "closed h-image" in result.reason
 
 
+def test_explicit_mode_forwards_vertex_budget_during_clique_graph_construction(
+    monkeypatch,
+):
+    actual_clique_graph = clique_graph
+    calls = []
+
+    def bounded_clique_graph(graph, bound=float("inf"), *, max_edges=None):
+        calls.append((bound, max_edges))
+        return actual_clique_graph(graph, bound=bound, max_edges=max_edges)
+
+    monkeypatch.setattr(poset_homotopy, "clique_graph", bounded_clique_graph)
+    monkeypatch.setattr(
+        poset_homotopy,
+        "closed_clique_intersections",
+        lambda *_args, **_kwargs: pytest.fail(
+            "closed-set enumeration must not follow budget exhaustion"
+        ),
+    )
+
+    result = theorem57_hypothesis_holds(
+        nx.path_graph(3),
+        construction="explicit",
+        max_direct_vertices=0,
+        max_direct_edges=17,
+    )
+
+    assert calls == [(0, 17)]
+    assert result.status is Theorem57Status.INCONCLUSIVE
+    assert result.construction_used == "explicit"
+    assert result.checked_h_images == 0
+    assert "max_direct_vertices and/or max_direct_edges" in result.reason
+
+
+def test_explicit_mode_enforces_edge_budget_during_clique_graph_construction():
+    result = theorem57_hypothesis_holds(
+        nx.path_graph(3),
+        construction="explicit",
+        max_direct_vertices=10,
+        max_direct_edges=0,
+    )
+
+    assert result.status is Theorem57Status.INCONCLUSIVE
+    assert result.construction_used == "explicit"
+    assert result.checked_h_images == 0
+    assert "max_direct_vertices and/or max_direct_edges" in result.reason
+
+
+def test_explicit_mode_none_output_budgets_are_unlimited():
+    result = theorem57_hypothesis_holds(
+        nx.empty_graph(1),
+        construction="explicit",
+        max_direct_vertices=None,
+        max_direct_edges=None,
+    )
+
+    assert result.status is Theorem57Status.PROVED
+    assert result.construction_used == "explicit"
+    assert result.checked_h_images == 1
+
+
+@pytest.mark.parametrize(
+    ("vertex_limit", "edge_limit", "expected_status"),
+    [
+        (4, 3, Theorem57Status.PROVED),
+        (3, 3, Theorem57Status.INCONCLUSIVE),
+        (4, 2, Theorem57Status.INCONCLUSIVE),
+    ],
+)
+def test_explicit_mode_output_budget_boundaries(
+    vertex_limit,
+    edge_limit,
+    expected_status,
+):
+    result = theorem57_hypothesis_holds(
+        nx.path_graph(3),
+        construction="explicit",
+        max_direct_vertices=vertex_limit,
+        max_direct_edges=edge_limit,
+    )
+
+    assert result.status is expected_status
+    assert result.construction_used == "explicit"
+    if expected_status is Theorem57Status.INCONCLUSIVE:
+        assert result.checked_h_images == 0
+
+
+def test_explicit_mode_k6_edge_budget_refuses_large_output_early():
+    result = theorem57_hypothesis_holds(
+        nx.complete_graph(6),
+        construction="explicit",
+        max_direct_edges=0,
+    )
+
+    assert result.status is Theorem57Status.INCONCLUSIVE
+    assert result.construction_used == "explicit"
+    assert result.checked_h_images == 0
+    assert "max_direct_vertices and/or max_direct_edges" in result.reason
+
+
 @pytest.mark.parametrize(
     "graph",
     [
@@ -712,7 +811,7 @@ def test_theorem57_nonzero_exact_homology_is_a_counterexample(monkeypatch):
     monkeypatch.setattr(
         poset_homotopy,
         "clique_graph",
-        lambda _graph: intersection_graph,
+        lambda _graph, **_kwargs: intersection_graph,
     )
     monkeypatch.setattr(
         poset_homotopy,
@@ -744,7 +843,7 @@ def test_theorem57_counterexample_count_includes_earlier_unknown_images(
     monkeypatch.setattr(
         poset_homotopy,
         "clique_graph",
-        lambda _graph: nx.Graph(),
+        lambda _graph, **_kwargs: nx.Graph(),
     )
     monkeypatch.setattr(
         poset_homotopy,

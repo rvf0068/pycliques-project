@@ -597,8 +597,12 @@ def theorem57_hypothesis_holds(
     exhaustion.
 
     ``max_direct_vertices`` and ``max_direct_edges`` bound the final
-    ``K(DB(P(G)))`` output in either construction mode. All closure budgets
-    and failed certificate searches preserve their inconclusive meanings.
+    ``K(DB(P(G)))`` output in either construction mode. In explicit mode,
+    these are enforced while the clique graph is constructed. They do not
+    bound allocations used to construct the intermediate ``DB(P(G))``;
+    ``max_faces``, ``max_candidates``, and ``max_edges`` provide those
+    intermediate-graph limits. All closure budgets and failed certificate
+    searches preserve their inconclusive meanings.
     """
     if construction not in {"auto", "direct", "explicit"}:
         raise ValueError("construction must be 'auto', 'direct', or 'explicit'")
@@ -677,30 +681,26 @@ def theorem57_hypothesis_holds(
                 construction_used="explicit",
                 construction_reason=selection_reason,
             )
-        second_clique_graph = clique_graph(double_bound)
-        if second_clique_graph is None:
-            raise RuntimeError("unbounded clique graph construction returned no graph")
-        if (
-            max_direct_vertices is not None
-            and second_clique_graph.number_of_nodes() > max_direct_vertices
-        ):
-            return Theorem57Result(
-                Theorem57Status.INCONCLUSIVE,
-                0,
-                {},
-                reason="explicit output exceeded max_direct_vertices",
-                construction_used="explicit",
-                construction_reason=selection_reason,
+        if max_direct_vertices is None:
+            second_clique_graph = clique_graph(
+                double_bound,
+                max_edges=max_direct_edges,
             )
-        if (
-            max_direct_edges is not None
-            and second_clique_graph.number_of_edges() > max_direct_edges
-        ):
+        else:
+            second_clique_graph = clique_graph(
+                double_bound,
+                bound=max_direct_vertices,
+                max_edges=max_direct_edges,
+            )
+        if second_clique_graph is None:
             return Theorem57Result(
                 Theorem57Status.INCONCLUSIVE,
                 0,
                 {},
-                reason="explicit output exceeded max_direct_edges",
+                reason=(
+                    "explicit K(DB(P(G))) construction exceeded "
+                    "max_direct_vertices and/or max_direct_edges"
+                ),
                 construction_used="explicit",
                 construction_reason=selection_reason,
             )
