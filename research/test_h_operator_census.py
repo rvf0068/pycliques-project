@@ -71,9 +71,7 @@ def test_double_bound_budgets_are_inconclusive():
 
 
 def test_experiment_uses_h_and_k_and_replays_collapse_for_single_vertex():
-    result = analyze_h_operator_graph(
-        nx.empty_graph(1), use_3_helly_certificate=False
-    )
+    result = analyze_h_operator_graph(nx.empty_graph(1), use_3_helly_certificate=False)
     assert result["h_order"] == 1
     assert result["middle_order"] == 1
     assert result["k2_order"] == 1
@@ -157,6 +155,12 @@ def test_three_helly_shortcut_returns_before_constructing_h_or_k(monkeypatch):
     assert audit["maximal_cliques_count"] == 1
     assert audit["four_sets_checked"] == 1
     assert "Theorem 4.2" in audit["theorem"]
+    assert audit["recognition_source"] == audit["theorem"]
+    assert (
+        audit["homotopy_implication"]["status"]
+        == "conditional_on_internal_note_verification"
+    )
+    assert "not a published theorem" in audit["homotopy_implication"]["caveat"]
     assert audit["witness"] is None
 
 
@@ -228,12 +232,13 @@ def test_o4_sphere_certificate_reduces_and_replays():
     assert result["reduced_core_f_vector"] == [40, 214, 348, 174]
     assert result["sphere_certificate_replayed"] is True
     assert len(result["s_reduction_certificate"]) == 216
-    assert sum(
-        move["kind"] == "vertex" for move in result["s_reduction_certificate"]
-    ) == 152
-    assert sum(
-        move["kind"] == "edge" for move in result["s_reduction_certificate"]
-    ) == 64
+    assert (
+        sum(move["kind"] == "vertex" for move in result["s_reduction_certificate"])
+        == 152
+    )
+    assert (
+        sum(move["kind"] == "edge" for move in result["s_reduction_certificate"]) == 64
+    )
     assert len(result["sphere_certificate"]["collapse_pairs"]) == 387
     assert len(result["sphere_certificate"]["deleted_facet"]) == 4
     assert result["status"] == PROVED_BY_SPHERE_CERTIFICATE
@@ -242,9 +247,7 @@ def test_o4_sphere_certificate_reduces_and_replays():
     assert compact is not None
     second = clique_graph(compact)
     assert second is not None
-    assert verify_s_reduction_certificate(
-        second, result["s_reduction_certificate"]
-    )
+    assert verify_s_reduction_certificate(second, result["s_reduction_certificate"])
 
 
 def test_o4_certificate_replay_is_invariant_under_input_relabeling():

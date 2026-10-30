@@ -122,6 +122,7 @@ from .poset_homotopy import (
     support_nerve_facets,
     theorem57_hypothesis_holds,
     verify_strong_collapse_certificate,
+    verify_support_nerve_cone_certificate,
 )
 from .retractions import (
     dict_to_tuple,
@@ -190,6 +191,7 @@ __all__ = [
     "strong_collapse_certificate",
     "support_nerve_cone_certificate",
     "support_nerve_facets",
+    "verify_support_nerve_cone_certificate",
     "theorem57_hypothesis_holds",
     "verify_strong_collapse_certificate",
     # clockwork

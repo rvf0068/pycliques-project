@@ -4,8 +4,12 @@ The direct construction is the reference path: M = K(H(G)), followed by the
 existing ``analyze_graph`` certificate search for Delta(K(M)) relative to the
 nerve of M's maximal cliques. ``double_bound_clique_graph`` is an optional,
 bounded realization of the same M using Proposition 7.5. An exact 3-Helly
-recognition test can certify affirmative cases before either route constructs
-an iterated clique graph; pass ``use_3_helly_certificate=False`` to disable it.
+recognition test can trigger the affirmative shortcut before either route
+constructs an iterated clique graph; pass ``use_3_helly_certificate=False``
+to disable it. The published recognition result is separate from the
+homotopy implication: that implication currently relies on the internal
+October 2026 canonical-core note and is marked conditional on its verification
+in the emitted audit.
 """
 
 from __future__ import annotations
@@ -41,6 +45,8 @@ from pycombtop import (
 from research.homotopy_census import _bounded_complex, analyze_graph
 
 PROVED_BY_COLLAPSE = "PROVED_BY_COLLAPSE"
+# This label is conditional on the internal canonical-core theorem recorded
+# in three_helly_audit, not a homotopy consequence of the recognition paper.
 PROVED_BY_3_HELLY = "PROVED_BY_3_HELLY"
 HOMOLOGY_MISMATCH_COUNTEREXAMPLE = "HOMOLOGY_MISMATCH_COUNTEREXAMPLE"
 INCONCLUSIVE_BUDGET = "INCONCLUSIVE_BUDGET"
@@ -60,8 +66,7 @@ def _encode_certificate_label(label: Any) -> Any:
     if isinstance(label, frozenset):
         return {
             "$frozenset": [
-                _encode_certificate_label(item)
-                for item in sorted(label, key=repr)
+                _encode_certificate_label(item) for item in sorted(label, key=repr)
             ]
         }
     if isinstance(label, tuple):
@@ -407,15 +412,11 @@ def _sphere_collapse_certificate(
     simplices = complex_.all_simplices()
     if not complex_.base_set:
         return None
-    ordered_facets = sorted(
-        facets, key=lambda face: tuple(sorted(map(repr, face)))
-    )
+    ordered_facets = sorted(facets, key=lambda face: tuple(sorted(map(repr, face))))
     for deleted_facet in ordered_facets:
         remaining = simplices - {deleted_facet}
         maximal = {
-            face
-            for face in remaining
-            if not any(face < other for other in remaining)
+            face for face in remaining if not any(face < other for other in remaining)
         }
         source = SimplicialComplex(complex_.base_set, facet_set=maximal)
         vertices = sorted(
@@ -426,9 +427,8 @@ def _sphere_collapse_certificate(
             continue
         target = SimplicialComplex({vertices[0]}, facet_set=[{vertices[0]}])
         result = relative_collapse(source, target, max_states=max_states)
-        if (
-            result.status is CollapseStatus.PROVED
-            and verify_relative_collapse(source, target, result.pairs)
+        if result.status is CollapseStatus.PROVED and verify_relative_collapse(
+            source, target, result.pairs
         ):
             certificate = {
                 "dimension": len(deleted_facet) - 1,
@@ -466,8 +466,7 @@ def verify_sphere_collapse_certificate(
         if not facets or len({len(facet) for facet in facets}) != 1:
             return False
         deleted_facet = Simplex(
-            _decode_certificate_label(vertex)
-            for vertex in certificate["deleted_facet"]
+            _decode_certificate_label(vertex) for vertex in certificate["deleted_facet"]
         )
         if deleted_facet not in complex_.facet_set:
             return False
@@ -475,9 +474,7 @@ def verify_sphere_collapse_certificate(
             return False
         simplices = complex_.all_simplices() - {deleted_facet}
         maximal = {
-            face
-            for face in simplices
-            if not any(face < other for other in simplices)
+            face for face in simplices if not any(face < other for other in simplices)
         }
         source = SimplicialComplex(complex_.base_set, facet_set=maximal)
         pairs = [
@@ -597,13 +594,15 @@ def analyze_h_operator_graph(
             max_maximal_cliques=max_cliques,
             max_4sets=max_3helly_4sets,
         )
-        vertex_indices = {
-            vertex: index for index, vertex in enumerate(graph.nodes())
-        }
+        vertex_indices = {vertex: index for index, vertex in enumerate(graph.nodes())}
         audit: dict[str, Any] = {
             "status": certificate.status.value,
             "exact_test": (
                 certificate.status is not ThreeHellyStatus.INCONCLUSIVE_BUDGET
+            ),
+            "recognition_source": (
+                "Dourado, Protti, and Szwarcfiter, EJC Dynamic Surveys DS17 "
+                "(2009), Theorem 4.2, DOI 10.37236/38"
             ),
             "theorem": (
                 "Dourado, Protti, and Szwarcfiter, EJC Dynamic Surveys DS17 "
@@ -614,6 +613,30 @@ def analyze_h_operator_graph(
                 "three vertices have nonempty total intersection, unless "
                 "there are no such cliques."
             ),
+            "homotopy_implication": {
+                "status": "conditional_on_internal_note_verification",
+                "research_result": (
+                    "A sharp 3-Helly criterion and the minimal obstructions "
+                    "for O5 (2026-10-29), Theorem 2.2"
+                ),
+                "statement": (
+                    "X(G)=Delta(K(DB(P(G)))) equals the canonical nerve core "
+                    "U(G) exactly when Q(G) is 3-Helly; the core is homotopy "
+                    "equivalent to Delta(G)."
+                ),
+                "published_bridge": (
+                    "Larrión, Pizaña, and Villarroel-Flores, Posets, clique "
+                    "graphs and their homotopy type, European Journal of "
+                    "Combinatorics 29 (2008), 334-342, Theorem 5.7, "
+                    "Proposition 7.5, and Section 7."
+                ),
+                "caveat": (
+                    "The canonical-core theorem is an internal research "
+                    "result, not a published theorem; its proof path is "
+                    "conditional until independently verified. Failure of "
+                    "3-Helly alone is not a homotopy counterexample."
+                ),
+            },
             "maximal_cliques_count": certificate.maximal_cliques_count,
             "maximal_cliques_complete": certificate.maximal_cliques_complete,
             "four_sets_checked": certificate.four_sets_checked,
@@ -714,9 +737,7 @@ def analyze_h_operator_graph(
                         "No replayable top-facet deletion collapse was found; "
                         "this is inconclusive."
                     )
-                input_complex_result = _complex_from_clique_graph(
-                    graph, max_simplices
-                )
+                input_complex_result = _complex_from_clique_graph(graph, max_simplices)
                 input_sphere_certificate = (
                     None
                     if input_complex_result is None

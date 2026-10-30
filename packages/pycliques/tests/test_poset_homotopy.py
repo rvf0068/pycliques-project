@@ -1,7 +1,9 @@
+from dataclasses import replace
 from itertools import combinations
 from math import comb
 
 import networkx as nx
+import pycliques.cliques as cliques_module
 import pycliques.poset_homotopy as poset_homotopy
 import pytest
 from pycliques import (
@@ -17,6 +19,7 @@ from pycliques import (
     support_nerve_facets,
     theorem57_hypothesis_holds,
     verify_strong_collapse_certificate,
+    verify_support_nerve_cone_certificate,
 )
 from pycliques.cliques import clique_graph
 from pycliques.named import octahedron
@@ -260,6 +263,83 @@ def test_direct_clique_graph_of_double_bound_matches_explicit_construction():
     }
 
 
+def _assert_direct_matches_explicit(graph):
+    double_bound = double_bound_graph(graph)
+    assert double_bound is not None
+    expected = clique_graph(double_bound)
+    assert expected is not None
+    direct = clique_graph_of_double_bound(graph)
+    assert direct is not None
+    assert set(direct) == set(expected)
+    assert {frozenset(edge) for edge in direct.edges} == {
+        frozenset(edge) for edge in expected.edges
+    }
+
+
+def test_direct_clique_graph_matches_explicit_on_feasible_atlas_graphs():
+    checked = 0
+    for graph in nx.graph_atlas_g():
+        if not graph or graph.number_of_nodes() > 6:
+            continue
+        direct = clique_graph_of_double_bound(graph)
+        if direct is None:
+            continue
+        double_bound = double_bound_graph(graph)
+        assert double_bound is not None
+        expected = clique_graph(double_bound)
+        assert expected is not None
+        assert set(direct) == set(expected)
+        assert {frozenset(edge) for edge in direct.edges} == {
+            frozenset(edge) for edge in expected.edges
+        }
+        checked += 1
+    assert checked == 207
+
+
+@pytest.mark.parametrize(
+    "graph",
+    [octahedron(4), nx.icosahedral_graph(), nx.from_graph6_bytes(b"G~]uf?")],
+)
+def test_direct_clique_graph_matches_explicit_on_named_graphs(graph):
+    _assert_direct_matches_explicit(graph)
+
+
+def test_direct_clique_graph_matches_explicit_on_disconnected_and_labeled_graphs():
+    disconnected = nx.disjoint_union(nx.path_graph(3), nx.empty_graph(2))
+    labeled = nx.relabel_nodes(
+        nx.cycle_graph(4),
+        {vertex: ("vertex", vertex) for vertex in range(4)},
+    )
+    _assert_direct_matches_explicit(disconnected)
+    _assert_direct_matches_explicit(labeled)
+
+
+def test_direct_clique_graph_uses_exact_support_adjacency_criterion():
+    graph = nx.Graph()
+    graph.add_edges_from(
+        combinations(
+            (0, 1, 2),
+            2,
+        )
+    )
+    graph.add_edges_from(combinations((1, 2, 3), 2))
+    direct = clique_graph_of_double_bound(graph)
+    assert direct is not None
+
+    vertices = tuple(direct)
+    supports = {family: frozenset().union(*family) for family in vertices}
+    for first_index, first in enumerate(vertices):
+        for second in vertices[first_index + 1 :]:
+            if supports[first] == supports[second]:
+                expected_adjacent = True
+            else:
+                common_support = supports[first] & supports[second]
+                expected_adjacent = bool(common_support) and (
+                    common_support in first and common_support in second
+                )
+            assert direct.has_edge(first, second) is expected_adjacent
+
+
 def test_direct_clique_graph_of_double_bound_budgets_are_exact():
     graph = nx.complete_graph(3)
 
@@ -273,6 +353,38 @@ def test_direct_clique_graph_of_double_bound_budgets_are_exact():
         clique_graph_of_double_bound(graph, max_vertices=True)
     with pytest.raises(ValueError):
         clique_graph_of_double_bound(graph, max_edges=-1)
+
+
+def test_direct_rank_six_and_vertex_budgets_refuse_before_family_decoding(
+    monkeypatch,
+):
+    def unexpected(_rank):
+        raise AssertionError("family contents should not be decoded")
+
+    monkeypatch.setattr(
+        cliques_module,
+        "_maximal_intersecting_family_library",
+        unexpected,
+    )
+
+    assert clique_graph_of_double_bound(nx.complete_graph(6)) is None
+
+
+def test_direct_family_library_rank_counts():
+    expected_counts = (1, 2, 4, 12, 81)
+    for rank, expected_count in enumerate(expected_counts, start=1):
+        families = cliques_module._maximal_intersecting_family_library(rank)
+        assert families is not None
+        assert len(families) == expected_count
+    assert cliques_module._maximal_intersecting_family_count(6) == 2646
+    assert (
+        clique_graph_of_double_bound(
+            nx.complete_graph(5),
+            max_vertices=80,
+            max_edges=None,
+        )
+        is None
+    )
 
 
 def test_support_nerve_facets_and_cone_certificate():
@@ -291,6 +403,7 @@ def test_support_nerve_facets_and_cone_certificate():
     assert certificate.apex_support in {first_support, second_support}
     assert all(mask & (1 << certificate.apex_index) for mask in certificate.facet_masks)
     assert certificate.support_order[certificate.apex_index] == certificate.apex_support
+    assert verify_support_nerve_cone_certificate(family, certificate)
 
 
 def test_support_nerve_without_common_apex_is_not_a_certificate():
@@ -306,11 +419,90 @@ def test_support_nerve_without_common_apex_is_not_a_certificate():
     assert support_nerve_cone_certificate(family) is None
 
 
+def test_support_nerve_verifier_rejects_corrupted_certificate_components():
+    family = (
+        (frozenset({"a", "b"}), frozenset({"b"})),
+        (frozenset({"b", "c"}), frozenset({"b"})),
+    )
+    certificate = support_nerve_cone_certificate(family)
+    assert certificate is not None
+    first, second = certificate.support_order
+
+    corrupted = (
+        replace(certificate, apex_support=frozenset({"wrong"})),
+        replace(certificate, apex_index=len(certificate.support_order)),
+        replace(certificate, apex_index=1),
+        replace(certificate, support_order=(second, first)),
+        replace(certificate, support_order=(first, first)),
+        replace(certificate, support_order=(first,)),
+        replace(certificate, facet_masks=()),
+        replace(certificate, facet_masks=certificate.facet_masks[:-1]),
+        replace(certificate, facet_masks=(*certificate.facet_masks, 0b01)),
+        replace(certificate, facet_masks=(0b01,)),
+        replace(certificate, facet_masks=(0b10,)),
+        replace(certificate, facet_masks=(0b11, 0b11)),
+        replace(certificate, facet_masks=(0b100,)),
+    )
+    for forged in corrupted:
+        assert not verify_support_nerve_cone_certificate(family, forged)
+
+
+def test_support_nerve_verifier_accepts_repeated_members_and_hashable_labels():
+    first = (("label", 1), "other")
+    second = (("label", 1), "third")
+    family_member = (
+        frozenset(first),
+        frozenset({("label", 1)}),
+    )
+    family = (
+        family_member,
+        family_member,
+        (frozenset(second), frozenset({("label", 1)})),
+    )
+
+    certificate = support_nerve_cone_certificate(family)
+
+    assert certificate is not None
+    assert verify_support_nerve_cone_certificate(family, certificate)
+
+
+def test_support_nerve_verifier_rejects_forged_nonconical_certificate():
+    family = (
+        (frozenset({"a", "b"}), frozenset({"a"})),
+        (frozenset({"b", "c"}), frozenset({"c"})),
+    )
+    assert support_nerve_cone_certificate(family) is None
+    forged = poset_homotopy.SupportNerveConeCertificate(
+        apex_support=frozenset({"a", "b"}),
+        apex_index=0,
+        support_order=(frozenset({"a", "b"}), frozenset({"b", "c"})),
+        facet_masks=(0b01, 0b10),
+    )
+
+    assert not verify_support_nerve_cone_certificate(family, forged)
+
+
 def test_support_nerve_rejects_invalid_families():
     with pytest.raises(ValueError):
         support_nerve_facets(())
     with pytest.raises(ValueError):
         support_nerve_facets(((frozenset({"a"}), frozenset({"b"})),))
+
+
+def test_support_nerve_verifier_rejects_malformed_families():
+    certificate = support_nerve_cone_certificate(
+        ((frozenset({"a", "b"}), frozenset({"b"})),)
+    )
+    assert certificate is not None
+    assert not verify_support_nerve_cone_certificate((), certificate)
+    assert not verify_support_nerve_cone_certificate(
+        ((frozenset(),),),
+        certificate,
+    )
+    assert not verify_support_nerve_cone_certificate(
+        ((frozenset({"a"}),),),
+        certificate,
+    )
 
 
 def test_h_closure_from_neighbors_matches_direct_definition_on_atlas():
@@ -416,7 +608,7 @@ def test_theorem57_driver_reports_proof_and_replays_certificate(monkeypatch):
         "support_nerve_cone_certificate",
         lambda _family: None,
     )
-    result = theorem57_hypothesis_holds(nx.empty_graph(1))
+    result = theorem57_hypothesis_holds(nx.empty_graph(1), construction="explicit")
 
     assert result.status is Theorem57Status.PROVED
     assert result.checked_h_images == 1
@@ -435,6 +627,74 @@ def test_theorem57_driver_reports_budget_exits_as_inconclusive():
 
     assert result.status is Theorem57Status.INCONCLUSIVE
     assert result.checked_h_images == 0
+    assert result.construction_used == "explicit"
+    assert "explicit-only budgets" in result.construction_reason
+
+
+@pytest.mark.parametrize(
+    ("graph", "budget", "reason"),
+    [
+        (nx.complete_graph(7), {}, "rank greater than six"),
+        (nx.path_graph(3), {"max_direct_vertices": 0}, "max_direct_vertices"),
+        (nx.path_graph(3), {"max_direct_edges": 0}, "max_direct_edges"),
+    ],
+)
+def test_theorem57_direct_refusals_are_inconclusive(graph, budget, reason):
+    result = theorem57_hypothesis_holds(
+        graph,
+        construction="direct",
+        **budget,
+    )
+
+    assert result.status is Theorem57Status.INCONCLUSIVE
+    assert result.construction_used == "direct"
+    assert reason in result.reason
+
+
+def test_theorem57_construction_modes_reject_or_route_mode_specific_budgets():
+    with pytest.raises(ValueError, match="apply only to explicit"):
+        theorem57_hypothesis_holds(
+            nx.path_graph(3),
+            construction="direct",
+            max_faces=100,
+        )
+
+    automatic = theorem57_hypothesis_holds(nx.path_graph(3), max_faces=0)
+    assert automatic.construction_used == "explicit"
+    assert automatic.status is Theorem57Status.INCONCLUSIVE
+
+
+def test_theorem57_direct_mode_preserves_closure_budget_semantics():
+    result = theorem57_hypothesis_holds(
+        nx.path_graph(3),
+        construction="direct",
+        max_closed_sets=0,
+    )
+
+    assert result.status is Theorem57Status.INCONCLUSIVE
+    assert result.construction_used == "direct"
+    assert "closed h-image" in result.reason
+
+
+@pytest.mark.parametrize(
+    "graph",
+    [
+        nx.path_graph(4),
+        nx.cycle_graph(5),
+        octahedron(3),
+        nx.from_graph6_bytes(b"G~]uf?"),
+        nx.disjoint_union(nx.path_graph(3), nx.empty_graph(2)),
+        nx.relabel_nodes(nx.cycle_graph(4), {i: ("v", i) for i in range(4)}),
+    ],
+)
+def test_theorem57_direct_and_explicit_modes_agree(graph):
+    direct = theorem57_hypothesis_holds(graph, construction="direct")
+    explicit = theorem57_hypothesis_holds(graph, construction="explicit")
+
+    assert direct.construction_used == "direct"
+    assert explicit.construction_used == "explicit"
+    assert direct.status is explicit.status
+    assert direct.checked_h_images == explicit.checked_h_images
 
 
 def test_theorem57_nonzero_exact_homology_is_a_counterexample(monkeypatch):
@@ -460,7 +720,7 @@ def test_theorem57_nonzero_exact_homology_is_a_counterexample(monkeypatch):
         lambda _family: None,
     )
 
-    result = theorem57_hypothesis_holds(nx.empty_graph(0))
+    result = theorem57_hypothesis_holds(nx.empty_graph(0), construction="explicit")
 
     assert result.status is Theorem57Status.COUNTEREXAMPLE
     assert result.witness == frozenset(facets)
@@ -510,7 +770,7 @@ def test_theorem57_counterexample_count_includes_earlier_unknown_images(
         ),
     )
 
-    result = theorem57_hypothesis_holds(nx.empty_graph(0))
+    result = theorem57_hypothesis_holds(nx.empty_graph(0), construction="explicit")
 
     assert result.status is Theorem57Status.COUNTEREXAMPLE
     assert result.checked_h_images == 2
@@ -550,6 +810,13 @@ def test_theorem57_o4_certifies_every_closed_h_image():
         assert all(
             mask & (1 << certificate.apex_index) for mask in certificate.facet_masks
         )
+    for h_image, certificate in result.support_certificates.items():
+        assert verify_support_nerve_cone_certificate(h_image, certificate)
+
+    explicit = theorem57_hypothesis_holds(graph, construction="explicit")
+    assert explicit.status is result.status
+    assert explicit.checked_h_images == result.checked_h_images
+    assert explicit.construction_used == "explicit"
 
 
 def test_full_double_bound_construction_is_not_coatomic_compact_graph():

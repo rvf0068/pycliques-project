@@ -4,6 +4,7 @@ import itertools
 import math
 from collections.abc import Hashable
 from functools import lru_cache, singledispatch
+from math import comb
 from typing import TypeAlias
 
 import networkx as nx
@@ -38,6 +39,8 @@ class Clique(frozenset):
 
 
 NodeH: TypeAlias = tuple[Hashable, Clique]
+
+_MAXIMAL_INTERSECTING_FAMILY_COUNTS = (0, 1, 2, 4, 12, 81, 2646)
 
 
 def _cliques_by_vertex(
@@ -259,6 +262,13 @@ def _maximal_intersecting_family_library(n: int) -> tuple[int, ...] | None:
     return result.families
 
 
+def _maximal_intersecting_family_count(n: int) -> int | None:
+    """Return canonical family counts without expanding family contents."""
+    if not 1 <= n < len(_MAXIMAL_INTERSECTING_FAMILY_COUNTS):
+        return None
+    return _MAXIMAL_INTERSECTING_FAMILY_COUNTS[n]
+
+
 def clique_graph_of_double_bound(
     graph: nx.Graph,
     *,
@@ -283,13 +293,26 @@ def clique_graph_of_double_bound(
         ):
             raise ValueError(f"{name} must be a nonnegative integer or None")
 
-    supports: list[tuple[frozenset, tuple[frozenset, ...]]] = []
-    vertex_count = 0
-    for clique in nx.find_cliques(graph):
-        support = frozenset(clique)
-        family_codes = _maximal_intersecting_family_library(len(support))
-        if family_codes is None:
+    support_sets = tuple(frozenset(clique) for clique in nx.find_cliques(graph))
+    family_counts: list[int] = []
+    for support in support_sets:
+        family_count = _maximal_intersecting_family_count(len(support))
+        if family_count is None:
             return None
+        family_counts.append(family_count)
+
+    vertex_count = sum(family_counts)
+    if max_vertices is not None and vertex_count > max_vertices:
+        return None
+    within_support_edge_count = sum(comb(count, 2) for count in family_counts)
+    if max_edges is not None and within_support_edge_count > max_edges:
+        return None
+
+    supports: list[tuple[frozenset, tuple[frozenset, ...]]] = []
+    for support, family_count in zip(support_sets, family_counts, strict=True):
+        family_codes = _maximal_intersecting_family_library(len(support))
+        if family_codes is None or len(family_codes) != family_count:
+            raise RuntimeError("maximal intersecting family count metadata mismatch")
 
         support_vertices = tuple(support)
         full_mask = (1 << len(support_vertices)) - 1
@@ -305,9 +328,6 @@ def clique_graph_of_double_bound(
             )
             for family_code in family_codes
         )
-        vertex_count += len(families)
-        if max_vertices is not None and vertex_count > max_vertices:
-            return None
         supports.append((support, families))
 
     result = nx.Graph()

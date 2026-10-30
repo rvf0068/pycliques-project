@@ -6,10 +6,15 @@ from collections.abc import Hashable, Iterable, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from itertools import combinations
+from typing import Literal
 
 import networkx as nx
 
-from .cliques import clique_graph, double_bound_graph
+from .cliques import (
+    clique_graph,
+    clique_graph_of_double_bound,
+    double_bound_graph,
+)
 
 
 @dataclass(frozen=True)
@@ -378,6 +383,94 @@ def support_nerve_cone_certificate(
     )
 
 
+def verify_support_nerve_cone_certificate(
+    family: Iterable[Iterable[Iterable[Hashable]]],
+    certificate: SupportNerveConeCertificate,
+) -> bool:
+    """Independently replay a support-nerve cone certificate.
+
+    Reconstructs face-to-support incidences directly from the input families;
+    it does not rely on the bitmask facet-generation helper. Repeated input
+    families are allowed. Malformed input or a forged certificate returns
+    ``False``.
+    """
+    if not isinstance(certificate, SupportNerveConeCertificate):
+        return False
+    try:
+        normalized: list[
+            tuple[frozenset[frozenset[Hashable]], frozenset[Hashable]]
+        ] = []
+        supports_in_family: set[frozenset[Hashable]] = set()
+        for member in family:
+            faces = frozenset(frozenset(face) for face in member)
+            if not faces or any(not face for face in faces):
+                return False
+            support = frozenset().union(*faces)
+            if support not in faces:
+                return False
+            normalized.append((faces, support))
+            supports_in_family.add(support)
+        if not normalized:
+            return False
+
+        support_order = certificate.support_order
+        if (
+            not isinstance(support_order, tuple)
+            or any(not isinstance(support, frozenset) for support in support_order)
+            or len(set(support_order)) != len(support_order)
+            or set(support_order) != supports_in_family
+        ):
+            return False
+
+        apex_index = certificate.apex_index
+        if (
+            not isinstance(apex_index, int)
+            or isinstance(apex_index, bool)
+            or not 0 <= apex_index < len(support_order)
+            or not isinstance(certificate.apex_support, frozenset)
+            or support_order[apex_index] != certificate.apex_support
+        ):
+            return False
+
+        facet_masks = certificate.facet_masks
+        if not isinstance(facet_masks, tuple) or not facet_masks:
+            return False
+        if any(
+            not isinstance(mask, int)
+            or isinstance(mask, bool)
+            or mask <= 0
+            or mask >= 1 << len(support_order)
+            for mask in facet_masks
+        ):
+            return False
+        if len(set(facet_masks)) != len(facet_masks):
+            return False
+
+        support_indices = {
+            support: index for index, support in enumerate(support_order)
+        }
+        supports_by_face: dict[frozenset[Hashable], set[frozenset[Hashable]]] = {}
+        for faces, support in normalized:
+            for face in faces:
+                supports_by_face.setdefault(face, set()).add(support)
+
+        incidence_sets = {frozenset(supports) for supports in supports_by_face.values()}
+        actual_facets = {
+            incidence
+            for incidence in incidence_sets
+            if not any(incidence < other for other in incidence_sets)
+        }
+        actual_masks = {
+            sum(1 << support_indices[support] for support in facet)
+            for facet in actual_facets
+        }
+        if actual_masks != set(facet_masks):
+            return False
+        return all(certificate.apex_support in facet for facet in actual_facets)
+    except (AttributeError, TypeError, ValueError):
+        return False
+
+
 def _dominated_move(
     facets: frozenset[frozenset[Hashable]],
 ) -> tuple[Hashable, Hashable] | None:
@@ -477,53 +570,142 @@ class Theorem57Result:
     support_certificates: dict[frozenset, SupportNerveConeCertificate] = field(
         default_factory=dict
     )
+    construction_used: str | None = None
+    construction_reason: str = ""
 
 
 def theorem57_hypothesis_holds(
     graph: nx.Graph,
     *,
+    construction: Literal["auto", "direct", "explicit"] = "auto",
     max_faces: int | None = None,
     max_candidates: int | None = None,
     max_edges: int | None = None,
+    max_direct_vertices: int | None = 10_000,
+    max_direct_edges: int | None = 100_000,
     max_maximal_cliques: int | None = None,
     max_closed_sets: int | None = None,
 ) -> Theorem57Result:
-    """Check Theorem 5.7 on the full ``DB(P(G))`` with replayable evidence.
+    """Check Theorem 5.7 using direct or explicit ``K(DB(P(G)))`` construction.
 
-    Each ``h``-image of the clique graph of ``DB(P(G))`` is tested for a
-    strong-collapse certificate. Failure to find a certificate is
-    inconclusive unless exact rational homology proves noncontractibility.
-    All face/closure bounds produce an inconclusive status rather than a
-    positive or negative theorem verdict.
+    ``direct`` constructs ``K(DB(P(G)))`` from maximal cliques without
+    materializing ``DB(P(G))``. ``explicit`` builds the full intermediate
+    ``DB(P(G))`` and then its clique graph. ``auto`` prefers ``direct``, but
+    selects ``explicit`` when any of ``max_faces``, ``max_candidates``, or
+    ``max_edges`` is supplied; these three limits apply only to the full
+    double-bound graph. Auto mode does not fall back after direct resource
+    exhaustion.
+
+    ``max_direct_vertices`` and ``max_direct_edges`` bound the final
+    ``K(DB(P(G)))`` output in either construction mode. All closure budgets
+    and failed certificate searches preserve their inconclusive meanings.
     """
+    if construction not in {"auto", "direct", "explicit"}:
+        raise ValueError("construction must be 'auto', 'direct', or 'explicit'")
     for name, value in (
         ("max_faces", max_faces),
         ("max_candidates", max_candidates),
         ("max_edges", max_edges),
+        ("max_direct_vertices", max_direct_vertices),
+        ("max_direct_edges", max_direct_edges),
         ("max_maximal_cliques", max_maximal_cliques),
         ("max_closed_sets", max_closed_sets),
     ):
-        if value is not None and value < 0:
-            raise ValueError(f"{name} must be nonnegative or None")
+        if value is not None and (
+            not isinstance(value, int) or isinstance(value, bool) or value < 0
+        ):
+            raise ValueError(f"{name} must be a nonnegative integer or None")
 
-    double_bound = double_bound_graph(
-        graph,
-        max_faces=max_faces,
-        max_candidates=max_candidates,
-        max_edges=max_edges,
+    explicit_limits_supplied = any(
+        value is not None for value in (max_faces, max_candidates, max_edges)
     )
-    if double_bound is None:
-        return Theorem57Result(
-            Theorem57Status.INCONCLUSIVE,
-            0,
-            {},
-            reason="double-bound construction exceeded a configured limit",
+    if construction == "direct" and explicit_limits_supplied:
+        raise ValueError(
+            "max_faces, max_candidates, and max_edges apply only to "
+            "explicit construction"
         )
-    clique_graph_of_double_bound = clique_graph(double_bound)
-    if clique_graph_of_double_bound is None:
-        raise RuntimeError("unbounded clique graph construction returned no graph")
+    selected_construction = (
+        "explicit"
+        if construction == "explicit"
+        or (construction == "auto" and explicit_limits_supplied)
+        else "direct"
+    )
+    selection_reason = (
+        "auto selected explicit construction because explicit-only budgets "
+        "were supplied"
+        if construction == "auto" and explicit_limits_supplied
+        else ""
+    )
+
+    if selected_construction == "direct":
+        second_clique_graph = clique_graph_of_double_bound(
+            graph,
+            max_vertices=max_direct_vertices,
+            max_edges=max_direct_edges,
+        )
+        if second_clique_graph is None:
+            maximum_rank = max(
+                (len(clique) for clique in nx.find_cliques(graph)), default=0
+            )
+            reason = (
+                "direct construction does not support maximal-clique "
+                "support rank greater than six"
+                if maximum_rank > 6
+                else "direct construction exceeded max_direct_vertices or "
+                "max_direct_edges"
+            )
+            return Theorem57Result(
+                Theorem57Status.INCONCLUSIVE,
+                0,
+                {},
+                reason=reason,
+                construction_used="direct",
+            )
+    else:
+        double_bound = double_bound_graph(
+            graph,
+            max_faces=max_faces,
+            max_candidates=max_candidates,
+            max_edges=max_edges,
+        )
+        if double_bound is None:
+            return Theorem57Result(
+                Theorem57Status.INCONCLUSIVE,
+                0,
+                {},
+                reason="double-bound construction exceeded a configured limit",
+                construction_used="explicit",
+                construction_reason=selection_reason,
+            )
+        second_clique_graph = clique_graph(double_bound)
+        if second_clique_graph is None:
+            raise RuntimeError("unbounded clique graph construction returned no graph")
+        if (
+            max_direct_vertices is not None
+            and second_clique_graph.number_of_nodes() > max_direct_vertices
+        ):
+            return Theorem57Result(
+                Theorem57Status.INCONCLUSIVE,
+                0,
+                {},
+                reason="explicit output exceeded max_direct_vertices",
+                construction_used="explicit",
+                construction_reason=selection_reason,
+            )
+        if (
+            max_direct_edges is not None
+            and second_clique_graph.number_of_edges() > max_direct_edges
+        ):
+            return Theorem57Result(
+                Theorem57Status.INCONCLUSIVE,
+                0,
+                {},
+                reason="explicit output exceeded max_direct_edges",
+                construction_used="explicit",
+                construction_reason=selection_reason,
+            )
     intersections = closed_clique_intersections(
-        clique_graph_of_double_bound,
+        second_clique_graph,
         max_maximal_cliques=max_maximal_cliques,
         max_closed_sets=max_closed_sets,
     )
@@ -533,6 +715,8 @@ def theorem57_hypothesis_holds(
             0,
             {},
             reason="closed h-image enumeration exceeded a configured limit",
+            construction_used=selected_construction,
+            construction_reason=selection_reason,
         )
 
     from pycombtop.simplex import relative_betti_numbers
@@ -543,6 +727,8 @@ def theorem57_hypothesis_holds(
     for checked_count, h_image in enumerate(intersections.closed_sets, start=1):
         support_certificate = support_nerve_cone_certificate(h_image)
         if support_certificate is not None:
+            if not verify_support_nerve_cone_certificate(h_image, support_certificate):
+                raise RuntimeError("generated support-nerve certificate failed replay")
             support_certificates[h_image] = support_certificate
             continue
 
@@ -572,6 +758,8 @@ def theorem57_hypothesis_holds(
                 witness=h_image,
                 reason="exact rational homology is nonzero in reduced degree",
                 support_certificates=support_certificates,
+                construction_used=selected_construction,
+                construction_reason=selection_reason,
             )
         if first_unknown is None:
             first_unknown = h_image
@@ -584,6 +772,8 @@ def theorem57_hypothesis_holds(
             witness=first_unknown,
             reason="no strong-collapse certificate; vanishing homology is not proof",
             support_certificates=support_certificates,
+            construction_used=selected_construction,
+            construction_reason=selection_reason,
         )
 
     return Theorem57Result(
@@ -595,4 +785,6 @@ def theorem57_hypothesis_holds(
             "verified strong-collapse certificate"
         ),
         support_certificates=support_certificates,
+        construction_used=selected_construction,
+        construction_reason=selection_reason,
     )
