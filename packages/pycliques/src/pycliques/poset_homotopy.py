@@ -35,7 +35,12 @@ class ThreeHellyStatus(Enum):
 
 @dataclass(frozen=True)
 class ThreeHellyResult:
-    """Auditable outcome of checking whether maximal cliques are 3-Helly."""
+    """Auditable outcome of checking whether maximal cliques are 3-Helly.
+
+    ``maximal_cliques_count`` is the number enumerated, not necessarily the
+    total number in the graph. ``maximal_cliques_complete`` indicates whether
+    enumeration was completed.
+    """
 
     status: ThreeHellyStatus
     vertex_count: int
@@ -60,6 +65,8 @@ def maximal_clique_hypergraph_is_3_helly(
     in at least three vertices must be empty or have nonempty total
     intersection. A clique-enumeration or four-set budget exit is
     inconclusive; partial clique lists are never used to prove the property.
+    Graphs with fewer than four vertices are proved by the size bound without
+    enumerating maximal cliques.
     """
     for name, value in (
         ("max_maximal_cliques", max_maximal_cliques),
@@ -80,6 +87,7 @@ def maximal_clique_hypergraph_is_3_helly(
             four_sets_checked=0,
             max_maximal_cliques=max_maximal_cliques,
             max_4sets=max_4sets,
+            maximal_cliques_complete=False,
         )
 
     vertex_index = {vertex: index for index, vertex in enumerate(vertices)}

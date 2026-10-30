@@ -29,6 +29,8 @@ def test_three_helly_is_trivial_through_three_vertices():
         )
         assert result.status is ThreeHellyStatus.PROVED
         assert result.four_sets_checked == 0
+        assert result.maximal_cliques_count == 0
+        assert result.maximal_cliques_complete is False
 
 
 @pytest.mark.parametrize(
@@ -44,6 +46,8 @@ def test_three_helly_complete_cycles_and_triangle_free_paths(graph):
 
     assert result.status is ThreeHellyStatus.PROVED
     assert result.four_sets_checked == comb(graph.number_of_nodes(), 4)
+    assert result.maximal_cliques_complete is True
+    assert result.maximal_cliques_count == len(list(nx.find_cliques(graph)))
 
 
 @pytest.mark.parametrize("dimension", [4, 5])
@@ -57,7 +61,7 @@ def test_octahedra_fail_three_helly_without_claiming_conjecture_failure(dimensio
     assert not set.intersection(*(set(clique) for clique in result.relevant_cliques))
 
 
-def test_three_helly_is_stricter_than_edge_intersection_helly():
+def test_three_helly_is_weaker_than_edge_intersection_helly():
     a = {"a", "b"}
     b = {"c", "d"}
     c = {"e", "f"}

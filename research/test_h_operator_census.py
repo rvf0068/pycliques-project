@@ -160,6 +160,17 @@ def test_three_helly_shortcut_returns_before_constructing_h_or_k(monkeypatch):
     assert audit["witness"] is None
 
 
+@pytest.mark.parametrize("graph", [nx.complete_graph(3), nx.empty_graph(3)])
+def test_three_helly_audit_does_not_claim_skipped_clique_enumeration_is_complete(
+    graph,
+):
+    audit = analyze_h_operator_graph(graph)["three_helly_audit"]
+
+    assert audit["status"] == "proved"
+    assert audit["maximal_cliques_count"] == 0
+    assert audit["maximal_cliques_complete"] is False
+
+
 def test_failed_three_helly_test_is_not_a_conjecture_counterexample():
     result = analyze_h_operator_graph(octahedron(4))
 
