@@ -16,3 +16,4 @@ mean any complete set.
    :caption: Contents
 
    api/index
+   research/partition_lattice
