@@ -50,6 +50,21 @@ direct clockwork fallback is disabled by default; enable it explicitly with
 ``classify_clique_behavior`` or
 ``classify_clique_behavior_with_theorem_2_6``.
 
+Positive-iterate retraction searches require a complete labelled prefix and
+its origin graph. Use ``verify_clockwork_retraction_certificate_detailed``
+for independent replay with optional clique-count and edge bounds; its
+``VERIFIED``, ``INVALID``, and ``LIMIT_REACHED`` outcomes distinguish a
+failed proof from replay that could not finish. The Boolean verifier remains
+available for unrestricted replay.
+
+``verify_theorem_2_6_certificate`` independently checks Theorem 2.6
+clockwork-pair certificates, including the canonical theorem source,
+coaffinations, equivariance, graph-morphism edges (which may collapse), and
+target provenance. For the combined classifier, pass the original graph;
+the certificate records whether the searched base was that graph or its
+completely pared graph. The clique-graph variant verifies unpared
+``K(theorem_base_graph)`` and accepts the same replay limits.
+
 .. automodule:: pycliques.clockwork_search
    :members:
    :undoc-members:

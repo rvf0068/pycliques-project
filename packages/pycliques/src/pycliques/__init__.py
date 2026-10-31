@@ -33,6 +33,8 @@ from .clockwork import (
     verify_clockwork_structure,
 )
 from .clockwork_search import (
+    CertificateVerificationResult,
+    CertificateVerificationStatus,
     ClockworkRetractionCertificate,
     ClockworkRetractionSearchResult,
     ClockworkSearchResult,
@@ -41,6 +43,7 @@ from .clockwork_search import (
     find_divergent_clockwork_retract,
     find_induced_clockwork_subgraphs,
     verify_clockwork_retraction_certificate,
+    verify_clockwork_retraction_certificate_detailed,
 )
 from .coaffinations import (
     CoaffinePair,
@@ -174,6 +177,7 @@ from .small import (
     register_reference_graph,
     suspension_bases,
     test_eventually_helly,
+    verify_theorem_2_6_certificate,
 )
 from .surfaces import (
     is_closed_surface,
@@ -236,12 +240,15 @@ __all__ = [
     "segmented_sum",
     "verify_clockwork_structure",
     "ClockworkSearchStatus",
+    "CertificateVerificationResult",
+    "CertificateVerificationStatus",
     "InducedClockworkWitness",
     "ClockworkSearchResult",
     "ClockworkRetractionCertificate",
     "ClockworkRetractionSearchResult",
     "find_induced_clockwork_subgraphs",
     "find_divergent_clockwork_retract",
+    "verify_clockwork_retraction_certificate_detailed",
     "verify_clockwork_retraction_certificate",
     # coaffinations
     "CoaffinePair",
@@ -336,6 +343,7 @@ __all__ = [
     "classify_inverse_cutpoint_extension",
     "classify_local_bridge",
     "classify_non_triangle_edge",
+    "verify_theorem_2_6_certificate",
     "clear_reference_graphs",
     "eventually_retracts_specially",
     "test_eventually_helly",

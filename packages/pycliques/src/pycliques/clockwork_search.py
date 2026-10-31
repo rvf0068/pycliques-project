@@ -6,7 +6,7 @@ import itertools
 from collections.abc import Hashable
 from dataclasses import dataclass
 from enum import Enum, auto
-from math import comb
+from math import comb, inf
 
 import networkx as nx
 
@@ -33,6 +33,22 @@ class ClockworkSearchStatus(Enum):
     FOUND = auto()
     EXHAUSTED = auto()
     LIMIT_REACHED = auto()
+
+
+class CertificateVerificationStatus(Enum):
+    """Outcome of independently checking a clockwork retraction certificate."""
+
+    VERIFIED = auto()
+    INVALID = auto()
+    LIMIT_REACHED = auto()
+
+
+@dataclass(frozen=True)
+class CertificateVerificationResult:
+    """Detailed outcome of certificate verification."""
+
+    status: CertificateVerificationStatus
+    reason: str
 
 
 @dataclass(frozen=True)
@@ -266,12 +282,34 @@ def _same_graph(left: nx.Graph, right: nx.Graph) -> bool:
 def verify_clockwork_retraction_certificate(
     certificate: ClockworkRetractionCertificate,
 ) -> bool:
-    """Independently verify every hypothesis of a clockwork retraction proof.
+    """Return whether ``certificate`` passes unrestricted independent replay."""
+    result = verify_clockwork_retraction_certificate_detailed(certificate)
+    return result.status is CertificateVerificationStatus.VERIFIED
 
-    For certificates at positive iterate indices, ``origin_graph`` and the
-    complete ``iterate_graphs`` prefix are required and every clique-graph
-    transition is recomputed and compared.
+
+def verify_clockwork_retraction_certificate_detailed(
+    certificate: ClockworkRetractionCertificate,
+    *,
+    clique_bound: int | float | None = None,
+    max_edges: int | None = None,
+) -> CertificateVerificationResult:
+    """Independently verify a retraction and its clique-iterate provenance.
+
+    Positive-index certificates replay every transition. ``clique_bound``
+    and ``max_edges`` limit each reconstructed clique graph; a reconstruction
+    stopped by either limit returns ``LIMIT_REACHED`` rather than ``INVALID``.
+    ``None`` for ``clique_bound`` means no clique-count limit.
     """
+    if clique_bound is not None and clique_bound < 0:
+        raise ValueError("clique_bound must be non-negative or None")
+    if max_edges is not None and max_edges < 0:
+        raise ValueError("max_edges must be non-negative or None")
+
+    def invalid(reason: str) -> CertificateVerificationResult:
+        return CertificateVerificationResult(
+            CertificateVerificationStatus.INVALID, reason
+        )
+
     source = certificate.source_graph
     target = certificate.target_graph
     if (
@@ -279,21 +317,21 @@ def verify_clockwork_retraction_certificate(
         or certificate.recognition_max_order < 0
         or certificate.recognition_max_candidates < 1
     ):
-        return False
+        return invalid("Certificate contains invalid indices or recognition bounds.")
     target_nodes = set(certificate.target_vertices)
     if target_nodes != set(target) or not target_nodes <= set(source):
-        return False
+        return invalid("Target vertices do not describe an induced source subgraph.")
     induced_target = source.subgraph(target_nodes)
     if not _same_graph(induced_target, target):
-        return False
+        return invalid("Certificate target is not the induced source subgraph.")
 
     mapping = certificate.retraction_map
     if set(mapping) != set(source) or not set(mapping.values()) <= target_nodes:
-        return False
+        return invalid("Retraction map is not total or has images outside the target.")
     if not is_map(source, target, mapping):
-        return False
+        return invalid("Retraction map does not preserve source edges.")
     if any(mapping[vertex] != vertex for vertex in target_nodes):
-        return False
+        return invalid("Retraction map does not fix target vertices pointwise.")
 
     valid, verified_structure = verify_clockwork_structure(
         target,
@@ -302,27 +340,37 @@ def verify_clockwork_retraction_certificate(
         certificate.structure.core_orders,
     )
     if not valid or not isinstance(verified_structure, ClockworkStructure):
-        return False
+        return invalid("Certificate clockwork structure is invalid.")
     divergence = clockwork_divergence_result(
         target,
         structure=verified_structure,
         fallback_max_order=certificate.recognition_max_order,
         fallback_max_candidates=certificate.recognition_max_candidates,
     )
+    if divergence.status is ClockworkDivergenceStatus.LIMIT_REACHED:
+        return CertificateVerificationResult(
+            CertificateVerificationStatus.LIMIT_REACHED,
+            "Clockwork divergence verification reached a recognition limit.",
+        )
     if divergence.status is not ClockworkDivergenceStatus.DIVERGENT:
-        return False
+        return invalid("Certificate target is not proven clique-divergent.")
 
     if certificate.iterate_index == 0:
         if certificate.iterate_graphs:
             if len(certificate.iterate_graphs) != 1 or not _same_graph(
                 certificate.iterate_graphs[0], source
             ):
-                return False
+                return invalid(
+                    "Iterate-zero prefix must contain only the source graph."
+                )
         if certificate.origin_graph is not None and not _same_graph(
             certificate.origin_graph, source
         ):
-            return False
-        return True
+            return invalid("Iterate-zero origin graph differs from the source.")
+        return CertificateVerificationResult(
+            CertificateVerificationStatus.VERIFIED,
+            "Retraction certificate verified at iterate zero.",
+        )
 
     iterates = certificate.iterate_graphs
     if (
@@ -331,14 +379,60 @@ def verify_clockwork_retraction_certificate(
         or not _same_graph(iterates[0], certificate.origin_graph)
         or not _same_graph(iterates[-1], source)
     ):
-        return False
+        return invalid("Clique-iterate provenance has an invalid prefix shape.")
+    replay_bound = inf if clique_bound is None else clique_bound
     for previous, current in itertools.pairwise(iterates):
-        next_graph = clique_graph(previous)
-        if next_graph is None or not _same_graph(
-            completely_pared_graph(next_graph), current
-        ):
-            return False
-    return True
+        next_graph = clique_graph(previous, replay_bound, max_edges=max_edges)
+        if next_graph is None:
+            return CertificateVerificationResult(
+                CertificateVerificationStatus.LIMIT_REACHED,
+                "Clique-graph replay exceeded its configured resource bound.",
+            )
+        if not _same_graph(completely_pared_graph(next_graph), current):
+            return invalid(
+                "A stored iterate does not match its clique-graph transition."
+            )
+    return CertificateVerificationResult(
+        CertificateVerificationStatus.VERIFIED,
+        "Retraction certificate and clique-iterate provenance verified.",
+    )
+
+
+def _validate_iterate_provenance(
+    graph: nx.Graph,
+    iterate_index: int,
+    origin_graph: nx.Graph | None,
+    iterate_graphs: tuple[nx.Graph, ...],
+) -> str | None:
+    """Return a validation error for the supplied labelled iterate prefix."""
+    if iterate_index < 0:
+        return "iterate_index must be non-negative"
+    if origin_graph is not None and not isinstance(origin_graph, nx.Graph):
+        return "origin_graph must be a NetworkX graph"
+    if not all(isinstance(iterate, nx.Graph) for iterate in iterate_graphs):
+        return "every iterate_graphs entry must be a NetworkX graph"
+    if iterate_index > 0 and (origin_graph is None or not iterate_graphs):
+        return (
+            "positive iterate_index requires origin_graph and the complete "
+            "iterate_graphs provenance prefix"
+        )
+    if iterate_graphs and len(iterate_graphs) != iterate_index + 1:
+        return "iterate_graphs length must equal iterate_index + 1"
+    if (
+        origin_graph is not None
+        and iterate_graphs
+        and not _same_graph(iterate_graphs[0], origin_graph)
+    ):
+        return "iterate_graphs[0] must equal origin_graph"
+    if iterate_graphs and not _same_graph(iterate_graphs[-1], graph):
+        return "the final iterate_graphs entry must equal graph"
+    if (
+        iterate_index == 0
+        and origin_graph is not None
+        and not _same_graph(origin_graph, graph)
+    ):
+        return "at iterate zero, origin_graph must equal graph"
+    return None
 
 
 def find_divergent_clockwork_retract(
@@ -354,6 +448,8 @@ def find_divergent_clockwork_retract(
     iterate_graphs: tuple[nx.Graph, ...] = (),
     recognition_max_order: int = 12,
     recognition_max_candidates: int = 5000,
+    replay_clique_bound: int | float | None = None,
+    replay_max_edges: int | None = None,
 ) -> ClockworkRetractionSearchResult:
     """Search for a verified retraction onto an induced divergent clockwork.
 
@@ -407,6 +503,15 @@ def find_divergent_clockwork_retract(
         raise ValueError("recognition_max_order must be non-negative")
     if recognition_max_candidates < 1:
         raise ValueError("recognition_max_candidates must be at least 1")
+    if replay_clique_bound is not None and replay_clique_bound < 0:
+        raise ValueError("replay_clique_bound must be non-negative or None")
+    if replay_max_edges is not None and replay_max_edges < 0:
+        raise ValueError("replay_max_edges must be non-negative or None")
+    provenance_error = _validate_iterate_provenance(
+        graph, iterate_index, origin_graph, iterate_graphs
+    )
+    if provenance_error is not None:
+        raise ValueError(provenance_error)
 
     upper_order = min(max_target_order, graph.number_of_nodes())
     candidate_orders = range(9, upper_order + 1)
@@ -512,9 +617,25 @@ def find_divergent_clockwork_retract(
                 recognition_max_order=recognition_max_order,
                 recognition_max_candidates=recognition_max_candidates,
             )
-            if not verify_clockwork_retraction_certificate(certificate):
-                raise RuntimeError(
-                    "Constructed clockwork retraction certificate failed verification."
+            verification = verify_clockwork_retraction_certificate_detailed(
+                certificate,
+                clique_bound=replay_clique_bound,
+                max_edges=replay_max_edges,
+            )
+            if verification.status is CertificateVerificationStatus.LIMIT_REACHED:
+                return ClockworkRetractionSearchResult(
+                    ClockworkSearchStatus.LIMIT_REACHED,
+                    None,
+                    checked,
+                    attempts,
+                    verification.reason,
+                    states_explored,
+                    assignments_tried,
+                )
+            if verification.status is CertificateVerificationStatus.INVALID:
+                raise ValueError(
+                    "Provided iterate provenance failed independent verification: "
+                    f"{verification.reason}"
                 )
             return ClockworkRetractionSearchResult(
                 ClockworkSearchStatus.FOUND,

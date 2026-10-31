@@ -1,7 +1,10 @@
 """Tests for the theorem_2_6_clockwork_pair_map classifier rule."""
 
+from dataclasses import replace
+
 import networkx as nx
 import pycliques.small as small
+from pycliques import CertificateVerificationStatus, verify_theorem_2_6_certificate
 from pycliques.cliques import clique_graph
 from pycliques.coaffinations import CoaffinePair
 from pycliques.small import (
@@ -143,6 +146,8 @@ def test_classify_clique_behavior_uses_clockwork_pair_map_certificate():
     assert result.certificate.m == 2
     assert result.certificate.n == 0
     assert result.certificate.radius == 3
+    verified = verify_theorem_2_6_certificate(kg, result.certificate)
+    assert verified.status is CertificateVerificationStatus.VERIFIED
 
 
 # ---------------------------------------------------------------------------
@@ -207,6 +212,66 @@ def test_icosahedron_is_divergent_via_its_clique_graph():
     assert result.certificate.n == 0
     assert result.certificate.radius == 3
     assert result.certificate.target.order() == 20
+    verified = verify_theorem_2_6_certificate(g, result.certificate, clique_bound=30)
+    assert verified.status is CertificateVerificationStatus.VERIFIED
+    limited = verify_theorem_2_6_certificate(g, result.certificate, clique_bound=1)
+    assert limited.status is CertificateVerificationStatus.LIMIT_REACHED
+    edge_limited = verify_theorem_2_6_certificate(
+        g, result.certificate, clique_bound=30, max_edges=0
+    )
+    assert edge_limited.status is CertificateVerificationStatus.LIMIT_REACHED
+    assert (
+        verify_theorem_2_6_certificate(g, result.certificate, clique_bound=30).status
+        is CertificateVerificationStatus.VERIFIED
+    )
+
+
+def test_theorem_2_6_verifier_rejects_certificate_corruption():
+    graph = clique_graph(nx.icosahedral_graph())
+    assert graph is not None
+    result = classify_clique_behavior_with_theorem_2_6(graph)
+    certificate = result.certificate
+    assert certificate is not None
+    assert certificate.rule == "theorem_2_6_clockwork_pair_map"
+    assert certificate.map is not None and isinstance(certificate.map, dict)
+    assert certificate.source is not None
+    assert certificate.source_coaffination is not None
+    assert certificate.target_coaffination is not None
+    assert certificate.target is not None
+    assert certificate.radius is not None
+
+    bad_map = dict(certificate.map)
+    map_vertex = next(iter(bad_map))
+    bad_map[map_vertex] = next(
+        vertex for vertex in certificate.target if vertex != bad_map[map_vertex]
+    )
+    bad_source = certificate.source.copy()
+    bad_source.remove_node(next(iter(bad_source)))
+    bad_sigma = dict(certificate.source_coaffination)
+    sigma_vertex = next(iter(bad_sigma))
+    bad_sigma[sigma_vertex] = next(
+        vertex for vertex in certificate.source if vertex != bad_sigma[sigma_vertex]
+    )
+    bad_tau = dict(certificate.target_coaffination)
+    tau_vertex = next(iter(bad_tau))
+    bad_tau[tau_vertex] = next(
+        vertex for vertex in certificate.target if vertex != bad_tau[tau_vertex]
+    )
+    bad_target = certificate.target.copy()
+    bad_target.add_node("tampered")
+
+    corruptions = [
+        replace(certificate, map=bad_map),
+        replace(certificate, source=bad_source),
+        replace(certificate, source_coaffination=bad_sigma),
+        replace(certificate, target_coaffination=bad_tau),
+        replace(certificate, m=1),
+        replace(certificate, radius=certificate.radius + 1),
+        replace(certificate, target=bad_target),
+    ]
+    for corrupted in corruptions:
+        result = verify_theorem_2_6_certificate(graph, corrupted)
+        assert result.status is CertificateVerificationStatus.INVALID
 
 
 def test_direct_success_does_not_compute_clique_graph(monkeypatch):

@@ -199,6 +199,14 @@ class BoundedRetractionResult:
     assignments_tried: int
 
 
+@dataclass
+class _RetractionSearchFrame:
+    vertex: Hashable
+    candidates: list[Hashable]
+    next_candidate: int = 0
+    assigned: bool = False
+
+
 def bounded_retraction(
     large: nx.Graph,
     small: nx.Graph,
@@ -213,7 +221,7 @@ def bounded_retraction(
     assigned to target vertices so each source edge maps to an edge or is
     collapsed to one vertex.
 
-    The operation limits count recursive search states and tested
+    The operation limits count search states and tested
     vertex-to-target assignments. Reaching either limit returns
     ``LIMIT_REACHED``; only a fully searched assignment tree returns
     ``EXHAUSTED``.
@@ -245,35 +253,27 @@ def bounded_retraction(
                 candidates &= closed_neighborhood(small, assignment[neighbor])
         return [target for target in target_order if target in candidates]
 
-    def search() -> bool:
-        nonlocal states_explored, assignments_tried, limit_reached
-        if states_explored >= max_states:
-            limit_reached = True
-            return False
+    def enter_state() -> tuple[bool, bool]:
+        """Return (complete, valid) after recording a newly entered state."""
+        nonlocal states_explored
         states_explored += 1
         remaining = [vertex for vertex in large if vertex not in assignment]
         if not remaining:
-            return is_map(large, small, assignment) and all(
-                assignment[vertex] == vertex for vertex in small
+            valid = (
+                set(assignment) == set(large)
+                and set(assignment.values()) <= target_nodes
+                and is_map(large, small, assignment)
+                and all(assignment[vertex] == vertex for vertex in small)
             )
-
+            return True, valid
         vertex_options = [(vertex, candidates_for(vertex)) for vertex in remaining]
         vertex, candidates = min(vertex_options, key=lambda item: len(item[1]))
-        for target in candidates:
-            if assignments_tried >= max_assignments:
-                limit_reached = True
-                return False
-            assignments_tried += 1
-            assignment[vertex] = target
-            if search():
-                return True
-            del assignment[vertex]
-            if limit_reached:
-                return False
-        return False
+        frames.append(_RetractionSearchFrame(vertex, candidates))
+        return False, False
 
-    found = search()
-    if found:
+    frames: list[_RetractionSearchFrame] = []
+    complete, valid = enter_state()
+    if complete and valid:
         return BoundedRetractionResult(
             RetractionSearchStatus.FOUND,
             dict(assignment),
@@ -281,6 +281,38 @@ def bounded_retraction(
             states_explored,
             assignments_tried,
         )
+
+    while frames:
+        frame = frames[-1]
+        if frame.assigned:
+            del assignment[frame.vertex]
+            frame.assigned = False
+        if frame.next_candidate >= len(frame.candidates):
+            frames.pop()
+            continue
+        if assignments_tried >= max_assignments:
+            limit_reached = True
+            break
+
+        target = frame.candidates[frame.next_candidate]
+        frame.next_candidate += 1
+        assignments_tried += 1
+        assignment[frame.vertex] = target
+        frame.assigned = True
+
+        if states_explored >= max_states:
+            limit_reached = True
+            break
+        complete, valid = enter_state()
+        if complete and valid:
+            return BoundedRetractionResult(
+                RetractionSearchStatus.FOUND,
+                dict(assignment),
+                inclusion,
+                states_explored,
+                assignments_tried,
+            )
+
     return BoundedRetractionResult(
         RetractionSearchStatus.LIMIT_REACHED
         if limit_reached

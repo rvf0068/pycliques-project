@@ -7,6 +7,7 @@ import pycliques.retractions as retractions_module
 import pycliques.small as small_module
 import pytest
 from pycliques import (
+    CertificateVerificationStatus,
     CliqueBehavior,
     ClockworkRecognitionResult,
     ClockworkRecognitionStatus,
@@ -16,9 +17,11 @@ from pycliques import (
     find_induced_clockwork_subgraphs,
     recognize_clockwork_detailed,
     verify_clockwork_retraction_certificate,
+    verify_clockwork_retraction_certificate_detailed,
     verify_clockwork_structure,
 )
 from pycliques.cliques import clique_graph
+from pycliques.dominated import completely_pared_graph
 from pycliques.retractions import (
     RetractionSearchStatus,
     bounded_retraction,
@@ -179,6 +182,28 @@ def test_bounded_retraction_handles_self_and_pendant_extensions() -> None:
         assert all(result.retraction[vertex] == vertex for vertex in target)
 
 
+@pytest.mark.parametrize(
+    ("vertex_count", "target_vertices"),
+    [(1100, [0]), (1002, [0, 1])],
+)
+def test_bounded_retraction_handles_deep_assignments(
+    vertex_count: int, target_vertices: list[int]
+) -> None:
+    large = nx.empty_graph(vertex_count)
+    target = large.subgraph(target_vertices).copy()
+
+    result = bounded_retraction(
+        large, target, max_states=vertex_count + 10, max_assignments=vertex_count + 10
+    )
+
+    assert result.status is RetractionSearchStatus.FOUND
+    assert result.retraction is not None
+    assert set(result.retraction) == set(large)
+    assert set(result.retraction.values()) <= set(target)
+    assert all(result.retraction[vertex] == vertex for vertex in target)
+    assert is_map(large, target, result.retraction)
+
+
 def test_bounded_retraction_exhaustion_and_limits() -> None:
     large = nx.wheel_graph(5)
     target = large.subgraph([1, 2, 3, 4]).copy()
@@ -269,6 +294,116 @@ def test_certificate_verifier_rejects_broken_iterate_provenance() -> None:
     )
 
     assert not verify_clockwork_retraction_certificate(invalid)
+
+
+def test_retraction_search_validates_provenance_before_search() -> None:
+    origin = clockwork_graph([1, 1, 1], [[0], [0], [0]], 2, [1, 0])
+    next_iterate = clique_graph(origin)
+    assert next_iterate is not None
+    next_iterate = completely_pared_graph(next_iterate)
+
+    with pytest.raises(ValueError, match="provenance|origin_graph|iterate_graphs"):
+        find_divergent_clockwork_retract(origin, iterate_index=1)
+    with pytest.raises(ValueError, match="length"):
+        find_divergent_clockwork_retract(
+            next_iterate,
+            iterate_index=1,
+            origin_graph=origin,
+            iterate_graphs=(origin,),
+        )
+    wrong_origin = origin.copy()
+    wrong_origin.add_node("extra")
+    with pytest.raises(ValueError, match=r"iterate_graphs\[0\]"):
+        find_divergent_clockwork_retract(
+            next_iterate,
+            iterate_index=1,
+            origin_graph=wrong_origin,
+            iterate_graphs=(origin, next_iterate),
+        )
+    with pytest.raises(ValueError, match="final iterate_graphs entry"):
+        find_divergent_clockwork_retract(
+            origin,
+            iterate_index=1,
+            origin_graph=origin,
+            iterate_graphs=(origin, next_iterate),
+        )
+
+    valid_prefix_search = find_divergent_clockwork_retract(
+        next_iterate,
+        max_target_order=8,
+        iterate_index=1,
+        origin_graph=origin,
+        iterate_graphs=(origin, next_iterate),
+    )
+    assert valid_prefix_search.status is ClockworkSearchStatus.EXHAUSTED
+
+
+def test_detailed_replay_distinguishes_invalid_and_resource_limited() -> None:
+    origin = clockwork_graph([1, 1, 1], [[0], [0], [0]], 2, [1, 0])
+    source = clique_graph(origin)
+    assert source is not None
+    source = completely_pared_graph(source)
+    recognition = recognize_clockwork_detailed(source)
+    assert recognition.structure is not None
+    certificate = search_module.ClockworkRetractionCertificate(
+        source_graph=source,
+        target_graph=source,
+        target_vertices=frozenset(source),
+        retraction_map={vertex: vertex for vertex in source},
+        structure=recognition.structure,
+        iterate_index=1,
+        origin_graph=origin,
+        iterate_graphs=(origin, source),
+    )
+
+    limited = verify_clockwork_retraction_certificate_detailed(
+        certificate, clique_bound=1
+    )
+    verified = verify_clockwork_retraction_certificate_detailed(
+        certificate, clique_bound=100
+    )
+    assert limited.status is CertificateVerificationStatus.LIMIT_REACHED
+    assert verified.status is CertificateVerificationStatus.VERIFIED
+
+    changed_origin = origin.copy()
+    changed_origin.add_node("tampered")
+    tampered = certificate.__class__(
+        source_graph=source,
+        target_graph=source,
+        target_vertices=frozenset(source),
+        retraction_map={vertex: vertex for vertex in source},
+        structure=recognition.structure,
+        iterate_index=1,
+        origin_graph=changed_origin,
+        iterate_graphs=(changed_origin, source),
+    )
+    assert (
+        verify_clockwork_retraction_certificate_detailed(
+            tampered, clique_bound=100
+        ).status
+        is CertificateVerificationStatus.INVALID
+    )
+
+    edge_limited = verify_clockwork_retraction_certificate_detailed(
+        certificate, clique_bound=100, max_edges=0
+    )
+    assert edge_limited.status is CertificateVerificationStatus.LIMIT_REACHED
+
+
+def test_iterate_zero_certificate_verification_skips_clique_replay(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = clockwork_graph([1, 1, 1], [[0], [0], [0]], 2, [1, 0])
+    result = find_divergent_clockwork_retract(target, max_target_order=9)
+    assert result.certificate is not None
+
+    def fail_if_called(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("iterate-zero verification must not construct K(G)")
+
+    monkeypatch.setattr(search_module, "clique_graph", fail_if_called)
+
+    verification = verify_clockwork_retraction_certificate_detailed(result.certificate)
+    assert verification.status is CertificateVerificationStatus.VERIFIED
 
 
 def test_classifier_uses_opt_in_retraction_stage() -> None:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import gzip
 import logging
+import math
 import sys
 from collections.abc import Callable, Hashable, Iterator
 from dataclasses import dataclass
@@ -29,6 +30,8 @@ from pycliques.clockwork_pairs import (
     find_pair_morphism,
 )
 from pycliques.clockwork_search import (
+    CertificateVerificationResult,
+    CertificateVerificationStatus,
     ClockworkSearchStatus,
     InducedClockworkWitness,
     find_divergent_clockwork_retract,
@@ -92,6 +95,7 @@ class Certificate:
     source: nx.Graph | None = None
     source_coaffination: dict[Hashable, Hashable] | None = None
     target_coaffination: dict[Hashable, Hashable] | None = None
+    theorem_base_graph: nx.Graph | None = None
     suspension_vertices: tuple[Hashable, Hashable] | None = None
     base_graph: nx.Graph | None = None
     base_coaffination: dict[Hashable, Hashable] | None = None
@@ -828,6 +832,7 @@ def _classify_clockwork_pair_map(
                 source=source_pair.graph,
                 source_coaffination=source_pair.coaffination,
                 target_coaffination=tau,
+                theorem_base_graph=graph,
             ),
         )
 
@@ -864,6 +869,7 @@ def _classify_clockwork_pair_map(
             source=source_pair.graph,
             source_coaffination=source_pair.coaffination,
             target_coaffination=tau,
+            theorem_base_graph=graph,
         ),
     )
 
@@ -937,6 +943,173 @@ def classify_clockwork_pair_map(
         max_coaffinations=max_coaffinations,
         max_source_order=max_source_order,
         bound=bound,
+    )
+
+
+def _same_labeled_graph(left: nx.Graph, right: nx.Graph) -> bool:
+    """Compare graph labels and edges while ignoring graph/node attributes."""
+    return set(left) == set(right) and {frozenset(edge) for edge in left.edges()} == {
+        frozenset(edge) for edge in right.edges()
+    }
+
+
+def _valid_theorem_coaffination(
+    graph: nx.Graph,
+    coaffination: dict[Hashable, Hashable],
+    radius: int,
+) -> bool:
+    """Check that a total involutive automorphism realizes the radius."""
+    vertices = set(graph)
+    if set(coaffination) != vertices:
+        return False
+    images = [coaffination[vertex] for vertex in graph]
+    if not all(isinstance(image, Hashable) for image in images):
+        return False
+    if set(images) != vertices or len(set(images)) != len(vertices):
+        return False
+    if any(coaffination[coaffination[vertex]] != vertex for vertex in graph):
+        return False
+    edge_set = {frozenset(edge) for edge in graph.edges()}
+    mapped_edges = {
+        frozenset((coaffination[left], coaffination[right]))
+        for left, right in graph.edges()
+    }
+    if mapped_edges != edge_set:
+        return False
+    distances = dict(nx.all_pairs_shortest_path_length(graph))
+    return all(
+        distances[vertex].get(coaffination[vertex], math.inf) >= radius
+        for vertex in graph
+    )
+
+
+def verify_theorem_2_6_certificate(
+    original_graph: nx.Graph,
+    certificate: Certificate,
+    *,
+    clique_bound: int | float | None = None,
+    max_edges: int | None = None,
+) -> CertificateVerificationResult:
+    """Independently verify a Theorem 2.6 clockwork-pair certificate.
+
+    ``theorem_base_graph`` records the exact graph searched by the pair-map
+    rule. The standalone rule records ``original_graph``; the combined
+    classifier may record its completely pared graph. A clique-graph
+    certificate always targets the unpared ``K(theorem_base_graph)``.
+
+    Clique-count or edge limits that prevent reconstructing that target
+    produce ``LIMIT_REACHED`` rather than ``INVALID``.
+    """
+    if clique_bound is not None and clique_bound < 0:
+        raise ValueError("clique_bound must be non-negative or None")
+    if max_edges is not None and max_edges < 0:
+        raise ValueError("max_edges must be non-negative or None")
+    if (
+        not isinstance(original_graph, nx.Graph)
+        or original_graph.is_directed()
+        or original_graph.is_multigraph()
+    ):
+        return CertificateVerificationResult(
+            CertificateVerificationStatus.INVALID,
+            "The original graph must be simple and undirected.",
+        )
+
+    def invalid(reason: str) -> CertificateVerificationResult:
+        return CertificateVerificationResult(
+            CertificateVerificationStatus.INVALID, reason
+        )
+
+    direct_rule = "theorem_2_6_clockwork_pair_map"
+    clique_rule = "theorem_2_6_clockwork_pair_map_clique_graph"
+    if certificate.rule not in {direct_rule, clique_rule}:
+        return invalid("Certificate rule is not a Theorem 2.6 clockwork-pair rule.")
+    if (
+        not isinstance(certificate.m, int)
+        or not isinstance(certificate.n, int)
+        or not isinstance(certificate.radius, int)
+        or certificate.m < 2
+        or certificate.n < 0
+        or certificate.radius != certificate.m + 1
+    ):
+        return invalid("Certificate has invalid theorem parameters or radius.")
+    if not isinstance(certificate.source, nx.Graph) or not isinstance(
+        certificate.target, nx.Graph
+    ):
+        return invalid("Certificate is missing its source or target graph.")
+    source = certificate.source
+    target = certificate.target
+    if (
+        source.is_directed()
+        or source.is_multigraph()
+        or target.is_directed()
+        or target.is_multigraph()
+    ):
+        return invalid("Theorem certificate graphs must be simple undirected graphs.")
+    expected_source = clockwork_coaffine_pair(certificate.m, certificate.n)
+    if not _same_labeled_graph(source, expected_source.graph):
+        return invalid("Certificate source is not the canonical theorem clockwork.")
+    sigma = certificate.source_coaffination
+    if not isinstance(sigma, dict) or sigma != expected_source.coaffination:
+        return invalid("Source coaffination is not the canonical theorem map.")
+    if not _valid_theorem_coaffination(source, sigma, certificate.radius):
+        return invalid("Source coaffination hypotheses are not satisfied.")
+
+    tau = certificate.target_coaffination
+    if not isinstance(tau, dict) or not _valid_theorem_coaffination(
+        target, tau, certificate.radius
+    ):
+        return invalid("Target coaffination hypotheses are not satisfied.")
+    mapping = certificate.map
+    if not isinstance(mapping, dict):
+        return invalid("Certificate map must be a total source-to-target mapping.")
+    target_vertices = set(target)
+    images = list(mapping.values())
+    if not all(isinstance(image, Hashable) for image in images):
+        return invalid("Certificate map contains a non-hashable image.")
+    if set(mapping) != set(source) or not set(images) <= target_vertices:
+        return invalid("Certificate map is not total or has images outside the target.")
+    for left, right in source.edges():
+        image_left, image_right = mapping[left], mapping[right]
+        if image_left != image_right and not target.has_edge(image_left, image_right):
+            return invalid("Certificate map does not preserve a source edge.")
+    if any(mapping[sigma[vertex]] != tau[mapping[vertex]] for vertex in source):
+        return invalid("Certificate map is not equivariant.")
+
+    base = certificate.theorem_base_graph
+    if not isinstance(base, nx.Graph) or base.is_directed() or base.is_multigraph():
+        return invalid("Certificate is missing a valid theorem base graph.")
+    pared = completely_pared_graph(original_graph)
+    if not (
+        _same_labeled_graph(base, original_graph) or _same_labeled_graph(base, pared)
+    ):
+        return invalid(
+            "Theorem base graph is neither the original nor its pared graph."
+        )
+
+    if certificate.rule == direct_rule:
+        if not _same_labeled_graph(target, base):
+            return invalid(
+                "Direct certificate target differs from its theorem base graph."
+            )
+    else:
+        clique_target = clique_graph(
+            base,
+            math.inf if clique_bound is None else clique_bound,
+            max_edges=max_edges,
+        )
+        if clique_target is None:
+            return CertificateVerificationResult(
+                CertificateVerificationStatus.LIMIT_REACHED,
+                "Clique-graph reconstruction exceeded its configured bound.",
+            )
+        if not _same_labeled_graph(target, clique_target):
+            return invalid(
+                "Certificate target is not the unpared clique graph of its base."
+            )
+
+    return CertificateVerificationResult(
+        CertificateVerificationStatus.VERIFIED,
+        "Theorem 2.6 certificate and target provenance verified.",
     )
 
 
@@ -1277,6 +1450,7 @@ def classify_clique_behavior(
             max_retraction_assignments=clockwork_max_retraction_assignments,
             recognition_max_order=clockwork_fallback_max_order,
             recognition_max_candidates=clockwork_fallback_max_candidates,
+            replay_clique_bound=bound,
             iterate_index=i,
             origin_graph=pared_graph,
             iterate_graphs=tuple(iterate_prefix),
