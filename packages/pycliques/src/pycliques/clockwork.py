@@ -647,19 +647,13 @@ class ClockworkGraph:
 # -------------------------------------------------------------------
 
 
-def recognize_clockwork(
+def _recognize_clockwork_fast(
     G: nx.Graph,
 ) -> tuple[bool, ClockworkStructure | str]:
     r"""Decide whether *G* is a clockwork graph.
 
     Follows Theorem 3.5 of Larrion *et al.* (2004), using
     Theorem 3.4 as the key structural test.
-
-    .. note::
-
-       Reliably handles :math:`s \ge 4`.  For :math:`s = 3` the
-       algorithm may return ``(False, ...)`` on a valid clockwork
-       graph due to Theorem 3.4's extra triangle condition.
 
     .. rubric:: Parameters
 
@@ -879,6 +873,297 @@ def recognize_clockwork(
         covered_vertices=covered,
         good_segments=good_segs,
     )
+
+
+# -------------------------------------------------------------------
+# Independent clockwork decomposition verification
+# -------------------------------------------------------------------
+
+
+def verify_clockwork_structure(
+    G: nx.Graph,
+    B_segments: list[set],
+    C_segments: list[set],
+    core_orders: list[list],
+) -> tuple[bool, ClockworkStructure | str]:
+    """Verify a proposed decomposition against the clockwork definition.
+
+    The lists must describe cyclic crown/core segmentations of all vertices;
+    ``core_orders[i]`` must satisfy C1 and C2 for ``C_segments[i]``.
+
+    Returns ``(True, structure)`` with recomputed covered/good-segment data,
+    or ``(False, reason)`` when any defining condition fails.
+    """
+    s = len(B_segments)
+    if s < 3 or len(C_segments) != s or len(core_orders) != s:
+        return False, "Crown, core, and core-order lists must have equal length >= 3."
+
+    B_nodes = set().union(*B_segments)
+    C_nodes = set().union(*C_segments)
+    if B_nodes & C_nodes or B_nodes | C_nodes != set(G):
+        return False, "Crown and core segments must partition the graph vertices."
+    if any(not segment for segment in C_segments):
+        return False, "Core segments must be non-empty."
+    if any(len(segment) < 2 for segment in B_segments):
+        return False, "Each crown segment must contain at least two vertices."
+    if any(not is_complete_graph(G, segment) for segment in B_segments):
+        return False, "Each crown segment must be a clique."
+    if any(not is_complete_graph(G, segment) for segment in C_segments):
+        return False, "Each core segment must be a clique."
+
+    B_segment_of: dict = {}
+    C_segment_of: dict = {}
+    for i, segment in enumerate(B_segments):
+        for vertex in segment:
+            if vertex in B_segment_of:
+                return False, "Crown segments must be pairwise disjoint."
+            B_segment_of[vertex] = i
+    for i, segment in enumerate(C_segments):
+        for vertex in segment:
+            if vertex in C_segment_of or vertex in B_segment_of:
+                return (
+                    False,
+                    "Core segments must be disjoint from one another and the crown.",
+                )
+            C_segment_of[vertex] = i
+
+    for i, segment in enumerate(B_segments):
+        previous = B_segments[(i - 1) % s]
+        following = B_segments[(i + 1) % s]
+        for vertex in segment:
+            if (
+                sum(G.has_edge(vertex, other) for other in previous) != 1
+                or sum(G.has_edge(vertex, other) for other in following) != 1
+            ):
+                return (
+                    False,
+                    f"Crown segment {i} does not have perfect neighboring matchings.",
+                )
+            if any(
+                G.has_edge(vertex, other)
+                for j, other_segment in enumerate(B_segments)
+                if j not in {i, (i - 1) % s, (i + 1) % s}
+                for other in other_segment
+            ):
+                return False, f"Crown segment {i} has a nonconsecutive crown edge."
+
+        for j, core_segment in enumerate(C_segments):
+            expected = j in {i, (i - 1) % s}
+            if any(
+                G.has_edge(vertex, core_vertex) != expected
+                for vertex in segment
+                for core_vertex in core_segment
+            ):
+                return False, "Crown-core adjacencies do not form the segmented sum."
+
+    for i, segment in enumerate(C_segments):
+        previous = C_segments[(i - 1) % s]
+        following = C_segments[(i + 1) % s]
+        if any(
+            G.has_edge(vertex, other)
+            for vertex in segment
+            for j, other_segment in enumerate(C_segments)
+            if j not in {i, (i - 1) % s, (i + 1) % s}
+            for other in other_segment
+        ):
+            return False, f"Core segment {i} has a nonconsecutive core edge."
+        order = core_orders[i]
+        if len(order) != len(segment) or set(order) != segment:
+            return (
+                False,
+                f"Core order {i} must contain every vertex of its segment once.",
+            )
+        for left_index, left in enumerate(order):
+            for right in order[left_index + 1 :]:
+                if not (
+                    (set(G.neighbors(right)) & previous).issubset(
+                        set(G.neighbors(left)) & previous
+                    )
+                    and (set(G.neighbors(left)) & following).issubset(
+                        set(G.neighbors(right)) & following
+                    )
+                ):
+                    return False, f"Core order {i} violates C1 or C2."
+
+    for triangle in itertools.combinations(G, 3):
+        if all(G.has_edge(u, v) for u, v in itertools.combinations(triangle, 2)):
+            outer_segments = {
+                B_segment_of.get(vertex, C_segment_of.get(vertex))
+                for vertex in triangle
+            }
+            if len(outer_segments) == 3:
+                return False, "A triangle meets three distinct clockwork segments."
+
+    covered: set = set()
+    for i, order in enumerate(core_orders):
+        following = C_segments[(i + 1) % s]
+        for left_index, left in enumerate(order):
+            for right in order[left_index + 1 :]:
+                if (set(G.neighbors(left)) & following) == (
+                    set(G.neighbors(right)) & following
+                ):
+                    covered.add(right)
+    good_segments = [
+        i
+        for i, segment in enumerate(C_segments)
+        if all(
+            any(not G.has_edge(vertex, other) for other in C_segments[(i + 1) % s])
+            for vertex in segment
+        )
+    ]
+    return True, ClockworkStructure(
+        G=G,
+        C_nodes=C_nodes,
+        B_nodes=B_nodes,
+        s=s,
+        B_segments=B_segments,
+        C_segments=C_segments,
+        core_orders=core_orders,
+        covered_vertices=covered,
+        good_segments=good_segments,
+    )
+
+
+def _recognize_clockwork_fallback(
+    G: nx.Graph, *, max_candidates: int
+) -> tuple[bool, ClockworkStructure | str]:
+    """Try bounded alternative core partitions, verifying every result."""
+    vertices = list(G)
+    candidates = 0
+    for core_size in range(3, len(vertices) - 5):
+        for core_tuple in itertools.combinations(vertices, core_size):
+            candidates += 1
+            if candidates > max_candidates:
+                return False, "Clockwork fallback candidate limit reached."
+            C_nodes = set(core_tuple)
+            B_nodes = set(vertices) - C_nodes
+            groups_by_neighborhood: dict[frozenset, set] = {}
+            for vertex in B_nodes:
+                neighborhood = frozenset(set(G.neighbors(vertex)) & C_nodes)
+                groups_by_neighborhood.setdefault(neighborhood, set()).add(vertex)
+            raw_segments = list(groups_by_neighborhood.values())
+            s = len(raw_segments)
+            if s < 3 or any(len(segment) < 2 for segment in raw_segments):
+                continue
+            if any(not is_complete_graph(G, segment) for segment in raw_segments):
+                continue
+
+            segment_index = {
+                vertex: i
+                for i, segment in enumerate(raw_segments)
+                for vertex in segment
+            }
+            segment_adjacency: dict[int, set[int]] = {i: set() for i in range(s)}
+            for vertex in B_nodes:
+                i = segment_index[vertex]
+                segment_adjacency[i].update(
+                    segment_index[neighbor]
+                    for neighbor in G.neighbors(vertex)
+                    if neighbor in B_nodes and segment_index[neighbor] != i
+                )
+            if any(len(neighbors) != 2 for neighbors in segment_adjacency.values()):
+                continue
+            cycle = _find_cyclic_order(segment_adjacency, s)
+            if cycle is None:
+                continue
+
+            for cycle_order in (cycle, [cycle[0], *reversed(cycle[1:])]):
+                B_segments = [raw_segments[i] for i in cycle_order]
+                C_segments = [
+                    (_nbrs_of_set(G, B_segments[i]) & C_nodes)
+                    & (_nbrs_of_set(G, B_segments[(i + 1) % s]) & C_nodes)
+                    for i in range(s)
+                ]
+                if set().union(*C_segments) != C_nodes:
+                    continue
+                if any(
+                    C_segments[i] & C_segments[j] for i in range(s) for j in range(i)
+                ):
+                    continue
+
+                core_orders: list[list] = []
+                for i, segment in enumerate(C_segments):
+                    previous = C_segments[(i - 1) % s]
+                    following = C_segments[(i + 1) % s]
+
+                    def previous_order(left: object, right: object) -> bool:
+                        return (set(G.neighbors(right)) & previous).issubset(
+                            set(G.neighbors(left)) & previous
+                        )
+
+                    def following_order(left: object, right: object) -> bool:
+                        return (set(G.neighbors(left)) & following).issubset(
+                            set(G.neighbors(right)) & following
+                        )
+
+                    core_order = _build_linear_order(
+                        list(segment), previous_order, following_order
+                    )
+                    if core_order is None:
+                        break
+                    core_orders.append(core_order)
+                if len(core_orders) != s:
+                    continue
+                valid, result = verify_clockwork_structure(
+                    G, B_segments, C_segments, core_orders
+                )
+                if valid:
+                    assert isinstance(result, ClockworkStructure)
+                    return True, result
+    return (
+        False,
+        "No verified clockwork decomposition was found by the bounded fallback.",
+    )
+
+
+def recognize_clockwork(
+    G: nx.Graph,
+    *,
+    fallback_max_order: int = 9,
+    fallback_max_candidates: int = 5000,
+) -> tuple[bool, ClockworkStructure | str]:
+    """Recognize a clockwork graph, with a bounded alternative-partition fallback.
+
+    The theorem-based recognizer runs first. For graphs up to
+    ``fallback_max_order``, a bounded search over alternative core partitions
+    follows if the first recognizer does not produce a verified structure.
+    A fallback limit failure is reported and is not a proof of nonexistence.
+
+    ``fallback_max_order`` defaults to 9 to keep routine classification
+    inexpensive. Callers may raise it for a more expensive fallback;
+    ``fallback_max_candidates`` limits the number of core vertex subsets
+    tested.
+    """
+    if fallback_max_order < 0:
+        raise ValueError("fallback_max_order must be non-negative")
+    if fallback_max_candidates < 1:
+        raise ValueError("fallback_max_candidates must be at least 1")
+    ok, result = _recognize_clockwork_fast(G)
+    if ok:
+        assert isinstance(result, ClockworkStructure)
+        valid, verified = verify_clockwork_structure(
+            G, result.B_segments, result.C_segments, result.core_orders
+        )
+        if valid:
+            assert isinstance(verified, ClockworkStructure)
+            return True, verified
+        result = f"Fast recognizer produced an invalid structure: {verified}"
+
+    if len(G) <= fallback_max_order:
+        fallback_ok, fallback_result = _recognize_clockwork_fallback(
+            G, max_candidates=fallback_max_candidates
+        )
+        if fallback_ok:
+            return True, fallback_result
+        if "limit reached" in str(fallback_result):
+            return False, f"{result} Fallback: {fallback_result}"
+        return False, f"{result} Exhaustive fallback found no valid decomposition."
+    else:
+        return (
+            False,
+            f"{result} Exhaustive fallback skipped above order {fallback_max_order}.",
+        )
+    return False, str(result)
 
 
 # -------------------------------------------------------------------

@@ -2,6 +2,7 @@ import networkx as nx
 import pycliques.small as small
 import pytest
 from pycliques import CliqueBehavior, classify_clique_behavior
+from pycliques.clockwork import clockwork_graph
 from pycliques.named import (
     complement_of_cycle,
     dominated_vertex_free_non_helly,
@@ -16,6 +17,7 @@ from pycliques.small import (
     _classify_reference_dependency,
     _classify_suspension_2_coaffination,
     _make_clique_retraction_test,
+    _test_clockwork,
     clear_reference_graphs,
     eventually_retracts_specially,
     register_reference_graph,
@@ -51,6 +53,20 @@ def test_clique_sequence_exposes_read_only_state():
     assert seq.exhausted is False
     assert seq[1] is not None
     assert seq.graph_count == 2
+
+
+def test_clockwork_depth_can_inspect_later_iterates():
+    seq = CliqueSequence(nx.empty_graph(1))
+    clockwork = clockwork_graph([1, 1, 1], [[0], [0], [0]], 2, [1, 0])
+    seq._graphs = [nx.empty_graph(1), nx.empty_graph(2), clockwork]
+
+    assert _test_clockwork(seq, tries=3, depth=2) is None
+    result = _test_clockwork(seq, tries=3, depth=3)
+
+    assert result is not None
+    assert result[0] is Verdict.DIVERGENT
+    assert result[2] is not None
+    assert result[2].iterate_index == 2
 
 
 def _labelled_suspension(base: nx.Graph) -> nx.Graph:

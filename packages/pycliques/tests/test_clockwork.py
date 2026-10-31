@@ -3,6 +3,7 @@
 import itertools
 
 import networkx as nx
+import pycliques.clockwork as clockwork_module
 import pytest
 from pycliques.clockwork import (
     ClockworkGraph,
@@ -18,6 +19,7 @@ from pycliques.clockwork import (
     recognize_clockwork,
     remove_dominated_vertices,
     segmented_sum,
+    verify_clockwork_structure,
 )
 from pycliques.small import Verdict, classify_clique_behavior
 
@@ -294,6 +296,117 @@ def test_recognize_from_clockwork_graph_function():
     ok, result = recognize_clockwork(G)
     assert ok
     assert isinstance(result, ClockworkStructure)
+
+
+@pytest.mark.parametrize(
+    ("segments", "neighbors"),
+    [
+        ([1, 1, 1], [[0], [0], [0]]),
+        ([1, 1, 1], [[1], [0], [0]]),
+        ([2, 2, 2], [[0, 1], [0, 1], [0, 1]]),
+        ([2, 1, 2], [[0, 1], [0], [0, 1]]),
+    ],
+)
+def test_three_segment_clockworks_are_verified_after_relabeling(
+    segments: list[int], neighbors: list[list[int]]
+) -> None:
+    graph = clockwork_graph(segments, neighbors, 2, [1, 0])
+
+    recognized, structure_or_reason = recognize_clockwork(graph)
+    assert recognized
+    assert isinstance(structure_or_reason, ClockworkStructure)
+    valid, _ = verify_clockwork_structure(
+        graph,
+        structure_or_reason.B_segments,
+        structure_or_reason.C_segments,
+        structure_or_reason.core_orders,
+    )
+    assert valid
+
+    relabeling = {vertex: f"node-{vertex}" for vertex in graph}
+    relabeled = nx.relabel_nodes(graph, relabeling)
+    relabeled_recognized, _ = recognize_clockwork(relabeled)
+    assert relabeled_recognized
+
+
+def test_three_segment_triangle_lookalike_is_rejected() -> None:
+    graph = clockwork_graph([1, 1, 1], [[1], [1], [1]], 2, [1, 0])
+
+    recognized, reason = recognize_clockwork(graph)
+
+    assert not recognized
+    assert "triangle" in str(reason).lower()
+
+
+def test_clockwork_verifier_rejects_an_invalid_core_order() -> None:
+    graph = clockwork_graph([2, 2, 2], [[0, 1], [0, 1], [0, 1]], 2, [1, 0])
+    recognized, structure_or_reason = recognize_clockwork(graph)
+    assert recognized
+    assert isinstance(structure_or_reason, ClockworkStructure)
+    invalid_orders = [order.copy() for order in structure_or_reason.core_orders]
+    invalid_orders[0].reverse()
+
+    valid, reason = verify_clockwork_structure(
+        graph,
+        structure_or_reason.B_segments,
+        structure_or_reason.C_segments,
+        invalid_orders,
+    )
+
+    assert not valid
+    assert "C1 or C2" in str(reason)
+
+
+def test_clockwork_verifier_rejects_a_broken_crown_matching() -> None:
+    graph = clockwork_graph([1, 1, 1], [[0], [0], [0]], 2, [1, 0])
+    recognized, structure_or_reason = recognize_clockwork(graph)
+    assert recognized
+    assert isinstance(structure_or_reason, ClockworkStructure)
+    broken = graph.copy()
+    vertex = next(iter(structure_or_reason.B_segments[0]))
+    neighbor = next(
+        other
+        for other in structure_or_reason.B_segments[1]
+        if graph.has_edge(vertex, other)
+    )
+    broken.remove_edge(vertex, neighbor)
+
+    valid, reason = verify_clockwork_structure(
+        broken,
+        structure_or_reason.B_segments,
+        structure_or_reason.C_segments,
+        structure_or_reason.core_orders,
+    )
+
+    assert not valid
+    assert "perfect neighboring matchings" in str(reason)
+
+
+def test_recognizer_fallback_verifies_alternative_partition(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    graph = clockwork_graph([1, 1, 1], [[0], [0], [0]], 2, [1, 0])
+    monkeypatch.setattr(
+        clockwork_module,
+        "_recognize_clockwork_fast",
+        lambda _graph: (False, "fast recognition declined"),
+    )
+
+    recognized, structure_or_reason = recognize_clockwork(graph, fallback_max_order=9)
+
+    assert recognized
+    assert isinstance(structure_or_reason, ClockworkStructure)
+
+
+def test_recognizer_reports_fallback_resource_limit() -> None:
+    graph = clockwork_graph([1, 1, 1], [[1], [1], [1]], 2, [1, 0])
+
+    recognized, reason = recognize_clockwork(
+        graph, fallback_max_order=9, fallback_max_candidates=1
+    )
+
+    assert not recognized
+    assert "candidate limit reached" in str(reason)
 
 
 def test_recognize_random_graph_not_clockwork():

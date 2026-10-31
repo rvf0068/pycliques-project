@@ -18,11 +18,21 @@ from rich.logging import RichHandler
 
 from pycliques import __version__
 from pycliques.cliques import clique_graph
-from pycliques.clockwork import is_clique_divergent_clockwork, recognize_clockwork
+from pycliques.clockwork import (
+    ClockworkStructure,
+    is_clique_divergent_clockwork,
+    recognize_clockwork,
+)
 from pycliques.clockwork_pairs import (
     candidate_target_coaffinations,
     clockwork_coaffine_pair,
     find_pair_morphism,
+)
+from pycliques.clockwork_search import (
+    ClockworkSearchStatus,
+    InducedClockworkWitness,
+    find_divergent_clockwork_retract,
+    find_induced_clockwork_subgraphs,
 )
 from pycliques.coaffinations import CoaffinePair, coaffinations
 from pycliques.cutpoints import (
@@ -85,6 +95,8 @@ class Certificate:
     suspension_vertices: tuple[Hashable, Hashable] | None = None
     base_graph: nx.Graph | None = None
     base_coaffination: dict[Hashable, Hashable] | None = None
+    clockwork_structure: ClockworkStructure | None = None
+    iterate_index: int | None = None
 
 
 @dataclass(frozen=True)
@@ -117,6 +129,9 @@ class CliqueBehavior:
     certificate : Certificate | None
         Structured justification for the inference rule that established the
         verdict, when available.
+    observations : tuple[InducedClockworkWitness, ...]
+        Verified induced divergent clockworks found by opt-in searches. These
+        structural observations do not, on their own, establish divergence.
     """
 
     verdict: Verdict
@@ -125,6 +140,7 @@ class CliqueBehavior:
     bound_exceeded: bool
     pared_graph: nx.Graph
     certificate: Certificate | None = None
+    observations: tuple[InducedClockworkWitness, ...] = ()
 
 
 #: Type alias for one inference rule's result.
@@ -936,18 +952,32 @@ def _test_eventually_helly(seq: CliqueSequence, tries: int) -> ClassifierResult 
     return None
 
 
-def _test_clockwork(seq: CliqueSequence, tries: int) -> ClassifierResult | None:
+def _test_clockwork(
+    seq: CliqueSequence, tries: int, depth: int = 2
+) -> ClassifierResult | None:
     """Return a clockwork verdict, or ``None`` if this rule proves nothing."""
-    for i in range(min(2, tries)):
+    for i in range(min(depth, tries)):
         g = seq[i]
         if g is None:
             return None
-        if recognize_clockwork(g)[0]:
+        recognized, structure_or_reason = recognize_clockwork(g)
+        if recognized:
+            assert isinstance(structure_or_reason, ClockworkStructure)
             divergent, _ = is_clique_divergent_clockwork(g)
+            if divergent is None:
+                continue
+            certificate = Certificate(
+                rule="clockwork_at_iterate",
+                target=g,
+                target_status=(
+                    "proven_divergent" if divergent else "proven_convergent"
+                ),
+                clockwork_structure=structure_or_reason,
+                iterate_index=i,
+            )
             if divergent is True:
-                return (Verdict.DIVERGENT, "is clockwork divergent", None)
-            if divergent is False:
-                return (Verdict.CONVERGENT, "is clockwork convergent", None)
+                return (Verdict.DIVERGENT, "is clockwork divergent", certificate)
+            return (Verdict.CONVERGENT, "is clockwork convergent", certificate)
     return None
 
 
@@ -994,10 +1024,10 @@ def _make_clique_retraction_test(target: nx.Graph, label: str) -> Classifier:
     return _test
 
 
-def _default_classifiers(tries: int) -> list[Classifier]:
+def _default_classifiers(tries: int, clockwork_depth: int = 2) -> list[Classifier]:
     """Return the standard ordered suite of clique-behavior tests."""
     classifiers = [
-        lambda seq: _test_clockwork(seq, tries),
+        lambda seq: _test_clockwork(seq, tries, clockwork_depth),
         lambda seq: _test_eventually_helly(seq, tries),
         lambda seq: _test_eventually_special_octahedra(seq, tries),
         _make_retraction_test(suspension_of_cycle(5), "retracts to Susp(C_5)"),
@@ -1014,6 +1044,12 @@ def classify_clique_behavior(
     tries: int = _MAX_ITERATIONS,
     bound: int = 30,
     extension_budget: int = 1,
+    clockwork_depth: int = 2,
+    induced_clockwork_depth: int = 0,
+    clockwork_retract_depth: int = 0,
+    clockwork_max_order: int = 12,
+    clockwork_max_candidates: int = 5000,
+    clockwork_max_retraction_attempts: int = 20,
 ) -> CliqueBehavior:
     """Classify the observed clique behavior of an undirected graph.
 
@@ -1054,6 +1090,20 @@ def classify_clique_behavior(
     bound : int, optional
         Maximum number of cliques allowed at each iteration
         (default: 30).
+    clockwork_depth : int, optional
+        Number of iterates checked directly for clockwork structure
+        (default: 2, preserving the historical G and K(G) check).
+    induced_clockwork_depth : int, optional
+        Number of initial iterates searched for induced divergent
+        clockwork witnesses. This opt-in structural search does not by
+        itself change the verdict (default: 0, disabled).
+    clockwork_retract_depth : int, optional
+        Number of initial iterates searched for verified retractions onto
+        divergent induced clockwork subgraphs (default: 0, disabled).
+    clockwork_max_order, clockwork_max_candidates
+        Candidate bounds for the optional induced-clockwork searches.
+    clockwork_max_retraction_attempts : int, optional
+        Maximum divergent candidate targets tested per iterate.
 
     .. rubric:: Returns
 
@@ -1075,6 +1125,18 @@ def classify_clique_behavior(
         raise ValueError("tries must be at least 1")
     if bound < 1:
         raise ValueError("bound must be at least 1")
+    if clockwork_depth < 0:
+        raise ValueError("clockwork_depth must be non-negative")
+    if induced_clockwork_depth < 0:
+        raise ValueError("induced_clockwork_depth must be non-negative")
+    if clockwork_retract_depth < 0:
+        raise ValueError("clockwork_retract_depth must be non-negative")
+    if clockwork_max_order < 0:
+        raise ValueError("clockwork_max_order must be non-negative")
+    if clockwork_max_candidates < 1:
+        raise ValueError("clockwork_max_candidates must be at least 1")
+    if clockwork_max_retraction_attempts < 1:
+        raise ValueError("clockwork_max_retraction_attempts must be at least 1")
 
     pared_graph = completely_pared_graph(graph)
     seq = CliqueSequence(pared_graph, bound=bound)
@@ -1093,7 +1155,7 @@ def classify_clique_behavior(
             verdict, reason, seq.graph_count, False, pared_graph, certificate
         )
 
-    for classifier in _default_classifiers(tries):
+    for classifier in _default_classifiers(tries, clockwork_depth):
         result = classifier(seq)
         if result is not None:
             verdict, reason, certificate = result
@@ -1135,18 +1197,80 @@ def classify_clique_behavior(
             verdict, reason, seq.graph_count, False, pared_graph, certificate
         )
 
+    observations: list[InducedClockworkWitness] = []
+    search_limited = False
+    for i in range(clockwork_retract_depth):
+        iterate = seq[i]
+        if iterate is None:
+            break
+        retraction_search = find_divergent_clockwork_retract(
+            iterate,
+            max_target_order=clockwork_max_order,
+            max_candidates=clockwork_max_candidates,
+            max_retraction_attempts=clockwork_max_retraction_attempts,
+            iterate_index=i,
+        )
+        if retraction_search.certificate is not None:
+            certificate = Certificate(
+                rule="induced_clockwork_retraction",
+                target=retraction_search.certificate.target_graph,
+                target_status="proven_divergent",
+                map=retraction_search.certificate.retraction_map,
+                source=iterate,
+                clockwork_structure=retraction_search.certificate.structure,
+                iterate_index=i,
+            )
+            return CliqueBehavior(
+                Verdict.DIVERGENT,
+                f"iterate {i} retracts onto a divergent clockwork graph",
+                seq.graph_count,
+                seq.exhausted,
+                pared_graph,
+                certificate,
+                tuple(observations),
+            )
+        search_limited |= (
+            retraction_search.status is ClockworkSearchStatus.LIMIT_REACHED
+        )
+
+    for i in range(induced_clockwork_depth):
+        iterate = seq[i]
+        if iterate is None:
+            break
+        induced_search = find_induced_clockwork_subgraphs(
+            iterate,
+            max_order=clockwork_max_order,
+            max_candidates=clockwork_max_candidates,
+            divergent_only=True,
+            iterate_index=i,
+        )
+        observations.extend(induced_search.witnesses)
+        search_limited |= induced_search.status is ClockworkSearchStatus.LIMIT_REACHED
+
     bound_exceeded = seq.exhausted
-    reason = (
-        "clique count exceeded bound"
-        if bound_exceeded
-        else "behavior is indeterminate under the available tests"
-    )
+    if observations:
+        indices = sorted({witness.iterate_index for witness in observations})
+        reason = (
+            "induced divergent clockwork found at iterate(s) "
+            f"{indices}; induced containment alone does not certify divergence"
+        )
+    elif search_limited:
+        reason = (
+            "clockwork search resource limit reached; behavior remains indeterminate"
+        )
+    else:
+        reason = (
+            "clique count exceeded bound"
+            if bound_exceeded
+            else "behavior is indeterminate under the available tests"
+        )
     return CliqueBehavior(
         Verdict.INDETERMINATE,
         reason,
         seq.graph_count,
         bound_exceeded,
         pared_graph,
+        observations=tuple(observations),
     )
 
 
@@ -1156,6 +1280,12 @@ def classify_clique_behavior_with_theorem_2_6(
     tries: int = _MAX_ITERATIONS,
     bound: int = 30,
     extension_budget: int = 1,
+    clockwork_depth: int = 2,
+    induced_clockwork_depth: int = 0,
+    clockwork_retract_depth: int = 0,
+    clockwork_max_order: int = 12,
+    clockwork_max_candidates: int = 5000,
+    clockwork_max_retraction_attempts: int = 20,
     max_m: int = 3,
     max_n: int = 3,
     max_coaffinations: int = 20,
@@ -1175,7 +1305,7 @@ def classify_clique_behavior_with_theorem_2_6(
 
     graph : networkx.Graph
         Input graph.
-    tries, bound, extension_budget
+    tries, bound, extension_budget and the ``clockwork_*`` search options
         Forwarded to :func:`classify_clique_behavior`.
     max_m, max_n, max_coaffinations, max_source_order
         Forwarded to :func:`classify_clockwork_pair_map`.
@@ -1190,7 +1320,16 @@ def classify_clique_behavior_with_theorem_2_6(
         ``INDETERMINATE`` and Theorem 2.6 establishes ``DIVERGENT``.
     """
     fast = classify_clique_behavior(
-        graph, tries=tries, bound=bound, extension_budget=extension_budget
+        graph,
+        tries=tries,
+        bound=bound,
+        extension_budget=extension_budget,
+        clockwork_depth=clockwork_depth,
+        induced_clockwork_depth=induced_clockwork_depth,
+        clockwork_retract_depth=clockwork_retract_depth,
+        clockwork_max_order=clockwork_max_order,
+        clockwork_max_candidates=clockwork_max_candidates,
+        clockwork_max_retraction_attempts=clockwork_max_retraction_attempts,
     )
     if fast.verdict is not Verdict.INDETERMINATE:
         return fast
@@ -1214,6 +1353,7 @@ def classify_clique_behavior_with_theorem_2_6(
         fast.bound_exceeded,
         fast.pared_graph,
         certificate,
+        fast.observations,
     )
 
 
@@ -1291,9 +1431,7 @@ def _save_indeterminate(
 def _graph6_string(graph: nx.Graph) -> str:
     """Return a graph6 string after normalizing arbitrary node labels."""
     numbered = nx.convert_node_labels_to_integers(graph)
-    return cast(
-        str, nx.to_graph6_bytes(numbered, header=False).decode("ascii").strip()
-    )
+    return cast(str, nx.to_graph6_bytes(numbered, header=False).decode("ascii").strip())
 
 
 def _recheck_indeterminate_file(

@@ -24,6 +24,16 @@ from .clockwork import (
     recognize_clockwork,
     remove_dominated_vertices,
     segmented_sum,
+    verify_clockwork_structure,
+)
+from .clockwork_search import (
+    ClockworkRetractionCertificate,
+    ClockworkRetractionSearchResult,
+    ClockworkSearchResult,
+    ClockworkSearchStatus,
+    InducedClockworkWitness,
+    find_divergent_clockwork_retract,
+    find_induced_clockwork_subgraphs,
 )
 from .coaffinations import (
     CoaffinePair,
@@ -208,6 +218,14 @@ __all__ = [
     "recognize_clockwork",
     "remove_dominated_vertices",
     "segmented_sum",
+    "verify_clockwork_structure",
+    "ClockworkSearchStatus",
+    "InducedClockworkWitness",
+    "ClockworkSearchResult",
+    "ClockworkRetractionCertificate",
+    "ClockworkRetractionSearchResult",
+    "find_induced_clockwork_subgraphs",
+    "find_divergent_clockwork_retract",
     # coaffinations
     "CoaffinePair",
     "automorphisms",

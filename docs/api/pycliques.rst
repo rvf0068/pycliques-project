@@ -23,6 +23,31 @@ Clockwork
    :show-inheritance:
    :member-order: bysource
 
+Clockwork Search
+----------------
+
+The bounded search functions below inspect induced vertex subsets in
+increasing order. ``ClockworkSearchStatus.EXHAUSTED`` means the requested
+candidate class was fully checked, while ``LIMIT_REACHED`` reports an
+interrupted search; neither a limit nor failure to find a candidate proves
+that no larger or unsearched clockwork exists.
+
+An induced divergent clockwork is structural evidence, not a divergence
+certificate for the containing graph. A verified graph retraction onto a
+divergent clockwork does certify divergence, because the retraction theorem
+transfers clique divergence from the retract to the source graph.
+
+For example, ``nx.from_graph6_bytes(b"IEjdnpy^O")`` has a first clique graph
+with a verified induced divergent clockwork on nine vertices. That
+observation alone does not classify the first clique graph as divergent; the
+bounded retraction search must separately find and verify a retraction.
+
+.. automodule:: pycliques.clockwork_search
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :member-order: bysource
+
 Clockwork Pairs
 ---------------
 

@@ -33,3 +33,4 @@ order9.tsv
 /.ob-jupyter/
 /research/references/
 /research/handoffs/
+*.txt
