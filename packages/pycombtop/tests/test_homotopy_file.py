@@ -8,7 +8,8 @@ from pycombtop.homotopy_file import analyze_indeterminate_file
 
 
 def _graph6(graph: nx.Graph) -> str:
-    return nx.to_graph6_bytes(graph, header=False).decode("ascii").strip()
+    encoded: bytes = nx.to_graph6_bytes(graph, header=False)
+    return encoded.decode("ascii").strip()
 
 
 def test_analyze_indeterminate_file_writes_exact_types(tmp_path):
