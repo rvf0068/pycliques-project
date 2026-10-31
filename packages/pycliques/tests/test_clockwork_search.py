@@ -1,5 +1,7 @@
 """Tests for bounded induced-clockwork and retraction searches."""
 
+from unittest.mock import Mock
+
 import networkx as nx
 import pycliques.clockwork as clockwork_module
 import pycliques.clockwork_search as search_module
@@ -364,6 +366,20 @@ def test_detailed_replay_distinguishes_invalid_and_resource_limited() -> None:
     )
     assert limited.status is CertificateVerificationStatus.LIMIT_REACHED
     assert verified.status is CertificateVerificationStatus.VERIFIED
+    needed = sum(1 for _ in nx.find_cliques(origin))
+    assert needed >= 1
+    assert (
+        verify_clockwork_retraction_certificate_detailed(
+            certificate, clique_bound=needed
+        ).status
+        is CertificateVerificationStatus.VERIFIED
+    )
+    assert (
+        verify_clockwork_retraction_certificate_detailed(
+            certificate, clique_bound=needed - 1
+        ).status
+        is CertificateVerificationStatus.LIMIT_REACHED
+    )
 
     changed_origin = origin.copy()
     changed_origin.add_node("tampered")
@@ -406,13 +422,19 @@ def test_iterate_zero_certificate_verification_skips_clique_replay(
     assert verification.status is CertificateVerificationStatus.VERIFIED
 
 
-def test_classifier_uses_opt_in_retraction_stage() -> None:
+def test_classifier_uses_opt_in_retraction_stage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     graph = clockwork_graph([1, 1, 1], [[0], [0], [0]], 2, [1, 0])
+    retraction_search = Mock(wraps=small_module.find_divergent_clockwork_retract)
+    monkeypatch.setattr(
+        small_module, "find_divergent_clockwork_retract", retraction_search
+    )
 
     behavior = classify_clique_behavior(
         graph,
         tries=1,
-        bound=1,
+        bound=17,
         clockwork_depth=0,
         clockwork_retract_depth=1,
         clockwork_max_order=9,
@@ -423,6 +445,8 @@ def test_classifier_uses_opt_in_retraction_stage() -> None:
     assert behavior.certificate is not None
     assert behavior.certificate.rule == "induced_clockwork_retraction"
     assert behavior.certificate.iterate_index == 0
+    assert retraction_search.call_args is not None
+    assert retraction_search.call_args.kwargs["replay_clique_bound"] == 17
 
 
 def test_direct_clockwork_fallback_is_opt_in(monkeypatch: pytest.MonkeyPatch) -> None:
