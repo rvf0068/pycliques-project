@@ -870,7 +870,7 @@ def classify_clockwork_pair_map(
     (:func:`pycliques.clockwork_pairs.clockwork_coaffine_pair`).
 
     :math:`R_{2m}^n` is :math:`(m+1)`-coaffine and rank divergent by Theorem
-    3.1 for :math:`m \geq 2`.  An admissible morphism of coaffine pairs
+    3.1 for :math:`m \\geq 2`.  An admissible morphism of coaffine pairs
     transfers rank divergence from the domain to the codomain by Theorem
     2.6, and rank divergence implies clique divergence.  ``m == 1`` (radius
     2) is never searched, since Theorem 3.1 does not certify rank

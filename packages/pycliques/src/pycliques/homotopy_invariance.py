@@ -25,10 +25,14 @@ from __future__ import annotations
 
 import itertools
 from collections.abc import Callable, Hashable, Iterable, Iterator
+from typing import TYPE_CHECKING
 
 import networkx as nx
 
 from .cliques import clique_graph
+
+if TYPE_CHECKING:
+    from pycombtop import SimplicialComplex
 
 # ---------------------------------------------------------------------------
 # 1a. Completes of K(G), centers, and neckties (Theorem 11 machinery)
@@ -592,12 +596,12 @@ def h_closure(
     return frozenset.intersection(*containing)
 
 
-def delta_of_clique_set(clique_set: Iterable[frozenset]) -> nx.Graph:
+def delta_of_clique_set(clique_set: Iterable[frozenset]) -> SimplicialComplex:
     """Return :math:`\\Delta(C)`: one full simplex per clique in *clique_set*.
 
-    The result lives on :math:`G`'s vertices (not on cliques): it is the
-    union, over every clique :math:`q` in *clique_set*, of the complete
-    graph on :math:`q`'s vertices.
+    The result is the union, over every clique :math:`q` in *clique_set*, of
+    the full simplex on :math:`q`'s vertices. It need not be flag: faces are
+    included only when they belong to one of the supplied cliques.
 
     .. rubric:: Parameters
 
@@ -606,28 +610,26 @@ def delta_of_clique_set(clique_set: Iterable[frozenset]) -> nx.Graph:
 
     .. rubric:: Returns
 
-    networkx.Graph
-        A graph whose clique complex is :math:`\\Delta(C)`.
+    SimplicialComplex
+        The genuine (possibly non-flag) simplicial complex :math:`\\Delta(C)`.
 
     .. rubric:: Examples
 
     >>> from pycliques.homotopy_invariance import delta_of_clique_set
     >>> d = delta_of_clique_set([frozenset({0, 1, 2})])
-    >>> sorted(d.nodes())
+    >>> sorted(d.vertex_set)
     [0, 1, 2]
-    >>> d.number_of_edges()
-    3
+    >>> len(d.facet_set)
+    1
     """
-    clique_set = list(clique_set)
-    verts: set = set()
-    for q in clique_set:
-        verts |= set(q)
-    delta = nx.Graph()
-    delta.add_nodes_from(verts)
-    for q in clique_set:
-        for u, v in itertools.combinations(q, 2):
-            delta.add_edge(u, v)
-    return delta
+    from pycombtop import Simplex, SimplicialComplex
+
+    generators = {Simplex(clique) for clique in clique_set}
+    facets = {
+        face for face in generators if not any(face < other for other in generators)
+    }
+    vertices = set().union(*(set(face) for face in facets)) if facets else set()
+    return SimplicialComplex(vertices, facet_set=facets)
 
 
 def _clique_index(
@@ -662,7 +664,15 @@ def _h_closure_indexed(
 
 
 def theorem15_hypothesis_holds(
-    graph: nx.Graph, size_cap: int | None = None
+    graph: nx.Graph,
+    size_cap: int | None = None,
+    *,
+    max_clique_graph_vertices: int | None = None,
+    max_clique_graph_edges: int | None = None,
+    max_maximal_cliques: int | None = None,
+    max_complete_sets: int | None = None,
+    max_closed_h_images: int | None = None,
+    max_simplices_per_h_image: int | None = None,
 ) -> tuple[bool | None, frozenset | None]:
     """Check Theorem 15's hypothesis: :math:`\\Delta(h(X))` contractible for every X.
 
@@ -692,14 +702,40 @@ def theorem15_hypothesis_holds(
         Skip (and report as inconclusive) any :math:`\\Delta(h(X))` with more
         than this many vertices, rather than risking a very slow
         homotopy-type computation.
+    max_clique_graph_vertices : int, optional
+        Stop before constructing a clique graph with more than this many
+        vertices. A budget exit is inconclusive.
+    max_clique_graph_edges : int, optional
+        Stop before constructing a clique graph with more than this many
+        edges. A budget exit is inconclusive.
+    max_maximal_cliques : int, optional
+        Maximum number of maximal cliques of :math:`K(G)` to index. A budget
+        exit is inconclusive.
+    max_complete_sets : int, optional
+        Maximum number of complete sets of :math:`K(G)` to process. If there
+        are more, stop at the first excess complete set and return
+        inconclusive. This bounds enumeration and the number of distinct
+        :math:`h`-images retained.
+    max_closed_h_images : int, optional
+        Maximum number of distinct closed :math:`h`-images to inspect. This
+        bounds the exhaustive intersection-based path used when
+        ``max_complete_sets`` is not supplied.
+    max_simplices_per_h_image : int, optional
+        Maximum number of distinct simplices in each :math:`\\Delta(h(X))`.
+        This is a per-image size guard, not a cumulative work limit or
+        timeout; an over-budget image is inconclusive while other images are
+        still checked.
 
     .. rubric:: Returns
 
     tuple[bool | None, frozenset | None]
-        ``(True, None)`` if the hypothesis holds for every complete;
-        ``(False, hX)`` if some :math:`\\Delta(h(X))` is provably not
-        contractible; ``(None, hX)`` if *size_cap* caused an early,
-        inconclusive stop.
+        ``(True, None)`` if every relevant complex is proved contractible;
+        ``(False, hX)`` if some :math:`\\Delta(h(X))` is proved
+        noncontractible; ``(None, hX)`` if at least one case is undecided,
+        including a size-limit exit or an inexact computation without a
+        nonzero reduced homology obstruction. A preprocessing-budget exit
+        returns ``(None, None)`` because no complete set has yet been
+        certified as a witness.
 
     .. rubric:: Examples
 
@@ -708,23 +744,100 @@ def theorem15_hypothesis_holds(
     >>> theorem15_hypothesis_holds(nx.complete_graph(4))
     (True, None)
     """
-    from pycombtop.homotopy_type import homotopy_type_with_verdict
+    from pycombtop.homotopy_type import homotopy_type_sc_with_verdict
 
-    kg = clique_graph(graph)
-    assert kg is not None
-    all_maximal = [frozenset(c) for c in nx.find_cliques(kg)]
-    index = _clique_index(all_maximal)
-    cache: dict[frozenset, frozenset] = {}
+    if max_clique_graph_vertices is not None and max_clique_graph_vertices < 0:
+        raise ValueError("max_clique_graph_vertices must be nonnegative or None")
+    if max_maximal_cliques is not None and max_maximal_cliques < 0:
+        raise ValueError("max_maximal_cliques must be nonnegative or None")
+    if max_complete_sets is not None and max_complete_sets < 0:
+        raise ValueError("max_complete_sets must be nonnegative or None")
+    if max_closed_h_images is not None and max_closed_h_images < 0:
+        raise ValueError("max_closed_h_images must be nonnegative or None")
+    if max_simplices_per_h_image is not None and max_simplices_per_h_image < 0:
+        raise ValueError("max_simplices_per_h_image must be nonnegative or None")
 
-    distinct_h: set[frozenset] = set()
-    for complete in nx.enumerate_all_cliques(kg):
-        distinct_h.add(_h_closure_indexed(complete, index, cache))
+    kg = clique_graph(
+        graph,
+        bound=(
+            max_clique_graph_vertices
+            if max_clique_graph_vertices is not None
+            else float("inf")
+        ),
+        max_edges=max_clique_graph_edges,
+    )
+    if kg is None:
+        return None, None
+    distinct_h: set[frozenset]
+    if max_complete_sets is None:
+        from .poset_homotopy import closed_clique_intersections
 
-    for h_image in distinct_h:
+        intersections = closed_clique_intersections(
+            kg,
+            max_maximal_cliques=max_maximal_cliques,
+            max_closed_sets=max_closed_h_images,
+        )
+        if not intersections.is_exact:
+            return None, None
+        distinct_h = set(intersections.closed_sets)
+    else:
+        all_maximal: list[frozenset] = []
+        for clique in nx.find_cliques(kg):
+            if (
+                max_maximal_cliques is not None
+                and len(all_maximal) >= max_maximal_cliques
+            ):
+                return None, None
+            all_maximal.append(frozenset(clique))
+        index = _clique_index(all_maximal)
+        cache: dict[frozenset, frozenset] = {}
+
+        distinct_h = set()
+        complete_count = 0
+        for complete in nx.enumerate_all_cliques(kg):
+            if complete_count >= max_complete_sets:
+                return None, None
+            complete_count += 1
+            distinct_h.add(_h_closure_indexed(complete, index, cache))
+            if (
+                max_closed_h_images is not None
+                and len(distinct_h) > max_closed_h_images
+            ):
+                return None, None
+
+    vertex_order = {vertex: index for index, vertex in enumerate(graph.nodes())}
+    ordered_h = sorted(
+        distinct_h,
+        key=lambda family: (
+            len(family),
+            tuple(
+                sorted(
+                    tuple(sorted(vertex_order[vertex] for vertex in clique))
+                    for clique in family
+                )
+            ),
+        ),
+    )
+    first_unknown: frozenset | None = None
+    for h_image in ordered_h:
         delta = delta_of_clique_set(h_image)
-        if size_cap is not None and delta.order() > size_cap:
-            return None, h_image
-        verdict = homotopy_type_with_verdict(delta)
-        if not (verdict.is_exact and verdict.wedge.is_contractible()):
+        if size_cap is not None and len(delta.vertex_set) > size_cap:
+            if first_unknown is None:
+                first_unknown = h_image
+            continue
+        verdict = homotopy_type_sc_with_verdict(
+            delta,
+            max_simplices=max_simplices_per_h_image,
+        )
+        if verdict.is_limited:
+            if first_unknown is None:
+                first_unknown = h_image
+            continue
+        if verdict.is_exact and not verdict.wedge.is_contractible():
             return False, h_image
-    return True, None
+        if not verdict.is_exact:
+            if not verdict.wedge.is_contractible():
+                return False, h_image
+            if first_unknown is None:
+                first_unknown = h_image
+    return (None, first_unknown) if first_unknown is not None else (True, None)

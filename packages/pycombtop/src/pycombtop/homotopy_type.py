@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
+from itertools import combinations
 
 import mogutda
 import networkx as nx
@@ -224,15 +225,19 @@ class HomotopyVerdict:
     .. rubric:: Attributes
 
     wedge : WedgeOfSpheres | None
-        The structured homotopy type when known to be a wedge of spheres.
-        ``None`` when only Betti numbers could be computed.
+        For an exact verdict, the established wedge-of-spheres homotopy type.
+        For an inexact verdict, this may contain only the reduced Betti-number
+        vector encoded as sphere counts; it is not then a homotopy
+        decomposition.
     reason : str
         The theorem or sequence of reductions used to establish the
         verdict.  One of the :class:`Theorem` constants, or a
         concatenation of several.
     is_exact : bool
-        ``True`` when the verdict is provably the correct homotopy type.
-        ``False`` when only Betti numbers could be computed.
+        ``True`` only when the claimed homotopy decomposition is proved.
+        Accurately computed Betti numbers alone do not prove a
+        wedge-of-spheres decomposition; in particular, an empty ``wedge``
+        when ``is_exact`` is false does not prove contractibility.
     is_limited : bool
         ``True`` when computation was skipped because a configured size limit
         was exceeded. A limited result is inconclusive, not contractible.
@@ -281,15 +286,22 @@ def _too_large_simplicial_complex(
     max_simplices: int | None,
 ) -> bool:
     """Return whether a complex exceeds either configured size limit."""
+    if max_simplices is not None and max_simplices < 0:
+        raise ValueError("max_simplices must be nonnegative or None")
     if max_vertices is not None and len(s_complex.vertex_set) > max_vertices:
         return True
     if max_simplices is None:
         return False
-    simplex_count = 0
+    upper_bound = sum(2 ** len(facet) for facet in s_complex.facet_set)
+    if upper_bound <= max_simplices:
+        return False
+    distinct_faces: set[frozenset] = set()
     for facet in s_complex.facet_set:
-        simplex_count += 2 ** len(facet)
-        if simplex_count > max_simplices:
-            return True
+        for size in range(len(facet) + 1):
+            for face in combinations(facet, size):
+                distinct_faces.add(frozenset(face))
+                if len(distinct_faces) > max_simplices:
+                    return True
     return False
 
 
@@ -339,7 +351,13 @@ def _has_free_face(s_complex: SimplicialComplex) -> Simplex | None:
 
 
 def collapse(s_complex: SimplicialComplex) -> SimplicialComplex:
-    """Collapse *s_complex* by repeated elementary collapses."""
+    """Greedily apply nonrelative elementary collapses to *s_complex*.
+
+    This procedure does not preserve a chosen subcomplex and makes no search
+    over competing collapse choices. If it stops before a point, that only
+    means this greedy procedure found no next free face; it does not establish
+    non-collapsibility.
+    """
     sc = s_complex
     while True:
         if len(sc.vertex_set) in {0, 1}:
@@ -597,10 +615,18 @@ def _try_special_neighbourhood(graph: nx.Graph) -> HomotopyVerdict | None:
     v = candidates[0]
     sub = nx.convert_node_labels_to_integers(graph.subgraph(set(graph.nodes()) - {v}))
     inner = homotopy_type_with_verdict(sub)
+    if inner.is_limited:
+        return HomotopyVerdict(
+            wedge=inner.wedge,
+            reason=inner.reason,
+            is_exact=False,
+            is_limited=True,
+        )
     w = inner.wedge.add_spheres(1, 1)
     return HomotopyVerdict(
         wedge=w,
         reason=Theorem.SPECIAL_NEIGHBOURHOOD,
+        is_exact=inner.is_exact,
     )
 
 
@@ -673,11 +699,19 @@ def _try_special_vertex_sc(
         if sc.link(vertex).dimension() == 0:
             deletion = sc.deletion(vertex)
             inner = homotopy_type_sc_with_verdict(deletion)
+            if inner.is_limited:
+                return HomotopyVerdict(
+                    wedge=inner.wedge,
+                    reason=inner.reason,
+                    is_exact=False,
+                    is_limited=True,
+                )
             n_neigh = len(sc.link(vertex).vertex_set)
             w = inner.wedge.add_spheres(1, n_neigh - 1)
             return HomotopyVerdict(
                 wedge=w,
                 reason=Theorem.SPECIAL_VERTEX_SC,
+                is_exact=inner.is_exact,
             )
     return None
 
@@ -704,7 +738,8 @@ def homotopy_type_sc_with_verdict(
     max_vertices : int, optional
         Abort before analysis when the complex has more vertices than this.
     max_simplices : int, optional
-        Abort before analysis when the complex has more simplices than this.
+        Abort before analysis when the complex has more distinct simplices
+        than this. This is a size guard, not a timeout.
 
     Returns
     -------
@@ -765,7 +800,9 @@ def homotopy_type_with_verdict(
 
         * ``verdict`` - LaTeX string for the homotopy type.
         * ``reason``  - The theorem(s) that justify the verdict.
-        * ``is_exact`` - ``False`` when only Betti numbers were computed.
+        * ``is_exact`` - ``False`` when only Betti numbers were computed; in
+          that case the returned sphere counts are Betti numbers, not a
+          verified wedge-of-spheres decomposition.
 
     .. rubric:: Examples
 

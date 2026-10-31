@@ -1,14 +1,26 @@
 """Tests for the homotopy_type module."""
 
+import json
+
 import networkx as nx
+import pytest
+from pycliques import clique_graph, suspension_of_cycle
 from pycombtop import (
+    CollapseStatus,
     Simplex,
     SimplicialComplex,
+    clique_complex,
+    nerve_of_cliques,
+    relative_collapse,
+    verify_relative_collapse,
 )
 from pycombtop.homotopy_type import (
     HomotopyVerdict,
     Theorem,
     WedgeOfSpheres,
+    _too_large_simplicial_complex,
+    _try_special_neighbourhood,
+    _try_special_vertex_sc,
     betti_numbers_graph,
     betti_numbers_sc,
     collapse,
@@ -38,6 +50,101 @@ def test_homotopy_verdict_default_exact():
     w = WedgeOfSpheres.contractible()
     v = HomotopyVerdict(wedge=w, reason="test")
     assert v.is_exact is True
+
+
+@pytest.mark.parametrize("is_exact", [True, False])
+def test_special_neighbourhood_preserves_recursive_exactness(monkeypatch, is_exact):
+    inner = HomotopyVerdict(
+        wedge=WedgeOfSpheres.contractible(),
+        reason="test inner result",
+        is_exact=is_exact,
+    )
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_with_verdict",
+        lambda _graph: inner,
+    )
+
+    verdict = _try_special_neighbourhood(nx.cycle_graph(4))
+
+    assert verdict is not None
+    assert verdict.is_exact is is_exact
+    assert verdict.is_limited is False
+    assert verdict.wedge == WedgeOfSpheres.sphere(1)
+
+
+@pytest.mark.parametrize("is_exact", [True, False])
+def test_special_vertex_sc_preserves_recursive_exactness(monkeypatch, is_exact):
+    cycle = SimplicialComplex(
+        {0, 1, 2, 3},
+        facet_set={
+            Simplex({0, 1}),
+            Simplex({1, 2}),
+            Simplex({2, 3}),
+            Simplex({3, 0}),
+        },
+    )
+    inner = HomotopyVerdict(
+        wedge=WedgeOfSpheres.contractible(),
+        reason="test inner result",
+        is_exact=is_exact,
+    )
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
+        lambda _complex: inner,
+    )
+
+    verdict = _try_special_vertex_sc(cycle)
+
+    assert verdict is not None
+    assert verdict.is_exact is is_exact
+    assert verdict.is_limited is False
+    assert verdict.wedge == WedgeOfSpheres.sphere(1)
+
+
+@pytest.mark.parametrize(
+    ("helper", "input_complex"),
+    [
+        (_try_special_neighbourhood, False),
+        (_try_special_vertex_sc, True),
+    ],
+)
+def test_recursive_special_cases_preserve_limited_verdict(
+    monkeypatch, helper, input_complex
+):
+    inner = HomotopyVerdict(
+        wedge=WedgeOfSpheres.contractible(),
+        reason=Theorem.LIMIT_EXCEEDED,
+        is_exact=False,
+        is_limited=True,
+    )
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_with_verdict",
+        lambda _graph: inner,
+    )
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
+        lambda _complex: inner,
+    )
+    if input_complex:
+        value = SimplicialComplex(
+            {0, 1, 2, 3},
+            facet_set={
+                Simplex({0, 1}),
+                Simplex({1, 2}),
+                Simplex({2, 3}),
+                Simplex({3, 0}),
+            },
+        )
+    else:
+        value = nx.cycle_graph(4)
+
+    verdict = helper(value)
+
+    assert verdict is not None
+    assert verdict.wedge is inner.wedge
+    assert verdict.reason == Theorem.LIMIT_EXCEEDED
+    assert verdict.is_exact is False
+    assert verdict.is_limited is True
 
 
 # ---------- collapse ----------
@@ -74,6 +181,81 @@ def test_collapse_boundary_triangle():
     # The boundary of a triangle has the homotopy type of S^1;
     # elementary collapses cannot reduce it to a point.
     assert len(result.vertex_set) >= 2
+
+
+def test_relative_collapse_of_simplex_to_its_base_facet():
+    """The K5 clique complex collapses relative to its K4 subcomplex."""
+    source = clique_complex(nx.complete_graph(5))
+    target = clique_complex(nx.complete_graph(4))
+
+    result = relative_collapse(source, target)
+
+    assert result.status is CollapseStatus.PROVED
+    assert result.pairs
+    assert verify_relative_collapse(source, target, result.pairs)
+    assert json.loads(result.certificate_json())
+
+
+def test_relative_collapse_preserves_target_and_rejects_bad_certificate():
+    source = SimplicialComplex({0, 1}, facet_set=[{0, 1}])
+    target = SimplicialComplex({0}, facet_set=[{0}])
+    result = relative_collapse(source, target)
+
+    assert result.status is CollapseStatus.PROVED
+    assert verify_relative_collapse(source, target, result.pairs)
+    assert not verify_relative_collapse(source, target, [])
+
+
+def test_relative_collapse_reports_inconclusive_for_impossible_target():
+    source = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1}, {1, 2}, {0, 2}])
+    target = SimplicialComplex({0}, facet_set=[{0}])
+
+    result = relative_collapse(source, target)
+
+    assert result.status is CollapseStatus.INCONCLUSIVE
+    assert "non-collapsibility is not established" in result.diagnostics
+
+
+def test_relative_collapse_requires_target_to_be_subcomplex():
+    source = SimplicialComplex({0, 1}, facet_set=[{0, 1}])
+    target = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1, 2}])
+
+    try:
+        relative_collapse(source, target)
+    except ValueError as error:
+        assert "subcomplex" in str(error)
+    else:
+        raise AssertionError("Expected target validation to fail")
+
+
+def test_octahedron_regression_is_not_a_relative_collapse():
+    graph = nx.octahedral_graph()
+    kg = clique_graph(graph)
+    assert kg is not None
+    source = clique_complex(kg)
+    target = nerve_of_cliques(graph)
+
+    source_betti = betti_numbers_sc(source)
+    graph_betti = betti_numbers_sc(clique_complex(graph))
+    result = relative_collapse(source, target, max_states=2_000)
+
+    assert graph_betti == [0, 0, 1]
+    assert source_betti == [0, 0, 0, 1]
+    assert result.status is CollapseStatus.INCONCLUSIVE
+    assert not verify_relative_collapse(source, target, result.pairs)
+
+
+def test_suspension_of_c5_has_verified_relative_collapse():
+    graph = suspension_of_cycle(5)
+    kg = clique_graph(graph)
+    assert kg is not None
+    source = clique_complex(kg)
+    target = nerve_of_cliques(graph)
+
+    result = relative_collapse(source, target)
+
+    assert result.status is CollapseStatus.PROVED
+    assert verify_relative_collapse(source, target, result.pairs)
 
 
 # ---------- is_vertex_decomposable ----------
@@ -250,6 +432,52 @@ def test_sc_simplex_limit_is_inconclusive():
     verdict = homotopy_type_sc_with_verdict(sc, max_simplices=3)
     assert verdict.is_limited is True
     assert verdict.verdict == "Too large to check"
+
+
+def test_simplex_budget_counts_distinct_faces_of_overlapping_facets():
+    sc = SimplicialComplex(
+        {0, 1, 2, 3},
+        facet_set=[{0, 1, 2}, {0, 1, 3}],
+    )
+
+    assert len(sc.all_simplices()) == 12
+    assert _too_large_simplicial_complex(sc, None, 12) is False
+    assert _too_large_simplicial_complex(sc, None, 11) is True
+
+
+@pytest.mark.parametrize(("budget", "is_limited"), [(7, True), (8, False)])
+def test_simplex_budget_counts_all_faces_of_one_facet(budget, is_limited):
+    sc = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1, 2}])
+
+    assert _too_large_simplicial_complex(sc, None, budget) is is_limited
+
+
+def test_simplex_budget_stops_after_budget_plus_one_distinct_faces(monkeypatch):
+    from itertools import combinations as itertools_combinations
+
+    yielded_faces = 0
+
+    def tracked_combinations(vertices, size):
+        nonlocal yielded_faces
+        for face in itertools_combinations(vertices, size):
+            yielded_faces += 1
+            yield face
+
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.combinations",
+        tracked_combinations,
+    )
+    sc = SimplicialComplex(set(range(8)), facet_set=[set(range(8))])
+
+    assert _too_large_simplicial_complex(sc, None, 2) is True
+    assert yielded_faces == 3
+
+
+def test_simplex_budget_rejects_negative_value():
+    sc = SimplicialComplex({0}, facet_set=[{0}])
+
+    with pytest.raises(ValueError, match="max_simplices"):
+        _too_large_simplicial_complex(sc, None, -1)
 
 
 def test_sc_boundary_triangle():

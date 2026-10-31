@@ -77,6 +77,33 @@ Homotopy Invariance
    :show-inheritance:
    :member-order: bysource
 
+Poset Homotopy
+--------------
+
+.. automodule:: pycliques.poset_homotopy
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :member-order: bysource
+
+Octahedral Boolean Model
+------------------------
+
+.. automodule:: pycliques.octahedral_boolean
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :member-order: bysource
+
+Homotopy Research Certificates
+------------------------------
+
+.. automodule:: pycliques.homotopy_research
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :member-order: bysource
+
 Named
 -----
 

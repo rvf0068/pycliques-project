@@ -2,7 +2,14 @@
 
 __version__ = "0.1.0"
 
-from .cliques import Clique, NodeH, clique_graph, homotopy_clique_graph
+from .cliques import (
+    Clique,
+    NodeH,
+    clique_graph,
+    clique_graph_of_double_bound,
+    double_bound_graph,
+    homotopy_clique_graph,
+)
 from .clockwork import (
     ClockworkGraph,
     ClockworkStructure,
@@ -76,6 +83,13 @@ from .homotopy_invariance import (
     verify_discrete_morse_matching,
     witnesses_and_extension,
 )
+from .homotopy_research import (
+    EnumerationStatus,
+    HomotopyStructureResult,
+    MissingFaceCertificate,
+    homotopy_structure_certificates,
+    verify_homotopy_structure_certificates,
+)
 from .named import (
     collapse_obstruction_fixture,
     complement_of_cycle,
@@ -84,6 +98,31 @@ from .named import (
     octahedron,
     snub_disphenoid,
     suspension_of_cycle,
+)
+from .octahedral_boolean import (
+    MaximalIntersectingFamilies,
+    OctahedralBooleanModel,
+    OctahedralModelResult,
+    build_octahedral_boolean_model,
+    degree_histogram,
+    enumerate_maximal_intersecting_families,
+)
+from .poset_homotopy import (
+    ClosedCliqueIntersections,
+    SupportNerveConeCertificate,
+    Theorem57Result,
+    Theorem57Status,
+    ThreeHellyResult,
+    ThreeHellyStatus,
+    closed_clique_intersections,
+    h_closure_from_neighbors,
+    maximal_clique_hypergraph_is_3_helly,
+    strong_collapse_certificate,
+    support_nerve_cone_certificate,
+    support_nerve_facets,
+    theorem57_hypothesis_holds,
+    verify_strong_collapse_certificate,
+    verify_support_nerve_cone_certificate,
 )
 from .retractions import (
     dict_to_tuple,
@@ -131,7 +170,30 @@ __all__ = [
     "Clique",
     "NodeH",
     "clique_graph",
+    "clique_graph_of_double_bound",
+    "double_bound_graph",
     "homotopy_clique_graph",
+    "MaximalIntersectingFamilies",
+    "OctahedralBooleanModel",
+    "OctahedralModelResult",
+    "build_octahedral_boolean_model",
+    "degree_histogram",
+    "enumerate_maximal_intersecting_families",
+    "ClosedCliqueIntersections",
+    "ThreeHellyResult",
+    "ThreeHellyStatus",
+    "SupportNerveConeCertificate",
+    "Theorem57Result",
+    "Theorem57Status",
+    "closed_clique_intersections",
+    "h_closure_from_neighbors",
+    "maximal_clique_hypergraph_is_3_helly",
+    "strong_collapse_certificate",
+    "support_nerve_cone_certificate",
+    "support_nerve_facets",
+    "verify_support_nerve_cone_certificate",
+    "theorem57_hypothesis_holds",
+    "verify_strong_collapse_certificate",
     # clockwork
     "ClockworkGraph",
     "ClockworkStructure",
@@ -199,6 +261,11 @@ __all__ = [
     "theorem15_hypothesis_holds",
     "verify_discrete_morse_matching",
     "witnesses_and_extension",
+    "EnumerationStatus",
+    "HomotopyStructureResult",
+    "MissingFaceCertificate",
+    "homotopy_structure_certificates",
+    "verify_homotopy_structure_certificates",
     # named
     "collapse_obstruction_fixture",
     "complement_of_cycle",

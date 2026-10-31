@@ -4,12 +4,15 @@ import networkx as nx
 from pycombtop.s_collapses import (
     complete_s_collapse,
     complete_s_collapse_edges,
+    complete_s_collapse_with_certificate,
+    dismantling_certificate,
     has_s_dismantlable_edge,
     has_s_dismantlable_vertex,
     is_s_dismantlable_edge,
     is_s_dismantlable_vertex,
     remove_s_dismantlable_edge,
     remove_s_dismantlable_vertex,
+    verify_dismantling_certificate,
 )
 
 # ---------- is_s_dismantlable_vertex ----------
@@ -147,3 +150,23 @@ def test_complete_collapse_edges_cycle_4():
     """C_4 has no s-dismantlable edges; unchanged."""
     g = complete_s_collapse_edges(nx.cycle_graph(4))
     assert g.size() == 4
+
+
+def test_dismantling_certificate_distinguishes_empty_and_singleton():
+    assert dismantling_certificate(nx.empty_graph(0)) is None
+    singleton = dismantling_certificate(nx.empty_graph(1))
+    assert singleton == ()
+    assert verify_dismantling_certificate(nx.empty_graph(1), singleton)
+    assert not verify_dismantling_certificate(nx.empty_graph(0), ())
+
+
+def test_s_collapse_certificate_replays_local_dismantling_sequences():
+    core, moves = complete_s_collapse_with_certificate(nx.complete_graph(4))
+    assert core.number_of_nodes() == 1
+    assert len(moves) == 3
+    replay = nx.complete_graph(4)
+    for removed_vertex, local_certificate in moves:
+        neighborhood = replay.subgraph(set(replay[removed_vertex])).copy()
+        assert verify_dismantling_certificate(neighborhood, local_certificate)
+        replay.remove_node(removed_vertex)
+    assert replay.number_of_nodes() == core.number_of_nodes()

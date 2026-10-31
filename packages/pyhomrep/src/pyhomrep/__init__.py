@@ -30,6 +30,7 @@ from pyhomrep.simplicial import (
     character_matrix_permutation,
     character_p_homology,
     decompose_into_irreducibles,
+    decompose_p_homology,
     faces,
     image_boundary_op,
     kernel_boundary_op,
@@ -86,6 +87,7 @@ __all__ = [
     "character_image",
     "character_p_homology",
     "decompose_into_irreducibles",
+    "decompose_p_homology",
     "character_matrix_permutation",
     # Utilities
     "reduce_matrix",

@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
 PACKAGE_SRC_DIRS = sorted(
     (path / "src" for path in PROJECT_ROOT.joinpath("packages").iterdir() if (path / "src").exists()),
     key=lambda p: p.parent.name,

@@ -271,3 +271,30 @@ class TestDecomposeIntoIrreducibles:
         basis_1 = basis_group_oriented_p_chains(sc, 1)
         assert basis_1 is not None
         assert len(basis_1.dic) == 3  # 3 edges
+
+
+class TestDecomposePHomology:
+    """Tests for decompose_p_homology."""
+
+    def test_complete_graph_h1(self):
+        from pycombtop import SimplicialComplex
+        from pyhomrep import decompose_p_homology
+
+        K = SimplicialComplex(range(4), function=lambda s: len(s) <= 2)
+        mult = decompose_p_homology(K, 4, 1)
+        assert {k: v for k, v in mult.items() if v != 0} == {(2, 1, 1): 1}
+
+    def test_matching_complex_h1(self):
+        from pyhomrep import decompose_p_homology
+
+        sc = clique_complex(matching_graph(5))
+        mult = decompose_p_homology(sc, 5, 1)
+        assert {k: v for k, v in mult.items() if v != 0} == {(3, 1, 1): 1}
+
+    def test_agrees_with_decompose_into_irreducibles(self):
+        from pyhomrep import decompose_into_irreducibles, decompose_p_homology
+
+        sc = clique_complex(matching_graph(4))
+        full = decompose_into_irreducibles(sc, 4)
+        for p in range(sc.dimension() + 1):
+            assert decompose_p_homology(sc, 4, p) == full[p]

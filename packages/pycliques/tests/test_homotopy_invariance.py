@@ -1,4 +1,7 @@
+from dataclasses import dataclass, replace
+
 import networkx as nx
+import pytest
 from pycliques.cliques import clique_graph
 from pycliques.helly import is_clique_helly
 from pycliques.homotopy_invariance import (
@@ -16,12 +19,25 @@ from pycliques.homotopy_invariance import (
     verify_discrete_morse_matching,
     witnesses_and_extension,
 )
+from pycliques.homotopy_research import (
+    EnumerationStatus,
+    homotopy_structure_certificates,
+    verify_homotopy_structure_certificates,
+)
 from pycliques.named import (
     collapse_obstruction_fixture,
     dominated_vertex_free_non_helly,
     octahedron,
     suspension_of_cycle,
 )
+from pycombtop import (
+    HomotopyVerdict,
+    Simplex,
+    SimplicialComplex,
+    WedgeOfSpheres,
+    relative_betti_numbers,
+)
+from pycombtop.homotopy_type import betti_numbers_sc
 
 # ---------- Shared fixtures (Priority 6, added early per project instructions) ---
 
@@ -91,6 +107,69 @@ def test_neckties_octahedron_are_maximal_bad_completes():
         candidates = set(kg.nodes()) - necktie
         for q in candidates:
             assert not all(kg.has_edge(q, member) for member in necktie)
+
+
+@dataclass(frozen=True)
+class _HashableLabel:
+    value: str
+
+
+def test_homotopy_structure_certificates_support_arbitrary_hashable_labels():
+    graph = nx.octahedral_graph()
+    graph = nx.relabel_nodes(
+        graph, {vertex: _HashableLabel(str(vertex)) for vertex in graph}
+    )
+
+    result = homotopy_structure_certificates(graph)
+
+    assert result.status is EnumerationStatus.COMPLETE
+    assert result.graph6
+    assert result.missing_faces
+    assert result.to_json()
+    assert verify_homotopy_structure_certificates(graph, result)
+    certificate = result.missing_faces[0]
+    invalid_certificate = replace(
+        certificate,
+        witness_vertices=(len(graph) + 1,) * len(certificate.clique_ids),
+    )
+    invalid_result = replace(
+        result,
+        missing_faces=(invalid_certificate, *result.missing_faces[1:]),
+    )
+    assert not verify_homotopy_structure_certificates(graph, invalid_result)
+
+
+def test_homotopy_structure_budget_is_explicitly_inconclusive():
+    graph = nx.octahedral_graph()
+
+    result = homotopy_structure_certificates(graph, max_cliques=1)
+
+    assert result.status is EnumerationStatus.INCONCLUSIVE
+    assert result.explored_cliques == 0
+    assert result.explored_graph_cliques == 2
+    assert verify_homotopy_structure_certificates(graph, result)
+
+
+def test_homotopy_structure_edge_budget_is_inconclusive():
+    graph = nx.octahedral_graph()
+
+    result = homotopy_structure_certificates(
+        graph, max_cliques=100, max_clique_graph_edges=0
+    )
+
+    assert result.status is EnumerationStatus.INCONCLUSIVE
+    assert result.explored_graph_cliques == 8
+    assert result.explored_graph_edges == 1
+    assert "max_clique_graph_edges=0" in result.diagnostics
+    assert verify_homotopy_structure_certificates(graph, result)
+
+
+def test_homotopy_structure_without_violations_verifies_none_minimum():
+    graph = nx.complete_graph(4)
+    result = homotopy_structure_certificates(graph)
+
+    assert result.smallest_violation_ids is None
+    assert verify_homotopy_structure_certificates(graph, result)
 
 
 def test_is_center_true_and_false_on_octahedron():
@@ -258,17 +337,70 @@ def test_h_closure_of_maximal_clique_is_itself():
         assert h_closure(q, kg, all_maximal) == q
 
 
-def test_delta_of_clique_set_single_clique_is_complete_graph():
-    """Delta of a single clique is the complete graph on its vertices."""
+def test_delta_of_clique_set_single_clique_is_a_full_simplex():
+    """Delta of a single clique has that clique as its only facet."""
     d = delta_of_clique_set([frozenset({0, 1, 2})])
-    assert sorted(d.nodes()) == [0, 1, 2]
-    assert d.number_of_edges() == 3
+    assert d.vertex_set == {0, 1, 2}
+    assert d.facet_set == {Simplex({0, 1, 2})}
+    assert (
+        d.all_simplices()
+        == SimplicialComplex({0, 1, 2}, facet_set=[{0, 1, 2}]).all_simplices()
+    )
 
 
-def test_delta_of_clique_set_empty_is_empty_graph():
+def test_delta_of_clique_set_empty_is_empty_complex():
     """Delta of an empty clique set has no vertices."""
     d = delta_of_clique_set([])
-    assert d.number_of_nodes() == 0
+    assert not d.vertex_set
+    assert not d.facet_set
+
+
+def test_delta_of_clique_set_preserves_nonflag_triangle_boundary():
+    """Three edge facets remain an unfilled triangle."""
+    d = delta_of_clique_set(
+        [
+            frozenset({0, 1}),
+            frozenset({1, 2}),
+            frozenset({0, 2}),
+        ]
+    )
+    assert d.facet_set == {
+        Simplex({0, 1}),
+        Simplex({1, 2}),
+        Simplex({0, 2}),
+    }
+    assert not d.is_clique_complex()
+    assert betti_numbers_sc(d) == [0, 1]
+
+
+def test_delta_of_h_closed_family_preserves_missing_triangle_face():
+    """The graph6 octahedron example remains the genuine non-flag complex."""
+    graph = nx.from_graph6_bytes(b"EznW")
+    family = frozenset(
+        {
+            frozenset({0, 4, 5}),
+            frozenset({1, 3, 5}),
+            frozenset({2, 3, 4}),
+        }
+    )
+    kg = clique_graph(graph)
+    assert kg is not None
+    assert family <= set(kg)
+    maximal_kg = [frozenset(clique) for clique in nx.find_cliques(kg)]
+    assert h_closure(family, kg, maximal_kg) == family
+
+    delta = delta_of_clique_set(family)
+    expected = SimplicialComplex(
+        set().union(*family), facet_set={Simplex(clique) for clique in family}
+    )
+    assert delta.all_simplices() == expected.all_simplices()
+    assert not delta.is_clique_complex()
+    assert betti_numbers_sc(delta) == [0, 1]
+
+
+def test_delta_of_clique_set_ignores_nonmaximal_generators():
+    delta = delta_of_clique_set([frozenset({0, 1}), frozenset({0})])
+    assert delta.facet_set == {Simplex({0, 1})}
 
 
 def test_theorem15_hypothesis_holds_for_complete_graph():
@@ -293,12 +425,16 @@ def test_theorem15_hypothesis_holds_fixture_1():
     assert holds is True
 
 
-def test_theorem15_hypothesis_holds_fixture_2():
-    """Fixture 2 (HUZv~zz): the sharpest stress test in the whole toolkit.
-    Elementary collapse provably cannot succeed here, yet Theorem 15's
-    hypothesis holds cleanly -- exactly the documented result."""
-    holds, _ = theorem15_hypothesis_holds(FIXTURE_2())
-    assert holds is True
+def test_theorem15_hypothesis_fails_fixture_2_with_nonflag_homology():
+    """The genuine h-closed family has nonzero rational first homology."""
+    holds, witness = theorem15_hypothesis_holds(FIXTURE_2())
+    assert holds is False
+    assert witness is not None
+    delta = delta_of_clique_set(witness)
+    betti_numbers = relative_betti_numbers(
+        delta.facet_set, lambda _face: False, method="exact"
+    )
+    assert betti_numbers[1] == 1
 
 
 def test_theorem15_hypothesis_size_cap_inconclusive():
@@ -307,6 +443,269 @@ def test_theorem15_hypothesis_size_cap_inconclusive():
     holds, hx = theorem15_hypothesis_holds(FIXTURE_2(), size_cap=1)
     assert holds is None
     assert hx is not None
+
+
+def test_theorem15_complete_set_budget_stops_enumeration_early(monkeypatch):
+    """A complete-set budget prevents exhaustive enumeration of K(G)."""
+    enumerate_all_cliques = nx.enumerate_all_cliques
+    enumerated = 0
+
+    def tracked_enumeration(graph):
+        nonlocal enumerated
+        for complete in enumerate_all_cliques(graph):
+            enumerated += 1
+            yield complete
+
+    monkeypatch.setattr(nx, "enumerate_all_cliques", tracked_enumeration)
+
+    result = theorem15_hypothesis_holds(
+        nx.star_graph(8),
+        max_complete_sets=3,
+    )
+
+    assert result == (None, None)
+    assert enumerated == 4
+
+
+def test_theorem15_maximal_clique_budget_stops_indexing_early(monkeypatch):
+    """A maximal-clique budget prevents materializing the full index."""
+    clique_graph = nx.complete_bipartite_graph(4, 4)
+    find_cliques = nx.find_cliques
+    indexed = 0
+
+    def tracked_find_cliques(graph):
+        nonlocal indexed
+        for clique in find_cliques(graph):
+            indexed += 1
+            yield clique
+
+    monkeypatch.setattr(
+        "pycliques.homotopy_invariance.clique_graph",
+        lambda *_args, **_kwargs: clique_graph,
+    )
+    monkeypatch.setattr(nx, "find_cliques", tracked_find_cliques)
+
+    def unexpected_enumeration(_graph):
+        raise AssertionError("complete sets must not be enumerated after a budget exit")
+
+    monkeypatch.setattr(nx, "enumerate_all_cliques", unexpected_enumeration)
+
+    assert theorem15_hypothesis_holds(
+        nx.path_graph(3),
+        max_maximal_cliques=2,
+    ) == (None, None)
+    assert indexed == 3
+
+
+@pytest.mark.parametrize(
+    "graph_budget",
+    [
+        "max_clique_graph_vertices",
+        "max_clique_graph_edges",
+    ],
+)
+def test_theorem15_clique_graph_budget_exits_before_enumeration(
+    monkeypatch, graph_budget
+):
+    def unexpected_enumeration(_graph):
+        raise AssertionError("complete sets must not be enumerated after a budget exit")
+
+    monkeypatch.setattr(nx, "enumerate_all_cliques", unexpected_enumeration)
+
+    assert theorem15_hypothesis_holds(
+        nx.path_graph(3),
+        **{graph_budget: 0},
+    ) == (None, None)
+
+
+@pytest.mark.parametrize(
+    "budget_name",
+    [
+        "max_complete_sets",
+        "max_closed_h_images",
+        "max_maximal_cliques",
+        "max_clique_graph_vertices",
+        "max_simplices_per_h_image",
+    ],
+)
+def test_theorem15_rejects_negative_resource_budgets(budget_name):
+    with pytest.raises(ValueError):
+        theorem15_hypothesis_holds(nx.path_graph(3), **{budget_name: -1})
+
+
+def test_theorem15_forwards_per_image_simplex_budget(monkeypatch):
+    observed = {}
+
+    def fake_homotopy_type(s_complex, *, max_simplices=None):
+        observed["complex"] = s_complex
+        observed["max_simplices"] = max_simplices
+        return HomotopyVerdict(
+            wedge=WedgeOfSpheres.contractible(),
+            reason="test contractible result",
+        )
+
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
+        fake_homotopy_type,
+    )
+
+    assert theorem15_hypothesis_holds(
+        nx.path_graph(3),
+        max_simplices_per_h_image=13,
+    ) == (True, None)
+    assert isinstance(observed["complex"], SimplicialComplex)
+    assert observed["max_simplices"] == 13
+
+
+def test_theorem15_rejects_negative_simplex_budget_before_computation(
+    monkeypatch,
+):
+    def unexpected_computation(*_args, **_kwargs):
+        raise AssertionError("invalid budgets must be rejected before computation")
+
+    monkeypatch.setattr(
+        "pycliques.homotopy_invariance.clique_graph",
+        unexpected_computation,
+    )
+
+    with pytest.raises(ValueError, match="max_simplices_per_h_image"):
+        theorem15_hypothesis_holds(
+            nx.path_graph(3),
+            max_simplices_per_h_image=-1,
+        )
+
+
+def test_theorem15_default_enumerates_closed_images_not_all_completes(monkeypatch):
+    def unexpected_enumeration(_graph):
+        raise AssertionError("closed-image enumeration must not enumerate completes")
+
+    monkeypatch.setattr(nx, "enumerate_all_cliques", unexpected_enumeration)
+
+    assert theorem15_hypothesis_holds(nx.path_graph(3)) == (True, None)
+
+
+def test_theorem15_closed_image_budget_exits_inconclusively():
+    assert theorem15_hypothesis_holds(
+        nx.path_graph(3),
+        max_closed_h_images=0,
+    ) == (None, None)
+
+
+def test_theorem15_per_image_limited_verdict_is_inconclusive(monkeypatch):
+    limited = HomotopyVerdict(
+        wedge=WedgeOfSpheres.contractible(),
+        reason="test resource limit",
+        is_exact=False,
+        is_limited=True,
+    )
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
+        lambda _complex, *, max_simplices=None: limited,
+    )
+
+    holds, witness = theorem15_hypothesis_holds(
+        nx.path_graph(3),
+        max_simplices_per_h_image=0,
+    )
+
+    assert holds is None
+    assert witness is not None
+
+
+def test_theorem15_large_simplex_budget_preserves_unlimited_result():
+    graph = nx.path_graph(3)
+
+    assert theorem15_hypothesis_holds(
+        graph,
+        max_simplices_per_h_image=10_000,
+    ) == theorem15_hypothesis_holds(graph)
+
+
+def test_theorem15_inexact_contractible_betti_result_is_inconclusive(monkeypatch):
+    """An inexact zero-Betti result does not prove contractibility."""
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
+        lambda _complex, *, max_simplices=None: HomotopyVerdict(
+            wedge=WedgeOfSpheres.contractible(),
+            reason="test-only Betti numbers",
+            is_exact=False,
+        ),
+    )
+    holds, witness = theorem15_hypothesis_holds(nx.path_graph(3))
+    assert holds is None
+    assert witness is not None
+
+
+def test_theorem15_limited_flag_takes_precedence_over_exactness(monkeypatch):
+    """The limited flag takes precedence over an exactness default."""
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
+        lambda _complex, *, max_simplices=None: HomotopyVerdict(
+            wedge=WedgeOfSpheres.contractible(),
+            reason="test resource limit",
+            is_limited=True,
+        ),
+    )
+    holds, witness = theorem15_hypothesis_holds(nx.path_graph(3))
+    assert holds is None
+    assert witness is not None
+
+
+def test_theorem15_recursive_limited_verdict_stays_inconclusive(monkeypatch):
+    """Theorem 15 must preserve an upstream limited placeholder as unknown."""
+    from pycombtop.homotopy_type import _try_special_neighbourhood
+
+    limited = HomotopyVerdict(
+        wedge=WedgeOfSpheres.contractible(),
+        reason="test resource limit",
+        is_exact=False,
+        is_limited=True,
+    )
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_with_verdict",
+        lambda _graph: limited,
+    )
+    recursively_derived = _try_special_neighbourhood(nx.cycle_graph(4))
+    assert recursively_derived is not None
+    assert recursively_derived.is_limited is True
+
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
+        lambda _complex, *, max_simplices=None: recursively_derived,
+    )
+    holds, witness = theorem15_hypothesis_holds(nx.path_graph(3))
+
+    assert holds is None
+    assert witness is not None
+
+
+def test_theorem15_inexact_nonzero_betti_result_proves_failure(monkeypatch):
+    """A nonzero reduced Betti number proves noncontractibility."""
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
+        lambda _complex, *, max_simplices=None: HomotopyVerdict(
+            wedge=WedgeOfSpheres.sphere(1),
+            reason="test-only nonzero reduced Betti number",
+            is_exact=False,
+        ),
+    )
+    holds, witness = theorem15_hypothesis_holds(nx.path_graph(3))
+    assert holds is False
+    assert witness is not None
+
+
+def test_theorem15_exact_noncontractible_verdict_proves_failure(monkeypatch):
+    monkeypatch.setattr(
+        "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
+        lambda _complex, *, max_simplices=None: HomotopyVerdict(
+            wedge=WedgeOfSpheres.sphere(1),
+            reason="test-only exact homotopy type",
+            is_exact=True,
+        ),
+    )
+    holds, witness = theorem15_hypothesis_holds(nx.path_graph(3))
+    assert holds is False
+    assert witness is not None
 
 
 # ---------- 1e: discrete Morse matching ----------
