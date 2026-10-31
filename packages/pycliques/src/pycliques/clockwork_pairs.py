@@ -273,7 +273,7 @@ def find_pair_morphism(
     Finds ``f: source_pair.graph -> target_pair.graph`` such that:
 
     * ``f`` is a graph morphism: for every edge ``xy`` of the source,
-      ``f(x)f(y)`` is an edge of the target;
+      either ``f(x) == f(y)`` or ``f(x)f(y)`` is an edge of the target;
     * ``f`` is admissible/equivariant: ``f(sigma(x)) == tau(f(x))`` for
       every source vertex ``x``, where ``sigma`` and ``tau`` are the two
       pairs' coaffinations.
@@ -326,9 +326,15 @@ def find_pair_morphism(
     def consistent(assign: dict[Hashable, Hashable]) -> bool:
         for x, fx in assign.items():
             for nb in source.neighbors(x):
-                if nb in assignment and not target.has_edge(fx, assignment[nb]):
+                if nb in assignment and not (
+                    fx == assignment[nb] or target.has_edge(fx, assignment[nb])
+                ):
                     return False
-                if nb in assign and nb != x and not target.has_edge(fx, assign[nb]):
+                if (
+                    nb in assign
+                    and nb != x
+                    and not (fx == assign[nb] or target.has_edge(fx, assign[nb]))
+                ):
                     return False
         return True
 

@@ -11,8 +11,13 @@ from .cliques import (
     homotopy_clique_graph,
 )
 from .clockwork import (
+    ClockworkDivergenceResult,
+    ClockworkDivergenceStatus,
     ClockworkGraph,
+    ClockworkRecognitionResult,
+    ClockworkRecognitionStatus,
     ClockworkStructure,
+    clockwork_divergence_result,
     clockwork_graph,
     core,
     crown,
@@ -22,6 +27,7 @@ from .clockwork import (
     is_complete_graph,
     recognize_as_clockwork_graph,
     recognize_clockwork,
+    recognize_clockwork_detailed,
     remove_dominated_vertices,
     segmented_sum,
     verify_clockwork_structure,
@@ -34,6 +40,7 @@ from .clockwork_search import (
     InducedClockworkWitness,
     find_divergent_clockwork_retract,
     find_induced_clockwork_subgraphs,
+    verify_clockwork_retraction_certificate,
 )
 from .coaffinations import (
     CoaffinePair,
@@ -135,6 +142,9 @@ from .poset_homotopy import (
     verify_support_nerve_cone_certificate,
 )
 from .retractions import (
+    BoundedRetractionResult,
+    RetractionSearchStatus,
+    bounded_retraction,
     dict_to_tuple,
     graph_from_gap_adjacency_list,
     has_induced,
@@ -205,8 +215,13 @@ __all__ = [
     "theorem57_hypothesis_holds",
     "verify_strong_collapse_certificate",
     # clockwork
+    "ClockworkDivergenceResult",
+    "ClockworkDivergenceStatus",
     "ClockworkGraph",
+    "ClockworkRecognitionResult",
+    "ClockworkRecognitionStatus",
     "ClockworkStructure",
+    "clockwork_divergence_result",
     "clockwork_graph",
     "core",
     "crown",
@@ -216,6 +231,7 @@ __all__ = [
     "is_complete_graph",
     "recognize_as_clockwork_graph",
     "recognize_clockwork",
+    "recognize_clockwork_detailed",
     "remove_dominated_vertices",
     "segmented_sum",
     "verify_clockwork_structure",
@@ -226,6 +242,7 @@ __all__ = [
     "ClockworkRetractionSearchResult",
     "find_induced_clockwork_subgraphs",
     "find_divergent_clockwork_retract",
+    "verify_clockwork_retraction_certificate",
     # coaffinations
     "CoaffinePair",
     "automorphisms",
@@ -293,6 +310,9 @@ __all__ = [
     "snub_disphenoid",
     "suspension_of_cycle",
     # retractions
+    "BoundedRetractionResult",
+    "RetractionSearchStatus",
+    "bounded_retraction",
     "dict_to_tuple",
     "graph_from_gap_adjacency_list",
     "has_induced",

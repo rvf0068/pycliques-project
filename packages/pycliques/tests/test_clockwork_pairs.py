@@ -61,7 +61,9 @@ def test_find_pair_morphism_finds_identity_clockwork_pair():
 
     assert f is not None
     assert is_coaffine_map(pair, pair, f)
-    assert all(pair.graph.has_edge(f[u], f[v]) for u, v in pair.graph.edges())
+    assert all(
+        f[u] == f[v] or pair.graph.has_edge(f[u], f[v]) for u, v in pair.graph.edges()
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -98,9 +100,9 @@ def test_candidate_target_coaffinations_accepts_correct_displacement():
 def test_find_pair_morphism_requires_equivariance():
     """An ordinary graph morphism exists, but no admissible one does."""
     source = nx.Graph([("a", "b")])
-    sigma = {"a": "b", "b": "a"}
+    sigma = {"a": "a", "b": "b"}
     target = nx.Graph([("x", "y")])
-    tau = {"x": "x", "y": "y"}
+    tau = {"x": "y", "y": "x"}
 
     # An ordinary homomorphism a -> x, b -> y exists (the edge is preserved).
     assert target.has_edge("x", "y")
@@ -129,7 +131,33 @@ def test_find_pair_morphism_allows_non_injective_maps():
     assert f is not None
     assert len(set(f.values())) < len(f)
     assert is_coaffine_map(source_pair, target_pair, f)
-    assert all(target.has_edge(f[u], f[v]) for u, v in source.edges())
+    assert all(f[u] == f[v] or target.has_edge(f[u], f[v]) for u, v in source.edges())
+
+
+def test_find_pair_morphism_accepts_collapsed_source_edges() -> None:
+    source = nx.cycle_graph(8)
+    target = nx.cycle_graph(6)
+    sigma = {i: (i + 4) % 8 for i in source}
+    tau = {i: (i + 3) % 6 for i in target}
+    source_pair = CoaffinePair(source, sigma)
+    target_pair = CoaffinePair(target, tau)
+    specified = dict(enumerate([0, 1, 2, 3, 3, 4, 5, 0]))
+
+    assert all(specified[sigma[x]] == tau[specified[x]] for x in source)
+    assert all(
+        specified[u] == specified[v] or target.has_edge(specified[u], specified[v])
+        for u, v in source.edges()
+    )
+
+    result = find_pair_morphism(source_pair, target_pair)
+
+    assert result is not None
+    assert any(result[u] == result[v] for u, v in source.edges())
+    assert is_coaffine_map(source_pair, target_pair, result)
+    assert all(
+        result[u] == result[v] or target.has_edge(result[u], result[v])
+        for u, v in source.edges()
+    )
 
 
 # ---------------------------------------------------------------------------

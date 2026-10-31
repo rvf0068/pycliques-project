@@ -7,6 +7,8 @@ import itertools
 import logging
 import sys
 from collections.abc import Callable, Hashable, Iterable, Iterator, Mapping
+from dataclasses import dataclass
+from enum import Enum, auto
 from typing import Any
 
 import networkx as nx
@@ -176,6 +178,118 @@ def _extend_retraction(
             else:
                 for res in _extend_retraction(large, small, state + ((v, w),)):
                     yield ((v, w),) + res
+
+
+class RetractionSearchStatus(Enum):
+    """Completion state for bounded retraction search."""
+
+    FOUND = auto()
+    EXHAUSTED = auto()
+    LIMIT_REACHED = auto()
+
+
+@dataclass(frozen=True)
+class BoundedRetractionResult:
+    """A bounded retraction result with explicit search-completion status."""
+
+    status: RetractionSearchStatus
+    retraction: dict[Hashable, Hashable] | None
+    inclusion: dict[Hashable, Hashable] | None
+    states_explored: int
+    assignments_tried: int
+
+
+def bounded_retraction(
+    large: nx.Graph,
+    small: nx.Graph,
+    *,
+    max_states: int = 100_000,
+    max_assignments: int = 1_000_000,
+) -> BoundedRetractionResult:
+    """Search for a retraction using bounded backtracking, without automorphisms.
+
+    ``small`` must be an induced subgraph of ``large`` with the same vertex
+    labels. The target vertices are fixed pointwise; other vertices are
+    assigned to target vertices so each source edge maps to an edge or is
+    collapsed to one vertex.
+
+    The operation limits count recursive search states and tested
+    vertex-to-target assignments. Reaching either limit returns
+    ``LIMIT_REACHED``; only a fully searched assignment tree returns
+    ``EXHAUSTED``.
+    """
+    if max_states < 1:
+        raise ValueError("max_states must be at least 1")
+    if max_assignments < 1:
+        raise ValueError("max_assignments must be at least 1")
+    target_nodes = set(small)
+    if not target_nodes <= set(large):
+        raise ValueError("small must be an induced subgraph of large")
+    induced = large.subgraph(target_nodes)
+    if {frozenset(edge) for edge in induced.edges()} != {
+        frozenset(edge) for edge in small.edges()
+    }:
+        raise ValueError("small must be an induced subgraph of large")
+
+    inclusion = {vertex: vertex for vertex in small}
+    assignment: dict[Hashable, Hashable] = dict(inclusion)
+    target_order = list(small)
+    states_explored = 0
+    assignments_tried = 0
+    limit_reached = False
+
+    def candidates_for(vertex: Hashable) -> list[Hashable]:
+        candidates = set(target_order)
+        for neighbor in large.neighbors(vertex):
+            if neighbor in assignment:
+                candidates &= closed_neighborhood(small, assignment[neighbor])
+        return [target for target in target_order if target in candidates]
+
+    def search() -> bool:
+        nonlocal states_explored, assignments_tried, limit_reached
+        if states_explored >= max_states:
+            limit_reached = True
+            return False
+        states_explored += 1
+        remaining = [vertex for vertex in large if vertex not in assignment]
+        if not remaining:
+            return is_map(large, small, assignment) and all(
+                assignment[vertex] == vertex for vertex in small
+            )
+
+        vertex_options = [(vertex, candidates_for(vertex)) for vertex in remaining]
+        vertex, candidates = min(vertex_options, key=lambda item: len(item[1]))
+        for target in candidates:
+            if assignments_tried >= max_assignments:
+                limit_reached = True
+                return False
+            assignments_tried += 1
+            assignment[vertex] = target
+            if search():
+                return True
+            del assignment[vertex]
+            if limit_reached:
+                return False
+        return False
+
+    found = search()
+    if found:
+        return BoundedRetractionResult(
+            RetractionSearchStatus.FOUND,
+            dict(assignment),
+            inclusion,
+            states_explored,
+            assignments_tried,
+        )
+    return BoundedRetractionResult(
+        RetractionSearchStatus.LIMIT_REACHED
+        if limit_reached
+        else RetractionSearchStatus.EXHAUSTED,
+        None,
+        None,
+        states_explored,
+        assignments_tried,
+    )
 
 
 def retraction(large: nx.Graph, small: nx.Graph) -> Iterator[tuple[dict, dict]]:

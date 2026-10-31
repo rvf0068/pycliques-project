@@ -42,6 +42,14 @@ with a verified induced divergent clockwork on nine vertices. That
 observation alone does not classify the first clique graph as divergent; the
 bounded retraction search must separately find and verify a retraction.
 
+Retraction search bounds candidate subsets, target attempts, backtracking
+states, and assignments independently. Recognition limits are passed through
+to both candidate recognition and dominated-vertex reduction. The classifier's
+direct clockwork fallback is disabled by default; enable it explicitly with
+``clockwork_fallback=True`` when using
+``classify_clique_behavior`` or
+``classify_clique_behavior_with_theorem_2_6``.
+
 .. automodule:: pycliques.clockwork_search
    :members:
    :undoc-members:

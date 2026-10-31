@@ -1,16 +1,37 @@
 """Tests for bounded induced-clockwork and retraction searches."""
 
 import networkx as nx
+import pycliques.clockwork as clockwork_module
+import pycliques.clockwork_search as search_module
+import pycliques.retractions as retractions_module
+import pycliques.small as small_module
+import pytest
 from pycliques import (
+    CliqueBehavior,
+    ClockworkRecognitionResult,
+    ClockworkRecognitionStatus,
     ClockworkSearchStatus,
     clockwork_graph,
     find_divergent_clockwork_retract,
     find_induced_clockwork_subgraphs,
+    recognize_clockwork_detailed,
+    verify_clockwork_retraction_certificate,
     verify_clockwork_structure,
 )
 from pycliques.cliques import clique_graph
-from pycliques.retractions import is_map, retracts
-from pycliques.small import Verdict, classify_clique_behavior
+from pycliques.retractions import (
+    RetractionSearchStatus,
+    bounded_retraction,
+    is_map,
+    retracts,
+)
+from pycliques.small import (
+    CliqueSequence,
+    Verdict,
+    _test_clockwork,
+    classify_clique_behavior,
+    classify_clique_behavior_with_theorem_2_6,
+)
 
 
 def _motivating_graph() -> tuple[nx.Graph, nx.Graph, nx.Graph]:
@@ -82,6 +103,113 @@ def test_induced_search_distinguishes_exhaustion_and_limits() -> None:
     assert limited_search.candidates_checked == 1
 
 
+def test_recognition_reports_fallback_incompleteness(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = clockwork_graph([1, 1, 1], [[0], [0], [0]], 2, [1, 0])
+    monkeypatch.setattr(
+        clockwork_module,
+        "_recognize_clockwork_fast",
+        lambda _graph: (False, "fast recognition declined"),
+    )
+
+    limited = recognize_clockwork_detailed(
+        target, fallback_max_order=9, fallback_max_candidates=1
+    )
+
+    assert limited.status is ClockworkRecognitionStatus.LIMIT_REACHED
+    assert limited.candidates_checked == 1
+
+
+def test_induced_search_preserves_incompleteness_with_a_witness(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    target = nx.relabel_nodes(
+        clockwork_graph([1, 1, 1], [[0], [0], [0]], 2, [1, 0]),
+        {vertex: vertex + 1 for vertex in range(9)},
+    )
+    graph = nx.Graph()
+    graph.add_node(0)
+    graph.add_nodes_from(target)
+    graph.add_edges_from(target.edges())
+    graph.add_edge(0, 1)
+    recognize = search_module.recognize_clockwork_detailed
+
+    def recognize_candidates(
+        candidate: nx.Graph,
+        *,
+        fallback_max_order: int = 12,
+        fallback_max_candidates: int = 5000,
+    ) -> ClockworkRecognitionResult:
+        if 0 in candidate:
+            return ClockworkRecognitionResult(
+                ClockworkRecognitionStatus.LIMIT_REACHED,
+                None,
+                "test recognition limit",
+            )
+        return recognize(
+            candidate,
+            fallback_max_order=fallback_max_order,
+            fallback_max_candidates=fallback_max_candidates,
+        )
+
+    monkeypatch.setattr(
+        search_module, "recognize_clockwork_detailed", recognize_candidates
+    )
+
+    result = find_induced_clockwork_subgraphs(graph, max_order=9, max_candidates=10)
+
+    assert result.status is ClockworkSearchStatus.LIMIT_REACHED
+    assert len(result.witnesses) == 1
+    assert result.candidates_checked == result.candidates_total == 10
+
+
+def test_bounded_retraction_handles_self_and_pendant_extensions() -> None:
+    target = clockwork_graph([1, 1, 1], [[0], [0], [0]], 2, [1, 0])
+    larger = target.copy()
+    larger.add_edge("leaf", 0)
+
+    self_result = bounded_retraction(target, target)
+    pendant_result = bounded_retraction(larger, target)
+
+    for result, source in ((self_result, target), (pendant_result, larger)):
+        assert result.status is RetractionSearchStatus.FOUND
+        assert result.retraction is not None
+        assert is_map(source, target, result.retraction)
+        assert all(result.retraction[vertex] == vertex for vertex in target)
+
+
+def test_bounded_retraction_exhaustion_and_limits() -> None:
+    large = nx.wheel_graph(5)
+    target = large.subgraph([1, 2, 3, 4]).copy()
+    assignment_case = nx.complete_graph(3)
+    assignment_target = assignment_case.subgraph([0, 1]).copy()
+
+    exhausted = bounded_retraction(large, target)
+    limited = bounded_retraction(assignment_case, assignment_target, max_states=1)
+
+    assert exhausted.status is RetractionSearchStatus.EXHAUSTED
+    assert limited.status is RetractionSearchStatus.LIMIT_REACHED
+    assert limited.states_explored == 1
+    assert limited.assignments_tried == 1
+
+
+def test_bounded_retraction_does_not_enumerate_automorphisms(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    large = nx.complete_graph(8)
+    target = large.subgraph([0, 1, 2]).copy()
+
+    def fail_if_called(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("bounded_retraction must not enumerate automorphisms")
+
+    monkeypatch.setattr(retractions_module, "automorphisms", fail_if_called)
+
+    result = bounded_retraction(large, target)
+
+    assert result.status is RetractionSearchStatus.FOUND
+
+
 def test_divergent_clockwork_retraction_certificates_are_verified() -> None:
     target = clockwork_graph([1, 1, 1], [[0], [0], [0]], 2, [1, 0])
     larger = target.copy()
@@ -110,6 +238,37 @@ def test_divergent_clockwork_retraction_certificates_are_verified() -> None:
         }
         assert nx.is_isomorphic(certificate.target_graph, target)
         assert certificate.structure.good_segments
+        assert verify_clockwork_retraction_certificate(certificate)
+
+    limited = find_divergent_clockwork_retract(
+        larger,
+        max_target_order=9,
+        max_candidates=20,
+        max_retraction_states=1,
+    )
+    assert limited.status is ClockworkSearchStatus.LIMIT_REACHED
+    assert limited.states_explored == 1
+    assert limited.assignments_tried == 1
+
+
+def test_certificate_verifier_rejects_broken_iterate_provenance() -> None:
+    target = clockwork_graph([1, 1, 1], [[0], [0], [0]], 2, [1, 0])
+    result = find_divergent_clockwork_retract(target, max_target_order=9)
+    assert result.certificate is not None
+    certificate = result.certificate
+
+    invalid = certificate.__class__(
+        source_graph=certificate.source_graph,
+        target_graph=certificate.target_graph,
+        target_vertices=certificate.target_vertices,
+        retraction_map=certificate.retraction_map,
+        structure=certificate.structure,
+        iterate_index=1,
+        origin_graph=target,
+        iterate_graphs=(target, target),
+    )
+
+    assert not verify_clockwork_retraction_certificate(invalid)
 
 
 def test_classifier_uses_opt_in_retraction_stage() -> None:
@@ -129,6 +288,82 @@ def test_classifier_uses_opt_in_retraction_stage() -> None:
     assert behavior.certificate is not None
     assert behavior.certificate.rule == "induced_clockwork_retraction"
     assert behavior.certificate.iterate_index == 0
+
+
+def test_direct_clockwork_fallback_is_opt_in(monkeypatch: pytest.MonkeyPatch) -> None:
+    target = clockwork_graph([1, 1, 1], [[0], [0], [0]], 2, [1, 0])
+    fallback_calls = 0
+    original = clockwork_module._recognize_clockwork_fallback
+
+    def counted_fallback(
+        graph: nx.Graph, *, max_candidates: int
+    ) -> clockwork_module.ClockworkRecognitionResult:
+        nonlocal fallback_calls
+        fallback_calls += 1
+        return original(graph, max_candidates=max_candidates)
+
+    monkeypatch.setattr(
+        clockwork_module, "_recognize_clockwork_fast", lambda _graph: (False, "miss")
+    )
+    monkeypatch.setattr(
+        clockwork_module, "_recognize_clockwork_fallback", counted_fallback
+    )
+
+    assert _test_clockwork(CliqueSequence(target), 1, 1) is None
+    assert fallback_calls == 0
+
+    _test_clockwork(
+        CliqueSequence(target), 1, 1, fallback_enabled=True, fallback_max_order=9
+    )
+    assert fallback_calls > 0
+
+
+def test_theorem_2_6_wrapper_forwards_clockwork_options(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    graph = nx.empty_graph(1)
+    fast = CliqueBehavior(Verdict.INDETERMINATE, "stub", 1, False, graph)
+    forwarded: dict[str, object] = {}
+
+    def capture_options(_graph: nx.Graph, **options: object) -> CliqueBehavior:
+        forwarded.update(options)
+        return fast
+
+    monkeypatch.setattr(small_module, "classify_clique_behavior", capture_options)
+    monkeypatch.setattr(
+        small_module, "classify_clockwork_pair_map", lambda *_args, **_kwargs: None
+    )
+    options = {
+        "clockwork_depth": 1,
+        "clockwork_fallback": True,
+        "clockwork_fallback_max_order": 7,
+        "clockwork_fallback_max_candidates": 23,
+        "induced_clockwork_depth": 2,
+        "clockwork_retract_depth": 3,
+        "clockwork_max_order": 8,
+        "clockwork_max_candidates": 29,
+        "clockwork_max_retraction_attempts": 4,
+        "clockwork_max_retraction_states": 31,
+        "clockwork_max_retraction_assignments": 37,
+    }
+
+    result = classify_clique_behavior_with_theorem_2_6(
+        graph,
+        clockwork_depth=1,
+        clockwork_fallback=True,
+        clockwork_fallback_max_order=7,
+        clockwork_fallback_max_candidates=23,
+        induced_clockwork_depth=2,
+        clockwork_retract_depth=3,
+        clockwork_max_order=8,
+        clockwork_max_candidates=29,
+        clockwork_max_retraction_attempts=4,
+        clockwork_max_retraction_states=31,
+        clockwork_max_retraction_assignments=37,
+    )
+
+    assert result is fast
+    assert {key: forwarded[key] for key in options} == options
 
 
 def test_motivating_containment_does_not_certify_divergence() -> None:

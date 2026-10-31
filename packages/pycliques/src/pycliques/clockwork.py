@@ -20,10 +20,49 @@ from __future__ import annotations
 
 import itertools
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
+from enum import Enum, auto
 
 import networkx as nx
 
 from .dominated import find_dominated_vertex
+
+
+class ClockworkRecognitionStatus(Enum):
+    """Whether clockwork recognition succeeded, failed conclusively, or stopped."""
+
+    FOUND = auto()
+    NOT_FOUND = auto()
+    LIMIT_REACHED = auto()
+
+
+@dataclass(frozen=True)
+class ClockworkRecognitionResult:
+    """Structured clockwork-recognition outcome with explicit completeness."""
+
+    status: ClockworkRecognitionStatus
+    structure: ClockworkStructure | None
+    reason: str
+    candidates_checked: int = 0
+
+
+class ClockworkDivergenceStatus(Enum):
+    """Outcome of applying the clockwork divergence theorem."""
+
+    DIVERGENT = auto()
+    BOUNDED = auto()
+    NOT_CLOCKWORK = auto()
+    LIMIT_REACHED = auto()
+
+
+@dataclass(frozen=True)
+class ClockworkDivergenceResult:
+    """Clockwork-theorem outcome with the verified structure used."""
+
+    status: ClockworkDivergenceStatus
+    structure: ClockworkStructure | None
+    reason: str
+
 
 # -------------------------------------------------------------------
 # Private helpers
@@ -1026,7 +1065,7 @@ def verify_clockwork_structure(
 
 def _recognize_clockwork_fallback(
     G: nx.Graph, *, max_candidates: int
-) -> tuple[bool, ClockworkStructure | str]:
+) -> ClockworkRecognitionResult:
     """Try bounded alternative core partitions, verifying every result."""
     vertices = list(G)
     candidates = 0
@@ -1034,7 +1073,12 @@ def _recognize_clockwork_fallback(
         for core_tuple in itertools.combinations(vertices, core_size):
             candidates += 1
             if candidates > max_candidates:
-                return False, "Clockwork fallback candidate limit reached."
+                return ClockworkRecognitionResult(
+                    ClockworkRecognitionStatus.LIMIT_REACHED,
+                    None,
+                    "Clockwork fallback candidate limit reached.",
+                    candidates - 1,
+                )
             C_nodes = set(core_tuple)
             B_nodes = set(vertices) - C_nodes
             groups_by_neighborhood: dict[frozenset, set] = {}
@@ -1108,21 +1152,32 @@ def _recognize_clockwork_fallback(
                     G, B_segments, C_segments, core_orders
                 )
                 if valid:
-                    assert isinstance(result, ClockworkStructure)
-                    return True, result
-    return (
-        False,
+                    if not isinstance(result, ClockworkStructure):
+                        raise RuntimeError(
+                            "Clockwork verifier returned an invalid success result."
+                        )
+                    return ClockworkRecognitionResult(
+                        ClockworkRecognitionStatus.FOUND,
+                        result,
+                        "A verified clockwork decomposition was found.",
+                        candidates,
+                    )
+    return ClockworkRecognitionResult(
+        ClockworkRecognitionStatus.NOT_FOUND,
+        None,
         "No verified clockwork decomposition was found by the bounded fallback.",
+        candidates,
     )
 
 
-def recognize_clockwork(
+def recognize_clockwork_detailed(
     G: nx.Graph,
     *,
     fallback_max_order: int = 9,
     fallback_max_candidates: int = 5000,
-) -> tuple[bool, ClockworkStructure | str]:
-    """Recognize a clockwork graph, with a bounded alternative-partition fallback.
+    fallback_enabled: bool = True,
+) -> ClockworkRecognitionResult:
+    """Recognize a clockwork graph with explicit search-completion status.
 
     The theorem-based recognizer runs first. For graphs up to
     ``fallback_max_order``, a bounded search over alternative core partitions
@@ -1132,7 +1187,9 @@ def recognize_clockwork(
     ``fallback_max_order`` defaults to 9 to keep routine classification
     inexpensive. Callers may raise it for a more expensive fallback;
     ``fallback_max_candidates`` limits the number of core vertex subsets
-    tested.
+    tested. Set ``fallback_enabled=False`` to use only theorem-based
+    recognition. A fast-recognizer miss is then reported as ``LIMIT_REACHED``
+    because the alternative-partition search was not run.
     """
     if fallback_max_order < 0:
         raise ValueError("fallback_max_order must be non-negative")
@@ -1140,30 +1197,68 @@ def recognize_clockwork(
         raise ValueError("fallback_max_candidates must be at least 1")
     ok, result = _recognize_clockwork_fast(G)
     if ok:
-        assert isinstance(result, ClockworkStructure)
+        if not isinstance(result, ClockworkStructure):
+            raise RuntimeError("Fast clockwork recognizer returned an invalid success.")
         valid, verified = verify_clockwork_structure(
             G, result.B_segments, result.C_segments, result.core_orders
         )
-        if valid:
-            assert isinstance(verified, ClockworkStructure)
-            return True, verified
-        result = f"Fast recognizer produced an invalid structure: {verified}"
+        if valid and isinstance(verified, ClockworkStructure):
+            return ClockworkRecognitionResult(
+                ClockworkRecognitionStatus.FOUND,
+                verified,
+                "A verified clockwork decomposition was found.",
+            )
+        raise RuntimeError(f"Fast recognizer produced an invalid structure: {verified}")
 
+    if not fallback_enabled:
+        return ClockworkRecognitionResult(
+            ClockworkRecognitionStatus.LIMIT_REACHED,
+            None,
+            f"{result} Alternative-partition fallback was disabled.",
+        )
     if len(G) <= fallback_max_order:
-        fallback_ok, fallback_result = _recognize_clockwork_fallback(
+        fallback = _recognize_clockwork_fallback(
             G, max_candidates=fallback_max_candidates
         )
-        if fallback_ok:
-            return True, fallback_result
-        if "limit reached" in str(fallback_result):
-            return False, f"{result} Fallback: {fallback_result}"
-        return False, f"{result} Exhaustive fallback found no valid decomposition."
-    else:
-        return (
-            False,
-            f"{result} Exhaustive fallback skipped above order {fallback_max_order}.",
+        if fallback.status is ClockworkRecognitionStatus.FOUND:
+            return fallback
+        return ClockworkRecognitionResult(
+            fallback.status,
+            None,
+            f"{result} {fallback.reason}",
+            fallback.candidates_checked,
         )
-    return False, str(result)
+    return ClockworkRecognitionResult(
+        ClockworkRecognitionStatus.LIMIT_REACHED,
+        None,
+        f"{result} Alternative-partition fallback skipped above order "
+        f"{fallback_max_order}.",
+    )
+
+
+def recognize_clockwork(
+    G: nx.Graph,
+    *,
+    fallback_max_order: int = 9,
+    fallback_max_candidates: int = 5000,
+    fallback_enabled: bool = True,
+) -> tuple[bool, ClockworkStructure | str]:
+    """Return whether ``G`` has a verified clockwork decomposition.
+
+    Use :func:`recognize_clockwork_detailed` when the caller must distinguish
+    a conclusive negative result from an interrupted search.
+    """
+    result = recognize_clockwork_detailed(
+        G,
+        fallback_max_order=fallback_max_order,
+        fallback_max_candidates=fallback_max_candidates,
+        fallback_enabled=fallback_enabled,
+    )
+    if result.status is ClockworkRecognitionStatus.FOUND:
+        if result.structure is None:
+            raise RuntimeError("Successful clockwork result has no structure.")
+        return True, result.structure
+    return False, result.reason
 
 
 # -------------------------------------------------------------------
@@ -1209,8 +1304,82 @@ def remove_dominated_vertices(G: nx.Graph) -> nx.Graph:
 # -------------------------------------------------------------------
 
 
+def _same_graph(G: nx.Graph, H: nx.Graph) -> bool:
+    return set(G) == set(H) and {frozenset(edge) for edge in G.edges()} == {
+        frozenset(edge) for edge in H.edges()
+    }
+
+
+def clockwork_divergence_result(
+    G: nx.Graph,
+    *,
+    structure: ClockworkStructure | None = None,
+    fallback_max_order: int = 9,
+    fallback_max_candidates: int = 5000,
+    fallback_enabled: bool = True,
+) -> ClockworkDivergenceResult:
+    """Apply the clockwork divergence theorem with explicit recognition status.
+
+    A supplied structure is independently verified and reused if dominated
+    vertex removal leaves the graph unchanged. Otherwise the reduced graph is
+    recognized using the same fallback bounds supplied here.
+    """
+    H = remove_dominated_vertices(G)
+    if structure is not None and _same_graph(G, H) and _same_graph(structure.G, G):
+        valid, verified = verify_clockwork_structure(
+            G,
+            structure.B_segments,
+            structure.C_segments,
+            structure.core_orders,
+        )
+        if not valid or not isinstance(verified, ClockworkStructure):
+            raise ValueError(f"Supplied clockwork structure is invalid: {verified}")
+    else:
+        recognition = recognize_clockwork_detailed(
+            H,
+            fallback_max_order=fallback_max_order,
+            fallback_max_candidates=fallback_max_candidates,
+            fallback_enabled=fallback_enabled,
+        )
+        if recognition.status is ClockworkRecognitionStatus.LIMIT_REACHED:
+            return ClockworkDivergenceResult(
+                ClockworkDivergenceStatus.LIMIT_REACHED,
+                None,
+                "Clockwork recognition of the dominated-vertex reduction was "
+                f"inconclusive: {recognition.reason}",
+            )
+        if recognition.status is ClockworkRecognitionStatus.NOT_FOUND:
+            return ClockworkDivergenceResult(
+                ClockworkDivergenceStatus.NOT_CLOCKWORK,
+                None,
+                "The dominated-vertex reduction was not recognized as clockwork: "
+                f"{recognition.reason}",
+            )
+        if recognition.structure is None:
+            raise RuntimeError("Successful clockwork recognition has no structure.")
+        verified = recognition.structure
+
+    if verified.good_segments:
+        return ClockworkDivergenceResult(
+            ClockworkDivergenceStatus.DIVERGENT,
+            verified,
+            f"CLIQUE-DIVERGENT: residual has {len(verified.good_segments)} good "
+            f"segment(s) at {verified.good_segments}.",
+        )
+    return ClockworkDivergenceResult(
+        ClockworkDivergenceStatus.BOUNDED,
+        verified,
+        "CLIQUE-BOUNDED: residual has 0 good segments.",
+    )
+
+
 def is_clique_divergent_clockwork(
     G: nx.Graph,
+    *,
+    structure: ClockworkStructure | None = None,
+    fallback_max_order: int = 9,
+    fallback_max_candidates: int = 5000,
+    fallback_enabled: bool = True,
 ) -> tuple[bool | None, str]:
     r"""Decide whether the clockwork graph *G* is clique-divergent.
 
@@ -1233,23 +1402,18 @@ def is_clique_divergent_clockwork(
         ``(False, explanation)`` when bounded, or
         ``(None, reason)`` when not recognised as clockwork.
     """
-    H = remove_dominated_vertices(G)
-    ok, result = recognize_clockwork(H)
-    if not ok:
-        assert isinstance(result, str)
-        return None, (
-            "After removing dominated vertices the "
-            "residual graph is not recognised as a "
-            f"clockwork graph: {result}"
-        )
-    assert isinstance(result, ClockworkStructure)
-    g = len(result.good_segments)
-    if g > 0:
-        return True, (
-            f"CLIQUE-DIVERGENT: residual has {g} good "
-            f"segment(s) at {result.good_segments}."
-        )
-    return False, ("CLIQUE-BOUNDED: residual has 0 good segments.")
+    result = clockwork_divergence_result(
+        G,
+        structure=structure,
+        fallback_max_order=fallback_max_order,
+        fallback_max_candidates=fallback_max_candidates,
+        fallback_enabled=fallback_enabled,
+    )
+    if result.status is ClockworkDivergenceStatus.DIVERGENT:
+        return True, result.reason
+    if result.status is ClockworkDivergenceStatus.BOUNDED:
+        return False, result.reason
+    return None, result.reason
 
 
 # -------------------------------------------------------------------
