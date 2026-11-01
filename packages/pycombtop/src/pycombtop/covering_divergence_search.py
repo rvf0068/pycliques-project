@@ -48,6 +48,16 @@ class CoveringSearchResult:
     reasons: tuple[str, ...]
 
 
+@dataclass
+class _PairMorphismSearchFrame:
+    """One orbit-assignment level in the iterative pair-morphism search."""
+
+    orbit_index: int
+    candidates: tuple[Hashable, ...]
+    introduced_assignments: tuple[Hashable, ...] = ()
+    next_candidate: int = 0
+
+
 def _triangles(graph: nx.Graph) -> tuple[tuple[Hashable, Hashable, Hashable], ...]:
     node_order = {vertex: index for index, vertex in enumerate(graph)}
     result: dict[frozenset[Hashable], tuple[Hashable, Hashable, Hashable]] = {}
@@ -212,7 +222,9 @@ def _bounded_pair_morphism(
     while unprocessed:
         vertex = next(node for node in source if node in unprocessed)
         partner = sigma[vertex]
-        orbit = (vertex,) if partner == vertex else (vertex, partner)
+        orbit: tuple[Hashable, ...] = (
+            (vertex,) if partner == vertex else (vertex, partner)
+        )
         unprocessed.difference_update(orbit)
         orbits.append(orbit)
     node_order = {vertex: index for index, vertex in enumerate(source)}
@@ -226,7 +238,6 @@ def _bounded_pair_morphism(
     assignment: dict[Hashable, Hashable] = {}
     states = 0
     assignments_tried = 0
-    limit_reached = False
 
     def consistent(additions: dict[Hashable, Hashable]) -> bool:
         partial = assignment | additions
@@ -238,39 +249,59 @@ def _bounded_pair_morphism(
                         return False
         return True
 
-    def backtrack(index: int) -> dict[Hashable, Hashable] | None:
-        nonlocal states, assignments_tried, limit_reached
+    if max_states < 1:
+        return None, states, assignments_tried, True
+    states += 1
+    if not orbits:
+        return {}, states, assignments_tried, False
+
+    frames = [
+        _PairMorphismSearchFrame(
+            0,
+            fixed_targets if len(orbits[0]) == 1 else target_nodes,
+        )
+    ]
+    while frames:
+        frame = frames[-1]
+        if frame.next_candidate >= len(frame.candidates):
+            frames.pop()
+            for vertex in frame.introduced_assignments:
+                del assignment[vertex]
+            continue
+        if assignments_tried >= max_assignments:
+            return None, states, assignments_tried, True
+
+        image = frame.candidates[frame.next_candidate]
+        frame.next_candidate += 1
+        assignments_tried += 1
+        orbit = orbits[frame.orbit_index]
+        additions = (
+            {orbit[0]: image}
+            if len(orbit) == 1
+            else {orbit[0]: image, orbit[1]: tau[image]}
+        )
+        if not consistent(additions):
+            continue
+
+        assignment.update(additions)
         if states >= max_states:
-            limit_reached = True
-            return None
-        states += 1
-        if index == len(orbits):
-            return dict(assignment)
-        orbit = orbits[index]
-        candidates = fixed_targets if len(orbit) == 1 else target_nodes
-        for image in candidates:
-            if assignments_tried >= max_assignments:
-                limit_reached = True
-                return None
-            assignments_tried += 1
-            additions = (
-                {orbit[0]: image}
-                if len(orbit) == 1
-                else {orbit[0]: image, orbit[1]: tau[image]}
-            )
-            if not consistent(additions):
-                continue
-            assignment.update(additions)
-            found = backtrack(index + 1)
-            if found is not None:
-                return found
             for vertex in additions:
                 del assignment[vertex]
-            if limit_reached:
-                return None
-        return None
+            return None, states, assignments_tried, True
+        states += 1
+        next_index = frame.orbit_index + 1
+        if next_index == len(orbits):
+            return dict(assignment), states, assignments_tried, False
+        next_orbit = orbits[next_index]
+        frames.append(
+            _PairMorphismSearchFrame(
+                next_index,
+                fixed_targets if len(next_orbit) == 1 else target_nodes,
+                tuple(additions),
+            )
+        )
 
-    return backtrack(0), states, assignments_tried, limit_reached
+    return None, states, assignments_tried, False
 
 
 def search_covering_divergence(

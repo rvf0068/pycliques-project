@@ -100,6 +100,8 @@ def verify_triangular_cover_divergence_certificate(
         return CertificateVerificationResult(invalid, "Base graph must be simple.")
     if not _simple_undirected(certificate.cover_graph):
         return CertificateVerificationResult(invalid, "Cover graph must be simple.")
+    if certificate.base_graph.number_of_nodes() == 0:
+        return CertificateVerificationResult(invalid, "Base graph must be nonempty.")
     if not nx.is_connected(certificate.base_graph):
         return CertificateVerificationResult(invalid, "Base graph must be connected.")
     if certificate.target_level != "clique_graph":

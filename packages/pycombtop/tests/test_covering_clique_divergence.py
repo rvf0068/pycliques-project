@@ -427,3 +427,18 @@ def test_certificate_for_a_different_base_graph_is_rejected(
 
     result = verify_triangular_cover_divergence_certificate(changed)
     assert result.status is CertificateVerificationStatus.INVALID
+
+
+def test_empty_base_graph_returns_invalid_certificate_result() -> None:
+    certificate = TriangularCoverDivergenceCertificate(
+        base_graph=nx.Graph(),
+        cover_graph=nx.Graph(),
+        projection={},
+        deck_transformation={},
+        theorem_certificate=Certificate(rule="theorem_2_6_clockwork_pair_map"),
+    )
+
+    result = verify_triangular_cover_divergence_certificate(certificate)
+
+    assert result.status is CertificateVerificationStatus.INVALID
+    assert "nonempty" in result.reason.lower()

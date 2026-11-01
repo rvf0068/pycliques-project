@@ -1,13 +1,17 @@
 """Tests for explicitly bounded triangular-cover divergence discovery."""
 
+from collections.abc import Hashable
+
 import networkx as nx
 from pycliques.clockwork_search import CertificateVerificationStatus
+from pycliques.coaffinations import CoaffinePair
 from pycombtop.covering_divergence import (
     verify_triangular_cover_divergence_certificate,
 )
 from pycombtop.covering_divergence_search import (
     CoveringSearchStatus,
     _all_nonzero_cocycles,
+    _bounded_pair_morphism,
     _triangles,
     search_covering_divergence,
 )
@@ -82,6 +86,86 @@ def test_morphism_budget_is_inconclusive_not_exhausted() -> None:
     assert result.cover_classes_complete
     assert not result.morphisms_complete
     assert result.certificate is None
+
+
+def test_pair_morphism_search_handles_more_than_one_thousand_orbits() -> None:
+    orbit_count = 1100
+    source = nx.empty_graph(2 * orbit_count)
+    sigma: dict[Hashable, Hashable] = {vertex: vertex ^ 1 for vertex in source}
+    target = nx.empty_graph(2)
+    tau: dict[Hashable, Hashable] = {0: 1, 1: 0}
+
+    mapping, states, attempts, limited = _bounded_pair_morphism(
+        CoaffinePair(source, sigma),
+        CoaffinePair(target, tau),
+        max_states=orbit_count + 2,
+        max_assignments=orbit_count + 2,
+    )
+
+    assert not limited
+    assert mapping is not None
+    assert set(mapping) == set(source)
+    assert states <= orbit_count + 2
+    assert attempts <= orbit_count + 2
+    assert all(mapping[sigma[vertex]] == tau[mapping[vertex]] for vertex in source)
+
+
+def test_pair_morphism_search_respects_each_budget_and_zero_budgets() -> None:
+    orbit_count = 1100
+    source = nx.empty_graph(2 * orbit_count)
+    sigma: dict[Hashable, Hashable] = {vertex: vertex ^ 1 for vertex in source}
+    target = nx.empty_graph(2)
+    tau: dict[Hashable, Hashable] = {0: 1, 1: 0}
+    source_pair = CoaffinePair(source, sigma)
+    target_pair = CoaffinePair(target, tau)
+
+    _, states, _, limited = _bounded_pair_morphism(
+        source_pair,
+        target_pair,
+        max_states=5,
+        max_assignments=10_000,
+    )
+    assert limited
+    assert states <= 5
+
+    _, _, attempts, limited = _bounded_pair_morphism(
+        source_pair,
+        target_pair,
+        max_states=10_000,
+        max_assignments=7,
+    )
+    assert limited
+    assert attempts <= 7
+
+    for state_budget, assignment_budget in ((0, 10), (10, 0)):
+        _, states, attempts, limited = _bounded_pair_morphism(
+            source_pair,
+            target_pair,
+            max_states=state_budget,
+            max_assignments=assignment_budget,
+        )
+        assert limited
+        assert states <= state_budget
+        assert attempts <= assignment_budget
+
+
+def test_pair_morphism_search_exhausts_unsatisfiable_instance() -> None:
+    source = nx.Graph([(0, 1)])
+    target = nx.empty_graph(2)
+    sigma: dict[Hashable, Hashable] = {0: 1, 1: 0}
+    tau: dict[Hashable, Hashable] = {0: 1, 1: 0}
+
+    mapping, states, attempts, limited = _bounded_pair_morphism(
+        CoaffinePair(source, sigma),
+        CoaffinePair(target, tau),
+        max_states=10,
+        max_assignments=10,
+    )
+
+    assert mapping is None
+    assert states == 1
+    assert attempts == 2
+    assert not limited
 
 
 def test_cover_and_clique_construction_budgets_are_reported() -> None:
