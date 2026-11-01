@@ -116,6 +116,15 @@ Helly
    :show-inheritance:
    :member-order: bysource
 
+Helly Edge Covers
+-----------------
+
+.. automodule:: pycliques.helly_cover
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :member-order: bysource
+
 Homotopy Invariance
 -------------------
 

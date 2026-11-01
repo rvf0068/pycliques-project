@@ -88,6 +88,16 @@ from .helly import (
     u_closed,
     u_open,
 )
+from .helly_cover import (
+    HellyCoverPruningResult,
+    HellyCoverStatus,
+    HellyCoverVerificationStatus,
+    HellyEdgeCoverVerification,
+    is_helly_family,
+    prune_helly_cover_candidates,
+    satisfies_helly_gate_condition,
+    verify_helly_edge_cover,
+)
 from .homotopy_invariance import (
     completes_of_size,
     completes_with_empty_intersection,
@@ -289,6 +299,14 @@ __all__ = [
     "n_open",
     "u_closed",
     "u_open",
+    "HellyCoverPruningResult",
+    "HellyCoverStatus",
+    "HellyCoverVerificationStatus",
+    "HellyEdgeCoverVerification",
+    "is_helly_family",
+    "satisfies_helly_gate_condition",
+    "prune_helly_cover_candidates",
+    "verify_helly_edge_cover",
     # homotopy_invariance
     "completes_of_size",
     "completes_with_empty_intersection",
