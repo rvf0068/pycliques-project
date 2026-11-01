@@ -10,6 +10,13 @@ a complete, every graph edge is covered, and the selected family is Helly. A
 failure includes either an uncovered edge or a pairwise-intersecting
 subfamily with empty intersection.
 
+The Helly check uses the exact gate characterization rather than enumerating
+subfamilies. It runs in polynomial time in the family incidence size. When a
+family is not Helly, the verifier returns a deterministic pairwise-intersecting
+empty-intersection witness containing at most ``max(|F|) + 1`` selected
+members. Edge coverage is checked first, so an uncovered edge remains the
+reported failure when both conditions fail.
+
 ``prune_helly_cover_candidates`` applies the gate characterization as a
 necessary local condition to a finite candidate universe. It removes only
 candidates that cannot belong to a Helly edge cover contained in the current
@@ -29,6 +36,33 @@ replayed should define a concrete label encoding and reconstruct the graph
 from it. Required facets, private edges, and fixed gate assignments are
 serialized explicitly, so a negative result remains scoped to its stated
 normalization assumptions.
+
+Selected-cover search
+---------------------
+
+``research/selected_helly_cover.py`` adds a separate exact backtracking search
+over the candidates that survive propagation:
+
+.. code-block:: python
+
+   from research.selected_helly_cover import search_selected_helly_cover
+
+   search = search_selected_helly_cover(graph, pruned, max_states=100_000)
+
+The search branches on an uncovered edge and considers every remaining
+candidate containing that edge. A pairwise-intersecting obstruction in a
+partial selection is safe to prune because adding members cannot restore
+Hellyness. ``FOUND_VERIFIED_COVER`` includes an independent verifier result;
+``NO_COVER_CERTIFIED`` means every branch in the recorded surviving candidate
+universe and normalization scope was exhausted. A state or depth limit returns
+``INCONCLUSIVE_BUDGET`` and never a negative result. The serialized result
+records the pruned universe, branch policy, and configured limits for replay.
+These statuses do not imply that any surviving O8 candidate universe contains
+a selected cover, nor do they settle the clique-graph homotopy conjecture. The
+40 surviving normalized rank-four/five universes have not been exhaustively
+searched by this solver. If an O8 cover is found, its intersection-graph root
+and homology must be checked before making any claim about the original
+conjecture.
 
 The gate rule is a necessary-condition filter, not an unconditional conclusion
 about clique-graph homotopy or the homotopy type of clique complexes.
@@ -84,3 +118,13 @@ gate assignment without symmetry reduction (2,304 assignments):
 These are finite, normalized search results. They do not prove existence of a
 rank-five Helly cover when candidates survive, and do not imply a solution to
 the clique-graph homotopy conjecture.
+
+The regular fast CI lane runs the Helly certificate regression and selected
+search fixtures. The full rank-four and rank-four/five certificate replays can
+be run manually with GitHub Actions ``workflow_dispatch`` or locally using the
+commands above; the manual job has a 30-minute timeout. In this checkout, the
+fast Helly certificate and selected-search tests took 3.05 seconds, and the
+full rank-four and rank-four/five replays took 14.76 seconds and 2 minutes
+29.43 seconds, respectively. These machine-specific durations are informational.
+A completed replay still establishes only the stated normalized candidate
+universes.

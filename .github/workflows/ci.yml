@@ -82,6 +82,7 @@ jobs:
             research/test_homotopy_research.py \
             research/test_h_operator_census.py \
             research/test_helly_cover_certificates.py \
+            research/test_selected_helly_cover.py \
             -m "not slow"
 
   research-order-eight:
