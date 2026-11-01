@@ -7,6 +7,7 @@ Surviving candidates do not imply that a Helly edge cover exists.
 from __future__ import annotations
 
 import json
+from collections import defaultdict
 from collections.abc import Hashable, Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum
@@ -149,6 +150,67 @@ def _is_complete(graph: nx.Graph, member: frozenset[Hashable]) -> bool:
     )
 
 
+def _find_non_helly_subfamily(
+    members: tuple[frozenset[Hashable], ...],
+    *,
+    point_order: Iterable[Hashable] = (),
+) -> tuple[frozenset[Hashable], ...] | None:
+    """Return a bounded gate obstruction, preserving input member order."""
+    ordered_points: list[Hashable] = []
+    seen_points: set[Hashable] = set()
+    for point in point_order:
+        if point not in seen_points:
+            seen_points.add(point)
+            ordered_points.append(point)
+    for member in members:
+        for point in member:
+            if point not in seen_points:
+                seen_points.add(point)
+                ordered_points.append(point)
+
+    incidence: dict[Hashable, list[int]] = defaultdict(list)
+    for member_index, member in enumerate(members):
+        for point in member:
+            incidence[point].append(member_index)
+
+    for member_index, member in enumerate(members):
+        for point in ordered_points:
+            if point in member:
+                continue
+            touching = tuple(
+                other_index
+                for other_index in incidence[point]
+                if member.intersection(members[other_index])
+            )
+            if not touching:
+                continue
+
+            common = set(member)
+            for other_index in touching:
+                common.intersection_update(members[other_index])
+                if not common:
+                    break
+            if common:
+                continue
+
+            witness_indices = {member_index}
+            for gate in ordered_points:
+                if gate in member and not any(
+                    gate not in members[other_index] for other_index in touching
+                ):
+                    raise AssertionError("failed gate has no excluding witness")
+                if gate in member:
+                    witness_indices.add(
+                        next(
+                            other_index
+                            for other_index in touching
+                            if gate not in members[other_index]
+                        )
+                    )
+            return tuple(members[index] for index in sorted(witness_indices))
+    return None
+
+
 def is_helly_family(family: Iterable[Iterable[Hashable]]) -> bool:
     """Return whether a finite family of nonempty sets has the Helly property.
 
@@ -156,19 +218,7 @@ def is_helly_family(family: Iterable[Iterable[Hashable]]) -> bool:
     semantics. The empty family is Helly.
     """
     members = _frozen_family(family, allow_empty_member=False)
-    for size in range(2, len(members) + 1):
-        for selected in combinations(members, size):
-            if not all(
-                selected[first] & selected[second]
-                for first, second in combinations(range(size), 2)
-            ):
-                continue
-            common = set(selected[0])
-            for member in selected[1:]:
-                common.intersection_update(member)
-            if not common:
-                return False
-    return True
+    return _find_non_helly_subfamily(members) is None
 
 
 def satisfies_helly_gate_condition(
@@ -176,19 +226,7 @@ def satisfies_helly_gate_condition(
 ) -> bool:
     """Check the gate characterization of Hellyness for finite set families."""
     members = _frozen_family(family, allow_empty_member=False)
-    points = set().union(*members) if members else set()
-    for member in members:
-        for point in points - member:
-            touching = tuple(
-                other
-                for other in members
-                if point in other and member.intersection(other)
-            )
-            if touching and not any(
-                all(gate in other for other in touching) for gate in member
-            ):
-                return False
-    return True
+    return _find_non_helly_subfamily(members) is None
 
 
 def verify_helly_edge_cover(
@@ -223,24 +261,15 @@ def verify_helly_edge_cover(
     ordered_members = tuple(
         sorted(members, key=lambda member: tuple(sorted(vertex_ids[v] for v in member)))
     )
-    for size in range(2, len(ordered_members) + 1):
-        for selected in combinations(ordered_members, size):
-            if not all(
-                selected[first] & selected[second]
-                for first, second in combinations(range(size), 2)
-            ):
-                continue
-            common = set(selected[0])
-            for member in selected[1:]:
-                common.intersection_update(member)
-            if not common:
-                return HellyEdgeCoverVerification(
-                    HellyCoverVerificationStatus.INVALID,
-                    None,
-                    tuple(selected),
-                    "the selected family has a pairwise-intersecting subfamily "
-                    "with empty intersection",
-                )
+    obstruction = _find_non_helly_subfamily(ordered_members, point_order=vertices)
+    if obstruction is not None:
+        return HellyEdgeCoverVerification(
+            HellyCoverVerificationStatus.INVALID,
+            None,
+            obstruction,
+            "the selected family has a pairwise-intersecting subfamily "
+            "with empty intersection",
+        )
     return HellyEdgeCoverVerification(
         HellyCoverVerificationStatus.VERIFIED,
         None,

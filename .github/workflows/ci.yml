@@ -44,6 +44,7 @@ jobs:
       - name: Run Tests
         # Runs pytest on the specific package folder
         # --cov generates the report for Codecov
+        timeout-minutes: 15
         run: |
           uv run pytest packages/${{ matrix.package }} \
             --cov=packages/${{ matrix.package }}/src \
@@ -80,6 +81,7 @@ jobs:
           uv run pytest \
             research/test_homotopy_research.py \
             research/test_h_operator_census.py \
+            research/test_helly_cover_certificates.py \
             -m "not slow"
 
   research-order-eight:
@@ -102,3 +104,31 @@ jobs:
         run: uv sync
       - name: Run order-8 candidate-count regression
         run: uv run pytest research/test_homotopy_research.py -m slow
+
+  research-helly-certificate-replay:
+    name: Full Helly-cover certificate replay (Python 3.11)
+    if: github.event_name == 'workflow_dispatch'
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+      - name: Set up Python 3.11
+        run: uv python install 3.11
+      - name: Install Dependencies
+        run: uv sync
+      - name: Replay rank-four certificate
+        run: |
+          uv run python research/o8_helly_cover_certificates.py \
+            --check research/results/o8_four_uniform_helly_certificate.json
+      - name: Replay rank-four/five certificate
+        run: |
+          uv run python research/o8_helly_cover_certificates.py \
+            --check research/results/o8_helly_gate_certificate.json

@@ -41,6 +41,33 @@ def _all_subfamilies(
         )
 
 
+def _brute_force_helly(family: tuple[frozenset[int], ...]) -> bool:
+    for selected in _all_subfamilies(family):
+        if not selected or not all(
+            first & second for first, second in combinations(selected, 2)
+        ):
+            continue
+        common = set(selected[0])
+        for member in selected[1:]:
+            common.intersection_update(member)
+        if not common:
+            return False
+    return True
+
+
+def _assert_valid_obstruction(
+    witness: tuple[frozenset[object], ...],
+    family: tuple[frozenset[object], ...],
+) -> None:
+    assert witness
+    assert all(member in family for member in witness)
+    assert all(first & second for first, second in combinations(witness, 2))
+    common = set(witness[0])
+    for member in witness[1:]:
+        common.intersection_update(member)
+    assert not common
+
+
 def _halfcube_family(pair_count: int) -> tuple[frozenset[int], ...]:
     row_count = pair_count.bit_length()
     if pair_count != 1 << (row_count - 1):
@@ -61,14 +88,16 @@ def _halfcube_family(pair_count: int) -> tuple[frozenset[int], ...]:
 
 
 def test_gate_characterization_matches_direct_helly_test() -> None:
-    points = range(3)
-    possible_sets = tuple(
-        frozenset(subset)
-        for size in range(1, 4)
-        for subset in combinations(points, size)
-    )
-    for family in _all_subfamilies(possible_sets):
-        assert is_helly_family(family) == satisfies_helly_gate_condition(family)
+    for point_count in range(4):
+        possible_sets = tuple(
+            frozenset(subset)
+            for size in range(1, point_count + 1)
+            for subset in combinations(range(point_count), size)
+        )
+        for family in _all_subfamilies(possible_sets):
+            expected = _brute_force_helly(family)
+            assert is_helly_family(family) is expected
+            assert satisfies_helly_gate_condition(family) is expected
 
     non_helly_triple = ({0, 1}, {1, 2}, {0, 2})
     assert not is_helly_family(non_helly_triple)
@@ -82,6 +111,39 @@ def test_gate_characterization_matches_direct_helly_test() -> None:
     assert satisfies_helly_gate_condition(({0, 1}, {2}))
     with pytest.raises(ValueError, match="nonempty"):
         is_helly_family((set(),))
+
+
+def test_large_star_edge_family_is_verified_without_subset_enumeration() -> None:
+    graph = nx.star_graph(35)
+    family = tuple(frozenset(edge) for edge in graph.edges())
+
+    assert is_helly_family(family)
+    result = verify_helly_edge_cover(graph, family)
+    assert result.status is HellyCoverVerificationStatus.VERIFIED
+
+
+@pytest.mark.parametrize(
+    ("point_count", "member_size"),
+    [(4, 3), (5, 4)],
+)
+def test_minimal_uniform_obstructions_are_bounded_and_valid(
+    point_count: int, member_size: int
+) -> None:
+    family = tuple(
+        frozenset(member) for member in combinations(range(point_count), member_size)
+    )
+    graph = nx.complete_graph(point_count)
+
+    for proper_family in _all_subfamilies(family):
+        if len(proper_family) < len(family):
+            assert _brute_force_helly(proper_family)
+
+    result = verify_helly_edge_cover(graph, family)
+    assert result.status is HellyCoverVerificationStatus.INVALID
+    assert result.non_helly_subfamily is not None
+    assert len(result.non_helly_subfamily) == point_count
+    assert len(result.non_helly_subfamily) <= member_size + 1
+    _assert_valid_obstruction(result.non_helly_subfamily, family)
 
 
 @pytest.mark.parametrize(
@@ -249,12 +311,50 @@ def test_fixed_private_edge_and_gate_constraints_are_explicit() -> None:
 
 def test_independent_verifier_returns_pairwise_intersecting_obstruction() -> None:
     graph = nx.complete_graph(3)
-    family = ({0, 1}, {1, 2}, {0, 2})
+    family = tuple(map(frozenset, ({0, 1}, {1, 2}, {0, 2})))
     result = verify_helly_edge_cover(graph, family)
     assert result.status is HellyCoverVerificationStatus.INVALID
     assert result.uncovered_edge is None
     assert result.non_helly_subfamily is not None
     assert len(result.non_helly_subfamily) == 3
+    _assert_valid_obstruction(result.non_helly_subfamily, family)
+
+
+def test_uncovered_edge_precedes_helly_obstruction() -> None:
+    graph = nx.complete_graph(4)
+    family = tuple(map(frozenset, ({0, 1}, {1, 2}, {0, 2})))
+    result = verify_helly_edge_cover(graph, family)
+
+    assert result.status is HellyCoverVerificationStatus.INVALID
+    assert result.uncovered_edge is not None
+    assert result.non_helly_subfamily is None
+
+
+def test_verifier_accepts_isolated_vertices_and_rejects_noncomplete_members() -> None:
+    graph = nx.path_graph(3)
+    graph.add_node("isolated")
+    family = (frozenset({0, 1}), frozenset({1, 2}))
+    assert (
+        verify_helly_edge_cover(graph, family).status
+        is HellyCoverVerificationStatus.VERIFIED
+    )
+    with pytest.raises(ValueError, match="not a complete"):
+        verify_helly_edge_cover(graph, (frozenset({0, 2}),))
+
+
+def test_verifier_handles_mixed_hashable_labels_in_obstruction() -> None:
+    vertices = (1, "two", ("three", 3))
+    graph = nx.complete_graph(vertices)
+    family = (
+        frozenset(vertices[:2]),
+        frozenset((vertices[1], vertices[2])),
+        frozenset((vertices[0], vertices[2])),
+    )
+
+    result = verify_helly_edge_cover(graph, family)
+    assert result.status is HellyCoverVerificationStatus.INVALID
+    assert result.non_helly_subfamily is not None
+    _assert_valid_obstruction(result.non_helly_subfamily, family)
 
 
 def test_verifier_accepts_empty_family_for_edgeless_graph() -> None:

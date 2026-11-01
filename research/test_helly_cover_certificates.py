@@ -1,5 +1,9 @@
 """Reproducibility checks for normalized O8 Helly-cover research cases."""
 
+import json
+from copy import deepcopy
+from pathlib import Path
+
 import pytest
 
 from research.o8_helly_cover_certificates import (
@@ -15,6 +19,11 @@ from research.o8_helly_cover_certificates import (
     _set_based_case,
     _verify_private_edge_normalization,
     _verify_representative_coverage,
+    verify_four_uniform_certificate,
+)
+
+_FOUR_UNIFORM_CERTIFICATE_PATH = (
+    Path(__file__).parent / "results" / "o8_four_uniform_helly_certificate.json"
 )
 
 
@@ -97,3 +106,36 @@ def test_private_facet_and_edge_normalization_is_transitive(
     result = _verify_private_edge_normalization(rank)
     assert result["facet_edge_cases_checked"] == expected_cases
     assert result["all_cases_map_to_normal_form"]
+
+
+@pytest.fixture(scope="module")
+def four_uniform_certificate() -> dict[str, object]:
+    return json.loads(_FOUR_UNIFORM_CERTIFICATE_PATH.read_text())
+
+
+def test_certificate_checker_rejects_missing_gate_assignment(
+    four_uniform_certificate: dict[str, object],
+) -> None:
+    certificate = deepcopy(four_uniform_certificate)
+    cases = certificate["cases"]
+    assert isinstance(cases, list)
+    cases.pop()
+
+    with pytest.raises(ValueError, match="omits locally possible gate assignments"):
+        verify_four_uniform_certificate(certificate)
+
+
+def test_certificate_checker_replays_recorded_exclusion_witness(
+    four_uniform_certificate: dict[str, object],
+) -> None:
+    certificate = deepcopy(four_uniform_certificate)
+    cases = certificate["cases"]
+    assert isinstance(cases, list)
+    first_case = cases[0]
+    assert isinstance(first_case, dict)
+    first_case["uncovered_edge"] = (
+        [0, 4] if first_case["uncovered_edge"] == [0, 2] else [0, 2]
+    )
+
+    with pytest.raises(ValueError, match="uncovered edge does not replay"):
+        verify_four_uniform_certificate(certificate)
