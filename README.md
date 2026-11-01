@@ -140,6 +140,23 @@ With `--check-clique-retraction`, the pass runs
 graph and removes rows whose clique graph retracts to `Comp(C_10)`. Each
 studied row is logged at INFO level with its original index and graph6 string.
 
+On a fresh census run, each CLI updates only original indices it actually
+processed: stale unresolved rows for those indices are removed, newly
+unresolved rows are written, and records outside a selected `--start`/`--end`
+range are preserved. Graphs skipped as reducible are included in the processed
+cohort. The fast CLI gives the current certified verdict precedence over any
+isomorphic unresolved core found by lookup; a prior-core match only annotates
+a graph that is still indeterminate.
+
+For `small-behavior-theorem26 --from-indeterminate-file`, the saved file is the
+entire input cohort and is replaced with exactly the rows still unresolved
+after the pass, including a header-only file when all candidates resolve.
+`--start` and `--end` are rejected in this mode because saved-file entries do
+not define a census interval. `--no-save` leaves the unresolved file unchanged;
+`--output-file` can still record per-run verdicts. In fresh Theorem 2.6 runs,
+only indices actually visited by the fast pass are updated, preserving saved
+rows outside a partial range.
+
 The `small-behavior-theorem26` CLI exposes `--max-m`, `--max-n`,
 `--max-coaffinations`, `--max-source-order`, and `--bound` so that
 progressively larger computational limits can be tried without modifying

@@ -960,3 +960,311 @@ def test_small_main_excludes_conjectured_divergent_from_recheck(monkeypatch, tmp
     ]
     assert {row.split()[0] for row in rows} == {"3", "7"}
     assert "conjectured_divergent" in next(row for row in rows if row.startswith("7 "))
+
+
+def _install_tiny_census(monkeypatch, tmp_path, graphs):
+    import gzip
+
+    import pyg6data.lists as lists
+
+    census = tmp_path / "tiny-census.gz"
+    with gzip.open(census, "wt", encoding="ascii") as output:
+        for graph in graphs:
+            output.write(nx.to_graph6_bytes(graph, header=False).decode("ascii"))
+    monkeypatch.setattr(lists, "_get_data_file_path", lambda _name: census)
+    return census
+
+
+def _saved_indeterminate_rows(path):
+    return [
+        line
+        for line in path.read_text().splitlines()
+        if line and not line.startswith("#")
+    ]
+
+
+@pytest.mark.parametrize(
+    ("verdict", "expected_total", "lookup_args"),
+    [
+        (Verdict.CONVERGENT, "Total convergent graphs: 1", []),
+        (Verdict.DIVERGENT, "Total divergent graphs: 1", []),
+        (Verdict.DIVERGENT, "Total divergent graphs: 1", ["--no-lookup"]),
+    ],
+)
+def test_small_main_current_definitive_verdict_outranks_old_indeterminate(
+    verdict, expected_total, lookup_args, caplog, monkeypatch, tmp_path
+):
+    import logging
+
+    from pycliques.small import Certificate, _main, _save_indeterminate
+
+    _install_tiny_census(monkeypatch, tmp_path, [nx.path_graph(6)])
+    _save_indeterminate(5, [(0, nx.cycle_graph(5), None)], tmp_path)
+    certificate = Certificate(rule="certified-test-rule")
+
+    def fake_classify(graph, *, bound):
+        return CliqueBehavior(
+            verdict,
+            "current certified reason",
+            1,
+            False,
+            nx.cycle_graph(5),
+            certificate,
+        )
+
+    monkeypatch.setattr(small, "classify_clique_behavior", fake_classify)
+    output = tmp_path / "verdicts.tsv"
+    caplog.set_level(logging.INFO, logger=small.__name__)
+
+    _main(
+        [
+            "6",
+            "--start",
+            "0",
+            "--end",
+            "0",
+            "--data-dir",
+            str(tmp_path),
+            *lookup_args,
+            "--no-skip-dominated",
+            "--output-file",
+            str(output),
+        ]
+    )
+
+    row = output.read_text().splitlines()[1]
+    assert row.split("\t")[1:] == [verdict.name, "current certified reason"]
+    assert expected_total in caplog.text
+    assert "Total indeterminate graphs (further study): 0" in caplog.text
+    assert "Total graphs reduced to indeterminate: 0" in caplog.text
+    assert _saved_indeterminate_rows(tmp_path / "indeterminate_order_6.txt") == []
+
+
+def test_small_main_known_unresolved_is_annotated_and_counted_once(
+    caplog, monkeypatch, tmp_path
+):
+    import logging
+
+    import pycliques.small as small
+    from pycliques.small import _main, _save_indeterminate
+
+    _install_tiny_census(monkeypatch, tmp_path, [nx.path_graph(6)])
+    _save_indeterminate(5, [(0, nx.cycle_graph(5), None)], tmp_path)
+    monkeypatch.setattr(
+        small,
+        "classify_clique_behavior",
+        lambda graph, *, bound: CliqueBehavior(
+            Verdict.INDETERMINATE,
+            "original unresolved reason",
+            1,
+            False,
+            nx.cycle_graph(5),
+        ),
+    )
+    caplog.set_level(logging.INFO, logger=small.__name__)
+    output = tmp_path / "verdicts.tsv"
+
+    _main(
+        [
+            "6",
+            "--start",
+            "0",
+            "--end",
+            "0",
+            "--data-dir",
+            str(tmp_path),
+            "--no-skip-dominated",
+            "--output-file",
+            str(output),
+        ]
+    )
+
+    assert (
+        output.read_text()
+        .splitlines()[1]
+        .endswith("\tINDETERMINATE\treduces to known indeterminate graph")
+    )
+    assert "Processed 1 total graphs" in caplog.text
+    assert "Total indeterminate graphs (further study): 1" in caplog.text
+    assert "Total graphs reduced to indeterminate: 1" in caplog.text
+    assert len(_saved_indeterminate_rows(tmp_path / "indeterminate_order_6.txt")) == 1
+
+
+def test_small_main_no_lookup_keeps_current_unresolved_reason(monkeypatch, tmp_path):
+    import pycliques.small as small
+    from pycliques.small import _main, _save_indeterminate
+
+    _install_tiny_census(monkeypatch, tmp_path, [nx.path_graph(6)])
+    _save_indeterminate(5, [(0, nx.cycle_graph(5), None)], tmp_path)
+    monkeypatch.setattr(
+        small,
+        "classify_clique_behavior",
+        lambda graph, *, bound: CliqueBehavior(
+            Verdict.INDETERMINATE,
+            "current unresolved reason",
+            1,
+            False,
+            nx.cycle_graph(5),
+        ),
+    )
+    output = tmp_path / "verdicts.tsv"
+
+    _main(
+        [
+            "6",
+            "--no-lookup",
+            "--start",
+            "0",
+            "--end",
+            "0",
+            "--no-skip-dominated",
+            "--data-dir",
+            str(tmp_path),
+            "--output-file",
+            str(output),
+        ]
+    )
+
+    assert (
+        output.read_text()
+        .splitlines()[1]
+        .endswith("\tINDETERMINATE\tcurrent unresolved reason")
+    )
+
+
+def test_small_main_range_rerun_removes_only_processed_stale_row(monkeypatch, tmp_path):
+    from pycliques.small import Certificate, _main, _save_indeterminate
+
+    _install_tiny_census(monkeypatch, tmp_path, [nx.path_graph(6)] * 5)
+    _save_indeterminate(
+        6,
+        [
+            (1, nx.cycle_graph(5), None),
+            (4, nx.path_graph(5), None),
+            (9, nx.complete_graph(4), None),
+        ],
+        tmp_path,
+    )
+    monkeypatch.setattr(
+        small,
+        "classify_clique_behavior",
+        lambda graph, *, bound: CliqueBehavior(
+            Verdict.DIVERGENT,
+            "certified rerun",
+            1,
+            False,
+            graph,
+            Certificate(rule="proof"),
+        ),
+    )
+
+    _main(
+        [
+            "6",
+            "--start",
+            "4",
+            "--end",
+            "4",
+            "--no-skip-dominated",
+            "--data-dir",
+            str(tmp_path),
+        ]
+    )
+
+    rows = _saved_indeterminate_rows(tmp_path / "indeterminate_order_6.txt")
+    assert {int(row.split()[0]) for row in rows} == {1, 9}
+
+
+def test_small_main_empty_range_preserves_all_existing_rows(monkeypatch, tmp_path):
+    from pycliques.small import _main, _save_indeterminate
+
+    _install_tiny_census(monkeypatch, tmp_path, [nx.path_graph(6)])
+    _save_indeterminate(6, [(2, nx.cycle_graph(5), None)], tmp_path)
+
+    _main(
+        [
+            "6",
+            "--start",
+            "10",
+            "--end",
+            "12",
+            "--data-dir",
+            str(tmp_path),
+        ]
+    )
+
+    assert [
+        row.split()[0]
+        for row in _saved_indeterminate_rows(tmp_path / "indeterminate_order_6.txt")
+    ] == ["2"]
+
+
+def test_small_main_full_census_replaces_stale_out_of_range_rows(monkeypatch, tmp_path):
+    from pycliques.small import _main, _save_indeterminate
+
+    _install_tiny_census(monkeypatch, tmp_path, [nx.path_graph(6)])
+    _save_indeterminate(
+        6,
+        [
+            (0, nx.cycle_graph(5), None),
+            (99, nx.complete_graph(4), None),
+        ],
+        tmp_path,
+    )
+    monkeypatch.setattr(
+        small,
+        "classify_clique_behavior",
+        lambda graph, *, bound: CliqueBehavior(
+            Verdict.CONVERGENT, "resolved", 1, False, graph
+        ),
+    )
+
+    _main(["6", "--no-skip-dominated", "--data-dir", str(tmp_path)])
+
+    assert _saved_indeterminate_rows(tmp_path / "indeterminate_order_6.txt") == []
+
+
+def test_small_main_range_update_preserves_unresolved_certificate(
+    monkeypatch, tmp_path
+):
+    from pycliques.small import Certificate, _main, _save_indeterminate
+
+    _install_tiny_census(monkeypatch, tmp_path, [nx.path_graph(6)] * 5)
+    _save_indeterminate(
+        6,
+        [
+            (
+                4,
+                nx.path_graph(6),
+                Certificate(
+                    rule="retracts",
+                    target_status="conjectured_divergent",
+                    target_label="same-core",
+                ),
+            )
+        ],
+        tmp_path,
+    )
+    monkeypatch.setattr(
+        small,
+        "classify_clique_behavior",
+        lambda graph, *, bound: CliqueBehavior(
+            Verdict.INDETERMINATE, "still unresolved", 1, False, graph
+        ),
+    )
+
+    _main(
+        [
+            "6",
+            "--start",
+            "4",
+            "--end",
+            "4",
+            "--no-skip-dominated",
+            "--data-dir",
+            str(tmp_path),
+        ]
+    )
+
+    row = _saved_indeterminate_rows(tmp_path / "indeterminate_order_6.txt")[0]
+    assert "retracts conjectured_divergent same-core" in row

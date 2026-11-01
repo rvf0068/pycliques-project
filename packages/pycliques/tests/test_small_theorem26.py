@@ -4,10 +4,13 @@ import logging
 
 import networkx as nx
 import pycliques.small as small
+import pytest
 from pycliques.cliques import clique_graph
 from pycliques.small import (
+    Certificate,
     Verdict,
     _load_indeterminate_file_entries,
+    _load_indeterminate_file_entries_with_metadata,
     _main_theorem26,
     _parse_theorem26_args,
     _run_fast_pass_indeterminate,
@@ -135,7 +138,7 @@ def test_run_fast_pass_indeterminate_filters_to_indeterminate_only(
 
     monkeypatch.setattr(small, "classify_clique_behavior", fake_classify)
 
-    convergent, divergent, indeterminate = _run_fast_pass_indeterminate(
+    convergent, divergent, indeterminate, processed = _run_fast_pass_indeterminate(
         6,
         data_dir=tmp_path,
         start=None,
@@ -145,6 +148,7 @@ def test_run_fast_pass_indeterminate_filters_to_indeterminate_only(
     )
 
     assert convergent + divergent + len(indeterminate) == 21
+    assert processed == set(range(21))
     assert convergent > 0
     assert divergent > 0
     assert len(indeterminate) > 0
@@ -243,3 +247,210 @@ def test_main_theorem26_from_indeterminate_file(monkeypatch, tmp_path):
     _main_theorem26(["9", "--data-dir", str(tmp_path), "--from-indeterminate-file"])
 
     assert calls
+
+
+def _data_rows(path):
+    return [
+        line
+        for line in path.read_text().splitlines()
+        if line and not line.startswith("#")
+    ]
+
+
+def test_theorem26_saved_cohort_removes_resolved_and_preserves_metadata(
+    monkeypatch, tmp_path
+):
+    unresolved = nx.cycle_graph(5)
+    resolved = nx.path_graph(4)
+    conjecture = Certificate(
+        rule="retracts",
+        target_status="conjectured_divergent",
+        target_label="survivor",
+    )
+    _save_indeterminate(
+        9,
+        [(3, resolved, None), (7, unresolved, conjecture)],
+        tmp_path,
+    )
+
+    def fake_clockwork(graph, **kwargs):
+        if graph.order() == 4:
+            return ("DIVERGENT", "proved", Certificate(rule="theorem_2_6"))
+        return None
+
+    monkeypatch.setattr(small, "classify_clockwork_pair_map", fake_clockwork)
+    _main_theorem26(["9", "--from-indeterminate-file", "--data-dir", str(tmp_path)])
+
+    rows = _data_rows(tmp_path / "indeterminate_order_9.txt")
+    assert len(rows) == 1
+    assert rows[0].split()[0] == "7"
+    assert "retracts conjectured_divergent survivor" in rows[0]
+
+
+def test_theorem26_all_resolved_writes_empty_cohort_and_output(monkeypatch, tmp_path):
+    _save_indeterminate(
+        9,
+        [(3, nx.path_graph(4), None), (7, nx.cycle_graph(5), None)],
+        tmp_path,
+    )
+    output = tmp_path / "verdicts.tsv"
+    monkeypatch.setattr(
+        small,
+        "classify_clockwork_pair_map",
+        lambda graph, **kwargs: ("DIVERGENT", "proved", Certificate(rule="proof")),
+    )
+
+    _main_theorem26(
+        [
+            "9",
+            "--from-indeterminate-file",
+            "--data-dir",
+            str(tmp_path),
+            "--output-file",
+            str(output),
+        ]
+    )
+
+    assert _data_rows(tmp_path / "indeterminate_order_9.txt") == []
+    assert len(_data_rows(output)) == 2
+    assert all("\tDIVERGENT\tproved" in row for row in _data_rows(output))
+
+
+def test_theorem26_no_save_preserves_input_bytes(monkeypatch, tmp_path):
+    _save_indeterminate(
+        9,
+        [(3, nx.path_graph(4), None)],
+        tmp_path,
+    )
+    path = tmp_path / "indeterminate_order_9.txt"
+    original = path.read_bytes()
+    monkeypatch.setattr(
+        small,
+        "classify_clockwork_pair_map",
+        lambda graph, **kwargs: ("DIVERGENT", "proved", Certificate(rule="proof")),
+    )
+
+    _main_theorem26(
+        [
+            "9",
+            "--from-indeterminate-file",
+            "--no-save",
+            "--data-dir",
+            str(tmp_path),
+        ]
+    )
+
+    assert path.read_bytes() == original
+
+
+def test_theorem26_rejects_ranges_for_saved_cohort(tmp_path):
+    with pytest.raises(SystemExit):
+        _main_theorem26(
+            [
+                "9",
+                "--from-indeterminate-file",
+                "--start",
+                "0",
+                "--data-dir",
+                str(tmp_path),
+            ]
+        )
+
+
+def test_theorem26_range_update_preserves_outside_rows_and_adds_survivor(
+    monkeypatch, tmp_path
+):
+    _save_indeterminate(
+        9,
+        [
+            (1, nx.path_graph(4), None),
+            (4, nx.cycle_graph(5), None),
+            (9, nx.complete_graph(4), None),
+        ],
+        tmp_path,
+    )
+    new_unresolved = nx.path_graph(5)
+    monkeypatch.setattr(
+        small,
+        "_run_fast_pass_indeterminate",
+        lambda *args, **kwargs: (
+            0,
+            0,
+            [(4, nx.cycle_graph(5), None), (5, new_unresolved, None)],
+            {4, 5},
+        ),
+    )
+    monkeypatch.setattr(
+        small,
+        "classify_clockwork_pair_map",
+        lambda graph, **kwargs: (
+            ("DIVERGENT", "proved", Certificate(rule="proof"))
+            if graph.order() == 5 and graph.number_of_edges() == 5
+            else None
+        ),
+    )
+
+    _main_theorem26(["9", "--start", "4", "--end", "5", "--data-dir", str(tmp_path)])
+
+    rows = _data_rows(tmp_path / "indeterminate_order_9.txt")
+    assert {int(row.split()[0]) for row in rows} == {1, 5, 9}
+
+
+def test_theorem26_full_fresh_pass_replaces_the_unresolved_cohort(
+    monkeypatch, tmp_path
+):
+    _save_indeterminate(
+        6,
+        [
+            (0, nx.cycle_graph(5), None),
+            (99, nx.complete_graph(4), None),
+        ],
+        tmp_path,
+    )
+    monkeypatch.setattr(
+        small,
+        "_run_fast_pass_indeterminate",
+        lambda *args, **kwargs: (1, 0, [], {0}),
+    )
+
+    _main_theorem26(["6", "--data-dir", str(tmp_path)])
+
+    assert _data_rows(tmp_path / "indeterminate_order_6.txt") == []
+
+
+def test_theorem26_saved_unresolved_metadata_survives(monkeypatch, tmp_path):
+    prior = Certificate(
+        rule="retracts",
+        target_status="conjectured_divergent",
+        target_label="survivor",
+    )
+    _save_indeterminate(9, [(7, nx.cycle_graph(5), prior)], tmp_path)
+    monkeypatch.setattr(small, "classify_clockwork_pair_map", lambda *a, **k: None)
+
+    _main_theorem26(["9", "--from-indeterminate-file", "--data-dir", str(tmp_path)])
+
+    entry = _load_indeterminate_file_entries_with_metadata(9, tmp_path)[0]
+    assert entry[0] == 7
+    assert entry[2] is not None
+    assert entry[2].rule == "retracts"
+    assert entry[2].target_status == "conjectured_divergent"
+    assert entry[2].target_label == "survivor"
+
+
+def test_theorem26_rechecking_is_idempotent(monkeypatch, tmp_path):
+    _save_indeterminate(9, [(7, nx.cycle_graph(5), None)], tmp_path)
+    monkeypatch.setattr(small, "classify_clockwork_pair_map", lambda *a, **k: None)
+    arguments = ["9", "--from-indeterminate-file", "--data-dir", str(tmp_path)]
+
+    _main_theorem26(arguments)
+    first_contents = (tmp_path / "indeterminate_order_9.txt").read_bytes()
+    _main_theorem26(arguments)
+
+    assert (tmp_path / "indeterminate_order_9.txt").read_bytes() == first_contents
+    assert len(_data_rows(tmp_path / "indeterminate_order_9.txt")) == 1
+
+
+def test_theorem26_empty_input_writes_empty_cohort(tmp_path):
+    _main_theorem26(["9", "--from-indeterminate-file", "--data-dir", str(tmp_path)])
+
+    assert _data_rows(tmp_path / "indeterminate_order_9.txt") == []

@@ -6,12 +6,14 @@ import argparse
 import gzip
 import logging
 import math
+import os
 import sys
 from collections.abc import Callable, Hashable, Iterator
 from dataclasses import dataclass
 from enum import Enum, auto
 from itertools import combinations
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import cast
 
 import networkx as nx
@@ -1672,17 +1674,62 @@ def _save_indeterminate(
         existing[idx] = f"{idx} {g.order()} {g6} {_serialize_certificate(certificate)}"
 
     # Write everything back sorted by index.
-    with path.open("w", encoding="utf-8") as f:
-        f.write(
-            f"# Indeterminate clique behavior - connected graphs of order {order}\n"
-        )
-        f.write(
-            "# Format: original_index pared_order graph6 certificate_rule "
-            "certificate_target_status certificate_target_label\n"
-        )
-        for idx in sorted(existing):
-            f.write(f"{existing[idx]}\n")
+    temporary_path: Path | None = None
+    try:
+        with NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as f:
+            temporary_path = Path(f.name)
+            f.write(
+                f"# Indeterminate clique behavior - connected graphs of order {order}\n"
+            )
+            f.write(
+                "# Format: original_index pared_order graph6 certificate_rule "
+                "certificate_target_status certificate_target_label\n"
+            )
+            for idx in sorted(existing):
+                f.write(f"{existing[idx]}\n")
+        os.replace(temporary_path, path)
+    finally:
+        if temporary_path is not None and temporary_path.exists():
+            temporary_path.unlink()
     _logger.info(f"Saved {len(existing)} indeterminate graphs to {path}")
+
+
+def _update_processed_indeterminate(
+    order: int,
+    processed_indices: set[int],
+    indeterminate: list[tuple[int, nx.Graph, Certificate | None]],
+    data_dir: Path,
+) -> None:
+    """Replace unresolved rows for processed indices, preserving all others."""
+    existing = _load_indeterminate_file_entries_with_metadata(order, data_dir)
+    previous_by_index = {
+        index: (graph, certificate) for index, graph, certificate in existing
+    }
+    retained = [entry for entry in existing if entry[0] not in processed_indices]
+    refreshed = []
+    for index, graph, certificate in indeterminate:
+        previous = previous_by_index.get(index)
+        if (
+            certificate is None
+            and previous is not None
+            and previous[1] is not None
+            and nx.is_isomorphic(graph, previous[0])
+        ):
+            certificate = previous[1]
+        refreshed.append((index, graph, certificate))
+    _save_indeterminate(
+        order,
+        retained + refreshed,
+        data_dir,
+        replace=True,
+    )
 
 
 def _graph6_string(graph: nx.Graph) -> str:
@@ -2080,6 +2127,7 @@ def _main(args: list[str]):
     further_pared: list[tuple[int, nx.Graph, Certificate | None]] = []
     further_graphs: list[tuple[int, nx.Graph, Certificate | None]] = []
     reducible: list[int] = []
+    processed_indices: set[int] = set()
 
     range_msg = ""
     if start is not None or end is not None:
@@ -2114,6 +2162,7 @@ def _main(args: list[str]):
                         continue
                     if end is not None and index > end:
                         break
+                    processed_indices.add(index)
 
                     if index > 0 and index % 10000 == 0:  # pragma: no cover
                         _logger.info(f"Processed up to index {index}...")
@@ -2131,16 +2180,7 @@ def _main(args: list[str]):
                         continue
 
                     result = classify_clique_behavior(graph, bound=bound)
-                    if _is_known_indeterminate(result.pared_graph, known_indeterminate):
-                        further_pared.append(
-                            (index, result.pared_graph, result.certificate)
-                        )
-                        further_graphs.append(
-                            (index, result.pared_graph, result.certificate)
-                        )
-                        verdict_label = "INDETERMINATE"
-                        reason = "reduces to known indeterminate graph"
-                    elif result.verdict is Verdict.CONVERGENT:
+                    if result.verdict is Verdict.CONVERGENT:
                         convergent.append(index)
                         verdict_label = "CONVERGENT"
                         reason = result.reason
@@ -2154,7 +2194,15 @@ def _main(args: list[str]):
                             (index, result.pared_graph, result.certificate)
                         )
                         verdict_label = "INDETERMINATE"
-                        reason = result.reason
+                        if lookup and _is_known_indeterminate(
+                            result.pared_graph, known_indeterminate
+                        ):
+                            further_pared.append(
+                                (index, result.pared_graph, result.certificate)
+                            )
+                            reason = "reduces to known indeterminate graph"
+                        else:
+                            reason = result.reason
 
                     if verdict_file is not None:
                         verdict_file.write(f"{index}\t{verdict_label}\t{reason}\n")
@@ -2169,8 +2217,13 @@ def _main(args: list[str]):
     _logger.info(f"Total graphs reduced to indeterminate: {len(further_pared)}")
     _logger.info(f"Total indeterminate graphs (further study): {len(further)}")
 
-    if save and further_graphs:
-        _save_indeterminate(order, further_graphs, data_dir)
+    if save:
+        if start is None and end is None:
+            _save_indeterminate(order, further_graphs, data_dir, replace=True)
+        else:
+            _update_processed_indeterminate(
+                order, processed_indices, further_graphs, data_dir
+            )
 
 
 def main():  # pragma: no cover
@@ -2237,13 +2290,14 @@ def _run_fast_pass_indeterminate(
     end: int | None,
     skip_dominated: bool,
     bound: int,
-) -> tuple[int, int, list[tuple[int, nx.Graph, Certificate | None]]]:
+) -> tuple[int, int, list[tuple[int, nx.Graph, Certificate | None]], set[int]]:
     """Run the fast pass over the dataset, returning only INDETERMINATE graphs.
 
     .. rubric:: Returns
 
-    tuple[int, int, list[tuple[int, nx.Graph, Certificate | None]]]
-        ``(convergent_count, divergent_count, indeterminate)`` where
+    tuple[int, int, list[tuple[int, nx.Graph, Certificate | None]], set[int]]
+        ``(convergent_count, divergent_count, indeterminate, processed_indices)``
+        where ``processed_indices`` includes resolved and skipped graphs, and
         ``indeterminate`` holds ``(index, pared_graph, certificate)`` for
         every graph the fast pass left ``INDETERMINATE``.
     """
@@ -2253,6 +2307,7 @@ def _run_fast_pass_indeterminate(
     convergent = 0
     divergent = 0
     indeterminate: list[tuple[int, nx.Graph, Certificate | None]] = []
+    processed_indices: set[int] = set()
 
     with data_path.open("rb") as raw_file:
         with gzip.open(raw_file, "rt", encoding="utf-8") as graph_file:
@@ -2261,6 +2316,7 @@ def _run_fast_pass_indeterminate(
                     continue
                 if end is not None and index > end:
                     break
+                processed_indices.add(index)
                 graph = nx.from_graph6_bytes(bytes(line.strip(), "utf-8"))
                 if skip_dominated and find_dominated_vertex(graph) is not None:
                     continue
@@ -2274,7 +2330,7 @@ def _run_fast_pass_indeterminate(
                         (index, result.pared_graph, result.certificate)
                     )
 
-    return convergent, divergent, indeterminate
+    return convergent, divergent, indeterminate, processed_indices
 
 
 def _parse_theorem26_args(args: list[str]) -> argparse.Namespace:
@@ -2433,11 +2489,18 @@ def _main_theorem26(args: list[str]):
     ):
         _logger.error("--start must be less than or equal to --end.")
         sys.exit(1)
+    if parsed_args.from_indeterminate_file and (
+        parsed_args.start is not None or parsed_args.end is not None
+    ):
+        _logger.error(
+            "--start and --end cannot be used with --from-indeterminate-file."
+        )
+        sys.exit(1)
 
     candidates: list[tuple[int, nx.Graph, Certificate | None]]
     if parsed_args.from_indeterminate_file:
-        entries = _load_indeterminate_file_entries(order, data_dir)
-        candidates = [(idx, graph, None) for idx, graph in entries]
+        candidates = _load_indeterminate_file_entries_with_metadata(order, data_dir)
+        processed_indices = {idx for idx, _, _ in candidates}
         fast_convergent = fast_divergent = None
     else:
         from pyg6data.lists import _dict_connected
@@ -2446,7 +2509,12 @@ def _main_theorem26(args: list[str]):
             _logger.error(f"Error: Internal data for order {order} not available.")
             sys.exit(1)
         _logger.info("Running fast pass to collect INDETERMINATE graphs...")
-        fast_convergent, fast_divergent, candidates = _run_fast_pass_indeterminate(
+        (
+            fast_convergent,
+            fast_divergent,
+            candidates,
+            processed_indices,
+        ) = _run_fast_pass_indeterminate(
             order,
             data_dir=data_dir,
             start=parsed_args.start,
@@ -2475,7 +2543,7 @@ def _main_theorem26(args: list[str]):
         if verdict_file is not None:
             verdict_file.write("# index\tverdict\treason\n")
 
-        for idx, graph, _fast_certificate in candidates:
+        for idx, graph, fast_certificate in candidates:
             theorem_result = classify_clockwork_pair_map(
                 graph,
                 max_m=parsed_args.max_m,
@@ -2490,7 +2558,7 @@ def _main_theorem26(args: list[str]):
                 if verdict_file is not None:
                     verdict_file.write(f"{idx}\tDIVERGENT\t{reason}\n")
             else:
-                still_indeterminate.append((idx, graph, None))
+                still_indeterminate.append((idx, graph, fast_certificate))
                 if verdict_file is not None:
                     verdict_file.write(
                         f"{idx}\tINDETERMINATE\tunresolved by Theorem 2.6\n"
@@ -2500,8 +2568,15 @@ def _main_theorem26(args: list[str]):
     _logger.info(f"    newly divergent:         {len(newly_divergent)}")
     _logger.info(f"    remaining indeterminate: {len(still_indeterminate)}")
 
-    if parsed_args.save and still_indeterminate:
-        _save_indeterminate(order, still_indeterminate, data_dir)
+    if parsed_args.save:
+        if parsed_args.from_indeterminate_file:
+            _save_indeterminate(order, still_indeterminate, data_dir, replace=True)
+        elif parsed_args.start is None and parsed_args.end is None:
+            _save_indeterminate(order, still_indeterminate, data_dir, replace=True)
+        else:
+            _update_processed_indeterminate(
+                order, processed_indices, still_indeterminate, data_dir
+            )
 
 
 def main_theorem26():  # pragma: no cover
