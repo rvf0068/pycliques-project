@@ -18,3 +18,4 @@ mean any complete set.
    api/index
    research/partition_lattice
    research/helly_cover
+   research/triangular_cover_divergence

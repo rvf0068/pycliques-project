@@ -4,6 +4,7 @@ import networkx as nx
 import pytest
 from pycombtop.fundamental_group import (
     FundamentalRecord,
+    _extract_coset_actions,
     covering_graph,
     first_homology_rank,
     fundamental_group,
@@ -97,6 +98,37 @@ def test_cycle_graph_general():
         G = nx.cycle_graph(n)
         rec = fundamental_group(G)
         assert rec.rank == 1, f"C_{n} should have rank 1"
+
+
+@pytest.mark.parametrize(
+    ("degree", "subgroup_word"),
+    [(2, [1, 1]), (3, [1, 1, 1])],
+)
+def test_cycle_cover_coset_actions_are_complete_and_connected(degree, subgroup_word):
+    graph = nx.cycle_graph(4)
+    record = fundamental_group(graph)
+    cover = covering_graph(graph, [subgroup_word], rec=record, max_cosets=degree)
+
+    assert cover.number_of_nodes() == 4 * degree
+    assert cover.number_of_edges() == 4 * degree
+    assert nx.is_connected(cover)
+    for vertex in graph:
+        fiber = {lift for lift in cover if lift[0] == vertex}
+        assert len(fiber) == degree
+    for lift in cover:
+        assert {neighbor[0] for neighbor in cover.neighbors(lift)} == set(
+            graph.neighbors(lift[0])
+        )
+
+
+def test_coset_action_extraction_rejects_unknown_transitions():
+    with pytest.raises(RuntimeError, match="unknown generator transition"):
+        _extract_coset_actions([[-1, 0]], [0], {0: 0}, 1)
+
+
+def test_coset_action_extraction_requires_mutual_inverse_columns():
+    with pytest.raises(RuntimeError, match="not mutual inverses"):
+        _extract_coset_actions([[1, 0], [0, 1]], [0, 1], {0: 0, 1: 1}, 1)
 
 
 def test_chordal_graph_simply_connected():

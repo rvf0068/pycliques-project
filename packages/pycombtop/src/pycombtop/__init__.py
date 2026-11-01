@@ -4,6 +4,15 @@ pycombtop: Combinatorial topology and simplicial complexes.
 
 # Use relative imports to pull from your complex.py module
 # fundamental_group
+from .covering_divergence import (
+    TriangularCoverDivergenceCertificate,
+    verify_triangular_cover_divergence_certificate,
+)
+from .covering_divergence_search import (
+    CoveringSearchResult,
+    CoveringSearchStatus,
+    search_covering_divergence,
+)
 from .fundamental_group import (
     FundamentalRecord,
     covering_graph,
@@ -98,6 +107,12 @@ __all__ = [
     "first_homology_rank",
     "fundamental_group",
     "fundamental_group_as_permutation_group",
+    # covering divergence
+    "TriangularCoverDivergenceCertificate",
+    "verify_triangular_cover_divergence_certificate",
+    "CoveringSearchResult",
+    "CoveringSearchStatus",
+    "search_covering_divergence",
     # homotopy_type
     "HomotopyVerdict",
     "Theorem",
