@@ -843,11 +843,7 @@ def _recognize_clockwork_fast(
     # segments whether their vertices lie in the core, crown, or both.
     # The independent verifier checks every triangle, so the fast
     # recognizer must impose the same condition before reporting success.
-    segment_of = {
-        vertex: i
-        for i in range(s)
-        for vertex in B_segs[i] | C_segs[i]
-    }
+    segment_of = {vertex: i for i in range(s) for vertex in B_segs[i] | C_segs[i]}
     for a, b, c in itertools.combinations(G, 3):
         if G.has_edge(a, b) and G.has_edge(b, c) and G.has_edge(a, c):
             if len({segment_of[a], segment_of[b], segment_of[c]}) == 3:
