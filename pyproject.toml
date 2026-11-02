@@ -16,7 +16,7 @@ dependencies = [
 workspace.members = ["packages/*"]
 
 [tool.uv.sources]
-# This allows installing all docs dependencies at the root level easily
+# Resolve the workspace packages from this checkout instead of PyPI
 pycliques = { workspace = true }
 pyg6data = { workspace = true }
 pycombtop = { workspace = true }
@@ -40,6 +40,7 @@ line-length = 88
 [tool.pytest.ini_options]
 pythonpath = ["."]
 markers = ["slow: census-scale research regression tests"]
+addopts = "-m 'not slow'"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]

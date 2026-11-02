@@ -1,5 +1,5 @@
 # Root make targets for the Pycliques monorepo
-.PHONY: help test research-test research-test-slow html pdf clean lint lint-fix typecheck
+.PHONY: help test research-test research-test-slow html pdf clean lint lint-fix typecheck coverage coverage-html
 .DEFAULT_GOAL := help
 
 help: ## Show this help message

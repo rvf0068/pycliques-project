@@ -182,13 +182,18 @@ def suspension_bases(
 def _classify_suspension_2_coaffination(
     graph: nx.Graph,
 ) -> ClassifierResult | None:
-    """Apply Theorem 4.6 to a suspension with a 2-coaffine base."""
+    """Apply a special case of [LNP09, Theorem 4.6] to a suspension.
+
+    The implemented criterion is for ``H * complement(K_2)`` with ``H`` having
+    a 2-coaffination; it is an application of the connected-summand theorem,
+    not its full statement.
+    """
     for u, v, base in suspension_bases(graph):
         for tau in coaffinations(base, 2):
             return (
                 Verdict.DIVERGENT,
                 (
-                    "Theorem 4.6: graph is the suspension of a connected graph "
+                    "[LNP09, Theorem 4.6]: graph is the suspension of a connected graph "
                     "H admitting a 2-coaffination; hence it is expansive and "
                     "therefore clique divergent"
                 ),
@@ -418,7 +423,7 @@ def _classify_local_bridge(
     bound: int = 30,
     extension_budget: int = 1,
 ) -> ClassifierResult | None:
-    """Classify by Theorem 6.1, or return ``None`` when it proves nothing.
+    """Classify by [FANP13, Theorem 6.1], or return ``None`` when it proves nothing.
 
     A successful certificate records the contracted edge.  Failure to classify
     a contracted target falls through to the next inference rule.
@@ -431,7 +436,7 @@ def _classify_local_bridge(
         if h_behavior.verdict is Verdict.CONVERGENT:
             return (
                 Verdict.CONVERGENT,
-                "contracting a local bridge yields a convergent graph by Theorem 6.1",
+                "contracting a local bridge yields a convergent graph by [FANP13, Theorem 6.1]",
                 Certificate(
                     rule="local_bridge",
                     target=h,
@@ -445,7 +450,7 @@ def _classify_local_bridge(
         if h_behavior.verdict is Verdict.DIVERGENT:
             return (
                 Verdict.DIVERGENT,
-                "contracting a local bridge yields a divergent graph by Theorem 6.1",
+                "contracting a local bridge yields a divergent graph by [FANP13, Theorem 6.1]",
                 Certificate(
                     rule="local_bridge",
                     target=h,
@@ -465,7 +470,7 @@ def _classify_local_bridge(
                 (
                     "contracting a local bridge yields a conjectured divergent "
                     "graph; conditional on the target being clique divergent "
-                    "by Theorem 6.1"
+                    "by [FANP13, Theorem 6.1]"
                 ),
                 Certificate(
                     rule="local_bridge",
@@ -484,7 +489,7 @@ def classify_local_bridge(
     tries: int = _MAX_ITERATIONS,
     bound: int = 30,
 ) -> ClassifierResult | None:
-    """Classify clique behavior by contracting local bridges according to Theorem 6.1.
+    """Classify clique behavior by contracting local bridges according to [FANP13, Theorem 6.1].
 
     .. rubric:: Parameters
 
@@ -512,7 +517,7 @@ def _classify_non_triangle_edge(
     bound: int = 30,
     extension_budget: int = 1,
 ) -> ClassifierResult | None:
-    """Classify by Theorem 6.2, or return ``None`` when it proves nothing.
+    """Classify by [FANP13, Theorem 6.2], or return ``None`` when it proves nothing.
 
     A successful certificate records the deleted edge.  Failure to classify a
     deleted-edge target falls through to the next inference rule.
@@ -527,7 +532,7 @@ def _classify_non_triangle_edge(
                 Verdict.DIVERGENT,
                 (
                     "deleting an edge in no triangle yields a divergent graph "
-                    "by Theorem 6.2"
+                    "by [FANP13, Theorem 6.2]"
                 ),
                 Certificate(
                     rule="non_triangle_edge",
@@ -548,7 +553,7 @@ def _classify_non_triangle_edge(
                 (
                     "deleting an edge in no triangle yields a conjectured "
                     "divergent graph; conditional on the target being clique "
-                    "divergent by Theorem 6.2"
+                    "divergent by [FANP13, Theorem 6.2]"
                 ),
                 Certificate(
                     rule="non_triangle_edge",
@@ -569,7 +574,7 @@ def classify_non_triangle_edge(
 ) -> ClassifierResult | None:
     """Classify clique behavior by deleting edges in no triangle.
 
-    The decision uses Theorem 6.2.
+    The decision uses [FANP13, Theorem 6.2].
 
     .. rubric:: Parameters
 
@@ -602,13 +607,13 @@ def _classify_inverse_cutpoint_extension(
 
     Searches for a local cutpoint whose admissible split (see
     :mod:`pycliques.cutpoints`) followed by removing the newly added edge
-    (Theorem 6.2) yields a graph with known clique behavior. The admissible
-    split itself is justified by Theorem 6.1 applied to the constructed
+    ([FANP13, Theorem 6.2]) yields a graph with known clique behavior. The admissible
+    split itself is justified by [FANP13, Theorem 6.1] applied to the constructed
     edge, not by any additional unverified hypothesis.
 
     ``extension_budget`` bounds how many times this (expensive) rule may
     fire along a single recursive classification chain; it is decremented
-    only when this rule itself is applied, not by the cheaper Theorem 6.1 /
+    only when this rule itself is applied, not by the cheaper [FANP13, Theorem 6.1] /
     6.2 rules. A budget of 0 makes this rule return ``None`` immediately.
     """
     if extension_budget <= 0:
@@ -637,9 +642,9 @@ def _classify_inverse_cutpoint_extension(
             return (
                 Verdict.DIVERGENT,
                 (
-                    "an inverse cutpoint extension (Theorem 6.1) followed by "
+                    "an inverse cutpoint extension ([FANP13, Theorem 6.1]) followed by "
                     "deleting the added edge, contained in no triangle "
-                    "(Theorem 6.2), yields a divergent graph"
+                    "([FANP13, Theorem 6.2]), yields a divergent graph"
                 ),
                 Certificate(
                     rule="inverse_cutpoint_extension",
@@ -659,8 +664,8 @@ def _classify_inverse_cutpoint_extension(
             return (
                 Verdict.INDETERMINATE,
                 (
-                    "an inverse cutpoint extension (Theorem 6.1) followed by "
-                    "deleting the added edge (Theorem 6.2) yields a "
+                    "an inverse cutpoint extension ([FANP13, Theorem 6.1]) followed by "
+                    "deleting the added edge ([FANP13, Theorem 6.2]) yields a "
                     "conjectured divergent graph; conditional on the target "
                     "being clique divergent"
                 ),
@@ -688,9 +693,9 @@ def classify_inverse_cutpoint_extension(
 
     This searches for a local cutpoint of ``graph`` that admits a
     theorem-valid split into two vertices ``u``, ``v`` joined by a new edge
-    (Theorem 6.1), such that deleting that edge -- contained in no triangle
+    ([FANP13, Theorem 6.1]), such that deleting that edge -- contained in no triangle
     by construction requirements -- yields a graph of known clique behavior
-    (Theorem 6.2). See :mod:`pycliques.cutpoints` for the precise
+    ([FANP13, Theorem 6.2]). See :mod:`pycliques.cutpoints` for the precise
     admissibility condition.
 
     .. rubric:: Parameters
@@ -737,14 +742,14 @@ def _find_clockwork_pair_certificate(
     max_coaffinations: int,
     max_source_order: int,
 ) -> tuple[int, int, int, CoaffinePair, dict, dict] | None:
-    """Search for a Theorem 2.6 clockwork pair map into *target_graph*.
+    """Search for a [LNP06, Theorem 2.6] clockwork pair map into *target_graph*.
 
     Tries every ``m`` in ``2 .. max_m``; for each, collects up to
     ``max_coaffinations`` involutive ``(m + 1)``-coaffinations of
     ``target_graph``, then tries every ``n`` in ``0 .. max_n`` (subject to
     ``max_source_order``) against each candidate coaffination.
 
-    ``m == 1`` (radius 2) is never tried: Theorem 3.1 only certifies that
+    ``m == 1`` (radius 2) is never tried: [LNP06, Theorem 3.1] only certifies that
     ``R_{2m}^n`` is rank divergent for ``m >= 2``, so a 1- or 2-coaffination
     target would not be backed by that theorem's hypothesis.
 
@@ -785,16 +790,16 @@ def _classify_clockwork_pair_map(
     max_source_order: int = 40,
     bound: int = 30,
 ) -> ClassifierResult | None:
-    """Classify by Theorem 2.6 applied to Theorem 3.1, or return ``None``.
+    """Classify by [LNP06, Theorem 2.6] applied to [LNP06, Theorem 3.1], or return ``None``.
 
     Searches for an admissible graph morphism of coaffine pairs
     ``f: (R_{2m}^n, sigma) -> (graph, tau)`` for some ``m`` in
     ``2 .. max_m``, ``n`` in ``0 .. max_n``, and involutive
-    ``(m + 1)``-coaffination ``tau`` of ``graph``.  By Theorem 3.1,
+    ``(m + 1)``-coaffination ``tau`` of ``graph``.  By [LNP06, Theorem 3.1],
     ``R_{2m}^n`` is ``(m + 1)``-coaffine and rank divergent for ``m >= 2``;
-    by Theorem 2.6, an admissible morphism to ``(graph, tau)`` transfers
+    by [LNP06, Theorem 2.6], an admissible morphism to ``(graph, tau)`` transfers
     rank divergence to ``graph``, and rank divergence implies clique
-    divergence.  ``m == 1`` (radius 2) is never searched: Theorem 3.1 does
+    divergence.  ``m == 1`` (radius 2) is never searched: [LNP06, Theorem 3.1] does
     not certify rank divergence of ``R_2^n``, so a 1- or 2-coaffination
     target would not be a sound certificate.
 
@@ -831,8 +836,8 @@ def _classify_clockwork_pair_map(
             Verdict.DIVERGENT,
             (
                 f"admits a map of coaffine pairs from R_{{{2 * m}}}^"
-                f"{{{n}}} (Theorem 3.1) yielding rank divergence "
-                "transferred by Theorem 2.6"
+                f"{{{n}}} ([LNP06, Theorem 3.1]) yielding rank divergence "
+                "transferred by [LNP06, Theorem 2.6]"
             ),
             Certificate(
                 rule="theorem_2_6_clockwork_pair_map",
@@ -867,8 +872,8 @@ def _classify_clockwork_pair_map(
         Verdict.DIVERGENT,
         (
             f"admits a map of coaffine pairs from R_{{{2 * m}}}^{{{n}}} "
-            "(Theorem 3.1) into K(graph), yielding rank divergence of "
-            "K(graph) by Theorem 2.6, hence rank divergence -- and clique "
+            "([LNP06, Theorem 3.1]) into K(graph), yielding rank divergence of "
+            "K(graph) by [LNP06, Theorem 2.6], hence rank divergence -- and clique "
             "divergence -- of the original graph"
         ),
         Certificate(
@@ -908,7 +913,7 @@ def classify_clockwork_pair_map(
     3.1 for :math:`m \\geq 2`.  An admissible morphism of coaffine pairs
     transfers rank divergence from the domain to the codomain by Theorem
     2.6, and rank divergence implies clique divergence.  ``m == 1`` (radius
-    2) is never searched, since Theorem 3.1 does not certify rank
+    2) is never searched, since [LNP06, Theorem 3.1] does not certify rank
     divergence of :math:`R_2^n`.
 
     When the direct search fails, the same bounded search is retried with
@@ -926,7 +931,7 @@ def classify_clockwork_pair_map(
     max_m : int, optional
         Maximum clockwork parameter ``m`` to try (default: 3).  Values of
         ``m`` below 2 (radius below 3) are never tried, regardless of this
-        bound, since Theorem 3.1 only certifies rank divergence of
+        bound, since [LNP06, Theorem 3.1] only certifies rank divergence of
         ``R_{2m}^n`` for ``m >= 2``.
     max_n : int, optional
         Maximum clockwork parameter ``n`` to try (default: 3).
@@ -996,14 +1001,14 @@ def _valid_theorem_coaffination(
     )
 
 
-def verify_theorem_2_6_certificate(
+def verify_clockwork_pair_map_certificate(
     original_graph: nx.Graph,
     certificate: Certificate,
     *,
     clique_bound: int | float | None = None,
     max_edges: int | None = None,
 ) -> CertificateVerificationResult:
-    """Independently verify a Theorem 2.6 clockwork-pair certificate.
+    """Independently verify a [LNP06, Theorem 2.6] clockwork-pair certificate.
 
     ``theorem_base_graph`` records the exact graph searched by the pair-map
     rule. The standalone rule records ``original_graph``; the combined
@@ -1035,7 +1040,7 @@ def verify_theorem_2_6_certificate(
     direct_rule = "theorem_2_6_clockwork_pair_map"
     clique_rule = "theorem_2_6_clockwork_pair_map_clique_graph"
     if certificate.rule not in {direct_rule, clique_rule}:
-        return invalid("Certificate rule is not a Theorem 2.6 clockwork-pair rule.")
+        return invalid("Certificate rule is not a [LNP06, Theorem 2.6] clockwork-pair rule.")
     if (
         not isinstance(certificate.m, int)
         or not isinstance(certificate.n, int)
@@ -1122,7 +1127,7 @@ def verify_theorem_2_6_certificate(
 
     return CertificateVerificationResult(
         CertificateVerificationStatus.VERIFIED,
-        "Theorem 2.6 certificate and target provenance verified.",
+        "[LNP06, Theorem 2.6] certificate and target provenance verified.",
     )
 
 
@@ -1276,10 +1281,10 @@ def classify_clique_behavior(
     """Classify the observed clique behavior of an undirected graph.
 
     This is the *fast pass*: it deliberately excludes the expensive
-    Theorem 2.6 / coaffination search
+    [LNP06, Theorem 2.6] / coaffination search
     (:func:`classify_clockwork_pair_map`).  A graph left ``INDETERMINATE``
     by this fast pass may still be classifiable by that separate, more
-    expensive rule; see :func:`classify_clique_behavior_with_theorem_2_6`
+    expensive rule; see :func:`classify_clique_behavior_with_clockwork_pair_search`
     to run both stages together.
 
     The input is completely pared before its iterated clique graphs are
@@ -1289,7 +1294,7 @@ def classify_clique_behavior(
 
     The classifier applies a sequence of mathematically justified
     inference rules. These include retraction to registered reference
-    graphs, Theorem 6.1 local-bridge contractions, Theorem 6.2
+    graphs, [FANP13, Theorem 6.1] local-bridge contractions, [FANP13, Theorem 6.2]
     deletion of edges contained in no triangle, and theorem-motivated
     inverse cutpoint extensions. Each rule returns None when it
     establishes no verdict, allowing the pipeline to continue. A
@@ -1299,7 +1304,7 @@ def classify_clique_behavior(
     Each inference rule returns ``None`` when it establishes no verdict, so
     the pipeline continues.  The final ``INDETERMINATE`` result means that
     the available (fast) rules were exhausted without a definitive
-    conclusion -- it is not evidence about what the (unrun) Theorem 2.6
+    conclusion -- it is not evidence about what the (unrun) [LNP06, Theorem 2.6]
     search would find.
 
     .. rubric:: Parameters
@@ -1534,7 +1539,7 @@ def classify_clique_behavior(
     )
 
 
-def classify_clique_behavior_with_theorem_2_6(
+def classify_clique_behavior_with_clockwork_pair_search(
     graph: nx.Graph,
     *,
     tries: int = _MAX_ITERATIONS,
@@ -1555,13 +1560,13 @@ def classify_clique_behavior_with_theorem_2_6(
     max_n: int = 3,
     max_coaffinations: int = 20,
     max_source_order: int = 40,
-    theorem_2_6_bound: int | None = None,
+    clockwork_pair_bound: int | None = None,
 ) -> CliqueBehavior:
-    """Run the fast pass, then the expensive Theorem 2.6 pass if still unresolved.
+    """Run the fast pass, then the expensive [LNP06, Theorem 2.6] pass if still unresolved.
 
-    This is the two-stage workflow used by the ``small-behavior-theorem26``
+    This is the two-stage workflow used by the ``small-behavior-clockwork-pairs``
     CLI: :func:`classify_clique_behavior` (the fast pass) is run first, and
-    :func:`classify_clockwork_pair_map` (the Theorem 2.6 / coaffination
+    :func:`classify_clockwork_pair_map` (the [LNP06, Theorem 2.6] / coaffination
     search) is only attempted when the fast pass leaves the graph
     ``INDETERMINATE``.  Graphs already classified as ``CONVERGENT`` or
     ``DIVERGENT`` never reach the expensive search.
@@ -1574,15 +1579,15 @@ def classify_clique_behavior_with_theorem_2_6(
         Forwarded to :func:`classify_clique_behavior`.
     max_m, max_n, max_coaffinations, max_source_order
         Forwarded to :func:`classify_clockwork_pair_map`.
-    theorem_2_6_bound : int, optional
-        Clique-graph bound used by the Theorem 2.6 search's ``K(graph)``
+    clockwork_pair_bound : int, optional
+        Clique-graph bound used by the [LNP06, Theorem 2.6] search's ``K(graph)``
         fallback.  Defaults to ``bound`` when not given.
 
     .. rubric:: Returns
 
     CliqueBehavior
         The fast-pass result unchanged, unless the fast pass was
-        ``INDETERMINATE`` and Theorem 2.6 establishes ``DIVERGENT``.
+        ``INDETERMINATE`` and [LNP06, Theorem 2.6] establishes ``DIVERGENT``.
     """
     fast = classify_clique_behavior(
         graph,
@@ -1604,7 +1609,7 @@ def classify_clique_behavior_with_theorem_2_6(
     if fast.verdict is not Verdict.INDETERMINATE:
         return fast
 
-    theorem_bound = bound if theorem_2_6_bound is None else theorem_2_6_bound
+    theorem_bound = bound if clockwork_pair_bound is None else clockwork_pair_bound
     theorem_result = classify_clockwork_pair_map(
         fast.pared_graph,
         max_m=max_m,
@@ -2243,8 +2248,8 @@ def main():  # pragma: no cover
 
 
 # ---------------------------------------------------------------------------
-# Second-stage CLI: optional Theorem 2.6 pass over fast-pass INDETERMINATE
-# graphs. See classify_clique_behavior_with_theorem_2_6 for the classifier
+# Second-stage CLI: optional [LNP06, Theorem 2.6] pass over fast-pass INDETERMINATE
+# graphs. See classify_clique_behavior_with_clockwork_pair_search for the classifier
 # orchestration; this section only handles CLI parsing, dataset iteration,
 # and reporting.
 # ---------------------------------------------------------------------------
@@ -2344,11 +2349,11 @@ def _run_fast_pass_indeterminate(
     return convergent, divergent, indeterminate, processed_indices
 
 
-def _parse_theorem26_args(args: list[str]) -> argparse.Namespace:
-    """Parse command-line arguments for the Theorem 2.6 second-stage script."""
+def _parse_clockwork_pair_args(args: list[str]) -> argparse.Namespace:
+    """Parse command-line arguments for the [LNP06, Theorem 2.6] second-stage script."""
     parser = argparse.ArgumentParser(
         description=(
-            "Theorem 2.6 (coaffination) pass over graphs the fast "
+            "[LNP06, Theorem 2.6] (coaffination) pass over graphs the fast "
             "small-behavior pass left INDETERMINATE"
         )
     )
@@ -2451,7 +2456,7 @@ def _parse_theorem26_args(args: list[str]) -> argparse.Namespace:
         "--bound",
         dest="bound",
         help=(
-            "Clique bound for the K(graph) fallback used by the Theorem 2.6 "
+            "Clique bound for the K(graph) fallback used by the [LNP06, Theorem 2.6] "
             "search (default: 30)"
         ),
         type=int,
@@ -2479,9 +2484,9 @@ def _parse_theorem26_args(args: list[str]) -> argparse.Namespace:
     return parser.parse_args(args)
 
 
-def _main_theorem26(args: list[str]):
-    """Run the Theorem 2.6 pass over fast-pass INDETERMINATE graphs."""
-    parsed_args = _parse_theorem26_args(args)
+def _main_clockwork_pairs(args: list[str]):
+    """Run the [LNP06, Theorem 2.6] pass over fast-pass INDETERMINATE graphs."""
+    parsed_args = _parse_clockwork_pair_args(args)
     _setup_logging(parsed_args.loglevel)
 
     order = parsed_args.n
@@ -2572,10 +2577,10 @@ def _main_theorem26(args: list[str]):
                 still_indeterminate.append((idx, graph, fast_certificate))
                 if verdict_file is not None:
                     verdict_file.write(
-                        f"{idx}\tINDETERMINATE\tunresolved by Theorem 2.6\n"
+                        f"{idx}\tINDETERMINATE\tunresolved by [LNP06, Theorem 2.6]\n"
                     )
 
-    _logger.info("Theorem 2.6:")
+    _logger.info("[LNP06, Theorem 2.6]:")
     _logger.info(f"    newly divergent:         {len(newly_divergent)}")
     _logger.info(f"    remaining indeterminate: {len(still_indeterminate)}")
 
@@ -2590,9 +2595,9 @@ def _main_theorem26(args: list[str]):
             )
 
 
-def main_theorem26():  # pragma: no cover
-    """Entry point for the ``small-behavior-theorem26`` console script."""
-    _main_theorem26(sys.argv[1:])
+def main_clockwork_pairs():  # pragma: no cover
+    """Entry point for the ``small-behavior-clockwork-pairs`` console script."""
+    _main_clockwork_pairs(sys.argv[1:])
 
 
 if __name__ == "__main__":  # pragma: no cover

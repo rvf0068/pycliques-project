@@ -20,21 +20,29 @@ git clone https://github.com/rvf0068/pycliques-project.git
 cd pycliques-project
 ```
 
-**With uv** (recommended — handles the workspace automatically):
+**With uv** (recommended — resolves the sibling packages from this checkout):
 
 ```bash
-uv sync                        # install everything
-uv add pycliques               # or add a single package to your project
+uv sync                        # set up the cloned workspace (all packages + dev tools)
 ```
 
-**With pip** (install individual packages from source):
+Use `uv add pycliques` only to add the published package to a *different*
+project; it edits that project's dependencies and is not a setup step here.
+
+**With pip** (install individual packages from this checkout). Install
+`pyg6data` before packages that depend on it, and use local paths so pip does
+not resolve sibling packages from PyPI:
 
 ```bash
-pip install ./packages/pycliques
 pip install ./packages/pyg6data
+pip install ./packages/pycliques
 pip install ./packages/pycombtop
 pip install ./packages/pyhomrep
 ```
+
+Mathematical sources for the implemented theorems are listed in
+[`docs/references.rst`](docs/references.rst) (built into the Sphinx docs). They
+justify the theorems and algorithms, not the experimental census outcomes.
 
 ---
 
@@ -54,18 +62,18 @@ Tools for studying the **clique graph operator** K(G). Given a graph G, the cliq
 - `retracts` / `special_octahedra_dimension` — retraction tests
 - `classify_clique_behavior` — apply the fast standard convergence/divergence
   tests to one graph
-- `classify_clockwork_pair_map` — the separate, more expensive Theorem 2.6 /
-  coaffination search
-- `classify_clique_behavior_with_theorem_2_6` — runs the fast pass, then
-  Theorem 2.6 only if the fast pass left the graph `INDETERMINATE`
+- `classify_clockwork_pair_map` — the separate, more expensive clockwork-pair
+  (coaffination) search based on [LNP06, Theorems 2.6 and 3.1]
+- `classify_clique_behavior_with_clockwork_pair_search` — runs the fast pass, then
+  the clockwork-pair search only if the fast pass left the graph `INDETERMINATE`
 - CLI `small-behavior` — fast classification of all connected graphs of a
-  given order (never runs the Theorem 2.6 search)
-- CLI `small-behavior-theorem26` — optional, more expensive second pass:
-  applies Theorem 2.6 only to graphs the fast pass left `INDETERMINATE`
+  given order (never runs the clockwork-pair search)
+- CLI `small-behavior-clockwork-pairs` — optional, more expensive second pass:
+  applies the clockwork-pair search only to graphs the fast pass left `INDETERMINATE`
 
 **Dependencies:** `networkx`, `grandiso`, `rich`  
 **Optional:** `pyg6data` (needed only for the `small-behavior` /
-`small-behavior-theorem26` CLIs — install with
+`small-behavior-clockwork-pairs` CLIs — install with
 `pip install "./packages/pycliques[data]"`)
 
 ### Example
@@ -85,9 +93,10 @@ graph within the requested iteration and clique-count limits. Check
 `result.bound_exceeded` to distinguish a clique-count abort from an
 indeterminate result after all requested iterations.
 
-### Theorem 4.6 fast criterion
+### Suspension fast criterion ([LNP09, Theorem 4.6])
 
-The fast classifier also applies Theorem 4.6: if
+The fast classifier also applies a special case of Neumann-Lara's connected
+summand theorem, [LNP09, Theorem 4.6] (not its verbatim full statement): if
 `S = H * complement(K_2)`, where `H` is connected and admits a 2-coaffination,
 then `S` is expansive and therefore clique divergent. The implementation looks
 for two nonadjacent universal vertices whose deletion leaves a connected base
@@ -95,18 +104,18 @@ graph, then reuses the general `coaffinations(H, 2)` machinery. It does not
 search arbitrary induced subgraphs or require the coaffination to be an
 involution. A clique is understood here as a maximal complete subgraph.
 
-### Two-level classification: fast pass vs. Theorem 2.6
+### Two-level classification: fast pass vs. clockwork-pair search
 
 `classify_clique_behavior` (and the `small-behavior` CLI) is the **fast
 pass**: it applies complete paring, direct reference graphs, clockwork
 criteria, eventual-Helly and special-octahedron tests, fixed retractions,
-reference dependency, Theorem 6.1/6.2 local-bridge and non-triangle-edge
+reference dependency, [FANP13, Theorems 6.1/6.2] local-bridge and non-triangle-edge
 inference, and inverse cutpoint extension. It deliberately excludes the
-expensive Theorem 2.6 (rank-divergence) coaffination search, so it stays fast
+expensive clockwork-pair (rank-divergence, [LNP06, Theorems 2.6 and 3.1]) coaffination search, so it stays fast
 even for large censuses.
 
-Theorem 2.6 is available as a separate, optional second stage
-(`classify_clockwork_pair_map` / the `small-behavior-theorem26` CLI). It
+The clockwork-pair search is available as a separate, optional second stage
+(`classify_clockwork_pair_map` / the `small-behavior-clockwork-pairs` CLI). It
 searches, in increasing radius order (`r = 3, 4, 5, ...`, i.e. `m = 2, 3, 4,
 ...` with `r = m + 1`), for an admissible morphism of coaffine pairs from a
 clockwork graph `R_{2m}^n` into the target graph -- or, failing that, into
@@ -126,7 +135,7 @@ uv run small-behavior 9 --from-indeterminate-file \
 uv run small-behavior 9 --from-indeterminate-file \
   --check-clique-retraction
                         # run the seq[1] Comp(C_10) retraction pass
-uv run small-behavior-theorem26 9 --max-m 3   # Theorem 2.6 pass on the unresolved graphs
+uv run small-behavior-clockwork-pairs 9 --max-m 3   # clockwork-pair pass on the unresolved graphs
 ```
 
 The fast CLI's `--from-indeterminate-file` mode reads the saved
@@ -148,16 +157,16 @@ cohort. The fast CLI gives the current certified verdict precedence over any
 isomorphic unresolved core found by lookup; a prior-core match only annotates
 a graph that is still indeterminate.
 
-For `small-behavior-theorem26 --from-indeterminate-file`, the saved file is the
+For `small-behavior-clockwork-pairs --from-indeterminate-file`, the saved file is the
 entire input cohort and is replaced with exactly the rows still unresolved
 after the pass, including a header-only file when all candidates resolve.
 `--start` and `--end` are rejected in this mode because saved-file entries do
 not define a census interval. `--no-save` leaves the unresolved file unchanged;
-`--output-file` can still record per-run verdicts. In fresh Theorem 2.6 runs,
+`--output-file` can still record per-run verdicts. In fresh clockwork-pair runs,
 only indices actually visited by the fast pass are updated, preserving saved
 rows outside a partial range.
 
-The `small-behavior-theorem26` CLI exposes `--max-m`, `--max-n`,
+The `small-behavior-clockwork-pairs` CLI exposes `--max-m`, `--max-n`,
 `--max-coaffinations`, `--max-source-order`, and `--bound` so that
 progressively larger computational limits can be tried without modifying
 source code, and `--from-indeterminate-file` to reuse a previously saved
@@ -186,9 +195,8 @@ graphs = list_graphs(6)
 print(len(graphs))               # 112
 
 # Stream connected graphs on 9 vertices one by one
-for g in graph_generator(9):
-    if g.order() == 9:
-        pass  # process without loading all ~261 000 graphs at once
+dense = sum(1 for g in graph_generator(9) if g.number_of_edges() >= 30)
+print(dense)                     # computed lazily, without holding all graphs in memory
 
 # Run a filter/evaluator census with an atomic, resumable checkpoint
 from pyg6data.census import run_graph_census
@@ -212,7 +220,7 @@ Combinatorial topology tools for graphs and simplicial complexes:
 - `homotopy_type_with_verdict` — determine the homotopy type of a graph's clique
     complex, with optional vertex/simplex limits that return explicit
     inconclusive results
-- `fundamental_group` — compute the fundamental group (algorithm from Rees & Soicher, *J. Symbolic Comp.* 29, 2000)
+- `fundamental_group` — compute the fundamental group (algorithm from [RS00], Rees & Soicher, *J. Symbolic Comp.* 29, 2000; see [`docs/references.rst`](docs/references.rst))
 - `complete_s_collapse` — strong collapses
 - `hom_graph` / `graph_homomorphisms` — Hom complexes
 

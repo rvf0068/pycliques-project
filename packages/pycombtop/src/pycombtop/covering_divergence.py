@@ -13,7 +13,7 @@ from pycliques.clockwork_search import (
     CertificateVerificationResult,
     CertificateVerificationStatus,
 )
-from pycliques.small import Certificate, verify_theorem_2_6_certificate
+from pycliques.small import Certificate, verify_clockwork_pair_map_certificate
 
 from .fundamental_group import covering_graph, fundamental_group
 
@@ -257,7 +257,7 @@ def verify_triangular_cover_divergence_certificate(
             invalid, "Induced clique-graph action fails its coaffinity radius."
         )
 
-    theorem_result = verify_theorem_2_6_certificate(target, inner)
+    theorem_result = verify_clockwork_pair_map_certificate(target, inner)
     if theorem_result.status is not CertificateVerificationStatus.VERIFIED:
         return theorem_result
     return CertificateVerificationResult(

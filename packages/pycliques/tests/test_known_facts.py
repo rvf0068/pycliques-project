@@ -5,8 +5,8 @@ from pycliques.cliques import clique_graph
 from pycliques.dominated import find_dominated_vertex
 from pycliques.helly import is_clique_helly
 from pycliques.homotopy_invariance import (
+    check_closed_clique_intersection_contractibility,
     delta_of_clique_set,
-    theorem15_hypothesis_holds,
 )
 from pycliques.named import (
     collapse_obstruction_fixture,
@@ -93,7 +93,7 @@ def test_fixture_2_has_documented_invariants():
     assert graph.order() == 9
     assert kg.order() == 16
     assert has_induced(kg, octahedron(4))
-    holds, witness = theorem15_hypothesis_holds(graph)
+    holds, witness = check_closed_clique_intersection_contractibility(graph)
     assert holds is False
     assert witness is not None
     delta_h = delta_of_clique_set(witness)

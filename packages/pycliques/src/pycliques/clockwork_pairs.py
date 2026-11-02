@@ -1,9 +1,11 @@
 r"""Maps of coaffine pairs between clockwork graphs and target graphs.
 
-This module implements the classifier criterion of Theorem 2.6 of
+This module implements a classifier criterion built from Theorems 2.6 and 3.1
+of [LNP06] (see ``docs/references.rst``):
 
     F. Larrion, V. Neumann-Lara, M. A. Pizana,
-    *Graph relations, clique divergence and surface triangulations* (2006).
+    *Graph relations, clique divergence and surface triangulations*, J. Graph
+    Theory 51 (2006), 110-122.
 
 Theorem 2.6 states that an admissible graph relation between :math:`r`-coaffine
 graphs transfers rank divergence from the domain to the codomain: if

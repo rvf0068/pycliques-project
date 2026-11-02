@@ -4,7 +4,10 @@ from dataclasses import replace
 
 import networkx as nx
 import pycliques.small as small
-from pycliques import CertificateVerificationStatus, verify_theorem_2_6_certificate
+from pycliques import (
+    CertificateVerificationStatus,
+    verify_clockwork_pair_map_certificate,
+)
 from pycliques.cliques import clique_graph
 from pycliques.coaffinations import CoaffinePair
 from pycliques.small import (
@@ -12,7 +15,7 @@ from pycliques.small import (
     _classify_clockwork_pair_map,
     _find_clockwork_pair_certificate,
     classify_clique_behavior,
-    classify_clique_behavior_with_theorem_2_6,
+    classify_clique_behavior_with_clockwork_pair_search,
     classify_clockwork_pair_map,
 )
 
@@ -138,7 +141,7 @@ def test_classify_clique_behavior_uses_clockwork_pair_map_certificate():
     fast_result = classify_clique_behavior(kg)
     assert fast_result.verdict is Verdict.INDETERMINATE
 
-    result = classify_clique_behavior_with_theorem_2_6(kg)
+    result = classify_clique_behavior_with_clockwork_pair_search(kg)
 
     assert result.verdict is Verdict.DIVERGENT
     assert result.certificate is not None
@@ -146,7 +149,7 @@ def test_classify_clique_behavior_uses_clockwork_pair_map_certificate():
     assert result.certificate.m == 2
     assert result.certificate.n == 0
     assert result.certificate.radius == 3
-    verified = verify_theorem_2_6_certificate(kg, result.certificate)
+    verified = verify_clockwork_pair_map_certificate(kg, result.certificate)
     assert verified.status is CertificateVerificationStatus.VERIFIED
 
 
@@ -203,7 +206,7 @@ def test_icosahedron_is_divergent_via_its_clique_graph():
         is None
     )
 
-    result = classify_clique_behavior_with_theorem_2_6(g)
+    result = classify_clique_behavior_with_clockwork_pair_search(g)
 
     assert result.verdict is Verdict.DIVERGENT
     assert result.certificate is not None
@@ -212,24 +215,30 @@ def test_icosahedron_is_divergent_via_its_clique_graph():
     assert result.certificate.n == 0
     assert result.certificate.radius == 3
     assert result.certificate.target.order() == 20
-    verified = verify_theorem_2_6_certificate(g, result.certificate, clique_bound=30)
+    verified = verify_clockwork_pair_map_certificate(
+        g, result.certificate, clique_bound=30
+    )
     assert verified.status is CertificateVerificationStatus.VERIFIED
-    limited = verify_theorem_2_6_certificate(g, result.certificate, clique_bound=1)
+    limited = verify_clockwork_pair_map_certificate(
+        g, result.certificate, clique_bound=1
+    )
     assert limited.status is CertificateVerificationStatus.LIMIT_REACHED
-    edge_limited = verify_theorem_2_6_certificate(
+    edge_limited = verify_clockwork_pair_map_certificate(
         g, result.certificate, clique_bound=30, max_edges=0
     )
     assert edge_limited.status is CertificateVerificationStatus.LIMIT_REACHED
     assert (
-        verify_theorem_2_6_certificate(g, result.certificate, clique_bound=30).status
+        verify_clockwork_pair_map_certificate(
+            g, result.certificate, clique_bound=30
+        ).status
         is CertificateVerificationStatus.VERIFIED
     )
 
 
-def test_theorem_2_6_verifier_rejects_certificate_corruption():
+def test_clockwork_pair_search_verifier_rejects_certificate_corruption():
     graph = clique_graph(nx.icosahedral_graph())
     assert graph is not None
-    result = classify_clique_behavior_with_theorem_2_6(graph)
+    result = classify_clique_behavior_with_clockwork_pair_search(graph)
     certificate = result.certificate
     assert certificate is not None
     assert certificate.rule == "theorem_2_6_clockwork_pair_map"
@@ -270,7 +279,7 @@ def test_theorem_2_6_verifier_rejects_certificate_corruption():
         replace(certificate, target=bad_target),
     ]
     for corrupted in corruptions:
-        result = verify_theorem_2_6_certificate(graph, corrupted)
+        result = verify_clockwork_pair_map_certificate(graph, corrupted)
         assert result.status is CertificateVerificationStatus.INVALID
 
 
@@ -334,7 +343,7 @@ def test_clique_graph_extension_works_with_arbitrary_hashable_labels():
     g = nx.icosahedral_graph()
     g = nx.relabel_nodes(g, {i: f"v{i}" for i in g.nodes()})
 
-    result = classify_clique_behavior_with_theorem_2_6(g)
+    result = classify_clique_behavior_with_clockwork_pair_search(g)
 
     assert result.verdict is Verdict.DIVERGENT
     assert result.certificate is not None

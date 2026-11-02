@@ -6,15 +6,23 @@ operator :math:`K`. They all share the same underlying objects: completes of
 :math:`K(G)` (pairwise-intersecting sets of cliques of :math:`G`), and their
 intersections/centers/closures. See ``research/homotopy-invariance-toolkit.md``
 for the full narrative and ``research/references/`` for the cited papers,
-in particular the 2008 poset paper (Larrion, Pizana, Villarroel-Flores,
-"Posets, Clique Graphs and their Homotopy Type," *European J. Combin.* 29)
-for Theorems 11/13/15, and Islas-Gomez's 2021 thesis for the elementary
-collapse dichotomy referenced in Priority 4 of that document.
+in particular [LPV08] (Larrion, Pizana, Villarroel-Flores, "Posets, Clique
+Graphs and their Homotopy Type," *European J. Combin.* 29), and Islas-Gomez's
+2021 thesis for the elementary collapse dichotomy referenced in Priority 4 of
+that document. Full citations are in ``docs/references.rst``.
+
+.. note::
+
+   "Theorem 11/13/15" in the research notes are survey-local labels, not
+   published theorem numbers. The checks implemented here are this
+   repository's own tests and reductions; the published comparison is
+   [LPV08, Theorem 5.7], a *sufficient* condition for :math:`G \simeq K(G)`.
 
 .. rubric:: Note on package placement
 
-:func:`theorem15_hypothesis_holds` needs a homotopy-type computation from
-:mod:`pycombtop`, which itself depends on :mod:`pycliques`. To avoid a
+:func:`check_closed_clique_intersection_contractibility` needs a
+homotopy-type computation from :mod:`pycombtop`, which itself depends on
+:mod:`pycliques`. To avoid a
 circular *package* dependency, that one function imports
 :mod:`pycombtop.homotopy_type` lazily (inside the function body) rather than
 at module load time; every other function here only needs :mod:`networkx`
@@ -35,7 +43,7 @@ if TYPE_CHECKING:
     from pycombtop import SimplicialComplex
 
 # ---------------------------------------------------------------------------
-# 1a. Completes of K(G), centers, and neckties (Theorem 11 machinery)
+# 1a. Completes of K(G), centers, and neckties (necktie-center machinery)
 # ---------------------------------------------------------------------------
 
 
@@ -223,10 +231,10 @@ def has_center_at_all(complete: Iterable, kg: nx.Graph) -> bool:
     return any(is_center(q0, complete) for q0 in kg.nodes())
 
 
-def theorem11_hypothesis_holds(
+def necktie_center_condition_holds(
     graph: nx.Graph,
 ) -> tuple[bool, frozenset | None]:
-    """Check Theorem 11's hypothesis: every bad complete has a necktie-wide center.
+    """Check that every bad complete has a necktie-wide center.
 
     Every bad complete :math:`X` of :math:`K(G)` must have a center lying in
     every necktie containing :math:`X`.
@@ -246,8 +254,8 @@ def theorem11_hypothesis_holds(
     .. rubric:: Examples
 
     >>> import networkx as nx
-    >>> from pycliques.homotopy_invariance import theorem11_hypothesis_holds
-    >>> holds, _ = theorem11_hypothesis_holds(nx.complete_graph(4))
+    >>> from pycliques.homotopy_invariance import necktie_center_condition_holds
+    >>> holds, _ = necktie_center_condition_holds(nx.complete_graph(4))
     >>> holds
     True
     """
@@ -543,7 +551,7 @@ def verify_discrete_morse_matching(
 
 
 # ---------------------------------------------------------------------------
-# 1d. The h-closure operator and Theorem 15's direct hypothesis test
+# 1d. The h-closure operator and the direct contractibility test
 # ---------------------------------------------------------------------------
 
 
@@ -567,7 +575,8 @@ def h_closure(
         A complete of *kg* (an iterable of cliques of :math:`G`).
     kg : networkx.Graph
         The clique graph :math:`K(G)`. Present for API symmetry with
-        :func:`theorem15_hypothesis_holds`; not otherwise used since
+        :func:`check_closed_clique_intersection_contractibility`; not otherwise
+        used since
         *all_maximal_cliques_of_kg* already carries the needed information.
     all_maximal_cliques_of_kg : Iterable[frozenset]
         The cliques of *kg*, as returned by NetworkX's ``find_cliques``.
@@ -663,7 +672,7 @@ def _h_closure_indexed(
     return result
 
 
-def theorem15_hypothesis_holds(
+def check_closed_clique_intersection_contractibility(
     graph: nx.Graph,
     size_cap: int | None = None,
     *,
@@ -674,16 +683,15 @@ def theorem15_hypothesis_holds(
     max_closed_h_images: int | None = None,
     max_simplices_per_h_image: int | None = None,
 ) -> tuple[bool | None, frozenset | None]:
-    """Check Theorem 15's hypothesis: :math:`\\Delta(h(X))` contractible for every X.
+    """Check that :math:`\\Delta(h(X))` is contractible for every complete X.
 
     If :math:`\\Delta(h(X))` is contractible for every complete :math:`X` of
-    :math:`K(G)`, then :math:`G \\simeq K(G)`. This is an application of
-    Quillen's fiber lemma (survey Theorem 13/15, from the 2008 poset paper)
-    and, importantly, does not require exhibiting an explicit combinatorial
-    collapse -- so it is not vulnerable to a Whitehead-torsion-style
-    obstruction the way elementary-collapse-based approaches are.
+    :math:`K(G)`, then :math:`G \\simeq K(G)`; this is the sufficient
+    condition of [LPV08, Theorem 5.7]. A ``False`` result only means that this
+    sufficient condition fails, not that :math:`G \\simeq K(G)` fails. The
+    test does not require exhibiting an explicit combinatorial collapse.
 
-    By Proposition 14 of the survey, it is provably enough to check
+    By the survey's reduction (its Proposition 14), it is enough to check
     completes with ``h(X) == X`` (:math:`h`'s fixed points); since :math:`h`
     is idempotent, the *distinct* values of ``h_closure(X, ...)`` over all
     completes :math:`X` are exactly this set of fixed points, so no separate
@@ -740,8 +748,8 @@ def theorem15_hypothesis_holds(
     .. rubric:: Examples
 
     >>> import networkx as nx
-    >>> from pycliques.homotopy_invariance import theorem15_hypothesis_holds
-    >>> theorem15_hypothesis_holds(nx.complete_graph(4))
+    >>> from pycliques import homotopy_invariance as hi
+    >>> hi.check_closed_clique_intersection_contractibility(nx.complete_graph(4))
     (True, None)
     """
     from pycombtop.homotopy_type import homotopy_type_sc_with_verdict

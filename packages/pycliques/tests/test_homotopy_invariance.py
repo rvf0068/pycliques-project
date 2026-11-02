@@ -5,6 +5,7 @@ import pytest
 from pycliques.cliques import clique_graph
 from pycliques.helly import is_clique_helly
 from pycliques.homotopy_invariance import (
+    check_closed_clique_intersection_contractibility,
     completes_of_size,
     completes_with_empty_intersection,
     delta_of_clique_set,
@@ -13,9 +14,8 @@ from pycliques.homotopy_invariance import (
     has_center_at_all,
     is_center,
     minimal_violation,
+    necktie_center_condition_holds,
     neckties,
-    theorem11_hypothesis_holds,
-    theorem15_hypothesis_holds,
     verify_discrete_morse_matching,
     witnesses_and_extension,
 )
@@ -193,31 +193,31 @@ def test_has_center_at_all_reports_bool():
     assert has_center_at_all(X, kg) == expected
 
 
-def test_theorem11_hypothesis_holds_for_complete_graph():
+def test_necktie_center_condition_holds_for_complete_graph():
     """K4 is clique-Helly, so Theorem 11's hypothesis holds vacuously."""
-    holds, bad = theorem11_hypothesis_holds(nx.complete_graph(4))
+    holds, bad = necktie_center_condition_holds(nx.complete_graph(4))
     assert holds is True
     assert bad is None
 
 
-def test_theorem11_hypothesis_holds_for_suspension_of_c5():
+def test_necktie_center_condition_holds_for_suspension_of_c5():
     """The suspension of C5 is a known-good case from the research session."""
-    holds, _ = theorem11_hypothesis_holds(suspension_of_cycle(5))
+    holds, _ = necktie_center_condition_holds(suspension_of_cycle(5))
     assert holds is True
 
 
-def test_theorem11_hypothesis_fixture_1_holds():
+def test_necktie_center_hypothesis_fixture_1_holds():
     """Fixture 1 (H?qdvbU): K(G) is clique-Helly, so no bad completes exist."""
-    holds, bad = theorem11_hypothesis_holds(FIXTURE_1())
+    holds, bad = necktie_center_condition_holds(FIXTURE_1())
     assert holds is True
     assert bad is None
 
 
-def test_theorem11_hypothesis_fixture_2_fails():
+def test_necktie_center_hypothesis_fixture_2_fails():
     """Fixture 2 (HUZv~zz) is the sharpest known stress test: Theorem 11's
     direct hypothesis fails here even though G is (separately) known to be
     good -- this is exactly why Theorem 15 (1d) is the strongest tool."""
-    holds, bad = theorem11_hypothesis_holds(FIXTURE_2())
+    holds, bad = necktie_center_condition_holds(FIXTURE_2())
     assert holds is False
     assert bad is not None
 
@@ -403,31 +403,31 @@ def test_delta_of_clique_set_ignores_nonmaximal_generators():
     assert delta.facet_set == {Simplex({0, 1})}
 
 
-def test_theorem15_hypothesis_holds_for_complete_graph():
+def test_check_closed_clique_intersection_contractibility_for_complete_graph():
     """K4 trivially satisfies Theorem 15's hypothesis."""
-    holds, bad = theorem15_hypothesis_holds(nx.complete_graph(4))
+    holds, bad = check_closed_clique_intersection_contractibility(nx.complete_graph(4))
     assert holds is True
     assert bad is None
 
 
-def test_theorem15_hypothesis_fails_for_octahedron():
+def test_closed_clique_intersection_hypothesis_fails_for_octahedron():
     """The octahedron is a known NOT-good example: K(octahedron(3)) is
     S^3 while octahedron(3) itself is S^2, so Theorem 15's hypothesis must
     correctly fail here (see also Priority 6's octahedron regression fact)."""
-    holds, bad = theorem15_hypothesis_holds(octahedron(3))
+    holds, bad = check_closed_clique_intersection_contractibility(octahedron(3))
     assert holds is False
     assert bad is not None
 
 
-def test_theorem15_hypothesis_holds_fixture_1():
+def test_check_closed_clique_intersection_contractibility_fixture_1():
     """Fixture 1 (H?qdvbU): Theorem 15's hypothesis holds."""
-    holds, _ = theorem15_hypothesis_holds(FIXTURE_1())
+    holds, _ = check_closed_clique_intersection_contractibility(FIXTURE_1())
     assert holds is True
 
 
-def test_theorem15_hypothesis_fails_fixture_2_with_nonflag_homology():
+def test_closed_clique_intersection_hypothesis_fails_fixture_2_with_nonflag_homology():
     """The genuine h-closed family has nonzero rational first homology."""
-    holds, witness = theorem15_hypothesis_holds(FIXTURE_2())
+    holds, witness = check_closed_clique_intersection_contractibility(FIXTURE_2())
     assert holds is False
     assert witness is not None
     delta = delta_of_clique_set(witness)
@@ -437,15 +437,19 @@ def test_theorem15_hypothesis_fails_fixture_2_with_nonflag_homology():
     assert betti_numbers[1] == 1
 
 
-def test_theorem15_hypothesis_size_cap_inconclusive():
+def test_closed_clique_intersection_hypothesis_size_cap_inconclusive():
     """A tiny size_cap makes the check bail out as inconclusive (None), not
     raise or silently hang."""
-    holds, hx = theorem15_hypothesis_holds(FIXTURE_2(), size_cap=1)
+    holds, hx = check_closed_clique_intersection_contractibility(
+        FIXTURE_2(), size_cap=1
+    )
     assert holds is None
     assert hx is not None
 
 
-def test_theorem15_complete_set_budget_stops_enumeration_early(monkeypatch):
+def test_closed_clique_intersection_complete_set_budget_stops_enumeration_early(
+    monkeypatch,
+):
     """A complete-set budget prevents exhaustive enumeration of K(G)."""
     enumerate_all_cliques = nx.enumerate_all_cliques
     enumerated = 0
@@ -458,7 +462,7 @@ def test_theorem15_complete_set_budget_stops_enumeration_early(monkeypatch):
 
     monkeypatch.setattr(nx, "enumerate_all_cliques", tracked_enumeration)
 
-    result = theorem15_hypothesis_holds(
+    result = check_closed_clique_intersection_contractibility(
         nx.star_graph(8),
         max_complete_sets=3,
     )
@@ -467,7 +471,9 @@ def test_theorem15_complete_set_budget_stops_enumeration_early(monkeypatch):
     assert enumerated == 4
 
 
-def test_theorem15_maximal_clique_budget_stops_indexing_early(monkeypatch):
+def test_closed_clique_intersection_maximal_clique_budget_stops_indexing_early(
+    monkeypatch,
+):
     """A maximal-clique budget prevents materializing the full index."""
     clique_graph = nx.complete_bipartite_graph(4, 4)
     find_cliques = nx.find_cliques
@@ -490,7 +496,7 @@ def test_theorem15_maximal_clique_budget_stops_indexing_early(monkeypatch):
 
     monkeypatch.setattr(nx, "enumerate_all_cliques", unexpected_enumeration)
 
-    assert theorem15_hypothesis_holds(
+    assert check_closed_clique_intersection_contractibility(
         nx.path_graph(3),
         max_maximal_cliques=2,
     ) == (None, None)
@@ -504,7 +510,7 @@ def test_theorem15_maximal_clique_budget_stops_indexing_early(monkeypatch):
         "max_clique_graph_edges",
     ],
 )
-def test_theorem15_clique_graph_budget_exits_before_enumeration(
+def test_closed_clique_intersection_clique_graph_budget_exits_before_enumeration(
     monkeypatch, graph_budget
 ):
     def unexpected_enumeration(_graph):
@@ -512,7 +518,7 @@ def test_theorem15_clique_graph_budget_exits_before_enumeration(
 
     monkeypatch.setattr(nx, "enumerate_all_cliques", unexpected_enumeration)
 
-    assert theorem15_hypothesis_holds(
+    assert check_closed_clique_intersection_contractibility(
         nx.path_graph(3),
         **{graph_budget: 0},
     ) == (None, None)
@@ -528,12 +534,14 @@ def test_theorem15_clique_graph_budget_exits_before_enumeration(
         "max_simplices_per_h_image",
     ],
 )
-def test_theorem15_rejects_negative_resource_budgets(budget_name):
+def test_closed_clique_intersection_rejects_negative_resource_budgets(budget_name):
     with pytest.raises(ValueError):
-        theorem15_hypothesis_holds(nx.path_graph(3), **{budget_name: -1})
+        check_closed_clique_intersection_contractibility(
+            nx.path_graph(3), **{budget_name: -1}
+        )
 
 
-def test_theorem15_forwards_per_image_simplex_budget(monkeypatch):
+def test_closed_clique_intersection_forwards_per_image_simplex_budget(monkeypatch):
     observed = {}
 
     def fake_homotopy_type(s_complex, *, max_simplices=None):
@@ -549,7 +557,7 @@ def test_theorem15_forwards_per_image_simplex_budget(monkeypatch):
         fake_homotopy_type,
     )
 
-    assert theorem15_hypothesis_holds(
+    assert check_closed_clique_intersection_contractibility(
         nx.path_graph(3),
         max_simplices_per_h_image=13,
     ) == (True, None)
@@ -557,7 +565,7 @@ def test_theorem15_forwards_per_image_simplex_budget(monkeypatch):
     assert observed["max_simplices"] == 13
 
 
-def test_theorem15_rejects_negative_simplex_budget_before_computation(
+def test_closed_clique_intersection_rejects_negative_simplex_budget_before_computation(
     monkeypatch,
 ):
     def unexpected_computation(*_args, **_kwargs):
@@ -569,29 +577,36 @@ def test_theorem15_rejects_negative_simplex_budget_before_computation(
     )
 
     with pytest.raises(ValueError, match="max_simplices_per_h_image"):
-        theorem15_hypothesis_holds(
+        check_closed_clique_intersection_contractibility(
             nx.path_graph(3),
             max_simplices_per_h_image=-1,
         )
 
 
-def test_theorem15_default_enumerates_closed_images_not_all_completes(monkeypatch):
+def test_closed_clique_intersection_default_enumerates_closed_images_not_all_completes(
+    monkeypatch,
+):
     def unexpected_enumeration(_graph):
         raise AssertionError("closed-image enumeration must not enumerate completes")
 
     monkeypatch.setattr(nx, "enumerate_all_cliques", unexpected_enumeration)
 
-    assert theorem15_hypothesis_holds(nx.path_graph(3)) == (True, None)
+    assert check_closed_clique_intersection_contractibility(nx.path_graph(3)) == (
+        True,
+        None,
+    )
 
 
-def test_theorem15_closed_image_budget_exits_inconclusively():
-    assert theorem15_hypothesis_holds(
+def test_closed_clique_intersection_closed_image_budget_exits_inconclusively():
+    assert check_closed_clique_intersection_contractibility(
         nx.path_graph(3),
         max_closed_h_images=0,
     ) == (None, None)
 
 
-def test_theorem15_per_image_limited_verdict_is_inconclusive(monkeypatch):
+def test_closed_clique_intersection_per_image_limited_verdict_is_inconclusive(
+    monkeypatch,
+):
     limited = HomotopyVerdict(
         wedge=WedgeOfSpheres.contractible(),
         reason="test resource limit",
@@ -603,7 +618,7 @@ def test_theorem15_per_image_limited_verdict_is_inconclusive(monkeypatch):
         lambda _complex, *, max_simplices=None: limited,
     )
 
-    holds, witness = theorem15_hypothesis_holds(
+    holds, witness = check_closed_clique_intersection_contractibility(
         nx.path_graph(3),
         max_simplices_per_h_image=0,
     )
@@ -612,16 +627,18 @@ def test_theorem15_per_image_limited_verdict_is_inconclusive(monkeypatch):
     assert witness is not None
 
 
-def test_theorem15_large_simplex_budget_preserves_unlimited_result():
+def test_closed_clique_intersection_large_simplex_budget_preserves_unlimited_result():
     graph = nx.path_graph(3)
 
-    assert theorem15_hypothesis_holds(
+    assert check_closed_clique_intersection_contractibility(
         graph,
         max_simplices_per_h_image=10_000,
-    ) == theorem15_hypothesis_holds(graph)
+    ) == check_closed_clique_intersection_contractibility(graph)
 
 
-def test_theorem15_inexact_contractible_betti_result_is_inconclusive(monkeypatch):
+def test_closed_clique_intersection_inexact_contractible_betti_result_is_inconclusive(
+    monkeypatch,
+):
     """An inexact zero-Betti result does not prove contractibility."""
     monkeypatch.setattr(
         "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
@@ -631,12 +648,14 @@ def test_theorem15_inexact_contractible_betti_result_is_inconclusive(monkeypatch
             is_exact=False,
         ),
     )
-    holds, witness = theorem15_hypothesis_holds(nx.path_graph(3))
+    holds, witness = check_closed_clique_intersection_contractibility(nx.path_graph(3))
     assert holds is None
     assert witness is not None
 
 
-def test_theorem15_limited_flag_takes_precedence_over_exactness(monkeypatch):
+def test_closed_clique_intersection_limited_flag_takes_precedence_over_exactness(
+    monkeypatch,
+):
     """The limited flag takes precedence over an exactness default."""
     monkeypatch.setattr(
         "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
@@ -646,12 +665,14 @@ def test_theorem15_limited_flag_takes_precedence_over_exactness(monkeypatch):
             is_limited=True,
         ),
     )
-    holds, witness = theorem15_hypothesis_holds(nx.path_graph(3))
+    holds, witness = check_closed_clique_intersection_contractibility(nx.path_graph(3))
     assert holds is None
     assert witness is not None
 
 
-def test_theorem15_recursive_limited_verdict_stays_inconclusive(monkeypatch):
+def test_closed_clique_intersection_recursive_limited_verdict_stays_inconclusive(
+    monkeypatch,
+):
     """Theorem 15 must preserve an upstream limited placeholder as unknown."""
     from pycombtop.homotopy_type import _try_special_neighbourhood
 
@@ -673,13 +694,15 @@ def test_theorem15_recursive_limited_verdict_stays_inconclusive(monkeypatch):
         "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
         lambda _complex, *, max_simplices=None: recursively_derived,
     )
-    holds, witness = theorem15_hypothesis_holds(nx.path_graph(3))
+    holds, witness = check_closed_clique_intersection_contractibility(nx.path_graph(3))
 
     assert holds is None
     assert witness is not None
 
 
-def test_theorem15_inexact_nonzero_betti_result_proves_failure(monkeypatch):
+def test_closed_clique_intersection_inexact_nonzero_betti_result_proves_failure(
+    monkeypatch,
+):
     """A nonzero reduced Betti number proves noncontractibility."""
     monkeypatch.setattr(
         "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
@@ -689,12 +712,14 @@ def test_theorem15_inexact_nonzero_betti_result_proves_failure(monkeypatch):
             is_exact=False,
         ),
     )
-    holds, witness = theorem15_hypothesis_holds(nx.path_graph(3))
+    holds, witness = check_closed_clique_intersection_contractibility(nx.path_graph(3))
     assert holds is False
     assert witness is not None
 
 
-def test_theorem15_exact_noncontractible_verdict_proves_failure(monkeypatch):
+def test_closed_clique_intersection_exact_noncontractible_verdict_proves_failure(
+    monkeypatch,
+):
     monkeypatch.setattr(
         "pycombtop.homotopy_type.homotopy_type_sc_with_verdict",
         lambda _complex, *, max_simplices=None: HomotopyVerdict(
@@ -703,7 +728,7 @@ def test_theorem15_exact_noncontractible_verdict_proves_failure(monkeypatch):
             is_exact=True,
         ),
     )
-    holds, witness = theorem15_hypothesis_holds(nx.path_graph(3))
+    holds, witness = check_closed_clique_intersection_contractibility(nx.path_graph(3))
     assert holds is False
     assert witness is not None
 

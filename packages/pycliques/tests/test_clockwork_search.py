@@ -35,7 +35,7 @@ from pycliques.small import (
     Verdict,
     _test_clockwork,
     classify_clique_behavior,
-    classify_clique_behavior_with_theorem_2_6,
+    classify_clique_behavior_with_clockwork_pair_search,
 )
 
 
@@ -477,7 +477,7 @@ def test_direct_clockwork_fallback_is_opt_in(monkeypatch: pytest.MonkeyPatch) ->
     assert fallback_calls > 0
 
 
-def test_theorem_2_6_wrapper_forwards_clockwork_options(
+def test_clockwork_pair_search_wrapper_forwards_clockwork_options(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     graph = nx.empty_graph(1)
@@ -506,7 +506,7 @@ def test_theorem_2_6_wrapper_forwards_clockwork_options(
         "clockwork_max_retraction_assignments": 37,
     }
 
-    result = classify_clique_behavior_with_theorem_2_6(
+    result = classify_clique_behavior_with_clockwork_pair_search(
         graph,
         clockwork_depth=1,
         clockwork_fallback=True,

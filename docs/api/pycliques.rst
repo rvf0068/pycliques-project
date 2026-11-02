@@ -48,7 +48,7 @@ to both candidate recognition and dominated-vertex reduction. The classifier's
 direct clockwork fallback is disabled by default; enable it explicitly with
 ``clockwork_fallback=True`` when using
 ``classify_clique_behavior`` or
-``classify_clique_behavior_with_theorem_2_6``.
+``classify_clique_behavior_with_clockwork_pair_search``.
 
 Positive-iterate retraction searches require a complete labelled prefix and
 its origin graph. Use ``verify_clockwork_retraction_certificate_detailed``
@@ -57,7 +57,7 @@ for independent replay with optional clique-count and edge bounds; its
 failed proof from replay that could not finish. The Boolean verifier remains
 available for unrestricted replay.
 
-``verify_theorem_2_6_certificate`` independently checks Theorem 2.6
+``verify_clockwork_pair_map_certificate`` independently checks Theorem 2.6
 clockwork-pair certificates, including the canonical theorem source,
 coaffinations, equivariance, graph-morphism edges (which may collapse), and
 target provenance. For the combined classifier, pass the original graph;

@@ -1,4 +1,4 @@
-"""Regression tests for the fast pass / Theorem 2.6 pass separation."""
+"""Regression tests for the fast pass / clockwork-pair pass separation."""
 
 import logging
 
@@ -11,12 +11,12 @@ from pycliques.small import (
     Verdict,
     _load_indeterminate_file_entries,
     _load_indeterminate_file_entries_with_metadata,
-    _main_theorem26,
-    _parse_theorem26_args,
+    _main_clockwork_pairs,
+    _parse_clockwork_pair_args,
     _run_fast_pass_indeterminate,
     _save_indeterminate,
     classify_clique_behavior,
-    classify_clique_behavior_with_theorem_2_6,
+    classify_clique_behavior_with_clockwork_pair_search,
 )
 
 # ---------------------------------------------------------------------------
@@ -24,8 +24,8 @@ from pycliques.small import (
 # ---------------------------------------------------------------------------
 
 
-def test_theorem26_parse_args_defaults():
-    args = _parse_theorem26_args(["9"])
+def test_clockwork_pairs_parse_args_defaults():
+    args = _parse_clockwork_pair_args(["9"])
 
     assert args.n == 9
     assert args.max_m == 3
@@ -37,8 +37,8 @@ def test_theorem26_parse_args_defaults():
     assert args.loglevel == logging.INFO
 
 
-def test_theorem26_parse_args_custom():
-    args = _parse_theorem26_args(
+def test_clockwork_pairs_parse_args_custom():
+    args = _parse_clockwork_pair_args(
         [
             "9",
             "--max-m",
@@ -68,7 +68,7 @@ def test_theorem26_parse_args_custom():
 # ---------------------------------------------------------------------------
 
 
-def test_fast_pass_does_not_call_theorem_2_6(monkeypatch):
+def test_fast_pass_does_not_call_clockwork_pair_search(monkeypatch):
     """The fast pass must not call the expensive clockwork-pair search."""
 
     def fail_if_called(*args, **kwargs):
@@ -84,7 +84,7 @@ def test_fast_pass_does_not_call_theorem_2_6(monkeypatch):
     assert result.verdict is Verdict.INDETERMINATE
 
 
-def test_theorem_2_6_pass_does_invoke_the_search(monkeypatch):
+def test_clockwork_pair_search_pass_does_invoke_the_search(monkeypatch):
     """The combined pass must call the Theorem 2.6 search when unresolved."""
     called = []
     real = small._classify_clockwork_pair_map
@@ -96,13 +96,13 @@ def test_theorem_2_6_pass_does_invoke_the_search(monkeypatch):
     monkeypatch.setattr(small, "_classify_clockwork_pair_map", spy)
 
     kg = clique_graph(nx.icosahedral_graph())
-    result = classify_clique_behavior_with_theorem_2_6(kg)
+    result = classify_clique_behavior_with_clockwork_pair_search(kg)
 
     assert called
     assert result.verdict is Verdict.DIVERGENT
 
 
-def test_combined_pass_skips_theorem_2_6_when_already_resolved(monkeypatch):
+def test_combined_pass_skips_clockwork_pair_search_when_already_resolved(monkeypatch):
     """A graph resolved by the fast pass must not reach Theorem 2.6."""
 
     def fail_if_called(*args, **kwargs):
@@ -110,7 +110,7 @@ def test_combined_pass_skips_theorem_2_6_when_already_resolved(monkeypatch):
 
     monkeypatch.setattr(small, "classify_clockwork_pair_map", fail_if_called)
 
-    result = classify_clique_behavior_with_theorem_2_6(nx.cycle_graph(4))
+    result = classify_clique_behavior_with_clockwork_pair_search(nx.cycle_graph(4))
 
     assert result.verdict is Verdict.CONVERGENT
 
@@ -159,7 +159,7 @@ def test_run_fast_pass_indeterminate_filters_to_indeterminate_only(
 # ---------------------------------------------------------------------------
 
 
-def test_theorem_2_6_search_tries_radii_in_increasing_order(monkeypatch):
+def test_clockwork_pair_search_search_tries_radii_in_increasing_order(monkeypatch):
     seen_radii = []
 
     def fake_candidates(graph, radius):
@@ -201,8 +201,10 @@ def test_load_indeterminate_file_entries_missing_file_returns_empty(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_main_theorem26_runs_fast_pass_then_theorem_2_6(monkeypatch, tmp_path):
-    """_main_theorem26 collects fast-pass INDETERMINATE graphs, then classifies."""
+def test_main_clockwork_pairs_runs_fast_pass_then_clockwork_pair_search(
+    monkeypatch, tmp_path
+):
+    """_main_clockwork_pairs collects fast-pass INDETERMINATE graphs first."""
     from pycliques.small import CliqueBehavior
 
     def fake_classify(graph, *, bound):
@@ -223,13 +225,13 @@ def test_main_theorem26_runs_fast_pass_then_theorem_2_6(monkeypatch, tmp_path):
 
     monkeypatch.setattr(small, "classify_clockwork_pair_map", fake_clockwork)
 
-    _main_theorem26(["6", "--data-dir", str(tmp_path), "--end", "20"])
+    _main_clockwork_pairs(["6", "--data-dir", str(tmp_path), "--end", "20"])
 
     # Theorem 2.6 was invoked only for graphs the fast pass left indeterminate.
     assert calls, "expected at least one candidate to reach the Theorem 2.6 search"
 
 
-def test_main_theorem26_from_indeterminate_file(monkeypatch, tmp_path):
+def test_main_clockwork_pairs_from_indeterminate_file(monkeypatch, tmp_path):
     """--from-indeterminate-file reads candidates without rerunning the fast pass."""
     g = nx.icosahedral_graph()
     kg = clique_graph(g)
@@ -244,7 +246,9 @@ def test_main_theorem26_from_indeterminate_file(monkeypatch, tmp_path):
 
     monkeypatch.setattr(small, "classify_clockwork_pair_map", spy)
 
-    _main_theorem26(["9", "--data-dir", str(tmp_path), "--from-indeterminate-file"])
+    _main_clockwork_pairs(
+        ["9", "--data-dir", str(tmp_path), "--from-indeterminate-file"]
+    )
 
     assert calls
 
@@ -257,7 +261,7 @@ def _data_rows(path):
     ]
 
 
-def test_theorem26_saved_cohort_removes_resolved_and_preserves_metadata(
+def test_clockwork_pairs_saved_cohort_removes_resolved_and_preserves_metadata(
     monkeypatch, tmp_path
 ):
     unresolved = nx.cycle_graph(5)
@@ -279,7 +283,9 @@ def test_theorem26_saved_cohort_removes_resolved_and_preserves_metadata(
         return None
 
     monkeypatch.setattr(small, "classify_clockwork_pair_map", fake_clockwork)
-    _main_theorem26(["9", "--from-indeterminate-file", "--data-dir", str(tmp_path)])
+    _main_clockwork_pairs(
+        ["9", "--from-indeterminate-file", "--data-dir", str(tmp_path)]
+    )
 
     rows = _data_rows(tmp_path / "indeterminate_order_9.txt")
     assert len(rows) == 1
@@ -287,7 +293,9 @@ def test_theorem26_saved_cohort_removes_resolved_and_preserves_metadata(
     assert "retracts conjectured_divergent survivor" in rows[0]
 
 
-def test_theorem26_all_resolved_writes_empty_cohort_and_output(monkeypatch, tmp_path):
+def test_clockwork_pairs_all_resolved_writes_empty_cohort_and_output(
+    monkeypatch, tmp_path
+):
     _save_indeterminate(
         9,
         [(3, nx.path_graph(4), None), (7, nx.cycle_graph(5), None)],
@@ -300,7 +308,7 @@ def test_theorem26_all_resolved_writes_empty_cohort_and_output(monkeypatch, tmp_
         lambda graph, **kwargs: ("DIVERGENT", "proved", Certificate(rule="proof")),
     )
 
-    _main_theorem26(
+    _main_clockwork_pairs(
         [
             "9",
             "--from-indeterminate-file",
@@ -316,7 +324,7 @@ def test_theorem26_all_resolved_writes_empty_cohort_and_output(monkeypatch, tmp_
     assert all("\tDIVERGENT\tproved" in row for row in _data_rows(output))
 
 
-def test_theorem26_no_save_preserves_input_bytes(monkeypatch, tmp_path):
+def test_clockwork_pairs_no_save_preserves_input_bytes(monkeypatch, tmp_path):
     _save_indeterminate(
         9,
         [(3, nx.path_graph(4), None)],
@@ -330,7 +338,7 @@ def test_theorem26_no_save_preserves_input_bytes(monkeypatch, tmp_path):
         lambda graph, **kwargs: ("DIVERGENT", "proved", Certificate(rule="proof")),
     )
 
-    _main_theorem26(
+    _main_clockwork_pairs(
         [
             "9",
             "--from-indeterminate-file",
@@ -343,9 +351,9 @@ def test_theorem26_no_save_preserves_input_bytes(monkeypatch, tmp_path):
     assert path.read_bytes() == original
 
 
-def test_theorem26_rejects_ranges_for_saved_cohort(tmp_path):
+def test_clockwork_pairs_rejects_ranges_for_saved_cohort(tmp_path):
     with pytest.raises(SystemExit):
-        _main_theorem26(
+        _main_clockwork_pairs(
             [
                 "9",
                 "--from-indeterminate-file",
@@ -357,7 +365,7 @@ def test_theorem26_rejects_ranges_for_saved_cohort(tmp_path):
         )
 
 
-def test_theorem26_range_update_preserves_outside_rows_and_adds_survivor(
+def test_clockwork_pairs_range_update_preserves_outside_rows_and_adds_survivor(
     monkeypatch, tmp_path
 ):
     _save_indeterminate(
@@ -390,13 +398,15 @@ def test_theorem26_range_update_preserves_outside_rows_and_adds_survivor(
         ),
     )
 
-    _main_theorem26(["9", "--start", "4", "--end", "5", "--data-dir", str(tmp_path)])
+    _main_clockwork_pairs(
+        ["9", "--start", "4", "--end", "5", "--data-dir", str(tmp_path)]
+    )
 
     rows = _data_rows(tmp_path / "indeterminate_order_9.txt")
     assert {int(row.split()[0]) for row in rows} == {1, 5, 9}
 
 
-def test_theorem26_full_fresh_pass_replaces_the_unresolved_cohort(
+def test_clockwork_pairs_full_fresh_pass_replaces_the_unresolved_cohort(
     monkeypatch, tmp_path
 ):
     _save_indeterminate(
@@ -413,12 +423,12 @@ def test_theorem26_full_fresh_pass_replaces_the_unresolved_cohort(
         lambda *args, **kwargs: (1, 0, [], {0}),
     )
 
-    _main_theorem26(["6", "--data-dir", str(tmp_path)])
+    _main_clockwork_pairs(["6", "--data-dir", str(tmp_path)])
 
     assert _data_rows(tmp_path / "indeterminate_order_6.txt") == []
 
 
-def test_theorem26_saved_unresolved_metadata_survives(monkeypatch, tmp_path):
+def test_clockwork_pairs_saved_unresolved_metadata_survives(monkeypatch, tmp_path):
     prior = Certificate(
         rule="retracts",
         target_status="conjectured_divergent",
@@ -427,7 +437,9 @@ def test_theorem26_saved_unresolved_metadata_survives(monkeypatch, tmp_path):
     _save_indeterminate(9, [(7, nx.cycle_graph(5), prior)], tmp_path)
     monkeypatch.setattr(small, "classify_clockwork_pair_map", lambda *a, **k: None)
 
-    _main_theorem26(["9", "--from-indeterminate-file", "--data-dir", str(tmp_path)])
+    _main_clockwork_pairs(
+        ["9", "--from-indeterminate-file", "--data-dir", str(tmp_path)]
+    )
 
     entry = _load_indeterminate_file_entries_with_metadata(9, tmp_path)[0]
     assert entry[0] == 7
@@ -437,20 +449,61 @@ def test_theorem26_saved_unresolved_metadata_survives(monkeypatch, tmp_path):
     assert entry[2].target_label == "survivor"
 
 
-def test_theorem26_rechecking_is_idempotent(monkeypatch, tmp_path):
+def test_clockwork_pairs_rechecking_is_idempotent(monkeypatch, tmp_path):
     _save_indeterminate(9, [(7, nx.cycle_graph(5), None)], tmp_path)
     monkeypatch.setattr(small, "classify_clockwork_pair_map", lambda *a, **k: None)
     arguments = ["9", "--from-indeterminate-file", "--data-dir", str(tmp_path)]
 
-    _main_theorem26(arguments)
+    _main_clockwork_pairs(arguments)
     first_contents = (tmp_path / "indeterminate_order_9.txt").read_bytes()
-    _main_theorem26(arguments)
+    _main_clockwork_pairs(arguments)
 
     assert (tmp_path / "indeterminate_order_9.txt").read_bytes() == first_contents
     assert len(_data_rows(tmp_path / "indeterminate_order_9.txt")) == 1
 
 
-def test_theorem26_empty_input_writes_empty_cohort(tmp_path):
-    _main_theorem26(["9", "--from-indeterminate-file", "--data-dir", str(tmp_path)])
+def test_clockwork_pairs_empty_input_writes_empty_cohort(tmp_path):
+    _main_clockwork_pairs(
+        ["9", "--from-indeterminate-file", "--data-dir", str(tmp_path)]
+    )
 
     assert _data_rows(tmp_path / "indeterminate_order_9.txt") == []
+
+
+def test_renamed_api_and_console_script_resolve():
+    import tomllib
+    from pathlib import Path
+
+    import pycliques
+    import pycliques.small as small_module
+
+    for name in (
+        "classify_clique_behavior_with_clockwork_pair_search",
+        "verify_clockwork_pair_map_certificate",
+    ):
+        assert callable(getattr(pycliques, name))
+        assert callable(getattr(small_module, name))
+    for old in (
+        "classify_clique_behavior_with_theorem_2_6",
+        "verify_theorem_2_6_certificate",
+        "main_theorem26",
+    ):
+        assert not hasattr(pycliques, old)
+        assert not hasattr(small_module, old)
+
+    pyproject = Path(__file__).parents[1] / "pyproject.toml"
+    scripts = tomllib.loads(pyproject.read_text())["project"]["scripts"]
+    assert scripts["small-behavior-clockwork-pairs"] == (
+        "pycliques.small:main_clockwork_pairs"
+    )
+    assert "small-behavior-theorem26" not in scripts
+
+
+def test_combined_classifier_uses_clockwork_pair_bound_keyword():
+    import inspect
+
+    params = inspect.signature(
+        small.classify_clique_behavior_with_clockwork_pair_search
+    ).parameters
+    assert "clockwork_pair_bound" in params
+    assert "theorem_2_6_bound" not in params

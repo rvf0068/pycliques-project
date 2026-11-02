@@ -8,8 +8,9 @@ import pycliques.poset_homotopy as poset_homotopy
 import pytest
 from pycliques import (
     Complete,
-    Theorem57Status,
+    DoubleBoundHClosureStatus,
     ThreeHellyStatus,
+    check_double_bound_h_closure_contractibility,
     clique_graph_of_double_bound,
     closed_clique_intersections,
     double_bound_graph,
@@ -18,7 +19,6 @@ from pycliques import (
     strong_collapse_certificate,
     support_nerve_cone_certificate,
     support_nerve_facets,
-    theorem57_hypothesis_holds,
     verify_strong_collapse_certificate,
     verify_support_nerve_cone_certificate,
 )
@@ -608,15 +608,19 @@ def test_strong_collapse_certificate_supports_noninteger_labels():
     assert verify_strong_collapse_certificate(facets, certificate)
 
 
-def test_theorem57_driver_reports_proof_and_replays_certificate(monkeypatch):
+def test_double_bound_h_closure_driver_reports_proof_and_replays_certificate(
+    monkeypatch,
+):
     monkeypatch.setattr(
         poset_homotopy,
         "support_nerve_cone_certificate",
         lambda _family: None,
     )
-    result = theorem57_hypothesis_holds(nx.empty_graph(1), construction="explicit")
+    result = check_double_bound_h_closure_contractibility(
+        nx.empty_graph(1), construction="explicit"
+    )
 
-    assert result.status is Theorem57Status.PROVED
+    assert result.status is DoubleBoundHClosureStatus.PROVED
     assert result.checked_h_images == 1
     assert len(result.certificates) == 1
     assert not result.support_certificates
@@ -625,13 +629,13 @@ def test_theorem57_driver_reports_proof_and_replays_certificate(monkeypatch):
         assert verify_strong_collapse_certificate(facets, moves)
 
 
-def test_theorem57_driver_reports_budget_exits_as_inconclusive():
-    result = theorem57_hypothesis_holds(
+def test_double_bound_h_closure_driver_reports_budget_exits_as_inconclusive():
+    result = check_double_bound_h_closure_contractibility(
         nx.complete_graph(3),
         max_faces=0,
     )
 
-    assert result.status is Theorem57Status.INCONCLUSIVE
+    assert result.status is DoubleBoundHClosureStatus.INCONCLUSIVE
     assert result.checked_h_images == 0
     assert result.construction_used == "explicit"
     assert "explicit-only budgets" in result.construction_reason
@@ -645,39 +649,41 @@ def test_theorem57_driver_reports_budget_exits_as_inconclusive():
         (nx.path_graph(3), {"max_direct_edges": 0}, "max_direct_edges"),
     ],
 )
-def test_theorem57_direct_refusals_are_inconclusive(graph, budget, reason):
-    result = theorem57_hypothesis_holds(
+def test_double_bound_h_closure_direct_refusals_are_inconclusive(graph, budget, reason):
+    result = check_double_bound_h_closure_contractibility(
         graph,
         construction="direct",
         **budget,
     )
 
-    assert result.status is Theorem57Status.INCONCLUSIVE
+    assert result.status is DoubleBoundHClosureStatus.INCONCLUSIVE
     assert result.construction_used == "direct"
     assert reason in result.reason
 
 
-def test_theorem57_construction_modes_reject_or_route_mode_specific_budgets():
+def test_double_bound_h_closure_construction_modes_route_mode_specific_budgets():
     with pytest.raises(ValueError, match="apply only to explicit"):
-        theorem57_hypothesis_holds(
+        check_double_bound_h_closure_contractibility(
             nx.path_graph(3),
             construction="direct",
             max_faces=100,
         )
 
-    automatic = theorem57_hypothesis_holds(nx.path_graph(3), max_faces=0)
+    automatic = check_double_bound_h_closure_contractibility(
+        nx.path_graph(3), max_faces=0
+    )
     assert automatic.construction_used == "explicit"
-    assert automatic.status is Theorem57Status.INCONCLUSIVE
+    assert automatic.status is DoubleBoundHClosureStatus.INCONCLUSIVE
 
 
-def test_theorem57_direct_mode_preserves_closure_budget_semantics():
-    result = theorem57_hypothesis_holds(
+def test_double_bound_h_closure_direct_mode_preserves_closure_budget_semantics():
+    result = check_double_bound_h_closure_contractibility(
         nx.path_graph(3),
         construction="direct",
         max_closed_sets=0,
     )
 
-    assert result.status is Theorem57Status.INCONCLUSIVE
+    assert result.status is DoubleBoundHClosureStatus.INCONCLUSIVE
     assert result.construction_used == "direct"
     assert "closed h-image" in result.reason
 
@@ -701,7 +707,7 @@ def test_explicit_mode_forwards_vertex_budget_during_clique_graph_construction(
         ),
     )
 
-    result = theorem57_hypothesis_holds(
+    result = check_double_bound_h_closure_contractibility(
         nx.path_graph(3),
         construction="explicit",
         max_direct_vertices=0,
@@ -709,35 +715,35 @@ def test_explicit_mode_forwards_vertex_budget_during_clique_graph_construction(
     )
 
     assert calls == [(0, 17)]
-    assert result.status is Theorem57Status.INCONCLUSIVE
+    assert result.status is DoubleBoundHClosureStatus.INCONCLUSIVE
     assert result.construction_used == "explicit"
     assert result.checked_h_images == 0
     assert "max_direct_vertices and/or max_direct_edges" in result.reason
 
 
 def test_explicit_mode_enforces_edge_budget_during_clique_graph_construction():
-    result = theorem57_hypothesis_holds(
+    result = check_double_bound_h_closure_contractibility(
         nx.path_graph(3),
         construction="explicit",
         max_direct_vertices=10,
         max_direct_edges=0,
     )
 
-    assert result.status is Theorem57Status.INCONCLUSIVE
+    assert result.status is DoubleBoundHClosureStatus.INCONCLUSIVE
     assert result.construction_used == "explicit"
     assert result.checked_h_images == 0
     assert "max_direct_vertices and/or max_direct_edges" in result.reason
 
 
 def test_explicit_mode_none_output_budgets_are_unlimited():
-    result = theorem57_hypothesis_holds(
+    result = check_double_bound_h_closure_contractibility(
         nx.empty_graph(1),
         construction="explicit",
         max_direct_vertices=None,
         max_direct_edges=None,
     )
 
-    assert result.status is Theorem57Status.PROVED
+    assert result.status is DoubleBoundHClosureStatus.PROVED
     assert result.construction_used == "explicit"
     assert result.checked_h_images == 1
 
@@ -745,9 +751,9 @@ def test_explicit_mode_none_output_budgets_are_unlimited():
 @pytest.mark.parametrize(
     ("vertex_limit", "edge_limit", "expected_status"),
     [
-        (4, 3, Theorem57Status.PROVED),
-        (3, 3, Theorem57Status.INCONCLUSIVE),
-        (4, 2, Theorem57Status.INCONCLUSIVE),
+        (4, 3, DoubleBoundHClosureStatus.PROVED),
+        (3, 3, DoubleBoundHClosureStatus.INCONCLUSIVE),
+        (4, 2, DoubleBoundHClosureStatus.INCONCLUSIVE),
     ],
 )
 def test_explicit_mode_output_budget_boundaries(
@@ -755,7 +761,7 @@ def test_explicit_mode_output_budget_boundaries(
     edge_limit,
     expected_status,
 ):
-    result = theorem57_hypothesis_holds(
+    result = check_double_bound_h_closure_contractibility(
         nx.path_graph(3),
         construction="explicit",
         max_direct_vertices=vertex_limit,
@@ -764,18 +770,18 @@ def test_explicit_mode_output_budget_boundaries(
 
     assert result.status is expected_status
     assert result.construction_used == "explicit"
-    if expected_status is Theorem57Status.INCONCLUSIVE:
+    if expected_status is DoubleBoundHClosureStatus.INCONCLUSIVE:
         assert result.checked_h_images == 0
 
 
 def test_explicit_mode_k6_edge_budget_refuses_large_output_early():
-    result = theorem57_hypothesis_holds(
+    result = check_double_bound_h_closure_contractibility(
         nx.complete_graph(6),
         construction="explicit",
         max_direct_edges=0,
     )
 
-    assert result.status is Theorem57Status.INCONCLUSIVE
+    assert result.status is DoubleBoundHClosureStatus.INCONCLUSIVE
     assert result.construction_used == "explicit"
     assert result.checked_h_images == 0
     assert "max_direct_vertices and/or max_direct_edges" in result.reason
@@ -792,9 +798,11 @@ def test_explicit_mode_k6_edge_budget_refuses_large_output_early():
         nx.relabel_nodes(nx.cycle_graph(4), {i: ("v", i) for i in range(4)}),
     ],
 )
-def test_theorem57_direct_and_explicit_modes_agree(graph):
-    direct = theorem57_hypothesis_holds(graph, construction="direct")
-    explicit = theorem57_hypothesis_holds(graph, construction="explicit")
+def test_double_bound_h_closure_direct_and_explicit_modes_agree(graph):
+    direct = check_double_bound_h_closure_contractibility(graph, construction="direct")
+    explicit = check_double_bound_h_closure_contractibility(
+        graph, construction="explicit"
+    )
 
     assert direct.construction_used == "direct"
     assert explicit.construction_used == "explicit"
@@ -802,7 +810,7 @@ def test_theorem57_direct_and_explicit_modes_agree(graph):
     assert direct.checked_h_images == explicit.checked_h_images
 
 
-def test_theorem57_nonzero_exact_homology_is_a_counterexample(monkeypatch):
+def test_double_bound_h_closure_nonzero_exact_homology_is_a_counterexample(monkeypatch):
     facets = (
         frozenset({0, 1}),
         frozenset({1, 2}),
@@ -825,14 +833,16 @@ def test_theorem57_nonzero_exact_homology_is_a_counterexample(monkeypatch):
         lambda _family: None,
     )
 
-    result = theorem57_hypothesis_holds(nx.empty_graph(0), construction="explicit")
+    result = check_double_bound_h_closure_contractibility(
+        nx.empty_graph(0), construction="explicit"
+    )
 
-    assert result.status is Theorem57Status.COUNTEREXAMPLE
+    assert result.status is DoubleBoundHClosureStatus.COUNTEREXAMPLE
     assert result.witness == frozenset(facets)
     assert "exact rational homology" in result.reason
 
 
-def test_theorem57_counterexample_count_includes_earlier_unknown_images(
+def test_double_bound_h_closure_counterexample_count_includes_earlier_unknown_images(
     monkeypatch,
 ):
     earlier = frozenset({frozenset({0, 1}), frozenset({1, 2})})
@@ -875,14 +885,16 @@ def test_theorem57_counterexample_count_includes_earlier_unknown_images(
         ),
     )
 
-    result = theorem57_hypothesis_holds(nx.empty_graph(0), construction="explicit")
+    result = check_double_bound_h_closure_contractibility(
+        nx.empty_graph(0), construction="explicit"
+    )
 
-    assert result.status is Theorem57Status.COUNTEREXAMPLE
+    assert result.status is DoubleBoundHClosureStatus.COUNTEREXAMPLE
     assert result.checked_h_images == 2
     assert result.witness == obstructed
 
 
-def test_theorem57_o4_certifies_every_closed_h_image():
+def test_double_bound_h_closure_o4_certifies_every_closed_h_image():
     graph = octahedron(4)
     double_bound = double_bound_graph(graph)
     assert double_bound is not None
@@ -898,9 +910,9 @@ def test_theorem57_o4_certifies_every_closed_h_image():
     ) == (192, 6688)
     assert len(list(nx.find_cliques(second_clique_graph))) == 976
 
-    result = theorem57_hypothesis_holds(graph)
+    result = check_double_bound_h_closure_contractibility(graph)
 
-    assert result.status is Theorem57Status.PROVED
+    assert result.status is DoubleBoundHClosureStatus.PROVED
     assert result.checked_h_images == 19040
     assert len(result.support_certificates) == 19040
     assert not result.certificates
@@ -918,7 +930,9 @@ def test_theorem57_o4_certifies_every_closed_h_image():
     for h_image, certificate in result.support_certificates.items():
         assert verify_support_nerve_cone_certificate(h_image, certificate)
 
-    explicit = theorem57_hypothesis_holds(graph, construction="explicit")
+    explicit = check_double_bound_h_closure_contractibility(
+        graph, construction="explicit"
+    )
     assert explicit.status is result.status
     assert explicit.checked_h_images == result.checked_h_images
     assert explicit.construction_used == "explicit"

@@ -365,7 +365,7 @@ def support_nerve_cone_certificate(
     """Certify a common apex in every maximal support-nerve face.
 
     ``None`` means only that this nerve-cone criterion did not prove the
-    Theorem 5.7 hypothesis; callers must retain their other checks.
+    [LPV08, Theorem 5.7] hypothesis; callers must retain their other checks.
     """
     supports, facet_masks = _support_nerve_data(family)
     common_mask = (1 << len(supports)) - 1
@@ -540,12 +540,13 @@ def verify_strong_collapse_certificate(
     return len(active_vertices) == 1
 
 
-class Theorem57Status(Enum):
-    """Certainty for the Theorem 5.7 sufficient-hypothesis check.
+class DoubleBoundHClosureStatus(Enum):
+    """Certainty for the [LPV08, Theorem 5.7] sufficient-hypothesis check.
 
     ``COUNTEREXAMPLE`` means a closed h-image violates the sufficient
     contractibility hypothesis. It does not assert failure of
-    ``Delta(K^2(H(G))) ~= Delta(G)``.
+    ``Delta(K^2(H(G))) ~= Delta(G)``. ``INCONCLUSIVE`` is neither a proof
+    nor a counterexample: a resource limit or refusal stopped the check.
     """
 
     PROVED = "proved"
@@ -554,15 +555,15 @@ class Theorem57Status(Enum):
 
 
 @dataclass(frozen=True)
-class Theorem57Result:
-    """Status and replayable certificates from a Theorem 5.7 check.
+class DoubleBoundHClosureResult:
+    """Status and replayable certificates from a [LPV08, Theorem 5.7] check.
 
     A ``COUNTEREXAMPLE`` status is specifically a counterexample to the
     sufficient contractibility hypothesis, not to the underlying homotopy
     equivalence conclusion.
     """
 
-    status: Theorem57Status
+    status: DoubleBoundHClosureStatus
     checked_h_images: int
     certificates: dict[frozenset, tuple[tuple[Hashable, Hashable], ...]]
     witness: frozenset | None = None
@@ -574,7 +575,7 @@ class Theorem57Result:
     construction_reason: str = ""
 
 
-def theorem57_hypothesis_holds(
+def check_double_bound_h_closure_contractibility(
     graph: nx.Graph,
     *,
     construction: Literal["auto", "direct", "explicit"] = "auto",
@@ -585,8 +586,11 @@ def theorem57_hypothesis_holds(
     max_direct_edges: int | None = 100_000,
     max_maximal_cliques: int | None = None,
     max_closed_sets: int | None = None,
-) -> Theorem57Result:
-    """Check Theorem 5.7 using direct or explicit ``K(DB(P(G)))`` construction.
+) -> DoubleBoundHClosureResult:
+    """Check the [LPV08, Theorem 5.7] hypothesis on ``K(DB(P(G)))``.
+
+    Only the sufficient contractibility condition is tested; a failure does
+    not disprove the homotopy equivalence.
 
     ``direct`` constructs ``K(DB(P(G)))`` from maximal cliques without
     materializing ``DB(P(G))``. ``explicit`` builds the full intermediate
@@ -658,8 +662,8 @@ def theorem57_hypothesis_holds(
                 else "direct construction exceeded max_direct_vertices or "
                 "max_direct_edges"
             )
-            return Theorem57Result(
-                Theorem57Status.INCONCLUSIVE,
+            return DoubleBoundHClosureResult(
+                DoubleBoundHClosureStatus.INCONCLUSIVE,
                 0,
                 {},
                 reason=reason,
@@ -673,8 +677,8 @@ def theorem57_hypothesis_holds(
             max_edges=max_edges,
         )
         if double_bound is None:
-            return Theorem57Result(
-                Theorem57Status.INCONCLUSIVE,
+            return DoubleBoundHClosureResult(
+                DoubleBoundHClosureStatus.INCONCLUSIVE,
                 0,
                 {},
                 reason="double-bound construction exceeded a configured limit",
@@ -693,8 +697,8 @@ def theorem57_hypothesis_holds(
                 max_edges=max_direct_edges,
             )
         if second_clique_graph is None:
-            return Theorem57Result(
-                Theorem57Status.INCONCLUSIVE,
+            return DoubleBoundHClosureResult(
+                DoubleBoundHClosureStatus.INCONCLUSIVE,
                 0,
                 {},
                 reason=(
@@ -710,8 +714,8 @@ def theorem57_hypothesis_holds(
         max_closed_sets=max_closed_sets,
     )
     if not intersections.is_exact:
-        return Theorem57Result(
-            Theorem57Status.INCONCLUSIVE,
+        return DoubleBoundHClosureResult(
+            DoubleBoundHClosureStatus.INCONCLUSIVE,
             0,
             {},
             reason="closed h-image enumeration exceeded a configured limit",
@@ -751,8 +755,8 @@ def theorem57_hypothesis_holds(
             if dimension > 0
         )
         if noncontractible:
-            return Theorem57Result(
-                Theorem57Status.COUNTEREXAMPLE,
+            return DoubleBoundHClosureResult(
+                DoubleBoundHClosureStatus.COUNTEREXAMPLE,
                 checked_count,
                 certificates,
                 witness=h_image,
@@ -765,8 +769,8 @@ def theorem57_hypothesis_holds(
             first_unknown = h_image
 
     if first_unknown is not None:
-        return Theorem57Result(
-            Theorem57Status.INCONCLUSIVE,
+        return DoubleBoundHClosureResult(
+            DoubleBoundHClosureStatus.INCONCLUSIVE,
             len(intersections.closed_sets),
             certificates,
             witness=first_unknown,
@@ -776,8 +780,8 @@ def theorem57_hypothesis_holds(
             construction_reason=selection_reason,
         )
 
-    return Theorem57Result(
-        Theorem57Status.PROVED,
+    return DoubleBoundHClosureResult(
+        DoubleBoundHClosureStatus.PROVED,
         len(intersections.closed_sets),
         certificates,
         reason=(
