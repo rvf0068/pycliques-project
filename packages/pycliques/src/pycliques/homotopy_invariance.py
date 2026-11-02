@@ -4,12 +4,10 @@ This module collects five related pieces of machinery that recurred, ad hoc,
 across a research session working on open conjectures about the clique graph
 operator :math:`K`. They all share the same underlying objects: completes of
 :math:`K(G)` (pairwise-intersecting sets of cliques of :math:`G`), and their
-intersections/centers/closures. See ``research/homotopy-invariance-toolkit.md``
-for the full narrative and ``research/references/`` for the cited papers,
-in particular [LPV08] (Larrion, Pizana, Villarroel-Flores, "Posets, Clique
-Graphs and their Homotopy Type," *European J. Combin.* 29), and Islas-Gomez's
-2021 thesis for the elementary collapse dichotomy referenced in Priority 4 of
-that document. Full citations are in ``docs/references.rst``.
+intersections/centers/closures. The main published source is [LPV08]
+(Larrion, Pizana, Villarroel-Flores, "Posets, Clique Graphs and their Homotopy
+Type," *European J. Combin.* 29); full citations are in
+``docs/references.rst``.
 
 .. note::
 

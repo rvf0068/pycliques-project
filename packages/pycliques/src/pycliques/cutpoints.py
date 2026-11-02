@@ -2,7 +2,8 @@
 
 This module implements the elementary graph operations appearing in
 Frías-Armenta, Larrión, Neumann-Lara, and Pizaña (2013),
-"Edge contraction and edge removal on iterated clique graphs."
+"Edge contraction and edge removal on iterated clique graphs" ([FANP13,
+Theorems 6.1 and 6.2]; see ``docs/references.rst``).
 
 Theorem 6.1:
     If ``uv`` is a local bridge of ``G``, then ``G`` and ``G/uv`` have the

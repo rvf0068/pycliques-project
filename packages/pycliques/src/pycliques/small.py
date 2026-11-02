@@ -952,9 +952,11 @@ def classify_clockwork_pair_map(
         admissible map of coaffine pairs is found -- into ``graph`` itself
         or into ``K(graph)`` -- within the configured bounds; ``None`` if
         this rule establishes no verdict.  This rule never returns
-        ``Verdict.CONVERGENT``.
+        ``Verdict.CONVERGENT``.  Every positive result is re-checked by
+        :func:`verify_clockwork_pair_map_certificate` (with ``clique_bound=bound``);
+        a candidate that is ``INVALID`` or ``LIMIT_REACHED`` yields ``None``.
     """
-    return _classify_clockwork_pair_map(
+    result = _classify_clockwork_pair_map(
         graph,
         max_m=max_m,
         max_n=max_n,
@@ -962,6 +964,18 @@ def classify_clockwork_pair_map(
         max_source_order=max_source_order,
         bound=bound,
     )
+    if result is None:
+        return None
+    certificate = result[2]
+    if certificate is None:
+        return None
+    verification = verify_clockwork_pair_map_certificate(
+        graph, certificate, clique_bound=bound
+    )
+    if verification.status is not CertificateVerificationStatus.VERIFIED:
+        # An unverified or unverifiable candidate is never reported as proved.
+        return None
+    return result
 
 
 def _same_labeled_graph(left: nx.Graph, right: nx.Graph) -> bool:

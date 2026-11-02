@@ -188,15 +188,19 @@ Access to [Brendan McKay's](http://cs.anu.edu.au/~bdm/data/graphs.html) graph ce
 ### Example
 
 ```python
+from itertools import islice
+
 from pyg6data.lists import list_graphs, graph_generator
 
 # Load all 112 connected graphs on 6 vertices into memory
 graphs = list_graphs(6)
 print(len(graphs))               # 112
 
-# Stream connected graphs on 9 vertices one by one
-dense = sum(1 for g in graph_generator(9) if g.number_of_edges() >= 30)
-print(dense)                     # computed lazily, without holding all graphs in memory
+# graph_generator is lazy: take only the first five connected 9-vertex graphs
+for g in islice(graph_generator(9), 5):
+    print(g.number_of_edges())   # graphs are produced one at a time
+
+# Note: exhausting the generator (e.g. with sum(...)) visits all ~261 000 graphs
 
 # Run a filter/evaluator census with an atomic, resumable checkpoint
 from pyg6data.census import run_graph_census

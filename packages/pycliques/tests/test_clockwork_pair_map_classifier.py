@@ -348,3 +348,96 @@ def test_clique_graph_extension_works_with_arbitrary_hashable_labels():
     assert result.verdict is Verdict.DIVERGENT
     assert result.certificate is not None
     assert result.certificate.rule == "theorem_2_6_clockwork_pair_map_clique_graph"
+
+
+# ---------------------------------------------------------------------------
+# Public boundary: positive results are gated by the independent verifier.
+# ---------------------------------------------------------------------------
+
+
+def test_public_classifier_returns_replay_valid_direct_certificate():
+    kg = clique_graph(nx.icosahedral_graph())
+
+    result = classify_clockwork_pair_map(kg)
+
+    assert result is not None
+    verdict, _, certificate = result
+    assert verdict is Verdict.DIVERGENT
+    assert certificate is not None
+    assert certificate.rule == "theorem_2_6_clockwork_pair_map"
+    verified = verify_clockwork_pair_map_certificate(kg, certificate)
+    assert verified.status is CertificateVerificationStatus.VERIFIED
+
+
+def test_public_classifier_returns_replay_valid_clique_graph_certificate():
+    graph = nx.icosahedral_graph()
+
+    result = classify_clockwork_pair_map(graph)
+
+    assert result is not None
+    verdict, _, certificate = result
+    assert verdict is Verdict.DIVERGENT
+    assert certificate is not None
+    assert certificate.rule == "theorem_2_6_clockwork_pair_map_clique_graph"
+    verified = verify_clockwork_pair_map_certificate(
+        graph, certificate, clique_bound=30
+    )
+    assert verified.status is CertificateVerificationStatus.VERIFIED
+
+
+def _malformed_candidate(graph):
+    result = _classify_clockwork_pair_map(graph)
+    assert result is not None
+    verdict, reason, certificate = result
+    assert certificate is not None
+    return verdict, reason, replace(certificate, map={})
+
+
+def test_public_classifier_rejects_malformed_certificate(monkeypatch):
+    kg = clique_graph(nx.icosahedral_graph())
+    candidate = _malformed_candidate(kg)
+    monkeypatch.setattr(
+        small, "_classify_clockwork_pair_map", lambda *a, **k: candidate
+    )
+
+    assert classify_clockwork_pair_map(kg) is None
+    combined = classify_clique_behavior_with_clockwork_pair_search(kg)
+    assert combined.verdict is not Verdict.DIVERGENT
+
+
+def test_public_classifier_rejects_certificate_for_a_different_graph(monkeypatch):
+    kg = clique_graph(nx.icosahedral_graph())
+    candidate = _classify_clockwork_pair_map(kg)
+    monkeypatch.setattr(
+        small, "_classify_clockwork_pair_map", lambda *a, **k: candidate
+    )
+
+    assert classify_clockwork_pair_map(nx.petersen_graph()) is None
+
+
+def test_public_classifier_does_not_prove_when_verification_is_limited(monkeypatch):
+    kg = clique_graph(nx.icosahedral_graph())
+
+    def limited(*args, **kwargs):
+        return small.CertificateVerificationResult(
+            CertificateVerificationStatus.LIMIT_REACHED, "limit"
+        )
+
+    monkeypatch.setattr(small, "verify_clockwork_pair_map_certificate", limited)
+
+    assert classify_clockwork_pair_map(kg) is None
+
+
+def test_public_classifier_forwards_bound_to_verifier(monkeypatch):
+    kg = clique_graph(nx.icosahedral_graph())
+    seen = {}
+    real = small.verify_clockwork_pair_map_certificate
+
+    def spy(graph, certificate, **kwargs):
+        seen.update(kwargs)
+        return real(graph, certificate, **kwargs)
+
+    monkeypatch.setattr(small, "verify_clockwork_pair_map_certificate", spy)
+
+    assert classify_clockwork_pair_map(kg, bound=17) is not None
+    assert seen["clique_bound"] == 17
