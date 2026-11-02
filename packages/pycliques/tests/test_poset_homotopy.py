@@ -7,6 +7,7 @@ import pycliques.cliques as cliques_module
 import pycliques.poset_homotopy as poset_homotopy
 import pytest
 from pycliques import (
+    Complete,
     Theorem57Status,
     ThreeHellyStatus,
     clique_graph_of_double_bound,
@@ -215,6 +216,10 @@ def test_double_bound_graph_builds_full_nonempty_face_poset():
     assert double_bound is not None
     assert double_bound.number_of_nodes() == 7
     assert double_bound.number_of_edges() == 15
+    assert all(isinstance(vertex, Complete) for vertex in double_bound)
+    assert all("frozenset" not in str(vertex) for vertex in double_bound)
+    assert Complete({1, 2}) == frozenset({1, 2})
+    assert repr(Complete({1, 2})) in {"{1, 2}", "{2, 1}"}
 
 
 def test_double_bound_graph_budget_exits_and_validates():
@@ -243,6 +248,7 @@ def test_double_bound_graph_supports_noninteger_labels_and_disconnected_graphs()
         frozenset({"isolated"}),
         frozenset({("a", 1), "b"}),
     }
+    assert all(isinstance(vertex, Complete) for vertex in double_bound)
 
 
 def test_direct_clique_graph_of_double_bound_matches_explicit_construction():

@@ -326,6 +326,19 @@ def _summarize_reference_status(status: ReferenceStatus) -> str:
     return "conjectured_divergent"
 
 
+def _reference_identifier(reference_graph: nx.Graph, label: str | None) -> str:
+    """Return a whitespace-free identifier for a registered reference graph.
+
+    Unnamed references use the graph6 encoding of the stored graph in its own
+    vertex order; this is reproducible but not a canonical form.
+    """
+    if label:
+        return label
+    numbered = nx.convert_node_labels_to_integers(reference_graph)
+    g6 = nx.to_graph6_bytes(numbered, header=False).decode("ascii").strip()
+    return f"graph6:{g6}"
+
+
 def _classify_reference_graph(
     graph: nx.Graph,
 ) -> ClassifierResult | None:
@@ -334,28 +347,27 @@ def _classify_reference_graph(
     if match is None:
         return None
     ref_graph, status, label = match
+    ident = _reference_identifier(ref_graph, label)
+    prefix = f"pared graph is isomorphic to registered reference {ident!r}"
     if status is ReferenceStatus.PROVEN:
         return (
             Verdict.DIVERGENT,
-            "registered reference graph is proven clique divergent",
+            f"{prefix} (proven clique divergent)",
             Certificate(
                 rule="reference",
                 target=ref_graph,
                 target_status="proven_divergent",
-                target_label=label,
+                target_label=ident,
             ),
         )
     return (
         Verdict.INDETERMINATE,
-        (
-            "registered reference graph is conjectured clique divergent; "
-            "conditional on it being clique divergent"
-        ),
+        f"{prefix} (clique divergence conjectured; result remains indeterminate)",
         Certificate(
             rule="reference",
             target=ref_graph,
             target_status="conjectured_divergent",
-            target_label=label,
+            target_label=ident,
         ),
     )
 
@@ -371,29 +383,28 @@ def _classify_reference_dependency(
     for ref_graph, status, label in _REFERENCE_GRAPHS.values():
         retraction = retracts(graph, ref_graph)
         if isinstance(retraction, tuple):
+            ident = _reference_identifier(ref_graph, label)
+            prefix = f"retracts to registered reference {ident!r}"
             if status is ReferenceStatus.PROVEN:
                 return (
                     Verdict.DIVERGENT,
-                    "retracts to a proven divergent reference graph",
+                    f"{prefix} (proven clique divergent)",
                     Certificate(
                         rule="retracts",
                         target=ref_graph,
                         target_status="proven_divergent",
-                        target_label=label,
+                        target_label=ident,
                         map=retraction,
                     ),
                 )
             return (
                 Verdict.INDETERMINATE,
-                (
-                    "retracts to a conjectured divergent reference graph; "
-                    "conditional on the target being clique divergent"
-                ),
+                f"{prefix} (conjectured clique divergent; conclusion conditional)",
                 Certificate(
                     rule="retracts",
                     target=ref_graph,
                     target_status="conjectured_divergent",
-                    target_label=label,
+                    target_label=ident,
                     map=retraction,
                 ),
             )

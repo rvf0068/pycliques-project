@@ -38,6 +38,21 @@ class Clique(frozenset):
             return f"{u}"
 
 
+class Complete(frozenset):
+    """A vertex of the double-bound graph.
+
+    Like :class:`Clique`, this immutable set subclass keeps graph drawing
+    labels concise by displaying only its member vertices.
+    """
+
+    def __repr__(self) -> str:
+        """Return a set-style string representation."""
+        u = set(self)
+        if len(u) == 0:
+            return "{}"
+        return f"{u}"
+
+
 NodeH: TypeAlias = tuple[Hashable, Clique]
 
 _MAXIMAL_INTERSECTING_FAMILY_COUNTS = (0, 1, 2, 4, 12, 81, 2646)
@@ -219,11 +234,11 @@ def double_bound_graph(
             raise ValueError(f"{name} must be nonnegative or None")
 
     vertex_order = {vertex: index for index, vertex in enumerate(graph.nodes())}
-    faces: set[frozenset] = set()
+    faces: set[Complete] = set()
     for maximal_clique in nx.find_cliques(graph):
         for size in range(1, len(maximal_clique) + 1):
             for face in itertools.combinations(maximal_clique, size):
-                faces.add(frozenset(face))
+                faces.add(Complete(face))
                 if max_faces is not None and len(faces) > max_faces:
                     return None
 

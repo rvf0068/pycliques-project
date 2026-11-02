@@ -4,6 +4,7 @@ __version__ = "0.1.0"
 
 from .cliques import (
     Clique,
+    Complete,
     NodeH,
     clique_graph,
     clique_graph_of_double_bound,
@@ -202,6 +203,7 @@ __all__ = [
     "__version__",
     # cliques
     "Clique",
+    "Complete",
     "NodeH",
     "clique_graph",
     "clique_graph_of_double_bound",
