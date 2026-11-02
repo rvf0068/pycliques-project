@@ -839,12 +839,20 @@ def _recognize_clockwork_fast(
                     f"adjacent segments."
                 )
 
-    for a, b, c in itertools.combinations(C_nodes, 3):
+    # The clockwork definition forbids triangles across three distinct
+    # segments whether their vertices lie in the core, crown, or both.
+    # The independent verifier checks every triangle, so the fast
+    # recognizer must impose the same condition before reporting success.
+    segment_of = {
+        vertex: i
+        for i in range(s)
+        for vertex in B_segs[i] | C_segs[i]
+    }
+    for a, b, c in itertools.combinations(G, 3):
         if G.has_edge(a, b) and G.has_edge(b, c) and G.has_edge(a, c):
-            idxs = {_seg_idx(v, C_segs) for v in (a, b, c)}
-            if len(idxs) == 3:
+            if len({segment_of[a], segment_of[b], segment_of[c]}) == 3:
                 return False, (
-                    f"Triangle ({a},{b},{c}) spans three distinct core segments."
+                    f"Triangle ({a},{b},{c}) spans three distinct clockwork segments."
                 )
 
     # Step 4. Core orders (C1 and C2 conditions).

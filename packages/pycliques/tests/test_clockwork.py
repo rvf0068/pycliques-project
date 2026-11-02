@@ -329,6 +329,26 @@ def test_three_segment_clockworks_are_verified_after_relabeling(
     assert relabeled_recognized
 
 
+def test_fast_recognizer_rejects_triangle_across_three_crown_segments() -> None:
+    """A nine-vertex lookalike has crown triangles but no core triangles.
+
+    Three identity crown matchings form two triangles across B_0, B_1, B_2.
+    The fast recognizer must reject them instead of producing a decomposition
+    that the independent verifier later rejects with RuntimeError.
+    """
+    graph = clockwork_graph([1, 1, 1], [[0], [0], [0]], 2, [0, 1])
+
+    # This graph has three singleton core segments but its crown has
+    # triangles spanning all three crown segments.
+    fast_ok, fast_reason = clockwork_module._recognize_clockwork_fast(graph)
+    assert not fast_ok
+    assert "triangle" in str(fast_reason).lower()
+
+    recognized, reason = recognize_clockwork(graph, fallback_enabled=False)
+    assert not recognized
+    assert "triangle" in str(reason).lower()
+
+
 def test_three_segment_triangle_lookalike_is_rejected() -> None:
     graph = clockwork_graph([1, 1, 1], [[1], [1], [1]], 2, [1, 0])
 
