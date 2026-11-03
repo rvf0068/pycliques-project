@@ -15,17 +15,30 @@ Dependencies
 
 References
 ----------
-.. [Dong2002] X. Dong, "The topology of bounded-degree graph complexes",
-   J. Algebra 262 (2003) 287-312.
+.. [Dong2003] X. Dong, "Topology of bounded-degree graph complexes",
+   J. Algebra 262 (2003), 287--312. DOI: 10.1016/S0021-8693(03)00024-3.
+   (Vertex-ordered discrete Morse matching.)
 
-.. [BM1997] A. Björner & M. Wachs, "Shellable nonpure complexes and posets I",
-   Trans. Amer. Math. Soc. 348 (1996) 1299-1327.  (Vertex decomposability.)
+.. [Forman1998] R. Forman, "Morse theory for cell complexes",
+   Adv. Math. 134 (1998), 90--145. DOI: 10.1006/aima.1997.1650.
 
-.. [Wh1939] J. H. C. Whitehead, "Simplicial spaces, nuclei and m-groups",
-   Proc. London Math. Soc. 45 (1939) 243-327.  (Elementary collapses.)
+.. [BW1996] A. Björner and M. L. Wachs,
+   "Shellable nonpure complexes and posets. I",
+   Trans. Amer. Math. Soc. 348 (1996), 1299--1327.
 
-.. [MV1930] K. Mayer-Vietoris.  (Nerve / Mayer-Vietoris sequence used in the
-   join-complement, cutpoint, and special-edge theorems.)
+.. [Whitehead1939] J. H. C. Whitehead,
+   "Simplicial spaces, nuclei and m-groups",
+   Proc. London Math. Soc. (2) 45 (1939), 243--327.
+
+.. [FríasArmenta2013] M. E. Frías-Armenta, F. Larrión,
+   V. Neumann-Lara and M. A. Pizaña,
+   "Edge contraction and edge removal on iterated clique graphs",
+   Discrete Appl. Math. 161 (2013), 1427--1439.
+   DOI: 10.1016/j.dam.2013.02.003. (Local cutpoints.)
+
+The graph-join, cutvertex-wedge, link-attachment and edge-attachment
+reductions below follow directly from elementary simplicial constructions
+and homotopy pushouts, not from Mayer--Vietoris homology alone.
 """
 
 from __future__ import annotations
@@ -36,8 +49,9 @@ from itertools import combinations
 
 import mogutda
 import networkx as nx
+from pycliques import clique_graph
 from pycliques.surfaces import open_neighborhood
-from sympy import Add, Mul, Poly, symbols
+from sympy import Poly, symbols
 
 from .s_collapses import complete_s_collapse, complete_s_collapse_edges
 from .simplex import Simplex, SimplicialComplex, clique_complex, dong_matching, star
@@ -48,68 +62,75 @@ from .simplex import Simplex, SimplicialComplex, clique_complex, dong_matching, 
 
 
 class Theorem:
-    """Namespace of human-readable theorem labels used as ``reason`` values."""
+    """Human-readable mathematical justifications, not bare theorem names."""
 
-    CONTRACTIBLE_POINT = "One-point complex is contractible (trivially)."
+    CONTRACTIBLE_POINT = "A one-vertex clique complex is a point."
     COLLAPSIBLE = (
-        "Complex is collapsible (sequence of elementary collapses); "
-        "contractible by [Wh1939]."
+        "Verified graph s-collapse reduction to a point; its clique complex "
+        "has the homotopy type of a point."
     )
     DONG_MATCHING = (
-        "Dong matching (acyclic matching on the Hasse diagram) yields a "
-        "single critical cell in each dimension; homotopy type read off "
-        "from the critical cells [Dong2002]."
+        "Dong's vertex-ordered matching is checked to be acyclic on the "
+        "augmented face poset. Its critical nonempty faces all have one "
+        "dimension, so Forman's discrete Morse CW model is a wedge of "
+        "spheres [Dong2003, Forman1998]."
     )
     VERTEX_DECOMPOSABLE = (
-        "Complex (after collapse) is vertex decomposable [BM1997]; "
-        "Betti numbers computed and homotopy type identified."
+        "A checked shedding-vertex recursion certifies nonpure vertex "
+        "decomposability. The complex is shellable, hence a wedge of "
+        "spheres, with multiplicities determined by reduced Betti "
+        "numbers [BW1996]."
     )
     JOIN_COMPLEMENT = (
-        "Complement graph is disconnected; clique complex is the join of "
-        "the clique complexes of each complementary component. "
-        "Join formula applied via Künneth / suspension [MV1930]."
+        "A disconnected complement decomposes the graph as a join. "
+        "The clique complex is the simplicial join of the certified "
+        "factors; the join-suspension identity determines its spheres."
     )
-    STAR_CLUSTER = (
-        "Isolated vertex in complement graph detected; star-cluster "
-        "decomposition applied [MV1930]."
+    UNIVERSAL_VERTEX_CONE = (
+        "A vertex adjacent to every other vertex is an apex of every "
+        "maximal simplex; its clique complex is a cone."
     )
-    SPECIAL_NEIGHBOURHOOD = (
-        "Vertex whose open neighbourhood is a disjoint union of two "
-        "complete graphs detected; Mayer-Vietoris / pushout argument "
-        "gives +1 to the S^1 count [MV1930]."
+    DISJOINT_COMPLETE_NEIGHBORHOOD = (
+        "The open neighborhood is a disjoint union of r>=2 nonempty "
+        "complete graphs, and deleting the vertex leaves a connected "
+        "graph. The vertex star is a cone attached along r disjoint "
+        "contractible simplices, producing r-1 additional circles."
     )
-    SPECIAL_EDGES = (
-        "Bridge edges (no common neighbour, both endpoints have degree >= 3) "
-        "detected; graph splits into components whose complexes are vertex "
-        "decomposable; polynomial addition formula applied [MV1930]."
+    INDEPENDENT_NEIGHBORHOOD_CLIQUE_GRAPH = (
+        "The vertex has r>=2 pairwise nonadjacent neighbors and its "
+        "deletion is connected. In the clique graph, the r new edge-cliques "
+        "form a simplex; collapsing this simplex turns their attachments "
+        "into a cone over r disjoint simplices, adding r-1 circles "
+        "[FríasArmenta2013 gives related local-cutpoint terminology]."
     )
-    CUTPOINT = (
-        "Cut-point detected; complex splits as a wedge by a "
-        "Mayer-Vietoris argument; each piece is vertex decomposable "
-        "[MV1930]."
+    TRIANGLE_FREE_INTERCOMPONENT_EDGES = (
+        "Deleting all selected edges leaves precisely two connected "
+        "induced pieces, with every deleted edge joining the pieces "
+        "and lying in no triangle. The clique complex attaches m "
+        "one-cells between two certified pieces, adding m-1 circles."
     )
-    SPECIAL_CUTPOINT_KG = (
-        "Special cut-point in G used to compute homotopy type of K(G) via "
-        "a pushout / Mayer-Vietoris argument on the clique graph [MV1930]."
+    CUTVERTEX_WEDGE = (
+        "The graph has an articulation vertex. Its clique complex is "
+        "the union of the certified complexes of the cutvertex pieces "
+        "meeting exactly at that vertex, hence their wedge."
     )
-    SPECIAL_VERTEX_SC = (
-        "Vertex with 0-dimensional link found in simplified complex; "
-        "deletion / link decomposition applied recursively."
+    CONTRACTIBLE_LINK_COMPONENTS = (
+        "After a homotopy-preserving reduction, deleting a vertex leaves "
+        "a connected complex and the vertex link is a disjoint union "
+        "of r>=2 certified contractible complexes. Attaching the cone "
+        "on this link adds r-1 circles."
     )
     BETTI_ONLY = (
-        "No combinatorial shortcut succeeded; Betti numbers computed "
-        "directly (homotopy type may not be fully determined from Betti "
-        "numbers alone)."
+        "No certified wedge decomposition succeeded; reduced Betti "
+        "numbers alone do not determine the homotopy type."
     )
     LARGE_GRAPH_BETTI = (
-        "Graph too large for combinatorial homotopy-type methods; "
-        "reduced Betti numbers computed via mogutda."
+        "Graph too large for the combinatorial shortcuts; reduced "
+        "Betti numbers computed via mogutda, not a homotopy certificate."
     )
     LIMIT_EXCEEDED = (
-        "Homotopy-type computation skipped because a configured size limit "
-        "was exceeded."
+        "Configured size limit exceeded; no homotopy type established."
     )
-
 
 # ---------------------------------------------------------------------------
 # WedgeOfSpheres  - structured internal representation
@@ -323,53 +344,61 @@ def _facets_containing(s_complex: SimplicialComplex, simplex: Simplex) -> int:
 
 
 def _is_free_face(s_complex: SimplicialComplex, simplex: Simplex) -> bool:
-    return (
-        simplex not in s_complex.facet_set
-        and _facets_containing(s_complex, simplex) == 1
-    )
+    """An elementary free face has a unique facet, one dimension higher."""
+    if not simplex or simplex in s_complex.facet_set:
+        return False
+    containing = [f for f in s_complex.facet_set if simplex.issubset(f)]
+    return len(containing) == 1 and len(containing[0]) == len(simplex) + 1
 
 
 def _remove_simplex(
     s_complex: SimplicialComplex, simplex: Simplex
 ) -> SimplicialComplex:
+    """Delete exactly one elementary free face/coface pair.
+
+    All other faces survive, notably the other codimension-one faces of
+    the removed facet. The result retains only inclusion-maximal facets.
+    """
+    if not _is_free_face(s_complex, simplex):
+        raise ValueError("Not a codimension-one elementary free face")
     facet = next(f for f in s_complex.facet_set if simplex.issubset(f))
-    others = s_complex.facet_set - {facet}
-    good = others.copy()
-    for v in simplex:
-        reduced = Simplex(facet - {v})
-        if not any(reduced.issubset(f) for f in others):
-            good = good | {reduced}
-    vertices = set.union(*(set(s) for s in good))
-    return SimplicialComplex(vertices, facet_set=good)
+    candidates = set(s_complex.facet_set - {facet})
+    for vertex in facet:
+        codim_one_face = Simplex(facet - {vertex})
+        if codim_one_face != simplex:
+            candidates.add(codim_one_face)
+    facets = {
+        f for f in candidates
+        if not any(f < other for other in candidates)
+    }
+    vertices = set().union(*(set(f) for f in facets))
+    return SimplicialComplex(vertices, facet_set=facets)
 
 
 def _has_free_face(s_complex: SimplicialComplex) -> Simplex | None:
-    for face in s_complex.all_simplices():
+    for face in sorted(
+        s_complex.all_simplices(),
+        key=lambda s: (len(s), repr(sorted(s, key=repr))),
+        reverse=True,
+    ):
         if _is_free_face(s_complex, face):
             return face
     return None
 
 
 def collapse(s_complex: SimplicialComplex) -> SimplicialComplex:
-    """Greedily apply nonrelative elementary collapses to *s_complex*.
+    """Greedily apply *genuine* codimension-one elementary collapses.
 
-    This procedure does not preserve a chosen subcomplex and makes no search
-    over competing collapse choices. If it stops before a point, that only
-    means this greedy procedure found no next free face; it does not establish
-    non-collapsibility.
+    Each removal preserves simple-homotopy type. Failure to find another
+    free face is not a non-collapsibility certificate [Whitehead1939].
     """
     sc = s_complex
-    while True:
-        if len(sc.vertex_set) in {0, 1}:
-            return sc
+    while len(sc.vertex_set) > 1:
         free_face = _has_free_face(sc)
         if free_face is None:
-            return sc
-        if len(free_face) == 0:
-            v = next(iter(sc.vertex_set))
-            return SimplicialComplex({v}, facet_set={Simplex({v})})
+            break
         sc = _remove_simplex(sc, free_face)
-
+    return sc
 
 # --- Betti number helpers ---
 
@@ -403,19 +432,58 @@ def betti_numbers_graph(graph: nx.Graph) -> list[int]:
     return _simplify_betti_list(numbers)
 
 
-def _read_dong(dong) -> WedgeOfSpheres | None:
-    """Interpret a Dong matching into a WedgeOfSpheres, or None if ambiguous."""
-    n = len(dong)
-    if n == 0:
-        return WedgeOfSpheres.contractible()
-    lst = list(dong)
-    dim = len(lst[0])
-    if n == 1:
-        return WedgeOfSpheres.sphere(dim - 1)
-    if all(len(s) == dim for s in lst):
-        return WedgeOfSpheres({dim - 1: n})
-    return None
+def _read_dong(dong: set[Simplex]) -> WedgeOfSpheres | None:
+    """Read a *verified acyclic augmented* Dong matching.
 
+    The empty face must have been paired, and all remaining critical
+    faces must have the same positive cardinality. The Morse CW model
+    then has one 0-cell and n cells of a common positive dimension;
+    every attaching map has contractible target and the space is a wedge.
+    """
+    if not dong:
+        return WedgeOfSpheres.contractible()
+    if any(not s for s in dong):
+        return None
+    dimensions = {len(s) - 1 for s in dong}
+    if len(dimensions) != 1:
+        return None
+    dim = next(iter(dimensions))
+    return WedgeOfSpheres({dim: len(dong)})
+
+
+def _dong_matching_is_acyclic(
+    s_complex: SimplicialComplex,
+    critical: set[Simplex],
+    pairs: list[tuple[Simplex, Simplex]],
+) -> bool:
+    """Independently validate matched Hasse edges and gradient acyclicity."""
+    faces = s_complex.all_simplices()
+    used: set[Simplex] = set()
+    matched_edges: set[tuple[Simplex, Simplex]] = set()
+    for low, high in pairs:
+        if (
+            low not in faces
+            or high not in faces
+            or len(high) != len(low) + 1
+            or not low.issubset(high)
+            or low in used
+            or high in used
+        ):
+            return False
+        used.update((low, high))
+        matched_edges.add((low, high))
+    if critical != faces - used:
+        return False
+    gradient = nx.DiGraph()
+    gradient.add_nodes_from(faces)
+    for high in faces:
+        for vertex in high:
+            low = Simplex(high - {vertex})
+            if (low, high) in matched_edges:
+                gradient.add_edge(low, high)
+            else:
+                gradient.add_edge(high, low)
+    return nx.is_directed_acyclic_graph(gradient)
 
 # --- Polynomial helpers for Mayer-Vietoris arguments ---
 
@@ -504,23 +572,21 @@ def _try_trivial(graph: nx.Graph) -> HomotopyVerdict | None:
 def _try_dong(
     s_complex: SimplicialComplex, extra_reasons: str = ""
 ) -> HomotopyVerdict | None:
-    """Try Dong matching (up to 7 attempts with random vertex orderings)."""
+    """Try Dong's matching, accepting only verified acyclic matchings."""
     collapsed = collapse(s_complex)
-    # deterministic first pass
-    w = _read_dong(dong_matching(collapsed))
-    if w is not None:
+    for ordering in (list, *([_shuff] * 6)):
+        critical, pairs = dong_matching(
+            collapsed, order_function=ordering, return_pairs=True
+        )
+        if not _dong_matching_is_acyclic(collapsed, critical, pairs):
+            continue
+        wedge = _read_dong(critical)
+        if wedge is None:
+            continue
         reason = Theorem.DONG_MATCHING
         if extra_reasons:
-            reason = extra_reasons + "  Then: " + reason
-        return HomotopyVerdict(wedge=w, reason=reason)
-    # randomised passes
-    for _ in range(6):
-        w = _read_dong(dong_matching(collapsed, order_function=_shuff))
-        if w is not None:
-            reason = Theorem.DONG_MATCHING
-            if extra_reasons:
-                reason = extra_reasons + "  Then: " + reason
-            return HomotopyVerdict(wedge=w, reason=reason)
+            reason = extra_reasons + " Then: " + reason
+        return HomotopyVerdict(wedge=wedge, reason=reason)
     return None
 
 
@@ -541,93 +607,148 @@ def _try_vertex_decomposable(
 
 
 def _try_join_complement(graph: nx.Graph) -> HomotopyVerdict | None:
-    """Disconnected complement -> clique complex is a join."""
-    x = symbols("x")
-    cg = nx.complement(nx.convert_node_labels_to_integers(graph))
-    comps = [cg.subgraph(c).copy() for c in nx.connected_components(cg)]
-    if len(comps) <= 1:
+    """Use the join formula only with certified homotopy types of factors."""
+    complement = nx.complement(graph)
+    components = list(nx.connected_components(complement))
+    if len(components) < 2:
         return None
-    sub_complexes = [clique_complex(nx.complement(s)) for s in comps]
-    collapsed = [collapse(sc) for sc in sub_complexes]
-    if not all(is_vertex_decomposable(c) for c in collapsed):
-        return None
-    polys = [_list_to_poly(betti_numbers_sc(c)) for c in collapsed]
-    product = Poly(Mul(*[p.as_expr() for p in polys]), x)
-    padding = [0] * (len(comps) - 1)
-    bettis = padding + _poly_to_list(product)
+    factors = []
+    for component in components:
+        factor = nx.complement(complement.subgraph(component).copy())
+        verdict = homotopy_type_with_verdict(factor)
+        if not verdict.is_exact or verdict.is_limited:
+            return None
+        factors.append(verdict.wedge)
+    # (vee S^p) * (vee S^q) == vee S^(p+q+1);
+    # iterate for any number of factors.
+    spheres = {0: 1}
+    for factor in factors:
+        next_spheres: dict[int, int] = {}
+        for d, n in spheres.items():
+            for e, m in factor.spheres.items():
+                dim = d + e + 1
+                next_spheres[dim] = next_spheres.get(dim, 0) + n * m
+        spheres = next_spheres
+    # The initial formal 0-sphere is the unit only after adjusting
+    # the grading: the first factor must be used directly.
+    spheres = dict(factors[0].spheres)
+    for factor in factors[1:]:
+        next_spheres = {}
+        for d, n in spheres.items():
+            for e, m in factor.spheres.items():
+                dim = d + e + 1
+                next_spheres[dim] = next_spheres.get(dim, 0) + n * m
+        spheres = next_spheres
     return HomotopyVerdict(
-        wedge=WedgeOfSpheres.from_betti(bettis),
+        wedge=WedgeOfSpheres(spheres),
         reason=Theorem.JOIN_COMPLEMENT,
     )
 
 
-def _try_star_cluster(graph: nx.Graph) -> HomotopyVerdict | None:
-    """Isolated vertex in complement -> star-cluster decomposition."""
-    if graph.order() == 1:
+def _try_universal_vertex_cone(graph: nx.Graph) -> HomotopyVerdict | None:
+    """A universal vertex is an apex of the flag complex."""
+    if graph.number_of_nodes() and any(
+        degree == graph.number_of_nodes() - 1
+        for _, degree in graph.degree()
+    ):
         return HomotopyVerdict(
             wedge=WedgeOfSpheres.contractible(),
-            reason=Theorem.CONTRACTIBLE_POINT,
+            reason=Theorem.UNIVERSAL_VERTEX_CONE,
         )
-    graph = nx.convert_node_labels_to_integers(graph)
-    cg = nx.complement(graph)
-    isolated = [v for v in cg.nodes() if open_neighborhood(cg, v).size() == 0]
-    if not isolated:
-        return None
-    vertex = isolated[0]
-    ig = clique_complex(graph)
-    st = star(ig, vertex)
-    sc = star_cluster(ig, cg[vertex])
-    inter = collapse(intersection_complex(st, sc))
-    # empty intersection means the decomposition is not applicable
-    if not inter.vertex_set:
-        return None
-    # check vertex decomposability of intersection
-    if not is_vertex_decomposable(inter):
-        return None
-    bettis = [0] + betti_numbers_sc(inter)
-    return HomotopyVerdict(
-        wedge=WedgeOfSpheres.from_betti(bettis),
-        reason=Theorem.STAR_CLUSTER,
-    )
+    return None
+
 
 
 def _is_complete(graph: nx.Graph) -> bool:
     n = graph.order()
-    return bool(graph.size() == n * (n - 1) // 2)
+    return graph.size() == n * (n - 1) // 2
 
 
-def _is_disjoint_union_of_completes(graph: nx.Graph) -> bool:
-    comps = [graph.subgraph(c).copy() for c in nx.connected_components(graph)]
-    return len(comps) == 2 and all(_is_complete(h) for h in comps)
-
-
-def _try_special_neighbourhood(graph: nx.Graph) -> HomotopyVerdict | None:
-    """Vertex with open neighbourhood = K_p disjoint union of K_q -> +1 to S^1 count."""
-    neighs = [(v, open_neighborhood(graph, v)) for v in graph.nodes()]
-    candidates = [
-        v
-        for (v, nei) in neighs
-        if _is_disjoint_union_of_completes(nei)
-        and nx.is_connected(graph.subgraph(set(graph.nodes()) - {v}))
-    ]
-    if not candidates:
+def _complete_neighborhood_components(
+    graph: nx.Graph, vertex
+) -> list[set] | None:
+    """Return complete components of N(vertex), or None if inapplicable."""
+    neighbors = set(graph.neighbors(vertex))
+    if len(neighbors) < 2:
         return None
-    v = candidates[0]
-    sub = nx.convert_node_labels_to_integers(graph.subgraph(set(graph.nodes()) - {v}))
-    inner = homotopy_type_with_verdict(sub)
-    if inner.is_limited:
+    neighborhood = graph.subgraph(neighbors)
+    components = [set(c) for c in nx.connected_components(neighborhood)]
+    if len(components) < 2:
+        return None
+    if not all(_is_complete(neighborhood.subgraph(c)) for c in components):
+        return None
+    return components
+
+
+def _try_disjoint_complete_neighborhood(
+    graph: nx.Graph,
+) -> HomotopyVerdict | None:
+    """Delete a vertex with r>=2 disjoint complete neighborhood components.
+
+    The link in the flag complex consists of r contractible simplices.
+    If deletion is connected, attaching the vertex star adds r-1 circles.
+    """
+    for vertex in graph:
+        components = _complete_neighborhood_components(graph, vertex)
+        if components is None:
+            continue
+        deletion = graph.copy()
+        deletion.remove_node(vertex)
+        if deletion.number_of_nodes() == 0 or not nx.is_connected(deletion):
+            continue
+        verdict = homotopy_type_with_verdict(deletion)
+        if verdict.is_limited:
+            return verdict
         return HomotopyVerdict(
-            wedge=inner.wedge,
-            reason=inner.reason,
-            is_exact=False,
-            is_limited=True,
+            wedge=verdict.wedge.add_spheres(1, len(components) - 1),
+            reason=Theorem.DISJOINT_COMPLETE_NEIGHBORHOOD
+            + " Recursive result: " + verdict.reason,
+            is_exact=verdict.is_exact,
         )
-    w = inner.wedge.add_spheres(1, 1)
+    return None
+
+
+def homotopy_type_clique_graph_via_independent_neighborhood(
+    graph: nx.Graph,
+    vertex,
+) -> HomotopyVerdict:
+    """Classify Delta(K(graph)) from Delta(K(graph-vertex)).
+
+    Requires r>=2 pairwise nonadjacent neighbors of vertex, plus connected
+    deletion of order >=2. Otherwise raises ValueError rather than issuing
+    an invalid homotopy certificate.
+
+    All cliques of H=graph-vertex survive as cliques in graph, while each
+    edge {vertex,neighbor} gives a new clique. These r new cliques form a
+    simplex in Delta(K(graph)). Quotienting that simplex (a contractible
+    subcomplex) to a point turns the remaining attachments into a cone
+    over r disjoint simplices on the old cliques containing each neighbor.
+    The connected deletion therefore contributes r-1 circles.
+    """
+    if vertex not in graph:
+        raise ValueError("vertex is not in graph")
+    neighborhood = list(graph.neighbors(vertex))
+    if len(neighborhood) < 2:
+        raise ValueError("vertex must have at least two neighbors")
+    if graph.subgraph(neighborhood).number_of_edges() != 0:
+        raise ValueError("vertex's open neighborhood must be independent")
+    deletion = graph.copy()
+    deletion.remove_node(vertex)
+    if deletion.number_of_nodes() < 2 or not nx.is_connected(deletion):
+        raise ValueError("graph minus vertex must be connected of order >= 2")
+    clique_deletion = clique_graph(deletion)
+    if clique_deletion is None:
+        raise ValueError("could not construct the clique graph of deletion")
+    verdict = homotopy_type_with_verdict(clique_deletion)
+    if verdict.is_limited:
+        return verdict
     return HomotopyVerdict(
-        wedge=w,
-        reason=Theorem.SPECIAL_NEIGHBOURHOOD,
-        is_exact=inner.is_exact,
+        wedge=verdict.wedge.add_spheres(1, len(neighborhood) - 1),
+        reason=Theorem.INDEPENDENT_NEIGHBORHOOD_CLIQUE_GRAPH
+        + " Recursive result: " + verdict.reason,
+        is_exact=verdict.is_exact,
     )
+
 
 
 def _is_special_edge(graph: nx.Graph, edge) -> bool:
@@ -636,84 +757,124 @@ def _is_special_edge(graph: nx.Graph, edge) -> bool:
     return len(n1 & n2) == 0 and graph.degree(edge[0]) > 2 and graph.degree(edge[1]) > 2
 
 
-def _try_special_edges(graph: nx.Graph) -> HomotopyVerdict | None:
-    """Bridge-like edges with no common neighbour -> polynomial addition."""
-    x = symbols("x")
-    graph = _simplify_graph_ht(graph)
-    if not nx.is_connected(graph):
+def _try_triangle_free_intercomponent_edges(
+    graph: nx.Graph,
+) -> HomotopyVerdict | None:
+    """Split two induced connected pieces joined by triangle-free edges.
+
+    Every removed edge must run between the two pieces: removing an edge
+    inside a piece would invalidate the asserted homotopy decomposition.
+    """
+    candidate_edges = [
+        e for e in graph.edges() if _is_special_edge(graph, e)
+    ]
+    if not candidate_edges:
         return None
-    sp_edges = [e for e in graph.edges() if _is_special_edge(graph, e)]
-    if not sp_edges:
+    reduced = graph.copy()
+    reduced.remove_edges_from(candidate_edges)
+    components = [set(c) for c in nx.connected_components(reduced)]
+    if len(components) != 2:
         return None
-    cg = graph.copy()
-    cg.remove_edges_from(sp_edges)
-    comps = [cg.subgraph(c).copy() for c in nx.connected_components(cg)]
-    if len(comps) != 2:
+    left, right = components
+    if not all(
+        (u in left and v in right) or (u in right and v in left)
+        for u, v in candidate_edges
+    ):
         return None
-    sub_complexes = [clique_complex(s) for s in comps]
-    collapsed = [collapse(sc) for sc in sub_complexes]
-    if not all(is_vertex_decomposable(c) for c in collapsed):
+    # All cross edges must have been removed; each has no common neighbor.
+    cross_edges = [
+        (u, v) for u, v in graph.edges()
+        if (u in left and v in right) or (u in right and v in left)
+    ]
+    if len(cross_edges) != len(candidate_edges):
         return None
-    polys = [_list_to_poly(betti_numbers_sc(c)) for c in collapsed]
-    polys.append(_list_to_poly([0, len(sp_edges) - 1]))
-    total = Poly(Add(*[p.as_expr() for p in polys]), x)
-    bettis = _poly_to_list(total)
+    first = homotopy_type_with_verdict(graph.subgraph(left).copy())
+    second = homotopy_type_with_verdict(graph.subgraph(right).copy())
+    if first.is_limited or second.is_limited:
+        return None
+    if not first.is_exact or not second.is_exact:
+        return None
     return HomotopyVerdict(
-        wedge=WedgeOfSpheres.from_betti(bettis),
-        reason=Theorem.SPECIAL_EDGES,
+        wedge=first.wedge.wedge(second.wedge).add_spheres(
+            1, len(candidate_edges) - 1
+        ),
+        reason=Theorem.TRIANGLE_FREE_INTERCOMPONENT_EDGES,
     )
 
 
-def _try_cutpoints(graph: nx.Graph) -> HomotopyVerdict | None:
-    """Cut-point -> Mayer-Vietoris wedge."""
-    x = symbols("x")
-    graph = _simplify_graph_ht(graph)
+def _try_cutvertex_wedge(graph: nx.Graph) -> HomotopyVerdict | None:
+    """Cutvertex pieces intersect in exactly one vertex, hence wedge."""
     if not nx.is_connected(graph):
         return None
-    cutpoints = list(nx.articulation_points(graph))
-    if not cutpoints:
+    cutvertices = list(nx.articulation_points(graph))
+    if not cutvertices:
         return None
-    vertex = cutpoints[0]
-    cg = graph.copy()
-    cg.remove_node(vertex)
-    pieces = [graph.subgraph(comp | {vertex}) for comp in nx.connected_components(cg)]
-    sub_complexes = [clique_complex(g) for g in pieces]
-    collapsed = [collapse(sc) for sc in sub_complexes]
-    if not all(is_vertex_decomposable(c) for c in collapsed):
+    vertex = cutvertices[0]
+    reduced = graph.copy()
+    reduced.remove_node(vertex)
+    components = list(nx.connected_components(reduced))
+    pieces = [
+        graph.subgraph(set(component) | {vertex}).copy()
+        for component in components
+    ]
+    verdicts = [homotopy_type_with_verdict(piece) for piece in pieces]
+    if any(not v.is_exact or v.is_limited for v in verdicts):
         return None
-    polys = [_list_to_poly(betti_numbers_sc(c)) for c in collapsed]
-    total = Poly(Add(*[p.as_expr() for p in polys]), x)
-    bettis = _poly_to_list(total)
-    return HomotopyVerdict(
-        wedge=WedgeOfSpheres.from_betti(bettis),
-        reason=Theorem.CUTPOINT,
-    )
+    wedge = WedgeOfSpheres.contractible()
+    for v in verdicts:
+        wedge = wedge.wedge(v.wedge)
+    return HomotopyVerdict(wedge=wedge, reason=Theorem.CUTVERTEX_WEDGE)
 
 
-def _try_special_vertex_sc(
+def _try_contractible_link_components(
     s_complex: SimplicialComplex,
 ) -> HomotopyVerdict | None:
-    """Vertex with 0-dimensional link in collapsed complex."""
-    sc = collapse(s_complex)
-    for vertex in sc.vertex_set:
-        if sc.link(vertex).dimension() == 0:
-            deletion = sc.deletion(vertex)
-            inner = homotopy_type_sc_with_verdict(deletion)
-            if inner.is_limited:
-                return HomotopyVerdict(
-                    wedge=inner.wedge,
-                    reason=inner.reason,
-                    is_exact=False,
-                    is_limited=True,
-                )
-            n_neigh = len(sc.link(vertex).vertex_set)
-            w = inner.wedge.add_spheres(1, n_neigh - 1)
-            return HomotopyVerdict(
-                wedge=w,
-                reason=Theorem.SPECIAL_VERTEX_SC,
-                is_exact=inner.is_exact,
-            )
+    """Handle a vertex with a disconnected, componentwise contractible link.
+
+    Applies to arbitrary simplicial complexes, including non-flag ones.
+    Each link component must have a *certified* contractible type and the
+    deletion must have connected 1-skeleton. Under these exact hypotheses
+    the cone on the link adds one circle per component beyond the first.
+    """
+    reduced = collapse(s_complex)
+    for vertex in reduced.vertex_set:
+        lk = reduced.link(vertex)
+        skeleton = lk.one_skeleton_graph()
+        components = [set(c) for c in nx.connected_components(skeleton)]
+        if len(components) < 2:
+            continue
+        deletion = reduced.deletion(vertex)
+        deletion_graph = deletion.one_skeleton_graph()
+        if (
+            deletion_graph.number_of_nodes() == 0
+            or not nx.is_connected(deletion_graph)
+        ):
+            continue
+        certified = True
+        for component in components:
+            subfacets = [
+                f for f in lk.facet_set if f.issubset(component)
+            ]
+            piece = SimplicialComplex(component, facet_set=subfacets)
+            if len(piece.facet_set) == 1:
+                continue  # One simplex is visibly a cone.
+            check = homotopy_type_sc_with_verdict(piece)
+            if not check.is_exact or not check.wedge.is_contractible():
+                certified = False
+                break
+        if not certified:
+            continue
+        verdict = homotopy_type_sc_with_verdict(deletion)
+        if verdict.is_limited:
+            return verdict
+        return HomotopyVerdict(
+            wedge=verdict.wedge.add_spheres(1, len(components) - 1),
+            reason=Theorem.CONTRACTIBLE_LINK_COMPONENTS
+            + " Recursive result: " + verdict.reason,
+            is_exact=verdict.is_exact,
+        )
     return None
+
 
 
 # ---------------------------------------------------------------------------
@@ -757,8 +918,8 @@ def homotopy_type_sc_with_verdict(
     if v:
         return v
 
-    # 2. Special vertex with 0-dimensional link
-    v = _try_special_vertex_sc(s_complex)
+    # 2. Vertex with a disconnected union of contractible link components
+    v = _try_contractible_link_components(s_complex)
     if v:
         return v
 
@@ -840,23 +1001,23 @@ def homotopy_type_with_verdict(
     if v:
         return v
 
-    # 3. Star-cluster (isolated vertex in complement)
-    v = _try_star_cluster(graph)
+    # 3. Universal vertex gives a cone
+    v = _try_universal_vertex_cone(graph)
     if v:
         return v
 
-    # 4. Special neighbourhood
-    v = _try_special_neighbourhood(graph)
+    # 4. Disjoint complete components in the open neighborhood
+    v = _try_disjoint_complete_neighborhood(graph)
     if v:
         return v
 
-    # 5. Special bridge-like edges
-    v = _try_special_edges(graph)
+    # 5. Triangle-free edges between two induced connected pieces
+    v = _try_triangle_free_intercomponent_edges(graph)
     if v:
         return v
 
-    # 6. Cut-points
-    v = _try_cutpoints(graph)
+    # 6. Cutvertex wedge decomposition
+    v = _try_cutvertex_wedge(graph)
     if v:
         return v
 
@@ -872,8 +1033,8 @@ def homotopy_type_with_verdict(
     if v:
         return v
 
-    # 8. Special vertex in the complex
-    v = _try_special_vertex_sc(sc2)
+    # 8. Disconnected contractible vertex link
+    v = _try_contractible_link_components(sc2)
     if v:
         return v
 
