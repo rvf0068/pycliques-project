@@ -674,7 +674,7 @@ def test_closed_clique_intersection_recursive_limited_verdict_stays_inconclusive
     monkeypatch,
 ):
     """Theorem 15 must preserve an upstream limited placeholder as unknown."""
-    from pycombtop.homotopy_type import _try_special_neighbourhood
+    from pycombtop.homotopy_type import _try_disjoint_complete_neighborhood
 
     limited = HomotopyVerdict(
         wedge=WedgeOfSpheres.contractible(),
@@ -686,7 +686,7 @@ def test_closed_clique_intersection_recursive_limited_verdict_stays_inconclusive
         "pycombtop.homotopy_type.homotopy_type_with_verdict",
         lambda _graph: limited,
     )
-    recursively_derived = _try_special_neighbourhood(nx.cycle_graph(4))
+    recursively_derived = _try_disjoint_complete_neighborhood(nx.cycle_graph(4))
     assert recursively_derived is not None
     assert recursively_derived.is_limited is True
 
