@@ -49,6 +49,8 @@ and homotopy pushouts, not from Mayer--Vietoris homology alone.
 from __future__ import annotations
 
 import random
+from collections.abc import Callable
+from typing import cast
 from dataclasses import dataclass, field
 from itertools import combinations
 
@@ -487,7 +489,7 @@ def _dong_matching_is_acyclic(
                 gradient.add_edge(low, high)
             else:
                 gradient.add_edge(high, low)
-    return nx.is_directed_acyclic_graph(gradient)
+    return bool(nx.is_directed_acyclic_graph(gradient))
 
 
 # --- Polynomial helpers for Mayer-Vietoris arguments ---
@@ -579,9 +581,11 @@ def _try_dong(
 ) -> HomotopyVerdict | None:
     """Try Dong's matching, accepting only verified acyclic matchings."""
     collapsed = collapse(s_complex)
-    for ordering in (list, *([_shuff] * 6)):
-        critical, pairs = dong_matching(
-            collapsed, order_function=ordering, return_pairs=True
+    orderings: list[Callable[[set], list]] = [list] + [_shuff] * 6
+    for ordering in orderings:
+        critical, pairs = cast(
+            tuple[set[Simplex], list[tuple[Simplex, Simplex]]],
+            dong_matching(collapsed, order_function=ordering, return_pairs=True),
         )
         if not _dong_matching_is_acyclic(collapsed, critical, pairs):
             continue
@@ -628,7 +632,7 @@ def _try_join_complement(graph: nx.Graph) -> HomotopyVerdict | None:
     # for certified wedges this gives all sphere multiplicities.
     spheres = dict(factors[0].spheres)
     for factor in factors[1:]:
-        next_spheres = {}
+        next_spheres: dict[int, int] = {}
         for d, n in spheres.items():
             for e, m in factor.spheres.items():
                 dim = d + e + 1
@@ -654,7 +658,7 @@ def _try_universal_vertex_cone(graph: nx.Graph) -> HomotopyVerdict | None:
 
 def _is_complete(graph: nx.Graph) -> bool:
     n = graph.order()
-    return graph.size() == n * (n - 1) // 2
+    return bool(graph.size() == n * (n - 1) // 2)
 
 
 def _complete_neighborhood_components(graph: nx.Graph, vertex) -> list[set] | None:
