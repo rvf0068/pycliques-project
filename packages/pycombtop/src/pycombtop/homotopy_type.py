@@ -619,18 +619,8 @@ def _try_join_complement(graph: nx.Graph) -> HomotopyVerdict | None:
         if not verdict.is_exact or verdict.is_limited:
             return None
         factors.append(verdict.wedge)
-    # (vee S^p) * (vee S^q) == vee S^(p+q+1);
-    # iterate for any number of factors.
-    spheres = {0: 1}
-    for factor in factors:
-        next_spheres: dict[int, int] = {}
-        for d, n in spheres.items():
-            for e, m in factor.spheres.items():
-                dim = d + e + 1
-                next_spheres[dim] = next_spheres.get(dim, 0) + n * m
-        spheres = next_spheres
-    # The initial formal 0-sphere is the unit only after adjusting
-    # the grading: the first factor must be used directly.
+    # Reduced homology of a join is the shifted tensor product;
+    # for certified wedges this gives all sphere multiplicities.
     spheres = dict(factors[0].spheres)
     for factor in factors[1:]:
         next_spheres = {}
