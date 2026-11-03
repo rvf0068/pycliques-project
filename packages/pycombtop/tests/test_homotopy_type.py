@@ -19,11 +19,20 @@ from pycombtop.homotopy_type import (
     Theorem,
     WedgeOfSpheres,
     _too_large_simplicial_complex,
-    _try_special_neighbourhood,
-    _try_special_vertex_sc,
+    _dong_matching_is_acyclic,
+    _complete_neighborhood_components,
+    _try_triangle_free_intercomponent_edges,
+    _try_cutvertex_wedge,
+    _try_join_complement,
+    _try_universal_vertex_cone,
+    _try_dong,
+    _read_dong,
+    _try_disjoint_complete_neighborhood,
+    _try_contractible_link_components,
     betti_numbers_graph,
     betti_numbers_sc,
     collapse,
+    homotopy_type_clique_graph_via_independent_neighborhood,
     homotopy_type_large_graph,
     homotopy_type_sc_with_verdict,
     homotopy_type_with_verdict,
@@ -53,7 +62,7 @@ def test_homotopy_verdict_default_exact():
 
 
 @pytest.mark.parametrize("is_exact", [True, False])
-def test_special_neighbourhood_preserves_recursive_exactness(monkeypatch, is_exact):
+def test_disjoint_complete_neighborhood_preserves_recursive_exactness(monkeypatch, is_exact):
     inner = HomotopyVerdict(
         wedge=WedgeOfSpheres.contractible(),
         reason="test inner result",
@@ -64,7 +73,7 @@ def test_special_neighbourhood_preserves_recursive_exactness(monkeypatch, is_exa
         lambda _graph: inner,
     )
 
-    verdict = _try_special_neighbourhood(nx.cycle_graph(4))
+    verdict = _try_disjoint_complete_neighborhood(nx.cycle_graph(4))
 
     assert verdict is not None
     assert verdict.is_exact is is_exact
@@ -73,7 +82,7 @@ def test_special_neighbourhood_preserves_recursive_exactness(monkeypatch, is_exa
 
 
 @pytest.mark.parametrize("is_exact", [True, False])
-def test_special_vertex_sc_preserves_recursive_exactness(monkeypatch, is_exact):
+def test_contractible_link_components_preserves_recursive_exactness(monkeypatch, is_exact):
     cycle = SimplicialComplex(
         {0, 1, 2, 3},
         facet_set={
@@ -93,7 +102,7 @@ def test_special_vertex_sc_preserves_recursive_exactness(monkeypatch, is_exact):
         lambda _complex: inner,
     )
 
-    verdict = _try_special_vertex_sc(cycle)
+    verdict = _try_contractible_link_components(cycle)
 
     assert verdict is not None
     assert verdict.is_exact is is_exact
@@ -104,11 +113,11 @@ def test_special_vertex_sc_preserves_recursive_exactness(monkeypatch, is_exact):
 @pytest.mark.parametrize(
     ("helper", "input_complex"),
     [
-        (_try_special_neighbourhood, False),
-        (_try_special_vertex_sc, True),
+        (_try_disjoint_complete_neighborhood, False),
+        (_try_contractible_link_components, True),
     ],
 )
-def test_recursive_special_cases_preserve_limited_verdict(
+def test_recursive_attachment_cases_preserve_limited_verdict(
     monkeypatch, helper, input_complex
 ):
     inner = HomotopyVerdict(
@@ -685,3 +694,168 @@ def test_deletion_matches_graph_view_when_flag():
     sc_verdict = homotopy_type_sc_with_verdict(d)
     graph_verdict = homotopy_type_with_verdict(d.one_skeleton_graph())
     assert sc_verdict.wedge == graph_verdict.wedge
+
+
+# ---------- Certified vertex attachments and theorems ----------
+
+
+def test_elementary_collapse_rejects_non_codimension_one_free_face():
+    from pycombtop.homotopy_type import _is_free_face, _remove_simplex
+
+    sc = SimplicialComplex(set(range(4)), facet_set=[set(range(4))])
+    assert not _is_free_face(sc, Simplex({0}))
+    with pytest.raises(ValueError, match="codimension-one"):
+        _remove_simplex(sc, Simplex({0}))
+    assert len(collapse(sc).vertex_set) == 1
+
+
+def test_collapse_preserves_boundary_of_triangle():
+    boundary = SimplicialComplex(
+        {0, 1, 2}, facet_set=[{0, 1}, {1, 2}, {0, 2}]
+    )
+    assert collapse(boundary).facet_set == boundary.facet_set
+
+
+def test_disjoint_complete_neighborhood_requires_both_hypotheses():
+    # Nonempty clique components (K2 + K1), deletion connected.
+    g = nx.cycle_graph(5)
+    g.add_edge(0, 2)  # N(1) = {0,2}, but 0--2 destroys independence.
+    assert _complete_neighborhood_components(g, 1) is None
+
+    star = nx.star_graph(3)
+    assert _complete_neighborhood_components(star, 0) is not None
+    assert _try_disjoint_complete_neighborhood(star) is None
+
+
+def test_disjoint_complete_neighborhood_three_components():
+    # H=C6, v attached to alternate vertices of H.
+    g = nx.cycle_graph(6)
+    g.add_node(6)
+    g.add_edges_from([(6, 0), (6, 2), (6, 4)])
+    components = _complete_neighborhood_components(g, 6)
+    assert components is not None and len(components) == 3
+    verdict = _try_disjoint_complete_neighborhood(g)
+    assert verdict is not None
+    assert verdict.is_exact
+    assert verdict.wedge.spheres == {1: 3}  # C6 plus two circles
+
+
+def test_disjoint_complete_neighborhood_two_nonsingleton_components():
+    # Start with C4 and attach v to both endpoints of the edge 0--1
+    # and to the edge 2--3. The deletion is C4 and N(v)=K2 + K2.
+    g = nx.cycle_graph(4)
+    g.add_node(4)
+    g.add_edges_from([(4, 0), (4, 1), (4, 2), (4, 3)])
+    # C4 has cross edges 1--2 and 0--3, so its neighborhood is C4,
+    # deliberately NOT a union of two completes.
+    assert _complete_neighborhood_components(g, 4) is None
+
+
+def test_disconnected_deletion_rejects_discrete_link_shortcut():
+    sc = SimplicialComplex(
+        {0, 1, 2}, facet_set=[{0, 1}, {0, 2}]
+    )
+    assert _try_contractible_link_components(sc) is None
+
+
+def test_nonflag_contractible_link_components():
+    # Two filled triangles attached through a vertex v to a square;
+    # the deletion is connected, and the link has two edge-components.
+    sc = SimplicialComplex(
+        set(range(7)),
+        facet_set=[
+            {0, 1, 2}, {0, 3, 4},
+            {1, 2, 5}, {2, 3, 5}, {3, 4, 6}, {5, 6},
+        ],
+    )
+    # Check the link hypothesis structurally, not by relying on Betti numbers.
+    link = sc.link(0)
+    assert len(list(nx.connected_components(link.one_skeleton_graph()))) == 2
+    assert nx.is_connected(sc.deletion(0).one_skeleton_graph())
+
+
+@pytest.mark.parametrize("n", [4, 5, 6, 7])
+def test_clique_graph_independent_neighborhood_cycle(n):
+    g = nx.cycle_graph(n)
+    result = homotopy_type_clique_graph_via_independent_neighborhood(g, 0)
+    assert result.is_exact
+    assert result.wedge == WedgeOfSpheres.sphere(1)
+    actual = homotopy_type_with_verdict(clique_graph(g))
+    assert actual.is_exact
+    assert actual.wedge == result.wedge
+
+
+def test_clique_graph_independent_neighborhood_three_neighbors():
+    g = nx.cycle_graph(6)
+    g.add_node(6)
+    g.add_edges_from([(6, 0), (6, 2), (6, 4)])
+    result = homotopy_type_clique_graph_via_independent_neighborhood(g, 6)
+    assert result.is_exact
+    assert result.wedge.spheres == {1: 3}
+    assert betti_numbers_graph(clique_graph(g)) == [0, 3]
+
+
+@pytest.mark.parametrize("example, vertex", [
+    (nx.star_graph(3), 0),  # deletion disconnected
+    (nx.complete_graph(4), 0),  # neighborhood not independent
+    (nx.path_graph(3), 0),  # degree one
+])
+def test_clique_graph_attachment_rejects_invalid_hypotheses(example, vertex):
+    with pytest.raises(ValueError):
+        homotopy_type_clique_graph_via_independent_neighborhood(example, vertex)
+
+
+def test_dong_matching_is_independently_acyclic_on_small_atlas():
+    from pycombtop import dong_matching
+
+    for g in nx.graph_atlas_g():
+        if g.order() == 0:
+            continue
+        sc = clique_complex(g)
+        critical, pairs = dong_matching(
+            sc, order_function=sorted, return_pairs=True
+        )
+        assert _dong_matching_is_acyclic(sc, critical, pairs)
+
+
+def test_dong_matching_verifier_rejects_invalid_pair():
+    sc = clique_complex(nx.path_graph(3))
+    from pycombtop import dong_matching
+
+    critical, pairs = dong_matching(sc, return_pairs=True)
+    assert _dong_matching_is_acyclic(sc, critical, pairs)
+    assert not _dong_matching_is_acyclic(
+        sc, critical, pairs + [pairs[0]]
+    )
+
+
+def test_join_complement_octrahedron_sphere_two():
+    g = nx.octahedral_graph()
+    verdict = _try_join_complement(g)
+    assert verdict is not None
+    assert verdict.is_exact and verdict.wedge == WedgeOfSpheres.sphere(2)
+
+
+def test_cutvertex_wedge_two_cycles():
+    g = nx.disjoint_union(nx.cycle_graph(4), nx.cycle_graph(5))
+    # Identify vertex 4 with vertex 0.
+    g = nx.contracted_nodes(g, 0, 4, self_loops=False)
+    result = _try_cutvertex_wedge(g)
+    assert result is not None and result.is_exact
+    assert result.wedge == WedgeOfSpheres({1: 2})
+
+
+def test_triangle_free_intercomponent_edges_formula():
+    # Two disjoint triangles joined by three edges not in any triangle.
+    g = nx.disjoint_union(nx.complete_graph(3), nx.complete_graph(3))
+    g.add_edges_from([(0, 3), (1, 4), (2, 5)])
+    result = _try_triangle_free_intercomponent_edges(g)
+    assert result is not None and result.is_exact
+    assert result.wedge == WedgeOfSpheres({1: 2})
+
+
+def test_universal_vertex_is_cone():
+    result = _try_universal_vertex_cone(nx.star_graph(5))
+    assert result is not None
+    assert result.wedge.is_contractible()
+    assert result.reason == Theorem.UNIVERSAL_VERTEX_CONE
