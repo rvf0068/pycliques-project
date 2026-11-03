@@ -405,9 +405,7 @@ def collapse(s_complex: SimplicialComplex) -> SimplicialComplex:
             # A simplex has an explicit elementary collapse to a point,
             # but enumerating its 2^(n-1) pairs is unnecessary.
             one_vertex = next(iter(sc.vertex_set))
-            return SimplicialComplex(
-                {one_vertex}, facet_set=[{one_vertex}]
-            )
+            return SimplicialComplex({one_vertex}, facet_set=[{one_vertex}])
         free_face = _has_free_face(sc)
         if free_face is None:
             break
