@@ -39,6 +39,7 @@ from pycombtop.homotopy_type import (
     star,
     star_cluster,
 )
+
 # ---------- HomotopyVerdict ----------
 
 
