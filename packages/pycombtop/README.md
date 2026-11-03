@@ -1,3 +1,105 @@
+# Certified homotopy reductions
+
+`homotopy_type_with_verdict(G)` analyzes the clique complex
+`Delta(G)`. A result with `is_exact=True` is an asserted homotopy type;
+a result with `is_exact=False` carries Betti numbers only and must not
+be interpreted as a wedge-of-spheres certificate.
+
+The following descriptions explain the *reason* recorded in each exact
+verdict. They are mathematical arguments, not references to privately
+generated reports.
+
+- **Universal-vertex cone.** A vertex adjacent to all other vertices
+  belongs to every maximal complete; its clique complex is a cone.
+- **Graph join.** If the complement disconnects, the graph is a join
+  of the induced complementary factors; their clique complexes form a
+  simplicial join. We combine *certified* wedge types with the
+  join-suspension formula, not Betti numbers alone.
+- **Disjoint-complete open neighborhood.** The code checks that
+  `N_G(v)` has at least two connected components and *each* induces a
+  complete graph. It also explicitly checks that `G-v` is connected.
+  The vertex star is a cone on the disjoint union of these contractible
+  simplices, and its attachment contributes one circle per component
+  beyond the first. Two isolated neighbors are included, as are three
+  or more complete components.
+- **Contractible-link components (arbitrary simplicial complexes).**
+  This separately checks that the link has at least two connected
+  components, that every component is a *certifiably contractible*
+  subcomplex, and that the deletion is connected. Cone attachment
+  then contributes `r-1` circles. This method does not require a flag
+  complex.
+- **Triangle-free intercomponent edges.** The algorithm verifies that
+  removing selected edges leaves *exactly two connected induced parts*,
+  that every selected edge crosses between them, and that none lies in
+  a triangle. Attaching `m` one-cells between the two connected pieces
+  contributes `m-1` circles.
+- **Cutvertex wedge.** Decomposition at a genuine articulation vertex
+  produces subcomplexes with precisely that vertex in common; their
+  homotopy types form a wedge.
+- **Dong discrete Morse matching.** The vertex-ordered matching is
+  checked independently: every pair is a codimension-one face/coface
+  pair, each face is used at most once, and the oriented face poset
+  is acyclic. If all *remaining* critical cells have one dimension,
+  Dong's application of Forman's discrete Morse theory gives a wedge
+  of spheres. We retain the attribution to Dong and the 2003 publication
+  year.
+- **Vertex decomposability.** A shedding-vertex recursion checks the
+  nonpure vertex-decomposable condition. Björner--Wachs then supplies
+  shellability and a wedge-of-spheres homotopy type. Only in this
+  certified case do reduced Betti numbers determine sphere counts.
+- **Elementary collapse.** `collapse` removes only an actual free
+  face paired with a unique codimension-one coface; the other faces
+  survive. This is a simple-homotopy preserving operation, unlike
+  arbitrary deletion of a face contained in one facet.
+
+For the related clique-graph theorem, call:
+
+```python
+import networkx as nx
+from pycombtop import homotopy_type_clique_graph_via_independent_neighborhood
+
+G = nx.cycle_graph(6)
+result = homotopy_type_clique_graph_via_independent_neighborhood(G, 0)
+assert result.is_exact
+assert result.wedge.spheres == {1: 1}
+```
+
+This function explicitly checks that `v` has at least two **pairwise
+nonadjacent neighbors** and that `G-v` is connected of order at least
+two. It determines the homotopy type of `Delta(K(G))` from
+`Delta(K(G-v))`: the newly introduced maximal edge-completes form a
+simplex in `Delta(K(G))`. Contracting that simplex reduces their
+attachments to a cone on a disjoint union of simplices, so the
+difference is a wedge of `degree(v)-1` circles. An invalid hypothesis
+raises `ValueError`; an inexact recursive classification stays inexact.
+The function avoids constructing `K(G)` itself, but does compute
+`K(G-v)`.
+
+## Literature used by the implementations
+
+- Xun Dong, *Topology of bounded-degree graph complexes*,
+  *Journal of Algebra* **262** (2003), 287--312,
+  [doi:10.1016/S0021-8693(03)00024-3](https://doi.org/10.1016/S0021-8693(03)00024-3).
+- Robin Forman, *Morse theory for cell complexes*,
+  *Advances in Mathematics* **134** (1998), 90--145,
+  [doi:10.1006/aima.1997.1650](https://doi.org/10.1006/aima.1997.1650).
+- Anders Björner and Michelle L. Wachs, *Shellable nonpure complexes
+  and posets. I*, *Transactions of the AMS* **348** (1996), 1299--1327,
+  [author's bibliography](https://www.math.miami.edu/~wachs/eprints.html).
+- Romain Boulet, Étienne Fieux and Bertrand Jouve,
+  *Simplicial simple-homotopy of flag complexes in terms of graphs*,
+  *European Journal of Combinatorics* **31** (2010), 161--176,
+  [doi:10.1016/j.ejc.2009.05.003](https://doi.org/10.1016/j.ejc.2009.05.003).
+- M. E. Frías-Armenta, F. Larrión, V. Neumann-Lara and M. A. Pizaña,
+  *Edge contraction and edge removal on iterated clique graphs*,
+  *Discrete Applied Mathematics* **161** (2013), 1427--1439,
+  [doi:10.1016/j.dam.2013.02.003](https://doi.org/10.1016/j.dam.2013.02.003).
+  Section 2 introduces local cutpoints; the independent-neighborhood
+  homotopy reduction is proved directly in the code documentation.
+- J. H. C. Whitehead, *Simplicial spaces, nuclei and m-groups*,
+  *Proceedings of the London Mathematical Society* (2) **45**
+  (1939), 243--327.
+
 # Indeterminate graph files
 
 Compute the homotopy type of each graph's clique complex and write a tab-separated
