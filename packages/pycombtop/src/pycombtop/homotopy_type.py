@@ -756,7 +756,9 @@ def _try_triangle_free_intercomponent_edges(
     Every removed edge must run between the two pieces: removing an edge
     inside a piece would invalidate the asserted homotopy decomposition.
     """
-    candidate_edges = [e for e in graph.edges() if _is_triangle_free_edge_candidate(graph, e)]
+    candidate_edges = [
+        e for e in graph.edges() if _is_triangle_free_edge_candidate(graph, e)
+    ]
     if not candidate_edges:
         return None
     reduced = graph.copy()
