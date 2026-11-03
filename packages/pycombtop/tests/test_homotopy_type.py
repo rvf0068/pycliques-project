@@ -774,6 +774,9 @@ def test_nonflag_contractible_link_components():
     link = sc.link(0)
     assert len(list(nx.connected_components(link.one_skeleton_graph()))) == 2
     assert nx.is_connected(sc.deletion(0).one_skeleton_graph())
+    result = _try_contractible_link_components(sc)
+    assert result is not None and result.is_exact
+    assert result.wedge == WedgeOfSpheres({1: 2})
 
 
 @pytest.mark.parametrize("n", [4, 5, 6, 7])
@@ -878,3 +881,9 @@ def test_disjoint_complete_neighborhood_two_nontrivial_components():
     verdict = _try_disjoint_complete_neighborhood(g)
     assert verdict is not None and verdict.is_exact
     assert verdict.wedge == WedgeOfSpheres.sphere(1)
+
+
+def test_collapse_large_simplex_uses_certified_fast_path():
+    simplex = SimplicialComplex(set(range(20)), facet_set=[set(range(20))])
+    result = collapse(simplex)
+    assert len(result.vertex_set) == 1
