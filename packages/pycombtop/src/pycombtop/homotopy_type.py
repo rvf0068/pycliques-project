@@ -58,7 +58,6 @@ import mogutda
 import networkx as nx
 from pycliques import clique_graph
 from pycliques.surfaces import open_neighborhood
-from sympy import Poly, symbols
 
 from .s_collapses import complete_s_collapse, complete_s_collapse_edges
 from .simplex import Simplex, SimplicialComplex, clique_complex, dong_matching
@@ -490,20 +489,6 @@ def _dong_matching_is_acyclic(
             else:
                 gradient.add_edge(high, low)
     return bool(nx.is_directed_acyclic_graph(gradient))
-
-
-# --- Polynomial helpers for Mayer-Vietoris arguments ---
-
-
-def _list_to_poly(lst: list[int]) -> Poly:
-    x = symbols("x")
-    return Poly(sum(c * x**p for p, c in enumerate(lst)), x)
-
-
-def _poly_to_list(poly: Poly) -> list[int]:
-    coeffs: list[int] = list(poly.all_coeffs())
-    coeffs.reverse()
-    return coeffs
 
 
 # --- Vertex decomposability ---
