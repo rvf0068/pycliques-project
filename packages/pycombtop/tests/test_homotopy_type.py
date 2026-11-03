@@ -860,3 +860,21 @@ def test_universal_vertex_is_cone():
     assert result is not None
     assert result.wedge.is_contractible()
     assert result.reason == Theorem.UNIVERSAL_VERTEX_CONE
+
+
+def test_disjoint_complete_neighborhood_two_nontrivial_components():
+    # H is a tree joining two edges through vertex 4.
+    h = nx.Graph([(0, 1), (1, 4), (4, 2), (2, 3)])
+    g = h.copy()
+    g.add_node(5)
+    g.add_edges_from((5, u) for u in (0, 1, 2, 3))
+    components = _complete_neighborhood_components(g, 5)
+    assert components is not None
+    assert {frozenset(c) for c in components} == {
+        frozenset({0, 1}),
+        frozenset({2, 3}),
+    }
+    assert nx.is_connected(h)
+    verdict = _try_disjoint_complete_neighborhood(g)
+    assert verdict is not None and verdict.is_exact
+    assert verdict.wedge == WedgeOfSpheres.sphere(1)
