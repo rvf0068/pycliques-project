@@ -59,7 +59,8 @@ from pycliques.surfaces import open_neighborhood
 from sympy import Poly, symbols
 
 from .s_collapses import complete_s_collapse, complete_s_collapse_edges
-from .simplex import Simplex, SimplicialComplex, clique_complex, dong_matching, star
+from .simplex import Simplex, SimplicialComplex, clique_complex, dong_matching
+from .simplex import star as star  # Public re-export
 
 # ---------------------------------------------------------------------------
 # Theorem citations
