@@ -18,17 +18,15 @@ from pycombtop.homotopy_type import (
     HomotopyVerdict,
     Theorem,
     WedgeOfSpheres,
-    _too_large_simplicial_complex,
-    _dong_matching_is_acyclic,
     _complete_neighborhood_components,
-    _try_triangle_free_intercomponent_edges,
-    _try_cutvertex_wedge,
-    _try_join_complement,
-    _try_universal_vertex_cone,
-    _try_dong,
-    _read_dong,
-    _try_disjoint_complete_neighborhood,
+    _dong_matching_is_acyclic,
+    _too_large_simplicial_complex,
     _try_contractible_link_components,
+    _try_cutvertex_wedge,
+    _try_disjoint_complete_neighborhood,
+    _try_join_complement,
+    _try_triangle_free_intercomponent_edges,
+    _try_universal_vertex_cone,
     betti_numbers_graph,
     betti_numbers_sc,
     collapse,
@@ -41,7 +39,6 @@ from pycombtop.homotopy_type import (
     star,
     star_cluster,
 )
-
 # ---------- HomotopyVerdict ----------
 
 
@@ -62,7 +59,9 @@ def test_homotopy_verdict_default_exact():
 
 
 @pytest.mark.parametrize("is_exact", [True, False])
-def test_disjoint_complete_neighborhood_preserves_recursive_exactness(monkeypatch, is_exact):
+def test_disjoint_complete_neighborhood_preserves_recursive_exactness(
+    monkeypatch, is_exact
+):
     inner = HomotopyVerdict(
         wedge=WedgeOfSpheres.contractible(),
         reason="test inner result",
@@ -82,7 +81,9 @@ def test_disjoint_complete_neighborhood_preserves_recursive_exactness(monkeypatc
 
 
 @pytest.mark.parametrize("is_exact", [True, False])
-def test_contractible_link_components_preserves_recursive_exactness(monkeypatch, is_exact):
+def test_contractible_link_components_preserves_recursive_exactness(
+    monkeypatch, is_exact
+):
     cycle = SimplicialComplex(
         {0, 1, 2, 3},
         facet_set={
