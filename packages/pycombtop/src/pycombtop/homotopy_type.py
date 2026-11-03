@@ -72,7 +72,7 @@ class Theorem:
     """Human-readable mathematical justifications, not bare theorem names."""
 
     CONTRACTIBLE_POINT = "A one-vertex clique complex is a point."
-    COLLAPSIBLE = (
+    S_COLLAPSE_TO_POINT = (
         "Graph s-collapse reduction to a point: s-dismantlable vertex and "
         "edge removals preserve the simple-homotopy type of the clique "
         "complex [BFJ2010]."
@@ -732,7 +732,7 @@ def homotopy_type_clique_graph_via_independent_neighborhood(
     )
 
 
-def _is_special_edge(graph: nx.Graph, edge) -> bool:
+def _is_triangle_free_edge_candidate(graph: nx.Graph, edge) -> bool:
     n1 = set(open_neighborhood(graph, edge[0]))
     n2 = set(open_neighborhood(graph, edge[1]))
     return len(n1 & n2) == 0 and graph.degree(edge[0]) > 2 and graph.degree(edge[1]) > 2
@@ -746,7 +746,7 @@ def _try_triangle_free_intercomponent_edges(
     Every removed edge must run between the two pieces: removing an edge
     inside a piece would invalidate the asserted homotopy decomposition.
     """
-    candidate_edges = [e for e in graph.edges() if _is_special_edge(graph, e)]
+    candidate_edges = [e for e in graph.edges() if _is_triangle_free_edge_candidate(graph, e)]
     if not candidate_edges:
         return None
     reduced = graph.copy()
@@ -965,7 +965,7 @@ def homotopy_type_with_verdict(
         # upgrade reason to mention the collapse
         return HomotopyVerdict(
             wedge=WedgeOfSpheres.contractible(),
-            reason=Theorem.COLLAPSIBLE,
+            reason=Theorem.S_COLLAPSE_TO_POINT,
         )
 
     # 2. Universal vertex gives a cone (before the general join method)
