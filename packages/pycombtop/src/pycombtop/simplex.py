@@ -187,13 +187,14 @@ class SimplicialComplex:
         containing = {f for f in self.facet_set if x in f}
         not_containing = self.facet_set - containing
 
-        good_facets = set(not_containing)
+        candidates = set(not_containing)
         for s in containing:
-            candidate = Simplex(s - {x})
-            # Only add if it's not strictly contained in another existing facet
-            if not any(candidate.issubset(f) for f in not_containing):
-                good_facets.add(candidate)
-
+            candidates.add(Simplex(s - {x}))
+        # The shedding-vertex criterion and the subsequent algorithms
+        # require actual facets, not redundant nonmaximal faces.
+        good_facets = {
+            f for f in candidates if not any(f < other for other in candidates)
+        }
         return SimplicialComplex(vertices, facet_set=good_facets)
 
     def link(self, x) -> SimplicialComplex:
@@ -329,12 +330,21 @@ class SimplicialComplex:
 def dong_matching(
     s_complex: SimplicialComplex,
     order_function: Callable[[set], list] = list,
-) -> set[Simplex]:
-    """Return the critical simplices of *s_complex* under Dong's matching.
+    *,
+    return_pairs: bool = False,
+) -> set[Simplex] | tuple[set[Simplex], list[tuple[Simplex, Simplex]]]:
+    """Compute Dong's vertex-ordered discrete Morse matching.
 
-    The matching pairs simplices with their unions with a vertex according
-    to the vertex ordering given by *order_function*.  The returned set
-    contains exactly the unmatched (critical) simplices.
+    At each vertex, pair as-yet-unmatched faces in its link with their
+    union with that vertex. The empty face is included: this is the
+    augmented/reduced matching, whose first pair supplies the basepoint.
+    Dong, *Topology of bounded-degree graph complexes*, J. Algebra 262
+    (2003), 287--312, uses Forman's discrete Morse method (Forman,
+    *Morse theory for cell complexes*, Adv. Math. 134 (1998), 90--145).
+
+    Return unmatched faces, or (unmatched faces, matched codimension-one
+    pairs) when return_pairs=True. The latter permits independent
+    verification of acyclicity before certifying a homotopy type.
 
     .. rubric:: Parameters
 
@@ -358,7 +368,8 @@ def dong_matching(
     0
     """
     matched: set[Simplex] = set()
-    vertices = order_function(s_complex.base_set)
+    pairs: list[tuple[Simplex, Simplex]] = []
+    vertices = order_function(s_complex.vertex_set)
 
     for vertex in vertices:
         the_link = s_complex.link(vertex)
@@ -369,8 +380,10 @@ def dong_matching(
             if (s not in matched) and (s_plus_v not in matched):
                 matched.add(s)
                 matched.add(s_plus_v)
+                pairs.append((s, s_plus_v))
 
-    return s_complex.all_simplices() - matched
+    critical = s_complex.all_simplices() - matched
+    return (critical, pairs) if return_pairs else critical
 
 
 def all_subsets(the_set: set) -> Generator[Simplex]:
