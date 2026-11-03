@@ -380,13 +380,16 @@ def _remove_simplex(
 
 
 def _has_free_face(s_complex: SimplicialComplex) -> Simplex | None:
-    for face in sorted(
-        s_complex.all_simplices(),
+    """Search only codimension-one faces of facets, not all simplices."""
+    for facet in sorted(
+        s_complex.facet_set,
         key=lambda s: (len(s), repr(sorted(s, key=repr))),
         reverse=True,
     ):
-        if _is_free_face(s_complex, face):
-            return face
+        for vertex in sorted(facet, key=repr):
+            face = Simplex(facet - {vertex})
+            if _is_free_face(s_complex, face):
+                return face
     return None
 
 
@@ -398,6 +401,13 @@ def collapse(s_complex: SimplicialComplex) -> SimplicialComplex:
     """
     sc = s_complex
     while len(sc.vertex_set) > 1:
+        if len(sc.facet_set) == 1:
+            # A simplex has an explicit elementary collapse to a point,
+            # but enumerating its 2^(n-1) pairs is unnecessary.
+            one_vertex = next(iter(sc.vertex_set))
+            return SimplicialComplex(
+                {one_vertex}, facet_set=[{one_vertex}]
+            )
         free_face = _has_free_face(sc)
         if free_face is None:
             break
