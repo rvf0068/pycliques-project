@@ -193,8 +193,7 @@ class SimplicialComplex:
         # The shedding-vertex criterion and the subsequent algorithms
         # require actual facets, not redundant nonmaximal faces.
         good_facets = {
-            f for f in candidates
-            if not any(f < other for other in candidates)
+            f for f in candidates if not any(f < other for other in candidates)
         }
         return SimplicialComplex(vertices, facet_set=good_facets)
 

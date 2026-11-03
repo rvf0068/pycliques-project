@@ -135,9 +135,8 @@ class Theorem:
         "Graph too large for the combinatorial shortcuts; reduced "
         "Betti numbers computed via mogutda, not a homotopy certificate."
     )
-    LIMIT_EXCEEDED = (
-        "Configured size limit exceeded; no homotopy type established."
-    )
+    LIMIT_EXCEEDED = "Configured size limit exceeded; no homotopy type established."
+
 
 # ---------------------------------------------------------------------------
 # WedgeOfSpheres  - structured internal representation
@@ -374,10 +373,7 @@ def _remove_simplex(
         codim_one_face = Simplex(facet - {vertex})
         if codim_one_face != simplex:
             candidates.add(codim_one_face)
-    facets = {
-        f for f in candidates
-        if not any(f < other for other in candidates)
-    }
+    facets = {f for f in candidates if not any(f < other for other in candidates)}
     vertices = set().union(*(set(f) for f in facets))
     return SimplicialComplex(vertices, facet_set=facets)
 
@@ -406,6 +402,7 @@ def collapse(s_complex: SimplicialComplex) -> SimplicialComplex:
             break
         sc = _remove_simplex(sc, free_face)
     return sc
+
 
 # --- Betti number helpers ---
 
@@ -491,6 +488,7 @@ def _dong_matching_is_acyclic(
             else:
                 gradient.add_edge(high, low)
     return nx.is_directed_acyclic_graph(gradient)
+
 
 # --- Polynomial helpers for Mayer-Vietoris arguments ---
 
@@ -645,8 +643,7 @@ def _try_join_complement(graph: nx.Graph) -> HomotopyVerdict | None:
 def _try_universal_vertex_cone(graph: nx.Graph) -> HomotopyVerdict | None:
     """A universal vertex is an apex of the flag complex."""
     if graph.number_of_nodes() and any(
-        degree == graph.number_of_nodes() - 1
-        for _, degree in graph.degree()
+        degree == graph.number_of_nodes() - 1 for _, degree in graph.degree()
     ):
         return HomotopyVerdict(
             wedge=WedgeOfSpheres.contractible(),
@@ -655,15 +652,12 @@ def _try_universal_vertex_cone(graph: nx.Graph) -> HomotopyVerdict | None:
     return None
 
 
-
 def _is_complete(graph: nx.Graph) -> bool:
     n = graph.order()
     return graph.size() == n * (n - 1) // 2
 
 
-def _complete_neighborhood_components(
-    graph: nx.Graph, vertex
-) -> list[set] | None:
+def _complete_neighborhood_components(graph: nx.Graph, vertex) -> list[set] | None:
     """Return complete components of N(vertex), or None if inapplicable."""
     neighbors = set(graph.neighbors(vertex))
     if len(neighbors) < 2:
@@ -699,7 +693,8 @@ def _try_disjoint_complete_neighborhood(
         return HomotopyVerdict(
             wedge=verdict.wedge.add_spheres(1, len(components) - 1),
             reason=Theorem.DISJOINT_COMPLETE_NEIGHBORHOOD
-            + " Recursive result: " + verdict.reason,
+            + " Recursive result: "
+            + verdict.reason,
             is_exact=verdict.is_exact,
         )
     return None
@@ -742,10 +737,10 @@ def homotopy_type_clique_graph_via_independent_neighborhood(
     return HomotopyVerdict(
         wedge=verdict.wedge.add_spheres(1, len(neighborhood) - 1),
         reason=Theorem.INDEPENDENT_NEIGHBORHOOD_CLIQUE_GRAPH
-        + " Recursive result: " + verdict.reason,
+        + " Recursive result: "
+        + verdict.reason,
         is_exact=verdict.is_exact,
     )
-
 
 
 def _is_special_edge(graph: nx.Graph, edge) -> bool:
@@ -762,9 +757,7 @@ def _try_triangle_free_intercomponent_edges(
     Every removed edge must run between the two pieces: removing an edge
     inside a piece would invalidate the asserted homotopy decomposition.
     """
-    candidate_edges = [
-        e for e in graph.edges() if _is_special_edge(graph, e)
-    ]
+    candidate_edges = [e for e in graph.edges() if _is_special_edge(graph, e)]
     if not candidate_edges:
         return None
     reduced = graph.copy()
@@ -780,7 +773,8 @@ def _try_triangle_free_intercomponent_edges(
         return None
     # All cross edges must have been removed; each has no common neighbor.
     cross_edges = [
-        (u, v) for u, v in graph.edges()
+        (u, v)
+        for u, v in graph.edges()
         if (u in left and v in right) or (u in right and v in left)
     ]
     if len(cross_edges) != len(candidate_edges):
@@ -792,9 +786,7 @@ def _try_triangle_free_intercomponent_edges(
     if not first.is_exact or not second.is_exact:
         return None
     return HomotopyVerdict(
-        wedge=first.wedge.wedge(second.wedge).add_spheres(
-            1, len(candidate_edges) - 1
-        ),
+        wedge=first.wedge.wedge(second.wedge).add_spheres(1, len(candidate_edges) - 1),
         reason=Theorem.TRIANGLE_FREE_INTERCOMPONENT_EDGES,
     )
 
@@ -811,8 +803,7 @@ def _try_cutvertex_wedge(graph: nx.Graph) -> HomotopyVerdict | None:
     reduced.remove_node(vertex)
     components = list(nx.connected_components(reduced))
     pieces = [
-        graph.subgraph(set(component) | {vertex}).copy()
-        for component in components
+        graph.subgraph(set(component) | {vertex}).copy() for component in components
     ]
     verdicts = [homotopy_type_with_verdict(piece) for piece in pieces]
     if any(not v.is_exact or v.is_limited for v in verdicts):
@@ -842,16 +833,11 @@ def _try_contractible_link_components(
             continue
         deletion = reduced.deletion(vertex)
         deletion_graph = deletion.one_skeleton_graph()
-        if (
-            deletion_graph.number_of_nodes() == 0
-            or not nx.is_connected(deletion_graph)
-        ):
+        if deletion_graph.number_of_nodes() == 0 or not nx.is_connected(deletion_graph):
             continue
         certified = True
         for component in components:
-            subfacets = [
-                f for f in lk.facet_set if f.issubset(component)
-            ]
+            subfacets = [f for f in lk.facet_set if f.issubset(component)]
             piece = SimplicialComplex(component, facet_set=subfacets)
             if len(piece.facet_set) == 1:
                 continue  # One simplex is visibly a cone.
@@ -867,11 +853,11 @@ def _try_contractible_link_components(
         return HomotopyVerdict(
             wedge=verdict.wedge.add_spheres(1, len(components) - 1),
             reason=Theorem.CONTRACTIBLE_LINK_COMPONENTS
-            + " Recursive result: " + verdict.reason,
+            + " Recursive result: "
+            + verdict.reason,
             is_exact=verdict.is_exact,
         )
     return None
-
 
 
 # ---------------------------------------------------------------------------

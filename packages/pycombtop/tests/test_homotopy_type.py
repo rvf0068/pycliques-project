@@ -712,9 +712,7 @@ def test_elementary_collapse_rejects_non_codimension_one_free_face():
 
 
 def test_collapse_preserves_boundary_of_triangle():
-    boundary = SimplicialComplex(
-        {0, 1, 2}, facet_set=[{0, 1}, {1, 2}, {0, 2}]
-    )
+    boundary = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1}, {1, 2}, {0, 2}])
     assert collapse(boundary).facet_set == boundary.facet_set
 
 
@@ -754,9 +752,7 @@ def test_disjoint_complete_neighborhood_two_nonsingleton_components():
 
 
 def test_disconnected_deletion_rejects_discrete_link_shortcut():
-    sc = SimplicialComplex(
-        {0, 1, 2}, facet_set=[{0, 1}, {0, 2}]
-    )
+    sc = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1}, {0, 2}])
     assert _try_contractible_link_components(sc) is None
 
 
@@ -766,8 +762,12 @@ def test_nonflag_contractible_link_components():
     sc = SimplicialComplex(
         set(range(7)),
         facet_set=[
-            {0, 1, 2}, {0, 3, 4},
-            {1, 2, 5}, {2, 3, 5}, {3, 4, 6}, {5, 6},
+            {0, 1, 2},
+            {0, 3, 4},
+            {1, 2, 5},
+            {2, 3, 5},
+            {3, 4, 6},
+            {5, 6},
         ],
     )
     # Check the link hypothesis structurally, not by relying on Betti numbers.
@@ -797,11 +797,14 @@ def test_clique_graph_independent_neighborhood_three_neighbors():
     assert betti_numbers_graph(clique_graph(g)) == [0, 3]
 
 
-@pytest.mark.parametrize("example, vertex", [
-    (nx.star_graph(3), 0),  # deletion disconnected
-    (nx.complete_graph(4), 0),  # neighborhood not independent
-    (nx.path_graph(3), 0),  # degree one
-])
+@pytest.mark.parametrize(
+    "example, vertex",
+    [
+        (nx.star_graph(3), 0),  # deletion disconnected
+        (nx.complete_graph(4), 0),  # neighborhood not independent
+        (nx.path_graph(3), 0),  # degree one
+    ],
+)
 def test_clique_graph_attachment_rejects_invalid_hypotheses(example, vertex):
     with pytest.raises(ValueError):
         homotopy_type_clique_graph_via_independent_neighborhood(example, vertex)
@@ -814,9 +817,7 @@ def test_dong_matching_is_independently_acyclic_on_small_atlas():
         if g.order() == 0:
             continue
         sc = clique_complex(g)
-        critical, pairs = dong_matching(
-            sc, order_function=sorted, return_pairs=True
-        )
+        critical, pairs = dong_matching(sc, order_function=sorted, return_pairs=True)
         assert _dong_matching_is_acyclic(sc, critical, pairs)
 
 
@@ -826,9 +827,7 @@ def test_dong_matching_verifier_rejects_invalid_pair():
 
     critical, pairs = dong_matching(sc, return_pairs=True)
     assert _dong_matching_is_acyclic(sc, critical, pairs)
-    assert not _dong_matching_is_acyclic(
-        sc, critical, pairs + [pairs[0]]
-    )
+    assert not _dong_matching_is_acyclic(sc, critical, pairs + [pairs[0]])
 
 
 def test_join_complement_octrahedron_sphere_two():
