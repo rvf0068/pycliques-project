@@ -187,13 +187,15 @@ class SimplicialComplex:
         containing = {f for f in self.facet_set if x in f}
         not_containing = self.facet_set - containing
 
-        good_facets = set(not_containing)
+        candidates = set(not_containing)
         for s in containing:
-            candidate = Simplex(s - {x})
-            # Only add if it's not strictly contained in another existing facet
-            if not any(candidate.issubset(f) for f in not_containing):
-                good_facets.add(candidate)
-
+            candidates.add(Simplex(s - {x}))
+        # The shedding-vertex criterion and the subsequent algorithms
+        # require actual facets, not redundant nonmaximal faces.
+        good_facets = {
+            f for f in candidates
+            if not any(f < other for other in candidates)
+        }
         return SimplicialComplex(vertices, facet_set=good_facets)
 
     def link(self, x) -> SimplicialComplex:
