@@ -50,9 +50,9 @@ from __future__ import annotations
 
 import random
 from collections.abc import Callable
-from typing import cast
 from dataclasses import dataclass, field
 from itertools import combinations
+from typing import cast
 
 import mogutda
 import networkx as nx
