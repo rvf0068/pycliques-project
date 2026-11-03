@@ -26,6 +26,11 @@ References
    "Shellable nonpure complexes and posets. I",
    Trans. Amer. Math. Soc. 348 (1996), 1299--1327.
 
+.. [BFJ2010] R. Boulet, E. Fieux and B. Jouve,
+   "Simplicial simple-homotopy of flag complexes in terms of graphs",
+   European J. Combin. 31 (2010), 161--176.
+   DOI: 10.1016/j.ejc.2009.05.003. (Graph s-homotopy.)
+
 .. [Whitehead1939] J. H. C. Whitehead,
    "Simplicial spaces, nuclei and m-groups",
    Proc. London Math. Soc. (2) 45 (1939), 243--327.
@@ -66,8 +71,9 @@ class Theorem:
 
     CONTRACTIBLE_POINT = "A one-vertex clique complex is a point."
     COLLAPSIBLE = (
-        "Verified graph s-collapse reduction to a point; its clique complex "
-        "has the homotopy type of a point."
+        "Graph s-collapse reduction to a point: s-dismantlable vertex and "
+        "edge removals preserve the simple-homotopy type of the clique "
+        "complex [BFJ2010]."
     )
     DONG_MATCHING = (
         "Dong's vertex-ordered matching is checked to be acyclic on the "
@@ -986,13 +992,13 @@ def homotopy_type_with_verdict(
             reason=Theorem.COLLAPSIBLE,
         )
 
-    # 2. Disconnected complement -> join
-    v = _try_join_complement(graph)
+    # 2. Universal vertex gives a cone (before the general join method)
+    v = _try_universal_vertex_cone(graph)
     if v:
         return v
 
-    # 3. Universal vertex gives a cone
-    v = _try_universal_vertex_cone(graph)
+    # 3. Disconnected complement -> simplicial join
+    v = _try_join_complement(graph)
     if v:
         return v
 
