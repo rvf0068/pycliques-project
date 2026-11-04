@@ -5,10 +5,9 @@ import itertools
 import random
 
 import networkx as nx
-import pytest
-
 import pycliques.retractions as r
 import pycliques.small as small
+import pytest
 
 
 def original_special(graph: nx.Graph) -> bool:
