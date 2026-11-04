@@ -1,4 +1,5 @@
 """Exact regression tests for special octahedra and first-witness retractions."""
+# ruff: noqa: I001
 from __future__ import annotations
 
 # fmt: off
