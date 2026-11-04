@@ -29,8 +29,6 @@ jobs:
       - name: Ruff check
         run: uv run ruff check packages/
 
-      - name: Show optimized test format diff
-        run: uv run ruff format --diff packages/pycliques/tests/test_retractions_optimized.py
       - name: Ruff format check
         run: uv run ruff format --check packages/
 
