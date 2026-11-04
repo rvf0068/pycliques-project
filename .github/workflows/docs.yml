@@ -4,6 +4,12 @@ on:
   push:
     branches: ["main"]
 
+# Serialize Pages deployments: overlapping pushes must never deploy at once.
+# Keep the running release instead of cancelling it mid-deployment.
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
 permissions:
   contents: read
   pages: write
