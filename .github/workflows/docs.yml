@@ -3,6 +3,7 @@ name: Build and Deploy Docs
 on:
   push:
     branches: ["main"]
+  workflow_dispatch:
 
 # Serialize Pages deployments: overlapping pushes must never deploy at once.
 # Keep the running release instead of cancelling it mid-deployment.
