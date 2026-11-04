@@ -381,33 +381,69 @@ def retraction(large: nx.Graph, small: nx.Graph) -> Iterator[tuple[dict, dict]]:
 
 
 def retracts(large: nx.Graph, small: nx.Graph) -> tuple[dict, dict] | bool:
-    """Return a retraction from ``large`` to ``small`` if one exists.
+    """Find one retraction without enumerating host automorphisms.
 
-    .. rubric:: Parameters
+    The full `retraction` generator retains its historical enumeration
+    semantics. For a first witness, its eager automorphism lists were
+    wasteful and could be factorial in the size of `large`.
 
-    large : networkx.Graph
-        Graph that may retract.
-    small : networkx.Graph
-        Target subgraph.
+    Each induced embedding of `small` into `large` fixes the retraction
+    on its image. A complete MRV backtracking search assigns the remaining
+    source vertices to target vertices. Adjacency may map to adjacency
+    *or equality*, as required by the graph-morphism convention.
 
-    .. rubric:: Returns
-
-    tuple[dict, dict] | False
-        The first retraction found, or ``False``.
-
-    .. rubric:: Examples
-
-    >>> import networkx as nx
-    >>> from pycliques.retractions import retracts
-    >>> retracts(nx.path_graph(3), nx.path_graph(2))
-    ({0: 0, 1: 1, 2: 0}, {0: 0, 1: 1})
-    >>> retracts(nx.wheel_graph(4), nx.cycle_graph(4)) is False
-    True
+    Returns `(retraction_map, inclusion_map)`, or `False`.
     """
-    try:
-        return next(retraction(large, small))
-    except StopIteration:
+    if large.number_of_nodes() < small.number_of_nodes():
         return False
+    if large.number_of_edges() < small.number_of_edges():
+        return False
+
+    target_nodes = tuple(small)
+    allowed_neighbors = {v: set(small[v]) | {v} for v in small}
+    host_nodes = set(large)
+
+    matcher = isomorphism.GraphMatcher(large, small)
+    for embedding in matcher.subgraph_isomorphisms_iter():
+        # GraphMatcher's dictionary maps host vertices into target labels,
+        # and is induced on the embedded vertex set.
+        assignment = dict(embedding)
+        inclusion = invert_dict(embedding)
+        remaining = host_nodes - set(assignment)
+
+        def finish(unassigned: set) -> dict | None:
+            if not unassigned:
+                return dict(assignment)
+
+            best_vertex = None
+            best_options = None
+            for vertex in unassigned:
+                options = set(target_nodes)
+                for neighbor in large[vertex]:
+                    if neighbor in assignment:
+                        options.intersection_update(
+                            allowed_neighbors[assignment[neighbor]]
+                        )
+                        if not options:
+                            return None
+                if best_options is None or len(options) < len(best_options):
+                    best_vertex, best_options = vertex, options
+                    if len(options) == 1:
+                        break
+
+            assert best_vertex is not None and best_options is not None
+            for image in best_options:
+                assignment[best_vertex] = image
+                result = finish(unassigned - {best_vertex})
+                if result is not None:
+                    return result
+                del assignment[best_vertex]
+            return None
+
+        witness = finish(remaining)
+        if witness is not None:
+            return witness, inclusion
+    return False
 
 
 def retracts_to(subgraph: nx.Graph) -> Callable[[nx.Graph], tuple[dict, dict] | bool]:
@@ -490,44 +526,68 @@ def _is_maximal_clique(graph: nx.Graph, clique: Iterable) -> bool:
 def _find_special_octahedra(
     graph: nx.Graph,
 ) -> tuple[bool, int | None]:
-    """Shared implementation for special-octahedra detection.
+    """Detect special octahedra via maximal cliques and compatible antipodes.
 
-    Returns ``(True, dimension)`` when a special octahedron of dimension
-    *dimension* is found, or ``(False, None)`` otherwise.
+    An induced octahedron O_d is special precisely when one of its
+    (size d) maximal cliques is also maximal in the host graph.
+
+    Fix a maximal host clique C. A vertex a is an antipode of v in C
+    if it is nonadjacent to v and adjacent to each vertex of C-{v}.
+    Choosing one antipode for every v in C, with the chosen vertices
+    pairwise adjacent, gives an induced O_|C|. Conversely, every
+    special O_d gives such a maximal host clique and assignment.
+
+    This avoids constructing the auxiliary graph on *all nonedges* and
+    enumerating its maximal cliques. In particular a missing antipode
+    rejects a host clique immediately. The search is exact, not bounded.
     """
-    c_graph = nx.complement(graph)
-    edges_complement = list(c_graph.edges())
+    if graph.number_of_nodes() < 6:
+        return False, None
+    neighbors = {v: set(graph[v]) for v in graph}
+    nodes = set(graph)
 
-    aux_graph = nx.Graph()
-    aux_graph.add_nodes_from(edges_complement)
-
-    valid_pairs = []
-    for e1, e2 in itertools.combinations(edges_complement, 2):
-        u, v = e1
-        x, y = e2
-
-        if u == x or u == y or v == x or v == y:
+    for clique in nx.find_cliques(graph):
+        if len(clique) < 3:
+            continue
+        chosen = tuple(clique)
+        clique_set = set(chosen)
+        domains = {}
+        for vertex in chosen:
+            others = [u for u in chosen if u != vertex]
+            possible = nodes.copy()
+            for u in others:
+                possible.intersection_update(neighbors[u])
+                if not possible:
+                    break
+            # Antipodes must be distinct from, and nonadjacent to, vertex.
+            possible.difference_update(neighbors[vertex])
+            possible.discard(vertex)
+            possible.difference_update(clique_set)
+            if not possible:
+                break
+            domains[vertex] = possible
+        if len(domains) != len(chosen):
             continue
 
-        if (
-            graph.has_edge(u, x)
-            and graph.has_edge(u, y)
-            and graph.has_edge(v, x)
-            and graph.has_edge(v, y)
-        ):
-            valid_pairs.append((e1, e2))
+        # Smallest candidate domains first; compatibility of an antipode
+        # with the previously selected antipodes is the only constraint
+        # not already included in its domain.
+        order = sorted(chosen, key=lambda v: len(domains[v]))
+        selected: list = []
 
-    aux_graph.add_edges_from(valid_pairs)
+        def extend(position: int) -> bool:
+            if position == len(order):
+                return True
+            for candidate in domains[order[position]]:
+                if all(candidate in neighbors[earlier] for earlier in selected):
+                    selected.append(candidate)
+                    if extend(position + 1):
+                        return True
+                    selected.pop()
+            return False
 
-    for edges_octa in nx.find_cliques(aux_graph):
-        if len(edges_octa) >= 3:
-            vertices_octa = {v for edge in edges_octa for v in edge}
-            octa_subgraph = graph.subgraph(vertices_octa)
-
-            for clique_octa in nx.find_cliques(octa_subgraph):
-                if _is_maximal_clique(graph, clique_octa):
-                    return True, len(edges_octa)
-
+        if extend(0):
+            return True, len(chosen)
     return False, None
 
 

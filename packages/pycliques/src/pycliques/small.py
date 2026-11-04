@@ -1222,15 +1222,23 @@ def _test_eventually_special_octahedra(
     return None
 
 
-def _make_retraction_test(target: nx.Graph, label: str) -> Classifier:
-    """Return a classifier that checks whether ``seq[0]`` retracts to *target*."""
+def _make_retraction_test(
+    target: nx.Graph, label: str, *, iterate_index: int = 0
+) -> Classifier:
+    """Check a selected pared iterate for retraction to a divergent target.
 
+    A retraction of K^i(G) onto a proven divergent target implies clique
+    divergence of G. The default iterate index 0 keeps existing callers.
+    """
     def _test(seq: CliqueSequence) -> ClassifierResult | None:
-        g = seq[0]
+        g = seq[iterate_index]
         if g is not None and retracts(g, target):
-            return (Verdict.DIVERGENT, label, None)
+            return (
+                Verdict.DIVERGENT,
+                f"{label} (pared iterate {iterate_index})",
+                None,
+            )
         return None
-
     return _test
 
 
@@ -1250,11 +1258,16 @@ def _default_classifiers(
     tries: int,
     clockwork_depth: int = 2,
     *,
+    retraction_depth: int = 1,
     clockwork_fallback: bool = False,
     clockwork_fallback_max_order: int = 12,
     clockwork_fallback_max_candidates: int = 5000,
 ) -> list[Classifier]:
-    """Return the standard ordered suite of clique-behavior tests."""
+    """Run inexpensive retraction criteria before special-octahedron search.
+
+    retraction_depth=1 checks only the pared original; 2 checks G and
+    its first pared clique iterate; 0 disables these four criteria.
+    """
     classifiers = [
         lambda seq: _test_clockwork(
             seq,
@@ -1265,12 +1278,19 @@ def _default_classifiers(
             fallback_max_candidates=clockwork_fallback_max_candidates,
         ),
         lambda seq: _test_eventually_helly(seq, tries),
-        lambda seq: _test_eventually_special_octahedra(seq, tries),
-        _make_retraction_test(suspension_of_cycle(5), "retracts to Susp(C_5)"),
-        _make_retraction_test(suspension_of_cycle(6), "retracts to Susp(C_6)"),
-        _make_retraction_test(suspension_of_cycle(7), "retracts to Susp(C_7)"),
-        _make_retraction_test(complement_of_cycle(8), "retracts to Comp(C_8)"),
     ]
+    targets = (
+        (suspension_of_cycle(5), "retracts to Susp(C_5)"),
+        (suspension_of_cycle(6), "retracts to Susp(C_6)"),
+        (suspension_of_cycle(7), "retracts to Susp(C_7)"),
+        (complement_of_cycle(8), "retracts to Comp(C_8)"),
+    )
+    for iterate_index in range(min(retraction_depth, tries)):
+        classifiers.extend(
+            _make_retraction_test(target, label, iterate_index=iterate_index)
+            for target, label in targets
+        )
+    classifiers.append(lambda seq: _test_eventually_special_octahedra(seq, tries))
     return classifiers
 
 
@@ -1281,6 +1301,7 @@ def classify_clique_behavior(
     bound: int = 30,
     extension_budget: int = 1,
     clockwork_depth: int = 2,
+    retraction_depth: int = 1,
     clockwork_fallback: bool = False,
     clockwork_fallback_max_order: int = 12,
     clockwork_fallback_max_candidates: int = 5000,
@@ -1334,6 +1355,10 @@ def classify_clique_behavior(
     clockwork_depth : int, optional
         Number of iterates checked directly for clockwork structure
         (default: 2, preserving the historical G and K(G) check).
+    retraction_depth : int, optional
+        Number of pared iterates tested for retraction onto the four
+        proven divergent targets. 1 checks only G; 2 checks G and K(G),
+        both completely pared. Retractions precede special octahedra.
     clockwork_fallback : bool, optional
         Enable bounded alternative-partition recognition in the direct
         clockwork check (default: False to preserve fast-pass cost).
@@ -1375,6 +1400,8 @@ def classify_clique_behavior(
         raise ValueError("bound must be at least 1")
     if clockwork_depth < 0:
         raise ValueError("clockwork_depth must be non-negative")
+    if retraction_depth not in (0, 1, 2):
+        raise ValueError("retraction_depth must be 0, 1, or 2")
     if clockwork_fallback_max_order < 0:
         raise ValueError("clockwork_fallback_max_order must be non-negative")
     if clockwork_fallback_max_candidates < 1:
@@ -1414,6 +1441,7 @@ def classify_clique_behavior(
     for classifier in _default_classifiers(
         tries,
         clockwork_depth,
+        retraction_depth=retraction_depth,
         clockwork_fallback=clockwork_fallback,
         clockwork_fallback_max_order=clockwork_fallback_max_order,
         clockwork_fallback_max_candidates=clockwork_fallback_max_candidates,
