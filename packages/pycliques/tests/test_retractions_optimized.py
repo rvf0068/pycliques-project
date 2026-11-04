@@ -7,8 +7,7 @@ import random
 import networkx as nx
 import pytest
 
-from pycliques import retractions as r
-from pycliques import small
+from pycliques import retractions as r, small
 
 
 def original_special(graph: nx.Graph) -> bool:
