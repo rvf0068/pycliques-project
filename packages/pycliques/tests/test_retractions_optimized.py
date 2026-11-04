@@ -69,7 +69,8 @@ def test_special_octahedron_examples(graph):
 
 def test_all_atlas_graphs_through_seven_vertices():
     for graph in nx.graph_atlas_g():
-        assert (r.special_octahedra_dimension(graph) is not None) == original_special(graph)
+        found = r.special_octahedra_dimension(graph)
+        assert (found is not None) == original_special(graph)
 
 
 def test_special_octahedron_random_and_relabelled():

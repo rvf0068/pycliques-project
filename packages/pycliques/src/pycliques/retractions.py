@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import itertools
 import logging
 import sys
 from collections.abc import Callable, Hashable, Iterable, Iterator, Mapping
