@@ -1,6 +1,8 @@
 """Exact regression tests for special octahedra and first-witness retractions."""
 from __future__ import annotations
 
+# fmt: off
+
 import itertools
 import random
 
