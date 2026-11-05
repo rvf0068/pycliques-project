@@ -1254,6 +1254,49 @@ def _make_clique_retraction_test(target: nx.Graph, label: str) -> Classifier:
     return _test
 
 
+def _test_iterate_certificates(
+    seq: CliqueSequence,
+    tries: int,
+    retraction_depth: int,
+    targets: tuple[tuple[nx.Graph, str], ...],
+) -> ClassifierResult | None:
+    """Inspect each pared iterate fully before constructing the next.
+
+    The previous separate Helly sweep could attempt K^(i+1)(G) before
+    inspecting K^i(G) for a special octahedron. This exact per-iterate
+    check avoids unnecessary clique-graph construction when a sufficient
+    certificate is already present. Fixed-target retraction tests are
+    restricted to the first two pared iterates, regardless of `tries`.
+    """
+    for i in range(tries):
+        graph = seq[i]
+        if graph is None:
+            return None
+
+        if is_clique_helly(graph):
+            _logger.debug("Helly of index %s", i)
+            return (Verdict.CONVERGENT, f"is eventually Helly (index {i})", None)
+
+        if i < retraction_depth:
+            for target, label in targets:
+                if retracts(graph, target):
+                    return (
+                        Verdict.DIVERGENT,
+                        f"{label} (pared iterate {i})",
+                        None,
+                    )
+
+        dim = special_octahedra_dimension(graph)
+        if dim is not None:
+            _logger.debug("Index %s has induced special octahedra", i)
+            return (
+                Verdict.DIVERGENT,
+                f"eventually has a special octahedron (index {i}, dimension {dim})",
+                None,
+            )
+    return None
+
+
 def _default_classifiers(
     tries: int,
     clockwork_depth: int = 2,
@@ -1263,12 +1306,19 @@ def _default_classifiers(
     clockwork_fallback_max_order: int = 12,
     clockwork_fallback_max_candidates: int = 5000,
 ) -> list[Classifier]:
-    """Run inexpensive retraction criteria before special-octahedron search.
+    """Check clockwork, then Helly/retractions/special octahedra per iterate.
 
-    retraction_depth=1 checks only the pared original; 2 checks G and
-    its first pared clique iterate; 0 disables these four criteria.
+    Every pared iterate is checked for all applicable certificates before
+    attempting to generate the next one. Fixed-target retractions occur
+    only on indices 0 and 1 (as selected by `retraction_depth`).
     """
-    classifiers = [
+    targets = (
+        (suspension_of_cycle(5), "retracts to Susp(C_5)"),
+        (suspension_of_cycle(6), "retracts to Susp(C_6)"),
+        (suspension_of_cycle(7), "retracts to Susp(C_7)"),
+        (complement_of_cycle(8), "retracts to Comp(C_8)"),
+    )
+    return [
         lambda seq: _test_clockwork(
             seq,
             tries,
@@ -1277,21 +1327,10 @@ def _default_classifiers(
             fallback_max_order=clockwork_fallback_max_order,
             fallback_max_candidates=clockwork_fallback_max_candidates,
         ),
-        lambda seq: _test_eventually_helly(seq, tries),
+        lambda seq: _test_iterate_certificates(
+            seq, tries, retraction_depth, targets
+        ),
     ]
-    targets = (
-        (suspension_of_cycle(5), "retracts to Susp(C_5)"),
-        (suspension_of_cycle(6), "retracts to Susp(C_6)"),
-        (suspension_of_cycle(7), "retracts to Susp(C_7)"),
-        (complement_of_cycle(8), "retracts to Comp(C_8)"),
-    )
-    for iterate_index in range(min(retraction_depth, tries)):
-        classifiers.extend(
-            _make_retraction_test(target, label, iterate_index=iterate_index)
-            for target, label in targets
-        )
-    classifiers.append(lambda seq: _test_eventually_special_octahedra(seq, tries))
-    return classifiers
 
 
 def classify_clique_behavior(
@@ -1358,7 +1397,9 @@ def classify_clique_behavior(
     retraction_depth : int, optional
         Number of pared iterates tested for retraction onto the four
         proven divergent targets. 1 checks only G; 2 checks G and K(G),
-        both completely pared. Retractions precede special octahedra.
+        both completely pared. Each iterate is checked first for Helly,
+        then eligible retractions, then special octahedra; no subsequent
+        iterate is constructed after finding a certificate.
     clockwork_fallback : bool, optional
         Enable bounded alternative-partition recognition in the direct
         clockwork check (default: False to preserve fast-pass cost).

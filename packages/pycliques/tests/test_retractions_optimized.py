@@ -113,29 +113,46 @@ def test_retracts_does_not_list_automorphisms(monkeypatch):
 def test_pared_iterate_retractions_are_early_and_only_at_zero_and_one(monkeypatch):
     originals = nx.cycle_graph(7)
     iterate1 = nx.cycle_graph(8)
+
     class FakeSequence:
+        def __init__(self):
+            self.requested = []
+
         def __getitem__(self, index):
+            self.requested.append(index)
             if index == 0:
                 return originals
             if index == 1:
                 return iterate1
-            raise AssertionError("Retraction checked a later iterate")
+            return None
 
     calls = []
+
     def fake_retracts(graph, target):
         calls.append(graph)
         return False
+
+    def fake_special(graph):
+        calls.append(("special", graph))
+        return None
+
     monkeypatch.setattr(small, "retracts", fake_retracts)
-    monkeypatch.setattr(small, "_test_eventually_special_octahedra",
-                        lambda seq, tries: calls.append("special") or None)
-    tests = small._default_classifiers(tries=9, retraction_depth=2)
-    # Skip initial clockwork and eventually-Helly checks for an exact
-    # isolation of the retraction suite.
-    for callback in tests[2:]:
-        callback(FakeSequence())
-    assert calls[:4] == [originals] * 4
-    assert calls[4:8] == [iterate1] * 4
-    assert calls[8:] == ["special"]
+    monkeypatch.setattr(small, "is_clique_helly", lambda graph: False)
+    monkeypatch.setattr(small, "special_octahedra_dimension", fake_special)
+
+    seq = FakeSequence()
+    classifiers = small._default_classifiers(
+        tries=9, clockwork_depth=0, retraction_depth=2
+    )
+    assert len(classifiers) == 2
+    assert classifiers[1](seq) is None
+    assert seq.requested == [0, 1, 2]
+    assert calls == (
+        [originals] * 4
+        + [("special", originals)]
+        + [iterate1] * 4
+        + [("special", iterate1)]
+    )
 
 
 def test_retraction_depth_bound_is_enforced():
