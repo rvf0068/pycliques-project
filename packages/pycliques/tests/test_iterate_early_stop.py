@@ -1,5 +1,6 @@
 """Early stopping at each pared iterate for the standard classifier."""
 
+# fmt: off
 import networkx as nx
 import pycliques.small as small
 import pytest
