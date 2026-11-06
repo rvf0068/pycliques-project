@@ -430,6 +430,7 @@ def _classify_local_bridge(
     tries: int = _MAX_ITERATIONS,
     bound: int = 30,
     extension_budget: int = 1,
+    retraction_depth: int = 1,
 ) -> ClassifierResult | None:
     """Classify by [FANP13, Theorem 6.1], or return ``None`` when it proves nothing.
 
@@ -439,7 +440,11 @@ def _classify_local_bridge(
     for u, v in local_bridges(graph):
         h = contract_local_bridge(graph, u, v)
         h_behavior = classify_clique_behavior(
-            h, tries=tries, bound=bound, extension_budget=extension_budget
+            h,
+            tries=tries,
+            bound=bound,
+            extension_budget=extension_budget,
+            retraction_depth=retraction_depth,
         )
         if h_behavior.verdict is Verdict.CONVERGENT:
             return (
@@ -524,6 +529,7 @@ def _classify_non_triangle_edge(
     tries: int = _MAX_ITERATIONS,
     bound: int = 30,
     extension_budget: int = 1,
+    retraction_depth: int = 1,
 ) -> ClassifierResult | None:
     """Classify by [FANP13, Theorem 6.2], or return ``None`` when it proves nothing.
 
@@ -533,7 +539,11 @@ def _classify_non_triangle_edge(
     for u, v in edges_in_no_triangle(graph):
         h = remove_edge_not_in_triangle(graph, u, v)
         h_behavior = classify_clique_behavior(
-            h, tries=tries, bound=bound, extension_budget=extension_budget
+            h,
+            tries=tries,
+            bound=bound,
+            extension_budget=extension_budget,
+            retraction_depth=retraction_depth,
         )
         if h_behavior.verdict is Verdict.DIVERGENT:
             return (
@@ -609,6 +619,7 @@ def _classify_inverse_cutpoint_extension(
     tries: int = _MAX_ITERATIONS,
     bound: int = 30,
     extension_budget: int = 1,
+    retraction_depth: int = 1,
     max_candidates: int = 64,
 ) -> ClassifierResult | None:
     """Classify by an inverse cutpoint extension, or return ``None``.
@@ -640,6 +651,7 @@ def _classify_inverse_cutpoint_extension(
             tries=tries,
             bound=bound,
             extension_budget=extension_budget - 1,
+            retraction_depth=retraction_depth,
         )
         certificate_map = {
             "cutpoint": extension.cutpoint,
