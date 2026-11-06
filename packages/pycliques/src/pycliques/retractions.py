@@ -475,8 +475,7 @@ def verify_retraction_witness(
     ):
         return False
     return all(
-        projection[u] == projection[v]
-        or small.has_edge(projection[u], projection[v])
+        projection[u] == projection[v] or small.has_edge(projection[u], projection[v])
         for u, v in large.edges()
     )
 
@@ -591,26 +590,15 @@ def verify_special_octahedron_witness(
         return False
     if any(not graph.has_edge(u, v) for u, v in itertools.combinations(clique, 2)):
         return False
-    if any(
-        all(graph.has_edge(x, c) for c in clique)
-        for x in graph
-        if x not in clique
-    ):
+    if any(all(graph.has_edge(x, c) for c in clique) for x in graph if x not in clique):
         return False  # The selected clique must be maximal in the host.
     if any(
         graph.has_edge(clique[i], antipodes[i])
-        or any(
-            not graph.has_edge(antipodes[i], clique[j])
-            for j in range(d)
-            if j != i
-        )
+        or any(not graph.has_edge(antipodes[i], clique[j]) for j in range(d) if j != i)
         for i in range(d)
     ):
         return False
-    return all(
-        graph.has_edge(a, b)
-        for a, b in itertools.combinations(antipodes, 2)
-    )
+    return all(graph.has_edge(a, b) for a, b in itertools.combinations(antipodes, 2))
 
 
 def find_special_octahedron_witness(
@@ -628,9 +616,7 @@ def find_special_octahedron_witness(
 
     vertices = tuple(graph)
     indices = {v: i for i, v in enumerate(vertices)}
-    neighbors = tuple(
-        sum(1 << indices[w] for w in graph[v]) for v in vertices
-    )
+    neighbors = tuple(sum(1 << indices[w] for w in graph[v]) for v in vertices)
     full_mask = (1 << len(vertices)) - 1
 
     for clique in nx.find_cliques(graph):
