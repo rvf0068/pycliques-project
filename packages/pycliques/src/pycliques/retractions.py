@@ -626,9 +626,7 @@ def find_special_octahedron_witness(
     neighbors = tuple(sum(1 << indices[w] for w in graph[v]) for v in vertices)
     full_mask = (1 << count) - 1
 
-    def possible_antipodes(
-        clique: list[int], clique_mask: int
-    ) -> list[int] | None:
+    def possible_antipodes(clique: list[int], clique_mask: int) -> list[int] | None:
         """Necessary domains for each vertex of a partial clique."""
         size = len(clique)
         prefix = [full_mask]
@@ -699,9 +697,7 @@ def find_special_octahedron_witness(
         # Standard pivoting: only nonneighbors of the pivot need branching.
         pivot_set = candidates | excluded
         if pivot_set:
-            pivot_nodes = (
-                i for i in range(count) if pivot_set & (1 << i)
-            )
+            pivot_nodes = (i for i in range(count) if pivot_set & (1 << i))
             pivot = max(
                 pivot_nodes, key=lambda i: (candidates & neighbors[i]).bit_count()
             )
