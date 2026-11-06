@@ -1,7 +1,7 @@
 """Independent witness verification and conditional-reference regression tests."""
 
-from dataclasses import replace
 import sys
+from dataclasses import replace
 
 import networkx as nx
 import pycliques.small as small
