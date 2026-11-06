@@ -112,7 +112,9 @@ def main() -> None:
                 )
         old, new = raw["uncached"], raw["cached"]
         outcomes = [r for r in old + new if r["status"] == "ok"]
-        consistent = bool(outcomes) and all(
+        # An entirely timed-out sample has no contradictory verdict; retain
+        # its timeout records and emit a complete artifact.
+        consistent = not outcomes or all(
             (r["verdict"], r["bound_exceeded"], r["reason"])
             == (
                 outcomes[0]["verdict"],
@@ -150,7 +152,7 @@ def main() -> None:
         new_text = f"{new_median:.4f}" if new_median is not None else "timeout"
         ratio_text = f"{ratio:.2f}x" if ratio is not None else "n/a"
         print(
-            f"{index} | \`{graph6}\` | {old_text} | {new_text} | "
+            f"{index} | `{graph6}` | {old_text} | {new_text} | "
             f"{ratio_text} | {hits} | {status}",
             flush=True,
         )
