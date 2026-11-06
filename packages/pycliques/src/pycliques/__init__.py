@@ -158,8 +158,10 @@ from .poset_homotopy import (
 from .retractions import (
     BoundedRetractionResult,
     RetractionSearchStatus,
+    SpecialOctahedronWitness,
     bounded_retraction,
     dict_to_tuple,
+    find_special_octahedron_witness,
     graph_from_gap_adjacency_list,
     has_induced,
     invert_dict,
@@ -170,6 +172,8 @@ from .retractions import (
     retracts_to,
     special_octahedra,
     special_octahedra_dimension,
+    verify_retraction_witness,
+    verify_special_octahedron_witness,
 )
 from .small import (
     Certificate,
@@ -339,8 +343,10 @@ __all__ = [
     # retractions
     "BoundedRetractionResult",
     "RetractionSearchStatus",
+    "SpecialOctahedronWitness",
     "bounded_retraction",
     "dict_to_tuple",
+    "find_special_octahedron_witness",
     "graph_from_gap_adjacency_list",
     "has_induced",
     "invert_dict",
@@ -351,6 +357,8 @@ __all__ = [
     "retracts_to",
     "special_octahedra",
     "special_octahedra_dimension",
+    "verify_retraction_witness",
+    "verify_special_octahedron_witness",
     # small
     "Certificate",
     "CliqueBehavior",
