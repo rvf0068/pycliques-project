@@ -189,3 +189,13 @@ def test_large_octahedron_avoids_recursive_search_limit():
     assert witness is not None
     assert witness.dimension == 240
     assert verify_special_octahedron_witness(graph, witness)
+
+
+def test_nonreflexive_nan_node_label_does_not_preserve_diagonal_bits():
+    nan = float("nan")
+    graph = nx.relabel_nodes(nx.octahedral_graph(), {0: nan})
+    graph.add_edges_from((vertex, vertex) for vertex in graph)
+    witness = find_special_octahedron_witness(graph)
+    assert witness is not None
+    assert witness.dimension == 3
+    assert verify_special_octahedron_witness(graph, witness)
