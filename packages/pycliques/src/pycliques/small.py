@@ -9,6 +9,7 @@ import math
 import os
 import sys
 from collections.abc import Callable, Hashable, Iterator
+from contextvars import ContextVar
 from dataclasses import dataclass
 from enum import Enum, auto
 from itertools import combinations
@@ -1380,7 +1381,7 @@ def _default_classifiers(
     ]
 
 
-def classify_clique_behavior(
+def _classify_clique_behavior_uncached(
     graph: nx.Graph,
     *,
     tries: int = _MAX_ITERATIONS,
@@ -1719,6 +1720,131 @@ def classify_clique_behavior(
         pared_graph,
         observations=tuple(observations),
     )
+
+
+@dataclass
+class _RecursiveCacheState:
+    """Per-root-call memoization; never shared across independent census cases."""
+
+    enabled: bool
+    entries: dict[tuple, CliqueBehavior]
+    hits: int = 0
+    misses: int = 0
+
+
+_RECURSIVE_CACHE: ContextVar[_RecursiveCacheState | None] = ContextVar(
+    "pycliques_recursive_cache", default=None
+)
+
+
+def _recursive_cache_key(graph: nx.Graph, settings: tuple) -> tuple:
+    """Use *label-preserving* topology, not an isomorphism heuristic.
+
+    Certificates may contain vertex-labelled maps and witness graphs, so a
+    cache key must never merge distinct vertex sets or relabellings.
+    Edge attributes are intentionally ignored by the clique classifier.
+    """
+    return (
+        frozenset(graph),
+        frozenset(frozenset((u, v)) for u, v in graph.edges()),
+        settings,
+    )
+
+
+def classify_clique_behavior(
+    graph: nx.Graph,
+    *,
+    tries: int = _MAX_ITERATIONS,
+    bound: int = 30,
+    extension_budget: int = 1,
+    clockwork_depth: int = 2,
+    retraction_depth: int = 1,
+    clockwork_fallback: bool = False,
+    clockwork_fallback_max_order: int = 12,
+    clockwork_fallback_max_candidates: int = 5000,
+    induced_clockwork_depth: int = 0,
+    clockwork_retract_depth: int = 0,
+    clockwork_max_order: int = 12,
+    clockwork_max_candidates: int = 5000,
+    clockwork_max_retraction_attempts: int = 20,
+    clockwork_max_retraction_states: int = 100_000,
+    clockwork_max_retraction_assignments: int = 1_000_000,
+    recursive_cache: bool = True,
+    cache_stats: dict[str, int] | None = None,
+) -> CliqueBehavior:
+    """Classify clique behavior using an optional per-root recursive cache.
+
+    Results of *identical labelled graphs with identical settings* are reused
+    only inside one root classification. This preserves the labels in
+    certificates and prevents cache leakage between independent census
+    graphs or after reference-registry changes. The cache is isolated with
+    a ContextVar and reset even when classification raises an exception.
+
+    Set `recursive_cache=False` for a matched uncached benchmark; an
+    optional `cache_stats` dictionary is populated with hits, misses and
+    entries on exit from a root call. Child calls use the root's cache state.
+    """
+    arguments = (
+        tries,
+        bound,
+        extension_budget,
+        clockwork_depth,
+        retraction_depth,
+        clockwork_fallback,
+        clockwork_fallback_max_order,
+        clockwork_fallback_max_candidates,
+        induced_clockwork_depth,
+        clockwork_retract_depth,
+        clockwork_max_order,
+        clockwork_max_candidates,
+        clockwork_max_retraction_attempts,
+        clockwork_max_retraction_states,
+        clockwork_max_retraction_assignments,
+    )
+    current = _RECURSIVE_CACHE.get()
+    root = current is None
+    if root:
+        current = _RecursiveCacheState(enabled=recursive_cache, entries={})
+        token = _RECURSIVE_CACHE.set(current)
+    assert current is not None
+    try:
+        key = _recursive_cache_key(graph, arguments) if current.enabled else None
+        if key is not None and key in current.entries:
+            current.hits += 1
+            return current.entries[key]
+        if key is not None:
+            current.misses += 1
+        outcome = _classify_clique_behavior_uncached(
+            graph,
+            tries=tries,
+            bound=bound,
+            extension_budget=extension_budget,
+            clockwork_depth=clockwork_depth,
+            retraction_depth=retraction_depth,
+            clockwork_fallback=clockwork_fallback,
+            clockwork_fallback_max_order=clockwork_fallback_max_order,
+            clockwork_fallback_max_candidates=clockwork_fallback_max_candidates,
+            induced_clockwork_depth=induced_clockwork_depth,
+            clockwork_retract_depth=clockwork_retract_depth,
+            clockwork_max_order=clockwork_max_order,
+            clockwork_max_candidates=clockwork_max_candidates,
+            clockwork_max_retraction_attempts=clockwork_max_retraction_attempts,
+            clockwork_max_retraction_states=clockwork_max_retraction_states,
+            clockwork_max_retraction_assignments=clockwork_max_retraction_assignments,
+        )
+        if key is not None:
+            current.entries[key] = outcome
+        return outcome
+    finally:
+        if root:
+            if cache_stats is not None:
+                cache_stats.update(
+                    hits=current.hits,
+                    misses=current.misses,
+                    entries=len(current.entries),
+                )
+            _RECURSIVE_CACHE.reset(token)
+
 
 
 def classify_clique_behavior_with_clockwork_pair_search(
