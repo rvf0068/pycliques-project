@@ -1499,20 +1499,29 @@ def classify_clique_behavior(
 
     pared_graph = completely_pared_graph(graph)
     seq = CliqueSequence(pared_graph, bound=bound)
+    conditional_result: ClassifierResult | None = None
 
     reference_result = _classify_reference_graph(pared_graph)
     if reference_result is not None:
         verdict, reason, certificate = reference_result
-        return CliqueBehavior(
-            verdict, reason, seq.graph_count, False, pared_graph, certificate
-        )
+        if verdict is Verdict.INDETERMINATE:
+            if conditional_result is None:
+                conditional_result = reference_result
+        else:
+            return CliqueBehavior(
+                verdict, reason, seq.graph_count, False, pared_graph, certificate
+            )
 
     theorem_4_6_result = _classify_suspension_2_coaffination(graph)
     if theorem_4_6_result is not None:
         verdict, reason, certificate = theorem_4_6_result
-        return CliqueBehavior(
-            verdict, reason, seq.graph_count, False, pared_graph, certificate
-        )
+        if verdict is Verdict.INDETERMINATE:
+            if conditional_result is None:
+                conditional_result = theorem_4_6_result
+        else:
+            return CliqueBehavior(
+                verdict, reason, seq.graph_count, False, pared_graph, certificate
+            )
 
     for classifier in _default_classifiers(
         tries,
@@ -1525,43 +1534,75 @@ def classify_clique_behavior(
         result = classifier(seq)
         if result is not None:
             verdict, reason, certificate = result
-            return CliqueBehavior(
-                verdict, reason, seq.graph_count, False, pared_graph, certificate
-            )
+            if verdict is Verdict.INDETERMINATE:
+                if conditional_result is None:
+                    conditional_result = result
+            else:
+                return CliqueBehavior(
+                    verdict, reason, seq.graph_count, False, pared_graph, certificate
+                )
 
     reference_dependency = _classify_reference_dependency(pared_graph)
     if reference_dependency is not None:
         verdict, reason, certificate = reference_dependency
-        return CliqueBehavior(
-            verdict, reason, seq.graph_count, False, pared_graph, certificate
-        )
+        if verdict is Verdict.INDETERMINATE:
+            if conditional_result is None:
+                conditional_result = reference_dependency
+        else:
+            return CliqueBehavior(
+                verdict, reason, seq.graph_count, False, pared_graph, certificate
+            )
 
     local_bridge_result = _classify_local_bridge(
-        pared_graph, tries=tries, bound=bound, extension_budget=extension_budget
+        pared_graph,
+        tries=tries,
+        bound=bound,
+        extension_budget=extension_budget,
+        retraction_depth=retraction_depth,
     )
     if local_bridge_result is not None:
         verdict, reason, certificate = local_bridge_result
-        return CliqueBehavior(
-            verdict, reason, seq.graph_count, False, pared_graph, certificate
-        )
+        if verdict is Verdict.INDETERMINATE:
+            if conditional_result is None:
+                conditional_result = local_bridge_result
+        else:
+            return CliqueBehavior(
+                verdict, reason, seq.graph_count, False, pared_graph, certificate
+            )
 
     non_triangle_edge_result = _classify_non_triangle_edge(
-        pared_graph, tries=tries, bound=bound, extension_budget=extension_budget
+        pared_graph,
+        tries=tries,
+        bound=bound,
+        extension_budget=extension_budget,
+        retraction_depth=retraction_depth,
     )
     if non_triangle_edge_result is not None:
         verdict, reason, certificate = non_triangle_edge_result
-        return CliqueBehavior(
-            verdict, reason, seq.graph_count, False, pared_graph, certificate
-        )
+        if verdict is Verdict.INDETERMINATE:
+            if conditional_result is None:
+                conditional_result = non_triangle_edge_result
+        else:
+            return CliqueBehavior(
+                verdict, reason, seq.graph_count, False, pared_graph, certificate
+            )
 
     inverse_extension_result = _classify_inverse_cutpoint_extension(
-        pared_graph, tries=tries, bound=bound, extension_budget=extension_budget
+        pared_graph,
+        tries=tries,
+        bound=bound,
+        extension_budget=extension_budget,
+        retraction_depth=retraction_depth,
     )
     if inverse_extension_result is not None:
         verdict, reason, certificate = inverse_extension_result
-        return CliqueBehavior(
-            verdict, reason, seq.graph_count, False, pared_graph, certificate
-        )
+        if verdict is Verdict.INDETERMINATE:
+            if conditional_result is None:
+                conditional_result = inverse_extension_result
+        else:
+            return CliqueBehavior(
+                verdict, reason, seq.graph_count, False, pared_graph, certificate
+            )
 
     observations: list[InducedClockworkWitness] = []
     search_limited = False
@@ -1646,6 +1687,17 @@ def classify_clique_behavior(
             "clique count exceeded bound"
             if bound_exceeded
             else "behavior is indeterminate under the available tests"
+        )
+    if conditional_result is not None:
+        _, conditional_reason, conditional_certificate = conditional_result
+        return CliqueBehavior(
+            Verdict.INDETERMINATE,
+            conditional_reason,
+            seq.graph_count,
+            bound_exceeded,
+            pared_graph,
+            conditional_certificate,
+            observations=tuple(observations),
         )
     return CliqueBehavior(
         Verdict.INDETERMINATE,
