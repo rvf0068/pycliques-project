@@ -30,9 +30,7 @@ jobs:
         run: uv run ruff check packages/
 
       - name: Ruff format check
-        run: |
-          uv run ruff format --diff packages/pycliques/src/pycliques/retractions.py packages/pycliques/tests/test_divergence_witnesses.py
-          uv run ruff format --check packages/
+        run: uv run ruff format --check packages/
 
       - name: Mypy
         run: uv run mypy packages/
