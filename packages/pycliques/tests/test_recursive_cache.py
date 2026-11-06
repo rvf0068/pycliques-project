@@ -100,10 +100,8 @@ def test_cache_resets_after_exception(monkeypatch):
         small.classify_clique_behavior(nx.cycle_graph(5))
     monkeypatch.setattr(small, "_classify_reference_graph", original)
     stats = {}
-    assert (
-        small.classify_clique_behavior(nx.cycle_graph(4), cache_stats=stats).verdict
-        is Verdict.CONVERGENT
-    )
+    result = small.classify_clique_behavior(nx.cycle_graph(4), cache_stats=stats)
+    assert result.verdict is Verdict.CONVERGENT
     assert stats["hits"] == 0
 
 
@@ -115,18 +113,14 @@ def test_reference_registry_changes_between_root_calls(monkeypatch):
         small.register_reference_graph(
             graph, status=ReferenceStatus.CONJECTURED, label="conditional"
         )
-        assert (
-            small.classify_clique_behavior(graph, tries=1).verdict
-            is Verdict.CONVERGENT
-        )
+        conditional = small.classify_clique_behavior(graph, tries=1)
+        assert conditional.verdict is Verdict.CONVERGENT
         small.clear_reference_graphs()
         small.register_reference_graph(
             graph, status=ReferenceStatus.PROVEN, label="proven"
         )
-        assert (
-            small.classify_clique_behavior(graph, tries=1).verdict
-            is Verdict.DIVERGENT
-        )
+        proved = small.classify_clique_behavior(graph, tries=1)
+        assert proved.verdict is Verdict.DIVERGENT
     finally:
         small._REFERENCE_GRAPHS.clear()
         small._REFERENCE_GRAPHS.update(original)
