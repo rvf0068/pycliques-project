@@ -22,6 +22,8 @@ jobs:
         run: uv python install 3.11
       - name: Install workspace
         run: uv sync
+      - name: Test benchmark timeout bookkeeping
+        run: uv run python -m pytest research/test_benchmark_recursive_cache.py -q
       - name: Benchmark cached vs uncached classification
         env:
           OPENBLAS_NUM_THREADS: "1"
