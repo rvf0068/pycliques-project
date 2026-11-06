@@ -601,39 +601,51 @@ def verify_special_octahedron_witness(
     return all(graph.has_edge(a, b) for a, b in itertools.combinations(antipodes, 2))
 
 
+@dataclass
+class _SpecialOctahedronFrame:
+    """One pending branch of iterative Bron--Kerbosch exploration."""
+
+    clique: tuple[int, ...]
+    clique_mask: int
+    candidates: int
+    excluded: int
+    options: int | None = None
+
+
 def find_special_octahedron_witness(
     graph: nx.Graph,
 ) -> SpecialOctahedronWitness | None:
-    """Find a special octahedron with an exact, pruned maximal-clique search.
+    """Find a special octahedron with exact, nonrecursive clique exploration.
 
-    A special O_d has a maximal host clique C with one opposite vertex
-    for each v in C. Every *partial* clique P contained in C must already
-    admit an antipode candidate for each of its vertices: a candidate for
-    v is nonadjacent to v and adjacent to every other vertex of P.
+    A special O_d has a maximal host clique C with one antipode for each
+    v in C. Every partial clique P of C must already admit candidates for
+    these antipodes, and those domains only shrink as P grows. Thus an
+    empty domain safely prunes the entire search branch.
 
-    Those candidate sets only shrink when P grows. Thus if a candidate
-    set becomes empty, the entire branch of the Bron--Kerbosch search
-    can be skipped, without enumerating its exponentially many maximal
-    cliques. All candidate domains and adjacency constraints are stored
-    as integer bit masks. The search remains exhaustive and exact;
-    None means no special octahedron exists, never a resource timeout.
+    The Bron--Kerbosch traversal and antipode assignment both use
+    explicit stacks to avoid recursion-limit failures for large graphs.
+    Adjacency masks exclude self-loops, as the clique relation does.
+    None means exhaustive absence, never a resource timeout.
     """
     if graph.number_of_nodes() < 6:
         return None
     vertices = tuple(graph)
     count = len(vertices)
     indices = {v: i for i, v in enumerate(vertices)}
-    neighbors = tuple(sum(1 << indices[w] for w in graph[v]) for v in vertices)
+    neighbors = tuple(
+        sum(1 << indices[w] for w in graph[v] if w != v) for v in vertices
+    )
     full_mask = (1 << count) - 1
 
-    def possible_antipodes(clique: list[int], clique_mask: int) -> list[int] | None:
-        """Necessary domains for each vertex of a partial clique."""
-        size = len(clique)
+    def possible_antipodes(
+        clique: tuple[int, ...], clique_mask: int
+    ) -> list[int] | None:
+        """Compute the necessary antipode domains of a partial clique."""
         prefix = [full_mask]
         for vertex in clique:
             prefix.append(prefix[-1] & neighbors[vertex])
-        suffix = [full_mask] * (size + 1)
-        for i in range(size - 1, -1, -1):
+        suffix = [full_mask] * (len(clique) + 1)
+        for i in range(len(clique) - 1, -1, -1):
             suffix[i] = suffix[i + 1] & neighbors[clique[i]]
         domains = []
         for i, vertex in enumerate(clique):
@@ -650,77 +662,94 @@ def find_special_octahedron_witness(
         return domains
 
     def compatible_antipodes(
-        clique: list[int], domains: list[int]
+        clique: tuple[int, ...], domains: list[int]
     ) -> SpecialOctahedronWitness | None:
-        """Choose one pairwise-adjacent antipode per maximal clique vertex."""
+        """Find a pairwise-adjacent transversal of antipode domains."""
         order = sorted(range(len(clique)), key=lambda j: domains[j].bit_count())
-        chosen: list[int] = []
-
-        def extend(position: int, common_neighbors: int) -> bool:
+        selected: list[int] = []
+        common = [full_mask]
+        options = [domains[order[0]]]
+        while True:
+            position = len(selected)
             if position == len(order):
-                return True
-            options = domains[order[position]] & common_neighbors
-            while options:
-                bit = options & -options
-                options ^= bit
-                candidate = bit.bit_length() - 1
-                chosen.append(candidate)
-                next_common = common_neighbors & neighbors[candidate]
-                if all(
-                    domains[j] & next_common for j in order[position + 1 :]
-                ) and extend(position + 1, next_common):
-                    return True
-                chosen.pop()
-            return False
+                return SpecialOctahedronWitness(
+                    clique=tuple(vertices[clique[j]] for j in order),
+                    antipodes=tuple(vertices[j] for j in selected),
+                )
+            remaining = options[position]
+            if not remaining:
+                if not position:
+                    return None
+                options.pop()
+                selected.pop()
+                common.pop()
+                continue
 
-        if not extend(0, full_mask):
-            return None
-        return SpecialOctahedronWitness(
-            clique=tuple(vertices[clique[j]] for j in order),
-            antipodes=tuple(vertices[j] for j in chosen),
+            bit = remaining & -remaining
+            options[position] ^= bit
+            candidate = bit.bit_length() - 1
+            next_common = common[position] & neighbors[candidate]
+            if not all(domains[j] & next_common for j in order[position + 1 :]):
+                continue
+            selected.append(candidate)
+            common.append(next_common)
+            if position + 1 < len(order):
+                options.append(domains[order[position + 1]] & next_common)
+
+    stack = [_SpecialOctahedronFrame((), 0, full_mask, 0)]
+    while stack:
+        frame = stack[-1]
+        if frame.options is None:
+            if len(frame.clique) + frame.candidates.bit_count() < 3:
+                stack.pop()
+                continue
+            domains = (
+                possible_antipodes(frame.clique, frame.clique_mask)
+                if frame.clique
+                else []
+            )
+            if domains is None:
+                stack.pop()
+                continue
+            if not frame.candidates and not frame.excluded:
+                if len(frame.clique) >= 3:
+                    witness = compatible_antipodes(frame.clique, domains)
+                    if witness is not None:
+                        return witness
+                stack.pop()
+                continue
+
+            pivot_set = frame.candidates | frame.excluded
+            if pivot_set:
+                pivot_nodes = (i for i in range(count) if pivot_set & (1 << i))
+                pivot = max(
+                    pivot_nodes,
+                    key=lambda i: (frame.candidates & neighbors[i]).bit_count(),
+                )
+                frame.options = frame.candidates & ~neighbors[pivot]
+            else:
+                frame.options = frame.candidates
+            continue
+
+        if not frame.options:
+            stack.pop()
+            continue
+        bit = frame.options & -frame.options
+        frame.options ^= bit
+        vertex = bit.bit_length() - 1
+        child_candidates = frame.candidates & neighbors[vertex]
+        child_excluded = frame.excluded & neighbors[vertex]
+        frame.candidates ^= bit
+        frame.excluded |= bit
+        stack.append(
+            _SpecialOctahedronFrame(
+                frame.clique + (vertex,),
+                frame.clique_mask | bit,
+                child_candidates,
+                child_excluded,
+            )
         )
-
-    def maximal_clique_search(
-        clique: list[int], clique_mask: int, candidates: int, excluded: int
-    ) -> SpecialOctahedronWitness | None:
-        """Bron--Kerbosch with a hereditary antipode-domain obstruction."""
-        if len(clique) + candidates.bit_count() < 3:
-            return None
-        domains = possible_antipodes(clique, clique_mask) if clique else []
-        if domains is None:
-            return None  # No extension could have all its required antipodes.
-        if not candidates and not excluded:
-            if len(clique) >= 3:
-                return compatible_antipodes(clique, domains)
-            return None
-
-        # Standard pivoting: only nonneighbors of the pivot need branching.
-        pivot_set = candidates | excluded
-        if pivot_set:
-            pivot_nodes = (i for i in range(count) if pivot_set & (1 << i))
-            pivot = max(
-                pivot_nodes, key=lambda i: (candidates & neighbors[i]).bit_count()
-            )
-            options = candidates & ~neighbors[pivot]
-        else:
-            options = candidates
-        while options:
-            bit = options & -options
-            options ^= bit
-            vertex = bit.bit_length() - 1
-            result = maximal_clique_search(
-                clique + [vertex],
-                clique_mask | bit,
-                candidates & neighbors[vertex],
-                excluded & neighbors[vertex],
-            )
-            if result is not None:
-                return result
-            candidates ^= bit
-            excluded |= bit
-        return None
-
-    return maximal_clique_search([], 0, full_mask, 0)
+    return None
 
 
 def _find_special_octahedra(
