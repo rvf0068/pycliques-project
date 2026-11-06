@@ -73,9 +73,7 @@ def test_retraction_verifier_accepts_witness_and_rejects_corruption():
     projection, inclusion = witness
     bad_projection = dict(projection)
     bad_projection[inclusion[0]] = 1
-    assert not verify_retraction_witness(
-        host, target, (bad_projection, inclusion)
-    )
+    assert not verify_retraction_witness(host, target, (bad_projection, inclusion))
 
 
 def test_special_certificate_replays_on_saved_iterate():
@@ -129,7 +127,9 @@ def test_proven_reference_wins_over_earlier_conjecture(empty_references):
 
 
 def test_conjectural_direct_reference_does_not_mask_helly_proof(empty_references):
-    graph = nx.path_graph(3)
+    # C5 is clique-Helly and has no dominated vertices; the direct
+    # conjectural reference is therefore encountered before the Helly proof.
+    graph = nx.cycle_graph(5)
     register_reference_graph(
         graph, status=ReferenceStatus.CONJECTURED, label="unproved"
     )
