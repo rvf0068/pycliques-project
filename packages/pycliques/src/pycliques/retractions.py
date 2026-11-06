@@ -633,7 +633,8 @@ def find_special_octahedron_witness(
     count = len(vertices)
     indices = {v: i for i, v in enumerate(vertices)}
     neighbors = tuple(
-        sum(1 << indices[w] for w in graph[v] if w != v) for v in vertices
+        sum(1 << indices[w] for w in graph[v] if indices[w] != i)
+        for i, v in enumerate(vertices)
     )
     full_mask = (1 << count) - 1
 
