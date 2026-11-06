@@ -52,7 +52,12 @@ from pycliques.cutpoints import (
 from pycliques.dominated import completely_pared_graph, find_dominated_vertex
 from pycliques.helly import is_clique_helly
 from pycliques.named import complement_of_cycle, snub_disphenoid, suspension_of_cycle
-from pycliques.retractions import retracts, special_octahedra_dimension
+from pycliques.retractions import (
+    SpecialOctahedronWitness,
+    find_special_octahedron_witness,
+    retracts,
+    special_octahedra_dimension,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -103,6 +108,7 @@ class Certificate:
     base_coaffination: dict[Hashable, Hashable] | None = None
     clockwork_structure: ClockworkStructure | None = None
     iterate_index: int | None = None
+    special_octahedron: SpecialOctahedronWitness | None = None
 
 
 @dataclass(frozen=True)
@@ -385,6 +391,7 @@ def _classify_reference_dependency(
     ``None`` means this inference rule did not establish a verdict; it does
     not make the overall graph indeterminate.
     """
+    conditional: ClassifierResult | None = None
     for ref_graph, status, label in _REFERENCE_GRAPHS.values():
         retraction = retracts(graph, ref_graph)
         if isinstance(retraction, tuple):
@@ -402,18 +409,19 @@ def _classify_reference_dependency(
                         map=retraction,
                     ),
                 )
-            return (
-                Verdict.INDETERMINATE,
-                f"{prefix} (conjectured clique divergent; conclusion conditional)",
-                Certificate(
-                    rule="retracts",
-                    target=ref_graph,
-                    target_status="conjectured_divergent",
-                    target_label=ident,
-                    map=retraction,
-                ),
-            )
-    return None
+            if conditional is None:
+                conditional = (
+                    Verdict.INDETERMINATE,
+                    f"{prefix} (conjectured clique divergent; conclusion conditional)",
+                    Certificate(
+                        rule="retracts",
+                        target=ref_graph,
+                        target_status="conjectured_divergent",
+                        target_label=ident,
+                        map=retraction,
+                    ),
+                )
+    return conditional
 
 
 def _classify_local_bridge(
@@ -1203,6 +1211,21 @@ def _test_clockwork(
     return None
 
 
+def _special_octahedron_certificate(graph: nx.Graph, index: int) -> Certificate | None:
+    """Attach an independently checkable witness to a positive search."""
+    witness = find_special_octahedron_witness(graph)
+    if witness is None:
+        return None
+    return Certificate(
+        rule="special_octahedron",
+        source=graph,
+        target=graph,
+        target_status="proven_divergent",
+        iterate_index=index,
+        special_octahedron=witness,
+    )
+
+
 def _test_eventually_special_octahedra(
     seq: CliqueSequence, tries: int
 ) -> ClassifierResult | None:
@@ -1217,7 +1240,7 @@ def _test_eventually_special_octahedra(
             return (
                 Verdict.DIVERGENT,
                 f"eventually has a special octahedron (index {i}, dimension {dim})",
-                None,
+                _special_octahedron_certificate(g, i),
             )
     return None
 
@@ -1279,11 +1302,23 @@ def _test_iterate_certificates(
 
         if i < retraction_depth:
             for target, label in targets:
-                if retracts(graph, target):
+                witness = retracts(graph, target)
+                if witness:
+                    certificate = (
+                        Certificate(
+                            rule="retracts",
+                            source=graph,
+                            target=target,
+                            target_status="proven_divergent",
+                            iterate_index=i,
+                            map=witness,
+                        )
+                        if isinstance(witness, tuple) else None
+                    )
                     return (
                         Verdict.DIVERGENT,
                         f"{label} (pared iterate {i})",
-                        None,
+                        certificate,
                     )
 
         dim = special_octahedra_dimension(graph)
@@ -1292,7 +1327,7 @@ def _test_iterate_certificates(
             return (
                 Verdict.DIVERGENT,
                 f"eventually has a special octahedron (index {i}, dimension {dim})",
-                None,
+                _special_octahedron_certificate(graph, i),
             )
     return None
 
