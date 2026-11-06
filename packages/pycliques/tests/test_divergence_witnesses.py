@@ -5,6 +5,8 @@ from dataclasses import replace
 import networkx as nx
 import pycliques.small as small
 import pytest
+from pycliques.cliques import clique_graph
+from pycliques.dominated import completely_pared_graph
 from pycliques.named import suspension_of_cycle
 from pycliques.retractions import (
     find_special_octahedron_witness,
@@ -151,3 +153,14 @@ def test_recursive_nontriangle_rule_propagates_retraction_depth(monkeypatch):
     monkeypatch.setattr(small, "classify_clique_behavior", substitute)
     small._classify_non_triangle_edge(graph, retraction_depth=2)
     assert depths and set(depths) == {2}
+
+
+def test_pruned_search_handles_historical_95_vertex_timeout_fixture():
+    """The third pared iterate formerly timed out in octahedron detection."""
+    graph = nx.from_graph6_bytes(b"IQzTvzu]w")
+    for _ in range(3):
+        next_graph = clique_graph(graph, bound=120)
+        assert next_graph is not None
+        graph = completely_pared_graph(next_graph)
+    assert (graph.order(), graph.size()) == (95, 4099)
+    assert find_special_octahedron_witness(graph) is None
