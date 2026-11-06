@@ -128,8 +128,11 @@ def test_early_iterate_certificate_under_small_bound(monkeypatch):
 
     monkeypatch.setattr(small, "is_clique_helly", lambda graph: False)
     result = small._test_iterate_certificates(NoNextIterate(), 9, 0, ())
-    assert result == (
-        small.Verdict.DIVERGENT,
-        "eventually has a special octahedron (index 0, dimension 4)",
-        None,
-    )
+    assert result is not None
+    verdict, reason, certificate = result
+    assert verdict is small.Verdict.DIVERGENT
+    assert reason == "eventually has a special octahedron (index 0, dimension 4)"
+    assert certificate is not None
+    assert certificate.rule == "special_octahedron"
+    assert certificate.iterate_index == 0
+    assert certificate.special_octahedron is not None

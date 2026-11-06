@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import itertools
 import logging
 import sys
 from collections.abc import Callable, Hashable, Iterable, Iterator, Mapping
@@ -445,6 +446,40 @@ def retracts(large: nx.Graph, small: nx.Graph) -> tuple[dict, dict] | bool:
     return False
 
 
+def verify_retraction_witness(
+    large: nx.Graph,
+    small: nx.Graph,
+    witness: tuple[dict, dict],
+) -> bool:
+    """Verify an induced inclusion and graph-morphism retraction.
+
+    This checker does not invoke a search or enumerate automorphisms.
+    Adjacency may map to adjacency or equality, as in clique graph theory.
+    """
+    if not isinstance(witness, tuple) or len(witness) != 2:
+        return False
+    projection, inclusion = witness
+    if not isinstance(projection, dict) or not isinstance(inclusion, dict):
+        return False
+    if set(projection) != set(large) or set(inclusion) != set(small):
+        return False
+    if set(projection.values()) - set(small):
+        return False
+    if len(set(inclusion.values())) != len(small):
+        return False
+    if any(inclusion[v] not in large or projection[inclusion[v]] != v for v in small):
+        return False
+    if any(
+        (large.has_edge(inclusion[u], inclusion[v]) != small.has_edge(u, v))
+        for u, v in itertools.combinations(small, 2)
+    ):
+        return False
+    return all(
+        projection[u] == projection[v] or small.has_edge(projection[u], projection[v])
+        for u, v in large.edges()
+    )
+
+
 def retracts_to(subgraph: nx.Graph) -> Callable[[nx.Graph], tuple[dict, dict] | bool]:
     """Return a function that checks retraction to ``subgraph``.
 
@@ -522,72 +557,178 @@ def _is_maximal_clique(graph: nx.Graph, clique: Iterable) -> bool:
     return False
 
 
+@dataclass(frozen=True)
+class SpecialOctahedronWitness:
+    """An induced special octahedron, with aligned opposite vertex pairs.
+
+    The entries in `clique` form a maximal clique of the host graph.
+    Each `antipodes[i]` is its unique nonneighbor among these entries;
+    the antipodes themselves form a clique. This directly certifies O_d,
+    where d = len(clique) >= 3.
+    """
+
+    clique: tuple[Hashable, ...]
+    antipodes: tuple[Hashable, ...]
+
+    @property
+    def dimension(self) -> int:
+        return len(self.clique)
+
+
+def verify_special_octahedron_witness(
+    graph: nx.Graph, witness: SpecialOctahedronWitness
+) -> bool:
+    """Verify a positive special-octahedron witness without doing any search."""
+    if not isinstance(witness, SpecialOctahedronWitness):
+        return False
+    clique, antipodes = witness.clique, witness.antipodes
+    d = len(clique)
+    if d < 3 or len(antipodes) != d:
+        return False
+    vertices = clique + antipodes
+    if len(set(vertices)) != 2 * d or not set(vertices) <= set(graph):
+        return False
+    if any(not graph.has_edge(u, v) for u, v in itertools.combinations(clique, 2)):
+        return False
+    if any(all(graph.has_edge(x, c) for c in clique) for x in graph if x not in clique):
+        return False  # The selected clique must be maximal in the host.
+    if any(
+        graph.has_edge(clique[i], antipodes[i])
+        or any(not graph.has_edge(antipodes[i], clique[j]) for j in range(d) if j != i)
+        for i in range(d)
+    ):
+        return False
+    return all(graph.has_edge(a, b) for a, b in itertools.combinations(antipodes, 2))
+
+
+def find_special_octahedron_witness(
+    graph: nx.Graph,
+) -> SpecialOctahedronWitness | None:
+    """Find a special octahedron with an exact, pruned maximal-clique search.
+
+    A special O_d has a maximal host clique C with one opposite vertex
+    for each v in C. Every *partial* clique P contained in C must already
+    admit an antipode candidate for each of its vertices: a candidate for
+    v is nonadjacent to v and adjacent to every other vertex of P.
+
+    Those candidate sets only shrink when P grows. Thus if a candidate
+    set becomes empty, the entire branch of the Bron--Kerbosch search
+    can be skipped, without enumerating its exponentially many maximal
+    cliques. All candidate domains and adjacency constraints are stored
+    as integer bit masks. The search remains exhaustive and exact;
+    None means no special octahedron exists, never a resource timeout.
+    """
+    if graph.number_of_nodes() < 6:
+        return None
+    vertices = tuple(graph)
+    count = len(vertices)
+    indices = {v: i for i, v in enumerate(vertices)}
+    neighbors = tuple(sum(1 << indices[w] for w in graph[v]) for v in vertices)
+    full_mask = (1 << count) - 1
+
+    def possible_antipodes(clique: list[int], clique_mask: int) -> list[int] | None:
+        """Necessary domains for each vertex of a partial clique."""
+        size = len(clique)
+        prefix = [full_mask]
+        for vertex in clique:
+            prefix.append(prefix[-1] & neighbors[vertex])
+        suffix = [full_mask] * (size + 1)
+        for i in range(size - 1, -1, -1):
+            suffix[i] = suffix[i + 1] & neighbors[clique[i]]
+        domains = []
+        for i, vertex in enumerate(clique):
+            candidates = (
+                prefix[i]
+                & suffix[i + 1]
+                & ~neighbors[vertex]
+                & ~clique_mask
+                & full_mask
+            )
+            if not candidates:
+                return None
+            domains.append(candidates)
+        return domains
+
+    def compatible_antipodes(
+        clique: list[int], domains: list[int]
+    ) -> SpecialOctahedronWitness | None:
+        """Choose one pairwise-adjacent antipode per maximal clique vertex."""
+        order = sorted(range(len(clique)), key=lambda j: domains[j].bit_count())
+        chosen: list[int] = []
+
+        def extend(position: int, common_neighbors: int) -> bool:
+            if position == len(order):
+                return True
+            options = domains[order[position]] & common_neighbors
+            while options:
+                bit = options & -options
+                options ^= bit
+                candidate = bit.bit_length() - 1
+                chosen.append(candidate)
+                next_common = common_neighbors & neighbors[candidate]
+                if all(
+                    domains[j] & next_common for j in order[position + 1 :]
+                ) and extend(position + 1, next_common):
+                    return True
+                chosen.pop()
+            return False
+
+        if not extend(0, full_mask):
+            return None
+        return SpecialOctahedronWitness(
+            clique=tuple(vertices[clique[j]] for j in order),
+            antipodes=tuple(vertices[j] for j in chosen),
+        )
+
+    def maximal_clique_search(
+        clique: list[int], clique_mask: int, candidates: int, excluded: int
+    ) -> SpecialOctahedronWitness | None:
+        """Bron--Kerbosch with a hereditary antipode-domain obstruction."""
+        if len(clique) + candidates.bit_count() < 3:
+            return None
+        domains = possible_antipodes(clique, clique_mask) if clique else []
+        if domains is None:
+            return None  # No extension could have all its required antipodes.
+        if not candidates and not excluded:
+            if len(clique) >= 3:
+                return compatible_antipodes(clique, domains)
+            return None
+
+        # Standard pivoting: only nonneighbors of the pivot need branching.
+        pivot_set = candidates | excluded
+        if pivot_set:
+            pivot_nodes = (i for i in range(count) if pivot_set & (1 << i))
+            pivot = max(
+                pivot_nodes, key=lambda i: (candidates & neighbors[i]).bit_count()
+            )
+            options = candidates & ~neighbors[pivot]
+        else:
+            options = candidates
+        while options:
+            bit = options & -options
+            options ^= bit
+            vertex = bit.bit_length() - 1
+            result = maximal_clique_search(
+                clique + [vertex],
+                clique_mask | bit,
+                candidates & neighbors[vertex],
+                excluded & neighbors[vertex],
+            )
+            if result is not None:
+                return result
+            candidates ^= bit
+            excluded |= bit
+        return None
+
+    return maximal_clique_search([], 0, full_mask, 0)
+
+
 def _find_special_octahedra(
     graph: nx.Graph,
 ) -> tuple[bool, int | None]:
-    """Detect special octahedra via maximal cliques and compatible antipodes.
-
-    An induced octahedron O_d is special precisely when one of its
-    (size d) maximal cliques is also maximal in the host graph.
-
-    Fix a maximal host clique C. A vertex a is an antipode of v in C
-    if it is nonadjacent to v and adjacent to each vertex of C-{v}.
-    Choosing one antipode for every v in C, with the chosen vertices
-    pairwise adjacent, gives an induced O_|C|. Conversely, every
-    special O_d gives such a maximal host clique and assignment.
-
-    This avoids constructing the auxiliary graph on *all nonedges* and
-    enumerating its maximal cliques. In particular a missing antipode
-    rejects a host clique immediately. The search is exact, not bounded.
-    """
-    if graph.number_of_nodes() < 6:
-        return False, None
-    neighbors = {v: set(graph[v]) for v in graph}
-    nodes = set(graph)
-
-    for clique in nx.find_cliques(graph):
-        if len(clique) < 3:
-            continue
-        chosen = tuple(clique)
-        clique_set = set(chosen)
-        domains = {}
-        for vertex in chosen:
-            others = [u for u in chosen if u != vertex]
-            possible = nodes.copy()
-            for u in others:
-                possible.intersection_update(neighbors[u])
-                if not possible:
-                    break
-            # Antipodes must be distinct from, and nonadjacent to, vertex.
-            possible.difference_update(neighbors[vertex])
-            possible.discard(vertex)
-            possible.difference_update(clique_set)
-            if not possible:
-                break
-            domains[vertex] = possible
-        if len(domains) != len(chosen):
-            continue
-
-        # Smallest candidate domains first; compatibility of an antipode
-        # with the previously selected antipodes is the only constraint
-        # not already included in its domain.
-        order = sorted(chosen, key=lambda v: len(domains[v]))
-        selected: list = []
-
-        def extend(position: int) -> bool:
-            if position == len(order):
-                return True
-            for candidate in domains[order[position]]:
-                if all(candidate in neighbors[earlier] for earlier in selected):
-                    selected.append(candidate)
-                    if extend(position + 1):
-                        return True
-                    selected.pop()
-            return False
-
-        if extend(0):
-            return True, len(chosen)
-    return False, None
+    """Return existence and dimension of a special octahedron."""
+    witness = find_special_octahedron_witness(graph)
+    return (True, witness.dimension) if witness is not None else (False, None)
 
 
 def is_O3_free(graph: nx.Graph) -> bool:

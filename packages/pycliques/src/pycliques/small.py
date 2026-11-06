@@ -52,7 +52,12 @@ from pycliques.cutpoints import (
 from pycliques.dominated import completely_pared_graph, find_dominated_vertex
 from pycliques.helly import is_clique_helly
 from pycliques.named import complement_of_cycle, snub_disphenoid, suspension_of_cycle
-from pycliques.retractions import retracts, special_octahedra_dimension
+from pycliques.retractions import (
+    SpecialOctahedronWitness,
+    find_special_octahedron_witness,
+    retracts,
+    special_octahedra_dimension,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -103,6 +108,7 @@ class Certificate:
     base_coaffination: dict[Hashable, Hashable] | None = None
     clockwork_structure: ClockworkStructure | None = None
     iterate_index: int | None = None
+    special_octahedron: SpecialOctahedronWitness | None = None
 
 
 @dataclass(frozen=True)
@@ -385,6 +391,7 @@ def _classify_reference_dependency(
     ``None`` means this inference rule did not establish a verdict; it does
     not make the overall graph indeterminate.
     """
+    conditional: ClassifierResult | None = None
     for ref_graph, status, label in _REFERENCE_GRAPHS.values():
         retraction = retracts(graph, ref_graph)
         if isinstance(retraction, tuple):
@@ -402,18 +409,19 @@ def _classify_reference_dependency(
                         map=retraction,
                     ),
                 )
-            return (
-                Verdict.INDETERMINATE,
-                f"{prefix} (conjectured clique divergent; conclusion conditional)",
-                Certificate(
-                    rule="retracts",
-                    target=ref_graph,
-                    target_status="conjectured_divergent",
-                    target_label=ident,
-                    map=retraction,
-                ),
-            )
-    return None
+            if conditional is None:
+                conditional = (
+                    Verdict.INDETERMINATE,
+                    f"{prefix} (conjectured clique divergent; conclusion conditional)",
+                    Certificate(
+                        rule="retracts",
+                        target=ref_graph,
+                        target_status="conjectured_divergent",
+                        target_label=ident,
+                        map=retraction,
+                    ),
+                )
+    return conditional
 
 
 def _classify_local_bridge(
@@ -422,6 +430,7 @@ def _classify_local_bridge(
     tries: int = _MAX_ITERATIONS,
     bound: int = 30,
     extension_budget: int = 1,
+    retraction_depth: int = 1,
 ) -> ClassifierResult | None:
     """Classify by [FANP13, Theorem 6.1], or return ``None`` when it proves nothing.
 
@@ -431,7 +440,11 @@ def _classify_local_bridge(
     for u, v in local_bridges(graph):
         h = contract_local_bridge(graph, u, v)
         h_behavior = classify_clique_behavior(
-            h, tries=tries, bound=bound, extension_budget=extension_budget
+            h,
+            tries=tries,
+            bound=bound,
+            extension_budget=extension_budget,
+            retraction_depth=retraction_depth,
         )
         if h_behavior.verdict is Verdict.CONVERGENT:
             return (
@@ -516,6 +529,7 @@ def _classify_non_triangle_edge(
     tries: int = _MAX_ITERATIONS,
     bound: int = 30,
     extension_budget: int = 1,
+    retraction_depth: int = 1,
 ) -> ClassifierResult | None:
     """Classify by [FANP13, Theorem 6.2], or return ``None`` when it proves nothing.
 
@@ -525,7 +539,11 @@ def _classify_non_triangle_edge(
     for u, v in edges_in_no_triangle(graph):
         h = remove_edge_not_in_triangle(graph, u, v)
         h_behavior = classify_clique_behavior(
-            h, tries=tries, bound=bound, extension_budget=extension_budget
+            h,
+            tries=tries,
+            bound=bound,
+            extension_budget=extension_budget,
+            retraction_depth=retraction_depth,
         )
         if h_behavior.verdict is Verdict.DIVERGENT:
             return (
@@ -601,6 +619,7 @@ def _classify_inverse_cutpoint_extension(
     tries: int = _MAX_ITERATIONS,
     bound: int = 30,
     extension_budget: int = 1,
+    retraction_depth: int = 1,
     max_candidates: int = 64,
 ) -> ClassifierResult | None:
     """Classify by an inverse cutpoint extension, or return ``None``.
@@ -632,6 +651,7 @@ def _classify_inverse_cutpoint_extension(
             tries=tries,
             bound=bound,
             extension_budget=extension_budget - 1,
+            retraction_depth=retraction_depth,
         )
         certificate_map = {
             "cutpoint": extension.cutpoint,
@@ -1203,6 +1223,21 @@ def _test_clockwork(
     return None
 
 
+def _special_octahedron_certificate(graph: nx.Graph, index: int) -> Certificate | None:
+    """Attach an independently checkable witness to a positive search."""
+    witness = find_special_octahedron_witness(graph)
+    if witness is None:
+        return None
+    return Certificate(
+        rule="special_octahedron",
+        source=graph,
+        target=graph,
+        target_status="proven_divergent",
+        iterate_index=index,
+        special_octahedron=witness,
+    )
+
+
 def _test_eventually_special_octahedra(
     seq: CliqueSequence, tries: int
 ) -> ClassifierResult | None:
@@ -1217,7 +1252,7 @@ def _test_eventually_special_octahedra(
             return (
                 Verdict.DIVERGENT,
                 f"eventually has a special octahedron (index {i}, dimension {dim})",
-                None,
+                _special_octahedron_certificate(g, i),
             )
     return None
 
@@ -1279,11 +1314,23 @@ def _test_iterate_certificates(
 
         if i < retraction_depth:
             for target, label in targets:
-                if retracts(graph, target):
+                witness = retracts(graph, target)
+                if witness:
+                    certificate = (
+                        Certificate(
+                            rule="retracts",
+                            source=graph,
+                            target=target,
+                            target_status="proven_divergent",
+                            iterate_index=i,
+                            map=witness,
+                        )
+                        if isinstance(witness, tuple) else None
+                    )
                     return (
                         Verdict.DIVERGENT,
                         f"{label} (pared iterate {i})",
-                        None,
+                        certificate,
                     )
 
         dim = special_octahedra_dimension(graph)
@@ -1292,7 +1339,7 @@ def _test_iterate_certificates(
             return (
                 Verdict.DIVERGENT,
                 f"eventually has a special octahedron (index {i}, dimension {dim})",
-                None,
+                _special_octahedron_certificate(graph, i),
             )
     return None
 
@@ -1464,20 +1511,29 @@ def classify_clique_behavior(
 
     pared_graph = completely_pared_graph(graph)
     seq = CliqueSequence(pared_graph, bound=bound)
+    conditional_result: ClassifierResult | None = None
 
     reference_result = _classify_reference_graph(pared_graph)
     if reference_result is not None:
         verdict, reason, certificate = reference_result
-        return CliqueBehavior(
-            verdict, reason, seq.graph_count, False, pared_graph, certificate
-        )
+        if verdict is Verdict.INDETERMINATE:
+            if conditional_result is None:
+                conditional_result = reference_result
+        else:
+            return CliqueBehavior(
+                verdict, reason, seq.graph_count, False, pared_graph, certificate
+            )
 
     theorem_4_6_result = _classify_suspension_2_coaffination(graph)
     if theorem_4_6_result is not None:
         verdict, reason, certificate = theorem_4_6_result
-        return CliqueBehavior(
-            verdict, reason, seq.graph_count, False, pared_graph, certificate
-        )
+        if verdict is Verdict.INDETERMINATE:
+            if conditional_result is None:
+                conditional_result = theorem_4_6_result
+        else:
+            return CliqueBehavior(
+                verdict, reason, seq.graph_count, False, pared_graph, certificate
+            )
 
     for classifier in _default_classifiers(
         tries,
@@ -1490,43 +1546,75 @@ def classify_clique_behavior(
         result = classifier(seq)
         if result is not None:
             verdict, reason, certificate = result
-            return CliqueBehavior(
-                verdict, reason, seq.graph_count, False, pared_graph, certificate
-            )
+            if verdict is Verdict.INDETERMINATE:
+                if conditional_result is None:
+                    conditional_result = result
+            else:
+                return CliqueBehavior(
+                    verdict, reason, seq.graph_count, False, pared_graph, certificate
+                )
 
     reference_dependency = _classify_reference_dependency(pared_graph)
     if reference_dependency is not None:
         verdict, reason, certificate = reference_dependency
-        return CliqueBehavior(
-            verdict, reason, seq.graph_count, False, pared_graph, certificate
-        )
+        if verdict is Verdict.INDETERMINATE:
+            if conditional_result is None:
+                conditional_result = reference_dependency
+        else:
+            return CliqueBehavior(
+                verdict, reason, seq.graph_count, False, pared_graph, certificate
+            )
 
     local_bridge_result = _classify_local_bridge(
-        pared_graph, tries=tries, bound=bound, extension_budget=extension_budget
+        pared_graph,
+        tries=tries,
+        bound=bound,
+        extension_budget=extension_budget,
+        retraction_depth=retraction_depth,
     )
     if local_bridge_result is not None:
         verdict, reason, certificate = local_bridge_result
-        return CliqueBehavior(
-            verdict, reason, seq.graph_count, False, pared_graph, certificate
-        )
+        if verdict is Verdict.INDETERMINATE:
+            if conditional_result is None:
+                conditional_result = local_bridge_result
+        else:
+            return CliqueBehavior(
+                verdict, reason, seq.graph_count, False, pared_graph, certificate
+            )
 
     non_triangle_edge_result = _classify_non_triangle_edge(
-        pared_graph, tries=tries, bound=bound, extension_budget=extension_budget
+        pared_graph,
+        tries=tries,
+        bound=bound,
+        extension_budget=extension_budget,
+        retraction_depth=retraction_depth,
     )
     if non_triangle_edge_result is not None:
         verdict, reason, certificate = non_triangle_edge_result
-        return CliqueBehavior(
-            verdict, reason, seq.graph_count, False, pared_graph, certificate
-        )
+        if verdict is Verdict.INDETERMINATE:
+            if conditional_result is None:
+                conditional_result = non_triangle_edge_result
+        else:
+            return CliqueBehavior(
+                verdict, reason, seq.graph_count, False, pared_graph, certificate
+            )
 
     inverse_extension_result = _classify_inverse_cutpoint_extension(
-        pared_graph, tries=tries, bound=bound, extension_budget=extension_budget
+        pared_graph,
+        tries=tries,
+        bound=bound,
+        extension_budget=extension_budget,
+        retraction_depth=retraction_depth,
     )
     if inverse_extension_result is not None:
         verdict, reason, certificate = inverse_extension_result
-        return CliqueBehavior(
-            verdict, reason, seq.graph_count, False, pared_graph, certificate
-        )
+        if verdict is Verdict.INDETERMINATE:
+            if conditional_result is None:
+                conditional_result = inverse_extension_result
+        else:
+            return CliqueBehavior(
+                verdict, reason, seq.graph_count, False, pared_graph, certificate
+            )
 
     observations: list[InducedClockworkWitness] = []
     search_limited = False
@@ -1611,6 +1699,17 @@ def classify_clique_behavior(
             "clique count exceeded bound"
             if bound_exceeded
             else "behavior is indeterminate under the available tests"
+        )
+    if conditional_result is not None:
+        _, conditional_reason, conditional_certificate = conditional_result
+        return CliqueBehavior(
+            Verdict.INDETERMINATE,
+            conditional_reason,
+            seq.graph_count,
+            bound_exceeded,
+            pared_graph,
+            conditional_certificate,
+            observations=tuple(observations),
         )
     return CliqueBehavior(
         Verdict.INDETERMINATE,
