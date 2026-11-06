@@ -1,5 +1,6 @@
 """Independent witness verification and conditional-reference regression tests."""
 
+import sys
 from dataclasses import replace
 
 import networkx as nx
@@ -164,3 +165,37 @@ def test_pruned_search_handles_historical_95_vertex_timeout_fixture():
         graph = completely_pared_graph(next_graph)
     assert (graph.order(), graph.size()) == (95, 4099)
     assert find_special_octahedron_witness(graph) is None
+
+
+def test_self_loops_do_not_change_special_octahedron_detection():
+    graph = nx.octahedral_graph()
+    graph.add_edges_from((vertex, vertex) for vertex in graph)
+    witness = find_special_octahedron_witness(graph)
+    assert witness is not None
+    assert witness.dimension == 3
+    assert verify_special_octahedron_witness(graph, witness)
+
+
+def test_large_octahedron_avoids_recursive_search_limit():
+    # With a recursively nested clique walk and antipode assignment,
+    # O_240 would exceed this recursion limit despite an easy certificate.
+    graph = nx.complete_multipartite_graph(*([2] * 240))
+    old_limit = sys.getrecursionlimit()
+    try:
+        sys.setrecursionlimit(450)
+        witness = find_special_octahedron_witness(graph)
+    finally:
+        sys.setrecursionlimit(old_limit)
+    assert witness is not None
+    assert witness.dimension == 240
+    assert verify_special_octahedron_witness(graph, witness)
+
+
+def test_nonreflexive_nan_node_label_does_not_preserve_diagonal_bits():
+    nan = float("nan")
+    graph = nx.relabel_nodes(nx.octahedral_graph(), {0: nan})
+    graph.add_edges_from((vertex, vertex) for vertex in graph)
+    witness = find_special_octahedron_witness(graph)
+    assert witness is not None
+    assert witness.dimension == 3
+    assert verify_special_octahedron_witness(graph, witness)
