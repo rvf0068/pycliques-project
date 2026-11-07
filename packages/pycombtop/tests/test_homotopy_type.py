@@ -419,11 +419,46 @@ def test_homotopy_type_vertex_limit_is_inconclusive():
     assert verdict.verdict == "Too large to check"
 
 
-def test_homotopy_type_simplex_limit_is_inconclusive():
-    """A configured simplex limit applies to the clique complex."""
+def test_homotopy_type_simplex_limit_allows_cheap_cone_certificate():
+    """An explicitly certified cone needs no exponential simplex expansion."""
     verdict = homotopy_type_with_verdict(nx.complete_graph(4), max_simplices=10)
+    assert verdict.is_limited is False
+    assert verdict.is_exact is True
+    assert verdict.wedge.is_contractible()
+
+
+def test_homotopy_type_simplex_limit_still_blocks_uncertified_graph():
+    """A cycle's complex has eleven faces, including the empty face."""
+    verdict = homotopy_type_with_verdict(nx.cycle_graph(5), max_simplices=10)
     assert verdict.is_limited is True
-    assert verdict.verdict == "Too large to check"
+    assert verdict.is_exact is False
+
+
+def test_homotopy_type_early_join_certifies_large_clique_graph():
+    """K(O_5) has a huge flag complex, but a certified join type S^15."""
+    o5 = nx.complement(nx.disjoint_union_all([nx.complete_graph(2)] * 5))
+    k = clique_graph(o5)
+    assert k is not None and len(k) == 32
+    v = homotopy_type_with_verdict(k, max_vertices=64, max_simplices=25000)
+    assert v.is_limited is False
+    assert v.is_exact is True
+    assert v.wedge.spheres == {15: 1}
+    # The strict vertex limit still applies even when a join is visible.
+    assert (
+        homotopy_type_with_verdict(k, max_vertices=31, max_simplices=25000).is_limited
+        is True
+    )
+
+
+def test_streaming_budget_counts_overlapping_flag_facets():
+    from pycombtop.homotopy_type import _graph_exceeds_simplex_budget
+
+    g = nx.Graph([(0, 1), (0, 2), (1, 2), (0, 3), (1, 3)])
+    assert _graph_exceeds_simplex_budget(g, 12) is False
+    assert _graph_exceeds_simplex_budget(g, 11) is True
+    assert _graph_exceeds_simplex_budget(nx.complete_graph(8), 2) is True
+    with pytest.raises(ValueError, match="max_simplices"):
+        _graph_exceeds_simplex_budget(g, -1)
 
 
 # ---------- homotopy_type_sc_with_verdict ----------
