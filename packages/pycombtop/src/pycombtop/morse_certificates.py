@@ -19,9 +19,9 @@ Algebraic Topology, Sections 0 and 4.2 (CW complexes and Hurewicz).
 
 from __future__ import annotations
 
+import random
 from collections import Counter
 from dataclasses import dataclass
-import random
 
 import networkx as nx
 from sympy import SparseMatrix
