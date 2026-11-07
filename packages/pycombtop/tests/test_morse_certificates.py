@@ -4,8 +4,12 @@ import networkx as nx
 import pytest
 
 from pycliques import clique_graph
-from pycombtop import facet_morse_certificate, graph_morse_certificate
-from pycombtop.homotopy_type import Theorem, homotopy_type_with_verdict
+from pycombtop import (
+    Theorem,
+    facet_morse_certificate,
+    graph_morse_certificate,
+    homotopy_type_with_verdict,
+)
 
 # The original order-9 McKay indices are retained to identify the census rows.
 SIX_TIMEOUTS = (
