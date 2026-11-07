@@ -5,10 +5,7 @@ import pytest
 
 from pycliques import clique_graph
 from pycombtop.homotopy_type import Theorem, homotopy_type_with_verdict
-from pycombtop.morse_certificates import (
-    facet_morse_certificate,
-    graph_morse_certificate,
-)
+from pycombtop.morse_certificates import facet_morse_certificate, graph_morse_certificate
 
 # The original order-9 McKay indices are retained to identify the census rows.
 SIX_TIMEOUTS = (
