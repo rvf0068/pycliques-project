@@ -148,7 +148,7 @@ def _valid_acyclic_matching(
                 gradient.add_edge(low, high)
             else:
                 gradient.add_edge(high, low)
-    return nx.is_directed_acyclic_graph(gradient)
+    return bool(nx.is_directed_acyclic_graph(gradient))
 
 
 def _collapse_free_pairs(
@@ -201,7 +201,7 @@ def _top_betti_matches(
             entries[row_idx[sigma ^ bit], j] = (-1) ** i
     boundary = SparseMatrix(len(lower), len(top), entries)
     # Since the core is dim-dimensional, H_dim = ker(d_dim).
-    return len(top) - boundary.rank() == count
+    return bool(len(top) - boundary.rank() == count)
 
 
 def facet_morse_certificate(
