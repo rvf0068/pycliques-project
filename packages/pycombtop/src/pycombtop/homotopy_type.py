@@ -333,6 +333,30 @@ def _too_large_simplicial_complex(
     return False
 
 
+def _graph_exceeds_simplex_budget(graph: nx.Graph, max_simplices: int) -> bool:
+    """Check a flag complex's face count while streaming maximal cliques.
+
+    This avoids first constructing a potentially huge facet collection.
+    The empty face is counted, exactly as in
+    :func:`_too_large_simplicial_complex`. Stop at the first confirmed
+    budget violation; overlap between facets is counted only once.
+    """
+    if max_simplices < 0:
+        raise ValueError("max_simplices must be nonnegative or None")
+    faces: set[frozenset] = set()
+    for clique in nx.find_cliques(graph):
+        if (1 << len(clique)) > max_simplices:
+            # A single facet already contains too many distinct faces.
+            return True
+        for size in range(len(clique) + 1):
+            for face in combinations(clique, size):
+                faces.add(frozenset(face))
+                if len(faces) > max_simplices:
+                    return True
+    # The empty graph has the empty face. It has no maximal cliques.
+    return max_simplices == 0
+
+
 def _limited_verdict() -> HomotopyVerdict:
     """Return the standard inconclusive result for a size-limited input."""
     return HomotopyVerdict(
@@ -608,7 +632,11 @@ def _try_vertex_decomposable(
     return None
 
 
-def _try_join_complement(graph: nx.Graph) -> HomotopyVerdict | None:
+def _try_join_complement(
+    graph: nx.Graph,
+    max_vertices: int | None = None,
+    max_simplices: int | None = None,
+) -> HomotopyVerdict | None:
     """Use the join formula only with certified homotopy types of factors."""
     complement = nx.complement(graph)
     components = list(nx.connected_components(complement))
@@ -617,7 +645,9 @@ def _try_join_complement(graph: nx.Graph) -> HomotopyVerdict | None:
     factors = []
     for component in components:
         factor = nx.complement(complement.subgraph(component).copy())
-        verdict = homotopy_type_with_verdict(factor)
+        verdict = homotopy_type_with_verdict(
+            factor, max_vertices=max_vertices, max_simplices=max_simplices
+        )
         if not verdict.is_exact or verdict.is_limited:
             return None
         factors.append(verdict.wedge)
@@ -933,8 +963,10 @@ def homotopy_type_with_verdict(
     max_vertices : int, optional
         Abort before analysis when the graph has more vertices than this.
     max_simplices : int, optional
-        Abort before analysis when its clique complex has more simplices than
-        this. This requires constructing the clique complex once.
+        Maximum number of distinct faces for general simplicial-complex
+        algorithms. Cheap exact cone/point/join certificates are tried first,
+        without materializing the full complex. If none applies, a streaming
+        face-count check stops at the configured budget.
 
     .. rubric:: Returns
 
@@ -958,15 +990,31 @@ def homotopy_type_with_verdict(
     """
     if max_vertices is not None and graph.number_of_nodes() > max_vertices:
         return _limited_verdict()
-    if max_simplices is not None:
-        simplex_complex = clique_complex(graph)
-        if _too_large_simplicial_complex(simplex_complex, max_vertices, max_simplices):
-            return _limited_verdict()
+    if max_simplices is not None and max_simplices < 0:
+        raise ValueError("max_simplices must be nonnegative or None")
 
-    # 0. Trivial case
+    # Cheap exact certificates need no explicit enumeration of faces.
+    # Preserve the strict vertex limit, but do not reject a cone or join
+    # merely because the full flag complex is exponentially large.
     v = _try_trivial(graph)
     if v:
         return v
+    v = _try_universal_vertex_cone(graph)
+    if v:
+        return v
+    v = _try_join_complement(
+        graph, max_vertices=max_vertices, max_simplices=max_simplices
+    )
+    if v:
+        return v
+
+    # Check the original complex budget BEFORE expensive s-collapses.
+    # Streaming nx.find_cliques permits early termination even when there
+    # would be exponentially many maximal cliques or distinct faces.
+    if max_simplices is not None and _graph_exceeds_simplex_budget(
+        graph, max_simplices
+    ):
+        return _limited_verdict()
 
     # 1. Simplify via s-collapses, then retry trivial
     graph = _simplify_graph_ht(graph)
