@@ -439,16 +439,15 @@ def test_homotopy_type_early_join_certifies_large_clique_graph():
     o5 = nx.complement(nx.disjoint_union_all([nx.complete_graph(2)] * 5))
     k = clique_graph(o5)
     assert k is not None and len(k) == 32
-    v = homotopy_type_with_verdict(
-        k, max_vertices=64, max_simplices=25000
-    )
+    v = homotopy_type_with_verdict(k, max_vertices=64, max_simplices=25000)
     assert v.is_limited is False
     assert v.is_exact is True
     assert v.wedge.spheres == {15: 1}
     # The strict vertex limit still applies even when a join is visible.
-    assert homotopy_type_with_verdict(
-        k, max_vertices=31, max_simplices=25000
-    ).is_limited is True
+    assert (
+        homotopy_type_with_verdict(k, max_vertices=31, max_simplices=25000).is_limited
+        is True
+    )
 
 
 def test_streaming_budget_counts_overlapping_flag_facets():
