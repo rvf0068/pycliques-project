@@ -4,7 +4,7 @@ import networkx as nx
 import pytest
 
 from pycliques import clique_graph
-from pycombtop.homotopy_type import homotopy_type_with_verdict, Theorem
+from pycombtop.homotopy_type import Theorem, homotopy_type_with_verdict
 from pycombtop.morse_certificates import (
     facet_morse_certificate,
     graph_morse_certificate,
