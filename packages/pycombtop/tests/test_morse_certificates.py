@@ -47,9 +47,7 @@ def test_classifier_uses_early_facet_morse_certificate():
 def test_clique_graph_with_mixed_critical_dimensions_uses_hurewicz():
     g = nx.from_graph6_bytes(b"H?o~f~}")
     k = clique_graph(g)
-    verdict = homotopy_type_with_verdict(
-        k, max_vertices=64, max_simplices=25000
-    )
+    verdict = homotopy_type_with_verdict(k, max_vertices=64, max_simplices=25000)
     assert verdict.is_exact and not verdict.is_limited
     assert verdict.wedge.spheres == {2: 1, 3: 2}
     assert verdict.reason == Theorem.FACET_MORSE_HUREWICZ
