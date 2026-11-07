@@ -1,0 +1,16 @@
+name: Morse formatting preview (temporary)
+on:
+  push:
+    branches: [feature/facet-morse-homotopy-20261107]
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv python install 3.11
+      - run: uv sync
+      - name: Show Ruff fixes
+        run: |
+          uv run ruff check packages/pycombtop/tests/test_morse_certificates.py --select I --fix --diff || true
+          uv run ruff format --diff packages/pycombtop/src/pycombtop/morse_certificates.py packages/pycombtop/src/pycombtop/homotopy_type.py packages/pycombtop/tests/test_morse_certificates.py || true
