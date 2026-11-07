@@ -85,12 +85,19 @@ def _free_pair(facets: set[int], order: list[int]) -> tuple[int, int] | None:
     return None
 
 
-def _run_matching(original: set[int], seed: int) -> tuple[Counter, list[tuple[int, int]]]:
+def _run_matching(
+    original: set[int], seed: int, *, max_facets: int = 1500,
+    max_steps: int = 12000,
+) -> tuple[Counter, list[tuple[int, int]]] | None:
     facets = set(original)
     rng = random.Random(seed)
     critical: Counter = Counter()
     pairs: list[tuple[int, int]] = []
+    steps = 0
     while facets:
+        if len(facets) > max_facets or steps >= max_steps:
+            return None
+        steps += 1
         # The integer set has stable membership and we sort before consuming
         # random tie-breaking values. Attempts use local, fixed RNG seeds.
         order = sorted(facets)
@@ -141,11 +148,17 @@ def _valid_acyclic_matching(
     return nx.is_directed_acyclic_graph(gradient)
 
 
-def _collapse_free_pairs(original: set[int]) -> set[int]:
+def _collapse_free_pairs(
+    original: set[int], *, max_facets: int = 1500, max_steps: int = 12000,
+) -> set[int] | None:
     """Only genuine elementary collapses; homotopy type is preserved."""
     facets = set(original)
     rng = random.Random(0)
+    steps = 0
     while True:
+        if len(facets) > max_facets or steps >= max_steps:
+            return None
+        steps += 1
         order = sorted(facets)
         order.sort(key=lambda f: (f.bit_count(), rng.random()), reverse=True)
         free = _free_pair(facets, order)
@@ -167,7 +180,7 @@ def _top_betti_matches(
     Never calculate ker(d_dim) alone when cells above dimension dim remain.
     """
     core = _collapse_free_pairs(original)
-    if not core or max(f.bit_count() for f in core) != dim + 1:
+    if core is None or not core or max(f.bit_count() for f in core) != dim + 1:
         return False
     top = sorted(f for f in core if f.bit_count() == dim + 1)
     if len(top) > max_top_cells:
@@ -210,7 +223,10 @@ def facet_morse_certificate(
     if faces is None:
         return None
     for seed in seeds:
-        critical, pairs = _run_matching(original, seed)
+        candidate = _run_matching(original, seed)
+        if candidate is None:
+            continue
+        critical, pairs = candidate
         if critical.get(0) != 1:
             continue
         positive = sorted(d for d in critical if d > 0)
