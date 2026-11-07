@@ -1113,7 +1113,7 @@ def homotopy_type_with_verdict(
     # 7. Prefer the bounded facet method on high-dimensional, many-facet
     # complexes, before the potentially expensive vertex-ordered matchings.
     sc = clique_complex(graph)
-    if len(sc.facet_set) >= 20 and sc.dimension >= 4:
+    if len(sc.facet_set) >= 20 and sc.dimension() >= 4:
         v = _try_facet_morse(sc)
         if v:
             return v
