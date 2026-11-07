@@ -40,6 +40,11 @@ from .homotopy_type import (
     star,
     star_cluster,
 )
+from .morse_certificates import (
+    MorseCertificate,
+    facet_morse_certificate,
+    graph_morse_certificate,
+)
 from .relative_collapse import (
     CollapseResult,
     CollapseStatus,
@@ -115,6 +120,9 @@ __all__ = [
     "CoveringSearchStatus",
     "search_covering_divergence",
     # homotopy_type
+    "MorseCertificate",
+    "facet_morse_certificate",
+    "graph_morse_certificate",
     "HomotopyVerdict",
     "Theorem",
     "betti_numbers_graph",

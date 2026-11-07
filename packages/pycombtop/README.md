@@ -179,3 +179,51 @@ finishes; resume rejects mismatched metadata and duplicate record indices.
 The summary distinguishes a fully enumerated dataset from candidate-filter
 results that were inconclusive for individual graphs.
 
+
+
+## Bounded facet-greedy discrete Morse certification
+
+The homotopy classifier now has a separate, exact facet-based matching
+strategy in pycombtop.morse_certificates, complementing Dong's
+vertex-ordered matching. It maintains maximal faces, repeatedly deletes
+a free face--coface pair when available, and otherwise removes a maximal
+simplex as a critical cell. The resulting matching is checked against
+the full nonempty face-poset Hasse diagram for acyclicity.
+
+A matching with one critical vertex and critical positive cells in
+a single dimension immediately certifies a wedge of spheres. More
+generally, with critical dimensions 0, m, m+1 for m>=2, if the exact
+rational top Betti number equals the number of critical (m+1)-cells,
+the cellular differential vanishes. The Hurewicz isomorphism for the
+wedge of m-spheres then proves that every (m+1)-cell attaching map
+is nullhomotopic. This is stronger than a Betti-only inference.
+
+The method returns None if it cannot establish an exact certificate.
+Its search is bounded by 12,000 distinct faces, 1,500 simultaneous
+maximal faces, 12,000 reduction steps per attempt, three fixed seeds,
+and a bounded exact top-dimensional boundary matrix. In the main
+homotopy classifier, it precedes expensive recursion. High-dimensional
+complexes with at least 20 facets are tested before Dong's matching;
+otherwise it is tried later in the strategy cascade.
+
+A direct certificate query (useful when an older classifier timed out):
+
+~~~python
+from pycliques import clique_graph
+from pycombtop import graph_morse_certificate
+import networkx as nx
+
+g = nx.from_graph6_bytes(b"H?o~f~}")
+certificate = graph_morse_certificate(clique_graph(g))
+assert certificate is not None
+assert certificate.spheres == {2: 1, 3: 2}
+~~~
+
+Six historical order-9 clique-graph timeout witnesses are covered by
+regression tests. Their original completed census records should not
+be modified in place; the separate pycliques-homotopy-census follow-up
+script preserves the old runner and checksum provenance.
+
+References: R. Forman, *Morse theory for cell complexes*, Adv. Math.
+**134** (1998), 90--145; A. Hatcher, *Algebraic Topology* (2002),
+Section 4.2 (Hurewicz theorem).
