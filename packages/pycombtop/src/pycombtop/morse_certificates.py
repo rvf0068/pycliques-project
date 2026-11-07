@@ -93,7 +93,8 @@ def _run_matching(original: set[int], seed: int) -> tuple[Counter, list[tuple[in
     while facets:
         # The integer set has stable membership and we sort before consuming
         # random tie-breaking values. Attempts use local, fixed RNG seeds.
-        order = sorted(facets, key=lambda f: (f.bit_count(), rng.random()), reverse=True)
+        order = sorted(facets)
+        order.sort(key=lambda f: (f.bit_count(), rng.random()), reverse=True)
         free = _free_pair(facets, order)
         if free is None:
             sigma = rng.choice(order)
@@ -145,7 +146,8 @@ def _collapse_free_pairs(original: set[int]) -> set[int]:
     facets = set(original)
     rng = random.Random(0)
     while True:
-        order = sorted(facets, key=lambda f: (f.bit_count(), rng.random()), reverse=True)
+        order = sorted(facets)
+        order.sort(key=lambda f: (f.bit_count(), rng.random()), reverse=True)
         free = _free_pair(facets, order)
         if free is None:
             return facets
