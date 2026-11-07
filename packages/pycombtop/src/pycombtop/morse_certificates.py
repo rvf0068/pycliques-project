@@ -86,7 +86,10 @@ def _free_pair(facets: set[int], order: list[int]) -> tuple[int, int] | None:
 
 
 def _run_matching(
-    original: set[int], seed: int, *, max_facets: int = 1500,
+    original: set[int],
+    seed: int,
+    *,
+    max_facets: int = 1500,
     max_steps: int = 12000,
 ) -> tuple[Counter, list[tuple[int, int]]] | None:
     facets = set(original)
@@ -149,7 +152,10 @@ def _valid_acyclic_matching(
 
 
 def _collapse_free_pairs(
-    original: set[int], *, max_facets: int = 1500, max_steps: int = 12000,
+    original: set[int],
+    *,
+    max_facets: int = 1500,
+    max_steps: int = 12000,
 ) -> set[int] | None:
     """Only genuine elementary collapses; homotopy type is preserved."""
     facets = set(original)
