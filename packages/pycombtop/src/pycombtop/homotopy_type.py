@@ -343,16 +343,37 @@ def _graph_exceeds_simplex_budget(graph: nx.Graph, max_simplices: int) -> bool:
     """
     if max_simplices < 0:
         raise ValueError("max_simplices must be nonnegative or None")
-    faces: set[frozenset] = set()
-    for clique in nx.find_cliques(graph):
-        if (1 << len(clique)) > max_simplices:
-            # A single facet already contains too many distinct faces.
-            return True
+    # When the sum of individual facet face counts is below budget, no
+    # deduplication is necessary. This is the common case for small graphs.
+    buffered: list[list] = []
+    upper_bound = 0
+    faces: set[frozenset] | None = None
+
+    def consume(clique: list, distinct_faces: set[frozenset]) -> bool:
         for size in range(len(clique) + 1):
             for face in combinations(clique, size):
-                faces.add(frozenset(face))
-                if len(faces) > max_simplices:
+                distinct_faces.add(frozenset(face))
+                if len(distinct_faces) > max_simplices:
                     return True
+        return False
+
+    for clique in nx.find_cliques(graph):
+        clique = list(clique)
+        count = 1 << len(clique)
+        if count > max_simplices:
+            return True
+        if faces is None:
+            upper_bound += count
+            buffered.append(clique)
+            if upper_bound <= max_simplices:
+                continue
+            faces = set()
+            for earlier in buffered:
+                if consume(earlier, faces):
+                    return True
+            buffered.clear()
+        elif consume(clique, faces):
+            return True
     # The empty graph has the empty face. It has no maximal cliques.
     return max_simplices == 0
 
