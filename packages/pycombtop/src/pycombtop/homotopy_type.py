@@ -59,6 +59,7 @@ import networkx as nx
 from pycliques import clique_graph
 from pycliques.surfaces import open_neighborhood
 
+from .morse_certificates import facet_morse_certificate
 from .s_collapses import complete_s_collapse, complete_s_collapse_edges
 from .simplex import Simplex, SimplicialComplex, clique_complex, dong_matching
 from .simplex import star as star  # Public re-export
@@ -82,6 +83,21 @@ class Theorem:
         "augmented face poset. Its critical nonempty faces all have one "
         "dimension, so Forman's discrete Morse CW model is a wedge of "
         "spheres [Dong2003, Forman1998]."
+    )
+    FACET_MORSE = (
+        "Verified facet-greedy discrete Morse matching: free pairs are "
+        "deleted, maximal faces recorded as critical, and the reversed "
+        "matched Hasse arrows are checked acyclic [Forman1998]. "
+        "Critical-cell dimensions alone determine the wedge of spheres."
+    )
+    FACET_MORSE_HUREWICZ = (
+        "Verified facet-greedy discrete Morse matching [Forman1998], "
+        "plus exact rational top homology on a dimension-bounded collapse "
+        "core. With one critical vertex and critical cells only in "
+        "consecutive dimensions m,m+1 (m>=2), the maximal top Betti "
+        "number forces zero cellular boundary. Hurewicz for a wedge of "
+        "m-spheres makes the attaching maps nullhomotopic "
+        "[Hatcher, Algebraic Topology, Section 4.2]."
     )
     VERTEX_DECOMPOSABLE = (
         "A checked shedding-vertex recursion certifies nonpure vertex "
@@ -637,6 +653,23 @@ def _try_dong(
     return None
 
 
+def _try_facet_morse(
+    s_complex: SimplicialComplex,
+) -> HomotopyVerdict | None:
+    """Accept only a bounded, independently verified exact Morse certificate."""
+    certificate = facet_morse_certificate(s_complex.facet_set)
+    if certificate is None:
+        return None
+    return HomotopyVerdict(
+        wedge=WedgeOfSpheres(certificate.spheres),
+        reason=(
+            Theorem.FACET_MORSE_HUREWICZ
+            if certificate.uses_hurewicz
+            else Theorem.FACET_MORSE
+        ),
+    )
+
+
 def _try_vertex_decomposable(
     s_complex: SimplicialComplex,
     extra_reasons: str = "",
@@ -951,7 +984,12 @@ def homotopy_type_sc_with_verdict(
     if v:
         return v
 
-    # 2. Vertex with a disconnected union of contractible link components
+    # 2. Verified facet-greedy Morse matching, before recursive link search
+    v = _try_facet_morse(s_complex)
+    if v:
+        return v
+
+    # 3. Vertex with disconnected contractible link components
     v = _try_contractible_link_components(s_complex)
     if v:
         return v
@@ -1072,8 +1110,13 @@ def homotopy_type_with_verdict(
     if v:
         return v
 
-    # 7. Dong matching on clique complex (possibly after further simplification)
+    # 7. Prefer the bounded facet method on high-dimensional, many-facet
+    # complexes, before the potentially expensive vertex-ordered matchings.
     sc = clique_complex(graph)
+    if len(sc.facet_set) >= 20 and sc.dimension >= 4:
+        v = _try_facet_morse(sc)
+        if v:
+            return v
     v = _try_dong(sc)
     if v:
         return v
@@ -1084,7 +1127,13 @@ def homotopy_type_with_verdict(
     if v:
         return v
 
-    # 8. Disconnected contractible vertex link
+    # 8. For the remaining complexes, try the bounded facet matching
+    # before expensive link and vertex-decomposability recursion.
+    v = _try_facet_morse(sc2)
+    if v:
+        return v
+
+    # 9. Disconnected contractible vertex link
     v = _try_contractible_link_components(sc2)
     if v:
         return v
