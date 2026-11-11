@@ -327,9 +327,23 @@ class SimplicialComplex:
 # --- Module Functions ---
 
 
+def _stable_vertex_key(vertex):
+    """Deterministic key for standard hashable vertex labels, including cliques."""
+    if isinstance(vertex, (set, frozenset)):
+        return ("set", tuple(sorted(_stable_vertex_key(v) for v in vertex)))
+    if isinstance(vertex, tuple):
+        return ("tuple", tuple(_stable_vertex_key(v) for v in vertex))
+    return ("atom", type(vertex).__name__, repr(vertex))
+
+
+def _stable_vertex_order(vertices: set) -> list:
+    """Avoid the process-dependent iteration order of a set."""
+    return sorted(vertices, key=_stable_vertex_key)
+
+
 def dong_matching(
     s_complex: SimplicialComplex,
-    order_function: Callable[[set], list] = list,
+    order_function: Callable[[set], list] = _stable_vertex_order,
     *,
     return_pairs: bool = False,
 ) -> set[Simplex] | tuple[set[Simplex], list[tuple[Simplex, Simplex]]]:
@@ -352,7 +366,7 @@ def dong_matching(
         The complex on which to run the matching.
     order_function : callable, optional
         A function that converts the vertex set into an ordered list
-        (default: ``list``).
+        (default: stable order by vertex label).
 
     .. rubric:: Returns
 
@@ -370,12 +384,18 @@ def dong_matching(
     matched: set[Simplex] = set()
     pairs: list[tuple[Simplex, Simplex]] = []
     vertices = order_function(s_complex.vertex_set)
+    # Face order matters: an early pair can exclude a later one. Sort by
+    # stable vertex ranks rather than the iteration order of a Python set.
+    rank = {v: i for i, v in enumerate(_stable_vertex_order(s_complex.vertex_set))}
 
     for vertex in vertices:
         the_link = s_complex.link(vertex)
         link_simplices = the_link.all_simplices()
 
-        for s in link_simplices:
+        for s in sorted(
+            link_simplices,
+            key=lambda face: (len(face), tuple(sorted(rank[v] for v in face))),
+        ):
             s_plus_v = Simplex(s | {vertex})
             if (s not in matched) and (s_plus_v not in matched):
                 matched.add(s)
