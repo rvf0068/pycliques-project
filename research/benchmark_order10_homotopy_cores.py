@@ -29,7 +29,34 @@ import time
 from pathlib import Path
 
 
+# Immutable Phase-1 input: exact git-blob identity from the committed
+# pycliques-homotopy-census/followups/order10_phase1/representatives.tsv.
+# Indices are source *order-10 census* indices, NOT consecutive 0..59 IDs.
+PHASE1_REPRESENTATIVES_GIT_SHA1 = "0da9d8cf5ebd01bf2e7144faafcb6aac919f22e2"
+EXPECTED_REPRESENTATIVE_INDICES = frozenset({
+    1561859, 1565330, 1565364, 1565393, 1565422, 1565424,
+    7923665, 7950656, 7977194, 7988753, 7991311, 7994188,
+    7994391, 7994482, 7994484, 7995143, 7995295, 7995314,
+    10043465, 10223998, 10362063, 10362424, 10419379, 10566451,
+    10578910, 11125947, 11488990, 11519684, 11522274, 11522704,
+    11523965, 11524199, 11525976, 11535601, 11537931, 11537978,
+    11619731, 11620761, 11645069, 11645294, 11650233, 11655953,
+    11656489, 11656499, 11656524, 11657377, 11660070, 11660425,
+    11660902, 11661308, 11661343, 11661348, 11661349, 11661360,
+    11661524, 11670395, 11708967, 11715924, 11716138, 11716425,
+})
+
+
+def git_blob_sha1(data: bytes) -> str:
+    """Git's content identity, allowing comparison with the Phase-1 blob."""
+    return hashlib.sha1(
+        b"blob " + str(len(data)).encode("ascii") + b"\\0" + data
+    ).hexdigest()
+
+
 def load_representatives(path: Path) -> list[dict[str, str]]:
+    if git_blob_sha1(path.read_bytes()) != PHASE1_REPRESENTATIVES_GIT_SHA1:
+        raise ValueError("Representatives file differs from committed Phase-1 input")
     with path.open("r", encoding="utf-8", newline="") as source:
         reader = csv.DictReader(source, delimiter="\t")
         required = {"representative_index", "graph6", "core_graph6", "members"}
@@ -37,8 +64,8 @@ def load_representatives(path: Path) -> list[dict[str, str]]:
             raise ValueError("Not a Phase-1 representatives.tsv: missing columns")
         rows = list(reader)
     indices = [int(row["representative_index"]) for row in rows]
-    if len(rows) != 60 or len(set(indices)) != 60:
-        raise ValueError("Phase-1 benchmark requires exactly 60 unique representatives")
+    if len(rows) != 60 or set(indices) != EXPECTED_REPRESENTATIVE_INDICES:
+        raise ValueError("Expected the exact 60 Phase-1 source census indices")
     if any(not row["core_graph6"] for row in rows):
         raise ValueError("Missing core graph6")
     return rows
@@ -89,6 +116,90 @@ def write_jsonl_line(path: Path, record: dict) -> None:
         output.write(json.dumps(record, sort_keys=True) + "\n")
         output.flush()
         os.fsync(output.fileno())
+
+
+def read_completed_records(
+    output: Path, rows: list[dict[str, str]]
+) -> set[int]:
+    """Replay the JSONL journal, rejecting mismatched inputs and malformed verdicts.
+
+    Checking the independent input blob is not enough: a stale or edited JSONL
+    record must never be silently skipped on resume.
+    """
+    expected_rows = {int(row["representative_index"]): row for row in rows}
+    completed: set[int] = set()
+    for lineno, line in enumerate(output.read_text(encoding="utf-8").splitlines(), 1):
+        try:
+            record = json.loads(line)
+            if not isinstance(record, dict):
+                raise ValueError("JSONL entry is not an object")
+            index = record["representative_index"]
+            if type(index) is not int or index not in expected_rows or index in completed:
+                raise ValueError("Unexpected or repeated representative index")
+            original = expected_rows[index]
+            if (
+                record.get("source_graph6") != original["graph6"]
+                or record.get("core_graph6") != original["core_graph6"]
+                or record.get("members") != original["members"].split(";")
+            ):
+                raise ValueError("Record does not match its Phase-1 representative")
+
+            elapsed = record.get("elapsed_seconds")
+            if (
+                type(elapsed) not in (float, int) or not 0 <= elapsed < float("inf")
+            ):
+                raise ValueError("Invalid elapsed time")
+            status = record.get("status")
+            if status in {"EXACT", "BETTI_ONLY", "LIMITED"}:
+                if not (
+                    type(record.get("core_order")) is int
+                    and type(record.get("core_edges")) is int
+                    and record["core_order"] == int(original["core_order"])
+                    and record["core_edges"] == int(original["core_edges"])
+                    and isinstance(record.get("reason"), str)
+                    and bool(record["reason"])
+                    and type(record.get("is_exact")) is bool
+                    and type(record.get("is_limited")) is bool
+                ):
+                    raise ValueError("Malformed classifier verdict")
+                if status == "EXACT":
+                    spheres = record.get("certified_spheres")
+                    if (
+                        not record["is_exact"] or record["is_limited"]
+                        or not isinstance(spheres, dict)
+                        or any(
+                            not isinstance(k, str) or not k.isdecimal()
+                            or type(v) is not int or v < 1
+                            for k, v in spheres.items()
+                        )
+                    ):
+                        raise ValueError("Malformed exact certificate summary")
+                elif (
+                    record["is_exact"]
+                    or record["is_limited"] != (status == "LIMITED")
+                    or record.get("certified_spheres") is not None
+                ):
+                    raise ValueError("Inexact status presented as an exact type")
+            elif status == "TIMEOUT":
+                if set(record) != {
+                    "status", "representative_index", "source_graph6",
+                    "core_graph6", "members", "elapsed_seconds",
+                }:
+                    raise ValueError("Malformed timeout record")
+            elif status == "ERROR":
+                if not isinstance(record.get("diagnostic"), str) or not record["diagnostic"]:
+                    raise ValueError("Missing error diagnostic")
+                if set(record) != {
+                    "status", "diagnostic", "representative_index", "source_graph6",
+                    "core_graph6", "members", "elapsed_seconds",
+                }:
+                    raise ValueError("Malformed error record")
+            else:
+                raise ValueError("Unknown benchmark status")
+            completed.add(index)
+        except (KeyError, ValueError, TypeError) as exc:
+            raise RuntimeError(f"Invalid benchmark record at line {lineno}: {exc}") from exc
+    return completed
 
 
 def main() -> None:
@@ -143,14 +254,7 @@ def main() -> None:
         metadata.write_text(json.dumps(identity, indent=2, sort_keys=True) + "\n")
         output.touch()
 
-    completed: set[int] = set()
-    allowed = {int(row["representative_index"]) for row in rows}
-    for line in output.read_text(encoding="utf-8").splitlines():
-        record = json.loads(line)
-        idx = record["representative_index"]
-        if idx not in allowed or idx in completed:
-            raise RuntimeError("Unexpected or repeated benchmark index")
-        completed.add(idx)
+    completed = read_completed_records(output, rows)
 
     processed = 0
     for row in rows:
