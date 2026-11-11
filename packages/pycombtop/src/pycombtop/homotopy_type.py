@@ -49,7 +49,6 @@ and homotopy pushouts, not from Mayer--Vietoris homology alone.
 from __future__ import annotations
 
 import random
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from itertools import combinations
 from typing import cast
