@@ -649,6 +649,7 @@ def _try_dong(
         rng.shuffle(shuffled)
         orderings.append(shuffled)
     for ordering in orderings:
+
         def use_order(_vertices: set) -> list:
             return ordering
 
