@@ -1106,7 +1106,7 @@ def homotopy_type_with_verdict(
         if (reduced.number_of_nodes(), reduced.number_of_edges()) == (
             graph.number_of_nodes(),
             graph.number_of_edges(),
-        )
+        ):
             return _limited_verdict()
         v = _try_trivial(reduced)
         if v:
