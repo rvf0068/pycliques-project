@@ -3,7 +3,6 @@
 import random
 
 import networkx as nx
-
 import pycombtop.homotopy_type as homotopy
 from pycombtop import clique_complex, dong_matching
 
