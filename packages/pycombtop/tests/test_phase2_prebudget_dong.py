@@ -6,10 +6,10 @@ import networkx as nx
 
 from pycombtop import clique_complex, dong_matching
 from pycombtop.homotopy_type import (
+    homotopy_type_with_verdict,
     _graph_exceeds_simplex_budget,
     _simplify_graph_ht,
     _try_dong,
-    homotopy_type_with_verdict,
 )
 
 
