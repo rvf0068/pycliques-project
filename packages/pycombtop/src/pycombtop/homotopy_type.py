@@ -652,7 +652,8 @@ def _try_dong(
         critical, pairs = cast(
             tuple[set[Simplex], list[tuple[Simplex, Simplex]]],
             dong_matching(
-                collapsed, order_function=lambda _vertices, order=ordering: order,
+                collapsed,
+                order_function=lambda _vertices, order=ordering: order,
                 return_pairs=True,
             ),
         )
@@ -1103,8 +1104,9 @@ def homotopy_type_with_verdict(
     ):
         reduced = _simplify_graph_ht(graph)
         if (reduced.number_of_nodes(), reduced.number_of_edges()) == (
-            graph.number_of_nodes(), graph.number_of_edges()
-        ):
+            graph.number_of_nodes(),
+            graph.number_of_edges(),
+        )
             return _limited_verdict()
         v = _try_trivial(reduced)
         if v:
