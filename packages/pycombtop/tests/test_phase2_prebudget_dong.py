@@ -70,3 +70,50 @@ def test_dong_seed_is_local_and_reproducible():
         second.wedge,
         second.reason,
     )
+
+
+def test_budget_overflow_can_s_collapse_to_contractible_point():
+    # P4 is not a cone, but its end vertices are s-dismantlable.
+    graph = nx.path_graph(4)
+    assert homotopy._graph_exceeds_simplex_budget(graph, 3)
+    result = homotopy.homotopy_type_with_verdict(graph, max_simplices=3)
+    assert result.is_exact and not result.is_limited
+    assert result.wedge.is_contractible()
+
+
+def test_budget_overflow_recovers_exact_join_on_reduced_core():
+    # The original graph is not a join. Removing the pendant vertex
+    # recovers the octahedron, a join of three 0-spheres (type S^2).
+    graph = nx.octahedral_graph()
+    graph.add_edge(0, 6)
+    assert homotopy._graph_exceeds_simplex_budget(graph, 27)
+    result = homotopy.homotopy_type_with_verdict(graph, max_simplices=27)
+    assert result.is_exact and not result.is_limited
+    assert result.wedge.spheres == {2: 1}
+
+
+def test_budget_overflow_reduced_core_still_too_large_is_inconclusive():
+    graph = nx.cycle_graph(5)
+    graph.add_edge(0, 5)
+    assert homotopy._graph_exceeds_simplex_budget(graph, 10)
+    assert homotopy._graph_exceeds_simplex_budget(
+        homotopy._simplify_graph_ht(graph), 10
+    )
+    result = homotopy.homotopy_type_with_verdict(graph, max_simplices=10)
+    assert result.is_limited and not result.is_exact
+
+
+def test_dong_seed_works_for_explicit_complex():
+    sc = clique_complex(nx.cycle_graph(5))
+    result = homotopy.homotopy_type_sc_with_verdict(sc, dong_seed=2026)
+    assert result.is_exact
+    assert result.wedge.spheres == {1: 1}
+
+
+def test_tuple_vertex_labels_use_stable_recursive_key():
+    g = nx.relabel_nodes(nx.cycle_graph(5), {i: (i, "alpha") for i in range(5)})
+    sc = clique_complex(g)
+    critical, pairs = dong_matching(sc, return_pairs=True)
+    assert homotopy._dong_matching_is_acyclic(sc, critical, pairs)
+    result = homotopy.homotopy_type_with_verdict(g, dong_seed=42)
+    assert result.is_exact and result.wedge.spheres == {1: 1}
