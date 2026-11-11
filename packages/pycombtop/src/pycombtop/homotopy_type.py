@@ -649,11 +649,14 @@ def _try_dong(
         rng.shuffle(shuffled)
         orderings.append(shuffled)
     for ordering in orderings:
+        def use_order(_vertices: set) -> list:
+            return ordering
+
         critical, pairs = cast(
             tuple[set[Simplex], list[tuple[Simplex, Simplex]]],
             dong_matching(
                 collapsed,
-                order_function=lambda _vertices, order=ordering: order,
+                order_function=use_order,
                 return_pairs=True,
             ),
         )
