@@ -25,7 +25,9 @@ def test_strict_vertex_budget_survives_prebudget_reduction():
     g = nx.cycle_graph(4)
     g.add_edge(0, 4)
     verdict = homotopy.homotopy_type_with_verdict(
-        g, max_vertices=4, max_simplices=9,
+        g,
+        max_vertices=4,
+        max_simplices=9,
     )
     assert verdict.is_limited and not verdict.is_exact
 
@@ -48,7 +50,8 @@ def test_dong_face_pairs_ignore_vertex_insertion_order():
     g2.add_edges_from(reversed(edges))
     sc1, sc2 = clique_complex(g1), clique_complex(g2)
     assert dong_matching(sc1, return_pairs=True) == dong_matching(
-        sc2, return_pairs=True,
+        sc2,
+        return_pairs=True,
     )
     assert homotopy._try_dong(sc1, seed=19).wedge.spheres == {1: 1}
     assert homotopy._try_dong(sc2, seed=19).wedge.spheres == {1: 1}
@@ -63,5 +66,7 @@ def test_dong_seed_is_local_and_reproducible():
     assert random.getstate() == state
     second = homotopy.homotopy_type_with_verdict(g, dong_seed=12345)
     assert (first.is_exact, first.wedge, first.reason) == (
-        second.is_exact, second.wedge, second.reason
+        second.is_exact,
+        second.wedge,
+        second.reason,
     )
