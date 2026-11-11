@@ -23,10 +23,10 @@ import csv
 import hashlib
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 
 def load_representatives(path: Path) -> list[dict[str, str]]:
