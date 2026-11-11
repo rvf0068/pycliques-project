@@ -50,7 +50,7 @@ EXPECTED_REPRESENTATIVE_INDICES = frozenset({
 def git_blob_sha1(data: bytes) -> str:
     """Git's content identity, allowing comparison with the Phase-1 blob."""
     return hashlib.sha1(
-        b"blob " + str(len(data)).encode("ascii") + b"\\0" + data
+        b"blob " + str(len(data)).encode("ascii") + b"\0" + data
     ).hexdigest()
 
 
