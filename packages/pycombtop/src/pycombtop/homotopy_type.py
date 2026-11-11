@@ -60,7 +60,13 @@ from pycliques.surfaces import open_neighborhood
 
 from .morse_certificates import facet_morse_certificate
 from .s_collapses import complete_s_collapse, complete_s_collapse_edges
-from .simplex import Simplex, SimplicialComplex, _stable_vertex_key, clique_complex, dong_matching
+from .simplex import (
+    Simplex,
+    SimplicialComplex,
+    _stable_vertex_key,
+    clique_complex,
+    dong_matching,
+)
 from .simplex import star as star  # Public re-export
 
 # ---------------------------------------------------------------------------
