@@ -100,6 +100,29 @@ The function avoids constructing `K(G)` itself, but does compute
   *Proceedings of the London Mathematical Society* (2) **45**
   (1939), 243--327.
 
+## Phase-2 budget recovery and reproducible Dong search
+
+For graph inputs, `homotopy_type_with_verdict` retains the strict
+`max_vertices` check on the **original** graph. The `max_simplices` limit
+guards general flag-complex methods: cheap exact cone and join certificates
+run first. If the original face-count bound is exceeded, the classifier now
+alternates graph vertex and edge s-collapses until stable, checks cheap exact
+certificates on that smaller graph, and reruns the face-count guard on the
+reduced core. An irreducible core that still exceeds the bound remains
+`LIMIT_EXCEEDED`, not an inferred type. S-collapses preserve the
+simple-homotopy type of the clique complex.
+
+`homotopy_type_with_verdict(graph, dong_seed=0)` and
+`homotopy_type_sc_with_verdict(complex, dong_seed=0)` use a local seeded
+generator for Dong's six shuffled vertex orderings; the initial ordering
+and each link's simplex ordering are stable for ordinary labeled vertices,
+including tuple and frozenset clique labels. No global random state is
+consumed. The explicit seed affects Dong attempts in the current call;
+recursively classified factors use their default seed. All returned exact
+Dong types still require independent acyclicity verification. A seed
+controls search order, **not** mathematical correctness, and it does not
+remove the need to save and check mathematical certificates for new results.
+
 # Indeterminate graph files
 
 Compute the homotopy type of each graph's clique complex and write a tab-separated
