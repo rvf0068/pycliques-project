@@ -49,7 +49,6 @@ and homotopy pushouts, not from Mayer--Vietoris homology alone.
 from __future__ import annotations
 
 import random
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from itertools import combinations
 from typing import cast
@@ -61,7 +60,13 @@ from pycliques.surfaces import open_neighborhood
 
 from .morse_certificates import facet_morse_certificate
 from .s_collapses import complete_s_collapse, complete_s_collapse_edges
-from .simplex import Simplex, SimplicialComplex, clique_complex, dong_matching
+from .simplex import (
+    Simplex,
+    SimplicialComplex,
+    _stable_vertex_key,
+    clique_complex,
+    dong_matching,
+)
 from .simplex import star as star  # Public re-export
 
 # ---------------------------------------------------------------------------
@@ -314,14 +319,15 @@ class HomotopyVerdict:
 
 
 def _simplify_graph_ht(graph: nx.Graph) -> nx.Graph:
-    """Apply vertex and edge s-collapses to simplify a graph for homotopy."""
-    g = complete_s_collapse(graph)
-    g = complete_s_collapse_edges(g)
-    return complete_s_collapse(g)
-
-
-def _shuff(lst: set) -> list:
-    return random.sample(list(lst), len(lst))
+    """Alternate vertex/edge s-collapses to a common fixed point."""
+    current = graph.copy()
+    while True:
+        old_size = (current.number_of_nodes(), current.number_of_edges())
+        current = complete_s_collapse(current)
+        current = complete_s_collapse_edges(current)
+        current = complete_s_collapse(current)
+        if (current.number_of_nodes(), current.number_of_edges()) == old_size:
+            return current
 
 
 def _too_large_simplicial_complex(
@@ -444,10 +450,10 @@ def _has_free_face(s_complex: SimplicialComplex) -> Simplex | None:
     """Search only codimension-one faces of facets, not all simplices."""
     for facet in sorted(
         s_complex.facet_set,
-        key=lambda s: (len(s), repr(sorted(s, key=repr))),
+        key=lambda s: (len(s), tuple(sorted(_stable_vertex_key(v) for v in s))),
         reverse=True,
     ):
-        for vertex in sorted(facet, key=repr):
+        for vertex in sorted(facet, key=_stable_vertex_key):
             face = Simplex(facet - {vertex})
             if _is_free_face(s_complex, face):
                 return face
@@ -465,7 +471,7 @@ def collapse(s_complex: SimplicialComplex) -> SimplicialComplex:
         if len(sc.facet_set) == 1:
             # A simplex has an explicit elementary collapse to a point,
             # but enumerating its 2^(n-1) pairs is unnecessary.
-            one_vertex = next(iter(sc.vertex_set))
+            one_vertex = min(sc.vertex_set, key=_stable_vertex_key)
             return SimplicialComplex({one_vertex}, facet_set=[{one_vertex}])
         free_face = _has_free_face(sc)
         if free_face is None:
@@ -631,15 +637,29 @@ def _try_trivial(graph: nx.Graph) -> HomotopyVerdict | None:
 
 
 def _try_dong(
-    s_complex: SimplicialComplex, extra_reasons: str = ""
+    s_complex: SimplicialComplex, extra_reasons: str = "", *, seed: int = 0
 ) -> HomotopyVerdict | None:
-    """Try Dong's matching, accepting only verified acyclic matchings."""
+    """Try seven reproducible vertex orderings; verify every acyclic matching."""
     collapsed = collapse(s_complex)
-    orderings: list[Callable[[set], list]] = [list] + [_shuff] * 6
+    vertices = sorted(collapsed.vertex_set, key=_stable_vertex_key)
+    rng = random.Random(seed)
+    orderings = [vertices]
+    for _ in range(6):
+        shuffled = vertices.copy()
+        rng.shuffle(shuffled)
+        orderings.append(shuffled)
     for ordering in orderings:
+
+        def use_order(_vertices: set) -> list:
+            return ordering
+
         critical, pairs = cast(
             tuple[set[Simplex], list[tuple[Simplex, Simplex]]],
-            dong_matching(collapsed, order_function=ordering, return_pairs=True),
+            dong_matching(
+                collapsed,
+                order_function=use_order,
+                return_pairs=True,
+            ),
         )
         if not _dong_matching_is_acyclic(collapsed, critical, pairs):
             continue
@@ -952,6 +972,8 @@ def homotopy_type_sc_with_verdict(
     s_complex: SimplicialComplex,
     max_vertices: int | None = None,
     max_simplices: int | None = None,
+    *,
+    dong_seed: int = 0,
 ) -> HomotopyVerdict:
     """Compute the homotopy type of a simplicial complex *s_complex*.
 
@@ -980,7 +1002,7 @@ def homotopy_type_sc_with_verdict(
         return _limited_verdict()
 
     # 1. Dong matching on original complex
-    v = _try_dong(s_complex)
+    v = _try_dong(s_complex, seed=dong_seed)
     if v:
         return v
 
@@ -1012,6 +1034,8 @@ def homotopy_type_with_verdict(
     graph: nx.Graph,
     max_vertices: int | None = None,
     max_simplices: int | None = None,
+    *,
+    dong_seed: int = 0,
 ) -> HomotopyVerdict:
     """Compute the homotopy type of the clique complex of *graph*.
 
@@ -1025,7 +1049,13 @@ def homotopy_type_with_verdict(
         Maximum number of distinct faces for general simplicial-complex
         algorithms. Cheap exact cone/point/join certificates are tried first,
         without materializing the full complex. If none applies, a streaming
-        face-count check stops at the configured budget.
+        face-count check stops at the configured budget. If the original
+        complex exceeds the budget, vertex/edge s-collapses are tried
+        before declaring LIMIT_EXCEEDED; a smaller equivalent core may fit.
+    dong_seed : int, optional
+        Local random seed for the six shuffled Dong vertex orders (the
+        initial order is stable). Recursive subproblems use their default
+        seed unless classified directly. All matchings are checked.
 
     .. rubric:: Returns
 
@@ -1067,16 +1097,43 @@ def homotopy_type_with_verdict(
     if v:
         return v
 
-    # Check the original complex budget BEFORE expensive s-collapses.
-    # Streaming nx.find_cliques permits early termination even when there
-    # would be exponentially many maximal cliques or distinct faces.
+    # The streaming check first avoids unnecessary reductions on the common
+    # within-budget path. On overflow, try all graph s-collapses before
+    # returning LIMIT_EXCEEDED: these preserve simple-homotopy type, and
+    # the reduced flag complex can be exponentially smaller. Exact cone/join
+    # certificates of that core do not require a simplex enumeration.
+    reduced_before_budget = False
     if max_simplices is not None and _graph_exceeds_simplex_budget(
         graph, max_simplices
     ):
-        return _limited_verdict()
+        reduced = _simplify_graph_ht(graph)
+        if (reduced.number_of_nodes(), reduced.number_of_edges()) == (
+            graph.number_of_nodes(),
+            graph.number_of_edges(),
+        ):
+            return _limited_verdict()
+        v = _try_trivial(reduced)
+        if v:
+            return HomotopyVerdict(
+                wedge=WedgeOfSpheres.contractible(),
+                reason=Theorem.S_COLLAPSE_TO_POINT,
+            )
+        v = _try_universal_vertex_cone(reduced)
+        if v:
+            return v
+        v = _try_join_complement(
+            reduced, max_vertices=max_vertices, max_simplices=max_simplices
+        )
+        if v:
+            return v
+        if _graph_exceeds_simplex_budget(reduced, max_simplices):
+            return _limited_verdict()
+        graph = reduced
+        reduced_before_budget = True
 
     # 1. Simplify via s-collapses, then retry trivial
-    graph = _simplify_graph_ht(graph)
+    if not reduced_before_budget:
+        graph = _simplify_graph_ht(graph)
     v = _try_trivial(graph)
     if v:
         # upgrade reason to mention the collapse
@@ -1117,13 +1174,13 @@ def homotopy_type_with_verdict(
         v = _try_facet_morse(sc)
         if v:
             return v
-    v = _try_dong(sc)
+    v = _try_dong(sc, seed=dong_seed)
     if v:
         return v
 
     graph2 = nx.convert_node_labels_to_integers(_simplify_graph_ht(graph))
     sc2 = clique_complex(graph2)
-    v = _try_dong(sc2)
+    v = _try_dong(sc2, seed=dong_seed)
     if v:
         return v
 

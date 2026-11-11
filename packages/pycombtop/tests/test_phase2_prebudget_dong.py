@@ -1,0 +1,119 @@
+"""Phase-2 regressions: safe budget recovery and reproducible Dong matchings."""
+
+import random
+
+import networkx as nx
+import pycombtop.homotopy_type as homotopy
+from pycombtop import clique_complex, dong_matching
+
+
+def test_prebudget_s_collapse_certifies_bounded_noncone():
+    # A pendant edge attached to C4 makes an 11-face complex; the
+    # s-dismantlable pendant vertex reduces it to C4, which has 9 faces.
+    g = nx.cycle_graph(4)
+    g.add_edge(0, 4)
+    assert homotopy._graph_exceeds_simplex_budget(g, 9)
+    core = homotopy._simplify_graph_ht(g)
+    assert nx.is_isomorphic(core, nx.cycle_graph(4))
+    assert not homotopy._graph_exceeds_simplex_budget(core, 9)
+    verdict = homotopy.homotopy_type_with_verdict(g, max_simplices=9)
+    assert verdict.is_exact and not verdict.is_limited
+    assert verdict.wedge.spheres == {1: 1}
+
+
+def test_strict_vertex_budget_survives_prebudget_reduction():
+    g = nx.cycle_graph(4)
+    g.add_edge(0, 4)
+    verdict = homotopy.homotopy_type_with_verdict(
+        g,
+        max_vertices=4,
+        max_simplices=9,
+    )
+    assert verdict.is_limited and not verdict.is_exact
+
+
+def test_no_invalid_type_from_irreducible_overbudget_core():
+    g = nx.cycle_graph(5)
+    assert nx.is_isomorphic(homotopy._simplify_graph_ht(g), g)
+    verdict = homotopy.homotopy_type_with_verdict(g, max_simplices=10)
+    assert verdict.is_limited and not verdict.is_exact
+
+
+def test_dong_face_pairs_ignore_vertex_insertion_order():
+    names = ("alpha", "beta", "gamma", "delta", "epsilon")
+    edges = [(names[i], names[(i + 1) % 5]) for i in range(5)]
+    g1 = nx.Graph()
+    g1.add_nodes_from(names)
+    g1.add_edges_from(edges)
+    g2 = nx.Graph()
+    g2.add_nodes_from(reversed(names))
+    g2.add_edges_from(reversed(edges))
+    sc1, sc2 = clique_complex(g1), clique_complex(g2)
+    assert dong_matching(sc1, return_pairs=True) == dong_matching(
+        sc2,
+        return_pairs=True,
+    )
+    assert homotopy._try_dong(sc1, seed=19).wedge.spheres == {1: 1}
+    assert homotopy._try_dong(sc2, seed=19).wedge.spheres == {1: 1}
+
+
+def test_dong_seed_is_local_and_reproducible():
+    # The API must not advance global random state, even when six shuffled
+    # vertex orderings are attempted.
+    g = nx.cycle_graph(5)
+    state = random.getstate()
+    first = homotopy.homotopy_type_with_verdict(g, dong_seed=12345)
+    assert random.getstate() == state
+    second = homotopy.homotopy_type_with_verdict(g, dong_seed=12345)
+    assert (first.is_exact, first.wedge, first.reason) == (
+        second.is_exact,
+        second.wedge,
+        second.reason,
+    )
+
+
+def test_budget_overflow_can_s_collapse_to_contractible_point():
+    # P4 is not a cone, but its end vertices are s-dismantlable.
+    graph = nx.path_graph(4)
+    assert homotopy._graph_exceeds_simplex_budget(graph, 3)
+    result = homotopy.homotopy_type_with_verdict(graph, max_simplices=3)
+    assert result.is_exact and not result.is_limited
+    assert result.wedge.is_contractible()
+
+
+def test_budget_overflow_recovers_exact_join_on_reduced_core():
+    # The original graph is not a join. Removing the pendant vertex
+    # recovers the octahedron, a join of three 0-spheres (type S^2).
+    graph = nx.octahedral_graph()
+    graph.add_edge(0, 6)
+    assert homotopy._graph_exceeds_simplex_budget(graph, 27)
+    result = homotopy.homotopy_type_with_verdict(graph, max_simplices=27)
+    assert result.is_exact and not result.is_limited
+    assert result.wedge.spheres == {2: 1}
+
+
+def test_budget_overflow_reduced_core_still_too_large_is_inconclusive():
+    graph = nx.cycle_graph(5)
+    graph.add_edge(0, 5)
+    assert homotopy._graph_exceeds_simplex_budget(graph, 10)
+    assert homotopy._graph_exceeds_simplex_budget(
+        homotopy._simplify_graph_ht(graph), 10
+    )
+    result = homotopy.homotopy_type_with_verdict(graph, max_simplices=10)
+    assert result.is_limited and not result.is_exact
+
+
+def test_dong_seed_works_for_explicit_complex():
+    sc = clique_complex(nx.cycle_graph(5))
+    result = homotopy.homotopy_type_sc_with_verdict(sc, dong_seed=2026)
+    assert result.is_exact
+    assert result.wedge.spheres == {1: 1}
+
+
+def test_tuple_vertex_labels_use_stable_recursive_key():
+    g = nx.relabel_nodes(nx.cycle_graph(5), {i: (i, "alpha") for i in range(5)})
+    sc = clique_complex(g)
+    critical, pairs = dong_matching(sc, return_pairs=True)
+    assert homotopy._dong_matching_is_acyclic(sc, critical, pairs)
+    result = homotopy.homotopy_type_with_verdict(g, dong_seed=42)
+    assert result.is_exact and result.wedge.spheres == {1: 1}
