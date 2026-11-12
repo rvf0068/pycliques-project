@@ -60,6 +60,7 @@ from pycliques.surfaces import open_neighborhood
 
 from .morse_certificates import facet_morse_certificate
 from .s_collapses import complete_s_collapse, complete_s_collapse_edges
+from .wedge_certificates import certified_flag_wedge
 from .simplex import (
     Simplex,
     SimplicialComplex,
@@ -126,13 +127,14 @@ class Theorem:
         "contractible simplices, producing r-1 additional circles."
     )
     NULLHOMOTOPIC_SPHERICAL_LINK = (
-        "A vertex link has r>=2 connected components, each a simplex or "
-        "an octahedral sphere. Its deletion s-collapses to a point, cone, "
-        "or octahedral sphere S^d. Every noncontractible link component "
-        "is an S^k with k<d, so its attaching map into the deletion is "
-        "nullhomotopic. The vertex-star homotopy cofiber splits as the "
-        "deletion wedged with the suspensions of the link components "
-        "and r-1 circles [Hatcher, Algebraic Topology, Section 0]."
+        "Each vertex-link component has a graph-theoretically certified "
+        "wedge-of-spheres homotopy type, and deletion s-collapses to a "
+        "certified wedge of spheres of dimensions >=d>=2 (or a cone). "
+        "Every link sphere dimension is <d, hence its component's "
+        "attaching map is nullhomotopic by (d-1)-connectivity. The "
+        "vertex-star homotopy cofiber splits into the deletion, "
+        "suspensions of link components, and r-1 circles "
+        "[Hatcher, Algebraic Topology, Chapter 0]."
     )
     INDEPENDENT_NEIGHBORHOOD_CLIQUE_GRAPH = (
         "The vertex has r>=2 pairwise nonadjacent neighbors and its "
@@ -829,53 +831,54 @@ def _octahedral_sphere_dimension(graph: nx.Graph) -> int | None:
 def _try_nullhomotopic_spherical_link_at_vertex(
     graph: nx.Graph, vertex
 ) -> HomotopyVerdict | None:
-    """Certified null attaching map, using only graph-sphere recognizers.
+    """Certify a null attaching map using explicit *homotopy* certificates.
 
-    The link consists of r>=2 components, each a simplex (contractible)
-    or an octahedral sphere S^k. Deleting the vertex and s-collapsing
-    must give either a contractible cone or an octahedral sphere S^d,
-    with each noncontractible link dimension k<d.
+    Recognize each connected link component as a sphere wedge, and
+    s-collapse the connected deletion to a graph whose flag complex
+    is independently certified as a sphere wedge. The deletion is
+    contractible, or its lowest sphere dimension is d>=2, strictly
+    above every nontrivial link sphere dimension.
 
-    Consequently every component-to-deletion map is nullhomotopic.
-    The homotopy cofiber of link -> deletion is
-      deletion wedged with suspended noncontractible link components
-               and (r-1) copies of S^1.
-    The dimension restriction is essential: homology alone does not
-    establish that a map S^d -> S^d is nullhomotopic.
+    Thus every map from a link component to the deletion is
+    nullhomotopic. The simplicial vertex-star cofiber splits into the
+    deletion, suspensions of all link components, and (r-1) circles.
+    This deliberately never infers a homotopy type from Betti numbers.
     """
     neighborhood = graph.subgraph(graph.neighbors(vertex))
     components = list(nx.connected_components(neighborhood))
     if len(components) < 2:
         return None
-    link_dimensions: list[int] = []
+    link_types: list[dict[int, int]] = []
     for component in components:
         piece = neighborhood.subgraph(component)
-        if _is_complete(piece):
-            continue
-        k = _octahedral_sphere_dimension(piece)
-        if k is None:
+        certified = certified_flag_wedge(piece, max_calls=48)
+        if certified is None or 0 in certified:
             return None
-        link_dimensions.append(k)
-    if not link_dimensions:
-        # Already handled by the complete-neighborhood reduction.
-        return None
+        link_types.append(certified)
+
     deletion = graph.copy()
     deletion.remove_node(vertex)
     if not deletion or not nx.is_connected(deletion):
         return None
 
     core = _simplify_graph_ht(deletion)
-    if core.number_of_nodes() == 1 or _try_universal_vertex_cone(core):
-        base = WedgeOfSpheres.contractible()
-    else:
-        d = _octahedral_sphere_dimension(core)
-        if d is None or max(link_dimensions) >= d:
+    base_type = certified_flag_wedge(core, max_calls=48)
+    if base_type is None or 0 in base_type:
+        return None
+    if base_type:
+        min_dimension = min(base_type)
+        if min_dimension < 2 or any(
+            dimension >= min_dimension
+            for link_type in link_types
+            for dimension in link_type
+        ):
+            # Homology alone would not establish a null attaching map.
             return None
-        base = WedgeOfSpheres.sphere(d)
 
-    spheres = base.add_spheres(1, len(components) - 1)
-    for k in link_dimensions:
-        spheres = spheres.add_spheres(k + 1)
+    spheres = WedgeOfSpheres(base_type).add_spheres(1, len(components) - 1)
+    for link_type in link_types:
+        for dimension, multiplicity in link_type.items():
+            spheres = spheres.add_spheres(dimension + 1, multiplicity)
     return HomotopyVerdict(
         wedge=spheres,
         reason=Theorem.NULLHOMOTOPIC_SPHERICAL_LINK,
@@ -885,12 +888,12 @@ def _try_nullhomotopic_spherical_link_at_vertex(
 def _try_nullhomotopic_spherical_link(
     graph: nx.Graph,
 ) -> HomotopyVerdict | None:
-    """Try at most two costly deletions, after a cheap link-only filter.
+    """Try at most two costly deletions, after bounded link-only filters.
 
-    This precedes the simplex-budget check, so it must *not* run the
-    iterative vertex/edge s-collapse on every vertex of a large graph.
-    The fixed caps affect completeness of this optional method only,
-    never soundness of a returned certificate.
+    Called before the simplex-budget check. A strict 24-vertex cap and
+    two expensive s-collapse attempts bound the added preprocessing
+    cost. Exceeding either cap returns no certificate, not an incorrect
+    result. The exact type returned is independent of these limits.
     """
     if graph.number_of_nodes() > 24:
         return None
@@ -900,23 +903,27 @@ def _try_nullhomotopic_spherical_link(
         components = list(nx.connected_components(neighborhood))
         if len(components) < 2:
             continue
-        has_spherical_component = False
-        for component in components:
-            piece = neighborhood.subgraph(component)
-            if _is_complete(piece):
-                continue
-            if _octahedral_sphere_dimension(piece) is None:
-                break
-            has_spherical_component = True
-        else:
-            if not has_spherical_component:
-                continue
-            attempts += 1
-            verdict = _try_nullhomotopic_spherical_link_at_vertex(graph, vertex)
-            if verdict is not None:
-                return verdict
-            if attempts >= 2:
-                break
+        # Cheap bounded recognition runs BEFORE attempting the deletion
+        # s-collapse; this saves full-graph scans on ineligible links.
+        if any(
+            certified_flag_wedge(
+                neighborhood.subgraph(component), max_calls=48
+            ) is None
+            for component in components
+        ):
+            continue
+        if all(
+            _is_complete(neighborhood.subgraph(component))
+            for component in components
+        ):
+            # The preexisting disjoint-simplex link rule handles this.
+            continue
+        attempts += 1
+        verdict = _try_nullhomotopic_spherical_link_at_vertex(graph, vertex)
+        if verdict is not None:
+            return verdict
+        if attempts >= 2:
+            break
     return None
 
 
