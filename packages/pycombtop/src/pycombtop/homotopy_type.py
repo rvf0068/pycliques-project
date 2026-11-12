@@ -817,7 +817,7 @@ def _octahedral_sphere_dimension(graph: nx.Graph) -> int | None:
     perfect matching. We deliberately exclude k=1 (two disconnected
     vertices), since a link *component* must be connected.
     """
-    n = graph.number_of_nodes()
+    n = int(graph.number_of_nodes())
     if n < 4 or n % 2:
         return None
     complement = nx.complement(graph)
