@@ -885,11 +885,38 @@ def _try_nullhomotopic_spherical_link_at_vertex(
 def _try_nullhomotopic_spherical_link(
     graph: nx.Graph,
 ) -> HomotopyVerdict | None:
-    """Try the cheap certified link/deletion decomposition at each vertex."""
+    """Try at most two costly deletions, after a cheap link-only filter.
+
+    This precedes the simplex-budget check, so it must *not* run the
+    iterative vertex/edge s-collapse on every vertex of a large graph.
+    The fixed caps affect completeness of this optional method only,
+    never soundness of a returned certificate.
+    """
+    if graph.number_of_nodes() > 24:
+        return None
+    attempts = 0
     for vertex in graph:
-        verdict = _try_nullhomotopic_spherical_link_at_vertex(graph, vertex)
-        if verdict is not None:
-            return verdict
+        neighborhood = graph.subgraph(graph.neighbors(vertex))
+        components = list(nx.connected_components(neighborhood))
+        if len(components) < 2:
+            continue
+        has_spherical_component = False
+        for component in components:
+            piece = neighborhood.subgraph(component)
+            if _is_complete(piece):
+                continue
+            if _octahedral_sphere_dimension(piece) is None:
+                break
+            has_spherical_component = True
+        else:
+            if not has_spherical_component:
+                continue
+            attempts += 1
+            verdict = _try_nullhomotopic_spherical_link_at_vertex(graph, vertex)
+            if verdict is not None:
+                return verdict
+            if attempts >= 2:
+                break
     return None
 
 
