@@ -125,6 +125,15 @@ class Theorem:
         "graph. The vertex star is a cone attached along r disjoint "
         "contractible simplices, producing r-1 additional circles."
     )
+    NULLHOMOTOPIC_SPHERICAL_LINK = (
+        "A vertex link has r>=2 connected components, each a simplex or "
+        "an octahedral sphere. Its deletion s-collapses to a point, cone, "
+        "or octahedral sphere S^d. Every noncontractible link component "
+        "is an S^k with k<d, so its attaching map into the deletion is "
+        "nullhomotopic. The vertex-star homotopy cofiber splits as the "
+        "deletion wedged with the suspensions of the link components "
+        "and r-1 circles [Hatcher, Algebraic Topology, Section 0]."
+    )
     INDEPENDENT_NEIGHBORHOOD_CLIQUE_GRAPH = (
         "The vertex has r>=2 pairwise nonadjacent neighbors and its "
         "deletion is connected. In the clique graph, the r new edge-cliques "
@@ -801,6 +810,89 @@ def _try_disjoint_complete_neighborhood(
     return None
 
 
+def _octahedral_sphere_dimension(graph: nx.Graph) -> int | None:
+    """Recognize O_k = complement(k K2) for k>=2, with Delta(O_k)=S^(k-1).
+
+    The check is completely combinatorial: the complement must be a
+    perfect matching. We deliberately exclude k=1 (two disconnected
+    vertices), since a link *component* must be connected.
+    """
+    n = graph.number_of_nodes()
+    if n < 4 or n % 2:
+        return None
+    complement = nx.complement(graph)
+    if all(degree == 1 for _, degree in complement.degree()):
+        return n // 2 - 1
+    return None
+
+
+def _try_nullhomotopic_spherical_link_at_vertex(
+    graph: nx.Graph, vertex
+) -> HomotopyVerdict | None:
+    """Certified null attaching map, using only graph-sphere recognizers.
+
+    The link consists of r>=2 components, each a simplex (contractible)
+    or an octahedral sphere S^k. Deleting the vertex and s-collapsing
+    must give either a contractible cone or an octahedral sphere S^d,
+    with each noncontractible link dimension k<d.
+
+    Consequently every component-to-deletion map is nullhomotopic.
+    The homotopy cofiber of link -> deletion is
+      deletion v (join of suspended noncontractible components)
+                 v ((r-1) copies of S^1).
+    The dimension restriction is essential: homology alone does not
+    establish that a map S^d -> S^d is nullhomotopic.
+    """
+    neighborhood = graph.subgraph(graph.neighbors(vertex))
+    components = list(nx.connected_components(neighborhood))
+    if len(components) < 2:
+        return None
+    link_dimensions: list[int] = []
+    for component in components:
+        piece = neighborhood.subgraph(component)
+        if _is_complete(piece):
+            continue
+        k = _octahedral_sphere_dimension(piece)
+        if k is None:
+            return None
+        link_dimensions.append(k)
+    if not link_dimensions:
+        # Already handled by the complete-neighborhood reduction.
+        return None
+    deletion = graph.copy()
+    deletion.remove_node(vertex)
+    if not deletion or not nx.is_connected(deletion):
+        return None
+
+    core = _simplify_graph_ht(deletion)
+    if core.number_of_nodes() == 1 or _try_universal_vertex_cone(core):
+        base = WedgeOfSpheres.contractible()
+    else:
+        d = _octahedral_sphere_dimension(core)
+        if d is None or max(link_dimensions) >= d:
+            return None
+        base = WedgeOfSpheres.sphere(d)
+
+    spheres = base.add_spheres(1, len(components) - 1)
+    for k in link_dimensions:
+        spheres = spheres.add_spheres(k + 1)
+    return HomotopyVerdict(
+        wedge=spheres,
+        reason=Theorem.NULLHOMOTOPIC_SPHERICAL_LINK,
+    )
+
+
+def _try_nullhomotopic_spherical_link(
+    graph: nx.Graph,
+) -> HomotopyVerdict | None:
+    """Try the cheap certified link/deletion decomposition at each vertex."""
+    for vertex in graph:
+        verdict = _try_nullhomotopic_spherical_link_at_vertex(graph, vertex)
+        if verdict is not None:
+            return verdict
+    return None
+
+
 def homotopy_type_clique_graph_via_independent_neighborhood(
     graph: nx.Graph,
     vertex,
@@ -1094,6 +1186,13 @@ def homotopy_type_with_verdict(
     v = _try_join_complement(
         graph, max_vertices=max_vertices, max_simplices=max_simplices
     )
+    if v:
+        return v
+
+    # A structural vertex-link certificate may resolve large complexes
+    # *before* materializing their simplices, with an explicit
+    # nullhomotopy ensured by the target sphere's connectivity.
+    v = _try_nullhomotopic_spherical_link(graph)
     if v:
         return v
 
