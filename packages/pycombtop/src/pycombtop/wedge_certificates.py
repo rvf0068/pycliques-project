@@ -17,6 +17,7 @@ Only elementary homotopy equivalences are accepted:
 Every recursive decomposition has strictly fewer vertices. A fixed
 call budget fails closed, affecting only completeness, not soundness.
 """
+
 from __future__ import annotations
 
 import networkx as nx
@@ -54,8 +55,10 @@ def certified_flag_wedge(
             return None
 
         complement = nx.complement(g)
-        if n >= 4 and n % 2 == 0 and all(
-            degree == 1 for _, degree in complement.degree()
+        if (
+            n >= 4
+            and n % 2 == 0
+            and all(degree == 1 for _, degree in complement.degree())
         ):
             return {n // 2 - 1: 1}  # Cross-polytope boundary.
 

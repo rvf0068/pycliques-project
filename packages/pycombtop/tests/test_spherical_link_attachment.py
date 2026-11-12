@@ -2,11 +2,11 @@
 
 import networkx as nx
 import pycombtop.homotopy_type as homotopy
-from pycombtop.wedge_certificates import certified_flag_wedge
 from pycombtop.s_collapses import (
     complete_s_collapse_with_certificate,
     verify_s_collapse_move,
 )
+from pycombtop.wedge_certificates import certified_flag_wedge
 
 
 def test_phase2_11670395_octahedral_link_deletion_certificate():

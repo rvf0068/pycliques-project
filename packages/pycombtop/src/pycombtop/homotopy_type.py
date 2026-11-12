@@ -60,7 +60,6 @@ from pycliques.surfaces import open_neighborhood
 
 from .morse_certificates import facet_morse_certificate
 from .s_collapses import complete_s_collapse, complete_s_collapse_edges
-from .wedge_certificates import certified_flag_wedge
 from .simplex import (
     Simplex,
     SimplicialComplex,
@@ -69,6 +68,7 @@ from .simplex import (
     dong_matching,
 )
 from .simplex import star as star  # Public re-export
+from .wedge_certificates import certified_flag_wedge
 
 # ---------------------------------------------------------------------------
 # Theorem citations
@@ -906,15 +906,12 @@ def _try_nullhomotopic_spherical_link(
         # Cheap bounded recognition runs BEFORE attempting the deletion
         # s-collapse; this saves full-graph scans on ineligible links.
         if any(
-            certified_flag_wedge(
-                neighborhood.subgraph(component), max_calls=48
-            ) is None
+            certified_flag_wedge(neighborhood.subgraph(component), max_calls=48) is None
             for component in components
         ):
             continue
         if all(
-            _is_complete(neighborhood.subgraph(component))
-            for component in components
+            _is_complete(neighborhood.subgraph(component)) for component in components
         ):
             # The preexisting disjoint-simplex link rule handles this.
             continue
