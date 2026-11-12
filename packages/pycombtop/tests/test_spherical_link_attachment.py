@@ -55,9 +55,12 @@ def test_dimension_inequality_blocks_essential_link_map():
     graph.add_edges_from([(0, 6), (6, 7)])
     graph.add_edges_from((8, x) for x in range(6))
     graph.add_edge(8, 7)
-    assert homotopy._octahedral_sphere_dimension(
-        homotopy._simplify_graph_ht(graph.subgraph(range(8)).copy())
-    ) == 2
+    assert (
+        homotopy._octahedral_sphere_dimension(
+            homotopy._simplify_graph_ht(graph.subgraph(range(8)).copy())
+        )
+        == 2
+    )
     assert homotopy._try_nullhomotopic_spherical_link_at_vertex(graph, 8) is None
 
 
