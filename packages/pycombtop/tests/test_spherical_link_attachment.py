@@ -2,6 +2,10 @@
 
 import networkx as nx
 import pycombtop.homotopy_type as homotopy
+from pycombtop.s_collapses import (
+    complete_s_collapse_with_certificate,
+    verify_s_collapse_move,
+)
 
 
 def test_phase2_11670395_octahedral_link_deletion_certificate():
@@ -24,6 +28,16 @@ def test_phase2_11670395_octahedral_link_deletion_certificate():
 
     deletion = graph.copy()
     deletion.remove_node(0)
+    replayed_core, moves = complete_s_collapse_with_certificate(deletion)
+    assert [vertex for vertex, _local in moves] == [1, 2, 3, 8, 9, 12]
+    replay = deletion.copy()
+    for vertex, local in moves:
+        assert verify_s_collapse_move(
+            replay,
+            {"kind": "vertex", "vertex": vertex, "dismantling": local},
+        )
+    assert set(replay) == set(replayed_core)
+    assert set(replay.edges) == set(replayed_core.edges)
     deletion_core = homotopy._simplify_graph_ht(deletion)
     assert deletion_core.number_of_nodes() == 8
     assert homotopy._octahedral_sphere_dimension(deletion_core) == 3
