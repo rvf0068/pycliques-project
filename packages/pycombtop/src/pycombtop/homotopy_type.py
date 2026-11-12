@@ -910,9 +910,7 @@ def _try_nullhomotopic_spherical_link(
         if not components:
             continue
         link_types = [
-            certified_flag_wedge(
-                neighborhood.subgraph(component), max_calls=48
-            )
+            certified_flag_wedge(neighborhood.subgraph(component), max_calls=48)
             for component in components
         ]
         if any(t is None or 0 in t for t in link_types):
@@ -921,8 +919,7 @@ def _try_nullhomotopic_spherical_link(
             # Avoid costly scans for connected contractible links.
             continue
         if len(components) > 1 and all(
-            _is_complete(neighborhood.subgraph(component))
-            for component in components
+            _is_complete(neighborhood.subgraph(component)) for component in components
         ):
             # Already handled by the disjoint-simplex link rule.
             continue
