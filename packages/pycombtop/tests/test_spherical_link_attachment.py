@@ -19,8 +19,7 @@ def test_phase2_11670395_octahedral_link_deletion_certificate():
     sphere_link = next(c for c in components if len(c) == 6)
     assert homotopy._octahedral_sphere_dimension(sphere_link) == 2
     assert any(
-        nx.is_isomorphic(c, nx.complete_graph(1))
-        for c in components if len(c) == 1
+        nx.is_isomorphic(c, nx.complete_graph(1)) for c in components if len(c) == 1
     )
 
     deletion = graph.copy()
