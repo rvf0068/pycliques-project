@@ -197,3 +197,17 @@ def test_contractible_deletion_allows_link_circles_without_dimension_gap():
     result = homotopy._try_nullhomotopic_spherical_link_at_vertex(graph, 7)
     assert result is not None and result.is_exact
     assert result.wedge.spheres == {1: 1, 2: 1}
+
+
+def test_connected_c5_link_into_a_three_sphere():
+    # The star-deletion cofiber formula also works with a connected
+    # noncontractible link: there are then zero extra S^1 summands.
+    graph = _join_graphs(nx.cycle_graph(5), nx.cycle_graph(4))
+    apex = len(graph)
+    graph.add_edges_from((apex, v) for v in range(5))
+    local = homotopy._try_nullhomotopic_spherical_link_at_vertex(graph, apex)
+    assert local is not None and local.is_exact
+    assert local.wedge.spheres == {2: 1, 3: 1}
+    verdict = homotopy.homotopy_type_with_verdict(graph, max_simplices=32)
+    assert verdict.is_exact
+    assert verdict.wedge.spheres == {2: 1, 3: 1}
