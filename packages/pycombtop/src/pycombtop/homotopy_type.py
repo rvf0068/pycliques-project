@@ -838,8 +838,8 @@ def _try_nullhomotopic_spherical_link_at_vertex(
 
     Consequently every component-to-deletion map is nullhomotopic.
     The homotopy cofiber of link -> deletion is
-      deletion v (join of suspended noncontractible components)
-                 v ((r-1) copies of S^1).
+      deletion wedged with suspended noncontractible link components
+               and (r-1) copies of S^1.
     The dimension restriction is essential: homology alone does not
     establish that a map S^d -> S^d is nullhomotopic.
     """
