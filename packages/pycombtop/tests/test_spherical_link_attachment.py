@@ -75,7 +75,7 @@ def test_vertex_limit_overrides_structural_certificate():
 def test_sphere_recognizer_rejects_partial_matchings():
     graph = nx.octahedral_graph()
     assert homotopy._octahedral_sphere_dimension(graph) == 2
-    graph.add_edge(0, 1)
+    graph.add_edge(0, 5)  # This is a missing antipodal edge of O3.
     assert homotopy._octahedral_sphere_dimension(graph) is None
     assert homotopy._octahedral_sphere_dimension(nx.cycle_graph(5)) is None
 
