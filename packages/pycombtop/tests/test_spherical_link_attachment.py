@@ -1,7 +1,6 @@
 """Exact nullhomotopic spherical-link attachment regressions."""
 
 import networkx as nx
-
 import pycombtop.homotopy_type as homotopy
 
 
