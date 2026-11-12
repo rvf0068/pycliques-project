@@ -211,3 +211,60 @@ def test_connected_c5_link_into_a_three_sphere():
     verdict = homotopy.homotopy_type_with_verdict(graph, max_simplices=32)
     assert verdict.is_exact
     assert verdict.wedge.spheres == {2: 1, 3: 1}
+
+
+def test_wedge_recognizer_fail_closed_on_unrecognized_complexes():
+    """Neither a missing type nor a search-budget refusal is a certificate."""
+    assert certified_flag_wedge(nx.Graph()) is None
+    assert certified_flag_wedge(nx.cycle_graph(5), max_calls=0) is None
+
+    # The icosahedral graph is not classified by any of the deliberately
+    # narrow exact rules. In particular, it has triangles, no cutvertex,
+    # and a connected complement.
+    unknown = nx.icosahedral_graph()
+    assert certified_flag_wedge(unknown) is None
+
+    # A join with a contractible factor is contractible, but a join with
+    # an unknown factor must remain UNKNOWN (not just infer its Betti type).
+    cone = _join_graphs(nx.cycle_graph(5), nx.complete_graph(1))
+    assert certified_flag_wedge(cone) == {}
+    unidentified_join = _join_graphs(unknown, nx.cycle_graph(4))
+    assert certified_flag_wedge(unidentified_join) is None
+
+    # Force an articulation-point recursion with a genuinely uncertified
+    # piece. The recognizer must reject the entire decomposition.
+    with_pendant = unknown.copy()
+    with_pendant.add_edge(0, len(unknown))
+    assert set(nx.articulation_points(with_pendant)) == {0}
+    assert certified_flag_wedge(with_pendant) is None
+
+
+def test_spherical_link_rejects_empty_or_disconnected_deletions():
+    """Nullhomotopy requires a correctly certified connected deletion."""
+    isolated = nx.empty_graph(3)
+    assert homotopy._try_nullhomotopic_spherical_link_at_vertex(isolated, 0) is None
+    assert homotopy._try_nullhomotopic_spherical_link(isolated) is None
+
+    # In the wheel, the hub has a C5 link, which is a certified S1.
+    # Adding a separate isolated vertex makes the deletion disconnected.
+    disconnected = nx.disjoint_union(nx.wheel_graph(6), nx.complete_graph(1))
+    assert certified_flag_wedge(
+        disconnected.subgraph(disconnected.neighbors(0))
+    ) == {1: 1}
+    assert (
+        homotopy._try_nullhomotopic_spherical_link_at_vertex(disconnected, 0)
+        is None
+    )
+
+
+def test_spherical_link_rejects_uncertified_deletion_type():
+    """A known S1 link does not determine an unknown attaching target."""
+    graph = nx.icosahedral_graph()
+    circle_vertices = list(graph.neighbors(0))
+    # An icosahedron vertex link is an induced C5. A new apex attached
+    # to these five vertices has a certified S1 link, but its deletion
+    # remains the icosahedral graph, which this recognizer cannot classify.
+    apex = len(graph)
+    graph.add_edges_from((apex, vertex) for vertex in circle_vertices)
+    assert certified_flag_wedge(graph.subgraph(circle_vertices)) == {1: 1}
+    assert homotopy._try_nullhomotopic_spherical_link_at_vertex(graph, apex) is None
