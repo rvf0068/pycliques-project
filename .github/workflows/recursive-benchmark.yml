@@ -1,0 +1,42 @@
+name: Recursive classifier comparative benchmark
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "research/benchmark_recursive_cache.py"
+      - "packages/pycliques/src/pycliques/small.py"
+      - ".github/workflows/recursive-benchmark.yml"
+  workflow_dispatch:
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+      - name: Set up Python
+        run: uv python install 3.11
+      - name: Install workspace
+        run: uv sync
+      - name: Test benchmark timeout bookkeeping
+        run: uv run python -m pytest research/test_benchmark_recursive_cache.py -q
+      - name: Benchmark cached vs uncached classification
+        env:
+          OPENBLAS_NUM_THREADS: "1"
+          OMP_NUM_THREADS: "1"
+          MKL_NUM_THREADS: "1"
+        run: |
+          uv run python research/benchmark_recursive_cache.py \
+            --repeats 2 --timeout 9 --bound 120 --tries 5 \
+            --json-out benchmark-recursive-cache.json
+      - name: Preserve benchmark measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recursive-cache-comparison
+          path: benchmark-recursive-cache.json
+          if-no-files-found: warn
