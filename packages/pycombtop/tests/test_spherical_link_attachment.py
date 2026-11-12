@@ -248,13 +248,10 @@ def test_spherical_link_rejects_empty_or_disconnected_deletions():
     # In the wheel, the hub has a C5 link, which is a certified S1.
     # Adding a separate isolated vertex makes the deletion disconnected.
     disconnected = nx.disjoint_union(nx.wheel_graph(6), nx.complete_graph(1))
-    assert certified_flag_wedge(
-        disconnected.subgraph(disconnected.neighbors(0))
-    ) == {1: 1}
-    assert (
-        homotopy._try_nullhomotopic_spherical_link_at_vertex(disconnected, 0)
-        is None
-    )
+    assert certified_flag_wedge(disconnected.subgraph(disconnected.neighbors(0))) == {
+        1: 1
+    }
+    assert homotopy._try_nullhomotopic_spherical_link_at_vertex(disconnected, 0) is None
 
 
 def test_spherical_link_rejects_uncertified_deletion_type():
