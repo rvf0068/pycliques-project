@@ -1,16 +1,14 @@
-# The CI test matrix has 4 packages x 4 Python versions, and each test
-# job uploads exactly one coverage XML report under its package flag.
+# Coverage is uploaded separately by each of the 4 x 4 CI test matrix jobs.
+# Reporting project coverage on partial uploads previously generated
+# transient false failures while the slowest pycliques tests were running.
 #
-# Without a synchronization barrier, Codecov posts its project status
-# after partial uploads (especially before the slower pycliques tests),
-# producing a spurious project-coverage regression on otherwise green
-# commits. Delay both statuses and PR comments until all 16 reports are
-# processed. Keep Codecov's existing project/patch thresholds unchanged.
+# The 'codecov-finalize' job in .github/workflows/ci.yml runs after the
+# entire matrix finishes (even if a matrix leg fails), and explicitly
+# releases the Codecov project/patch notifications with send-notifications.
+# This also handles failed legs that never produced a coverage report;
+# unlike after_n_builds, no fixed number of uploads is required.
 #
-# IMPORTANT: Update after_n_builds if the matrix or upload count changes.
+# Do not lower coverage thresholds or change any per-package upload flags.
 codecov:
   notify:
-    after_n_builds: 16
-
-comment:
-  after_n_builds: 16
+    manual_trigger: true
