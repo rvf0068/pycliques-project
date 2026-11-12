@@ -846,7 +846,7 @@ def _try_nullhomotopic_spherical_link_at_vertex(
     """
     neighborhood = graph.subgraph(graph.neighbors(vertex))
     components = list(nx.connected_components(neighborhood))
-    if len(components) < 2:
+    if not components:
         return None
     link_types: list[dict[int, int]] = []
     for component in components:
@@ -855,6 +855,9 @@ def _try_nullhomotopic_spherical_link_at_vertex(
         if certified is None or 0 in certified:
             return None
         link_types.append(certified)
+    if len(components) == 1 and not link_types[0]:
+        # A connected contractible link already admits cheaper folds.
+        return None
 
     deletion = graph.copy()
     deletion.remove_node(vertex)
@@ -901,7 +904,7 @@ def _try_nullhomotopic_spherical_link(
     for vertex in graph:
         neighborhood = graph.subgraph(graph.neighbors(vertex))
         components = list(nx.connected_components(neighborhood))
-        if len(components) < 2:
+        if not components:
             continue
         # Cheap bounded recognition runs BEFORE attempting the deletion
         # s-collapse; this saves full-graph scans on ineligible links.
@@ -910,7 +913,13 @@ def _try_nullhomotopic_spherical_link(
             for component in components
         ):
             continue
-        if all(
+        if len(components) == 1:
+            # Require a nontrivial connected link, not just any cone.
+            if not certified_flag_wedge(
+                neighborhood.subgraph(components[0]), max_calls=48
+            ):
+                continue
+        elif all(
             _is_complete(neighborhood.subgraph(component)) for component in components
         ):
             # The preexisting disjoint-simplex link rule handles this.
