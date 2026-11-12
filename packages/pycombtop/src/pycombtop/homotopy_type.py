@@ -878,7 +878,9 @@ def _try_nullhomotopic_spherical_link_at_vertex(
             # Homology alone would not establish a null attaching map.
             return None
 
-    spheres = WedgeOfSpheres(base_type).add_spheres(1, len(components) - 1)
+    spheres = WedgeOfSpheres(base_type)
+    if len(components) > 1:
+        spheres = spheres.add_spheres(1, len(components) - 1)
     for link_type in link_types:
         for dimension, multiplicity in link_type.items():
             spheres = spheres.add_spheres(dimension + 1, multiplicity)
@@ -891,45 +893,51 @@ def _try_nullhomotopic_spherical_link_at_vertex(
 def _try_nullhomotopic_spherical_link(
     graph: nx.Graph,
 ) -> HomotopyVerdict | None:
-    """Try at most two costly deletions, after bounded link-only filters.
+    """Consider the best two promising vertices, with bounded link tests.
 
-    Called before the simplex-budget check. A strict 24-vertex cap and
-    two expensive s-collapse attempts bound the added preprocessing
-    cost. Exceeding either cap returns no certificate, not an incorrect
-    result. The exact type returned is independent of these limits.
+    Prioritize smaller-dimensional link sphere wedges: these are more
+    likely to map nullhomotopically into the deletion. The selection
+    uses cheap graph-theoretic certificates only; no s-collapse is run
+    until the final two candidates. The fixed caps affect coverage,
+    not mathematical validity.
     """
     if graph.number_of_nodes() > 24:
         return None
-    attempts = 0
-    for vertex in graph:
+    candidates: list[tuple[int, int, int, object]] = []
+    for ordinal, vertex in enumerate(graph):
         neighborhood = graph.subgraph(graph.neighbors(vertex))
         components = list(nx.connected_components(neighborhood))
         if not components:
             continue
-        # Cheap bounded recognition runs BEFORE attempting the deletion
-        # s-collapse; this saves full-graph scans on ineligible links.
-        if any(
-            certified_flag_wedge(neighborhood.subgraph(component), max_calls=48) is None
+        link_types = [
+            certified_flag_wedge(
+                neighborhood.subgraph(component), max_calls=48
+            )
+            for component in components
+        ]
+        if any(t is None or 0 in t for t in link_types if t is not None):
+            continue
+        if any(t is None for t in link_types):
+            continue
+        if len(components) == 1 and not link_types[0]:
+            # Avoid costly scans for connected contractible links.
+            continue
+        if len(components) > 1 and all(
+            _is_complete(neighborhood.subgraph(component))
             for component in components
         ):
+            # Already handled by the disjoint-simplex link rule.
             continue
-        if len(components) == 1:
-            # Require a nontrivial connected link, not just any cone.
-            if not certified_flag_wedge(
-                neighborhood.subgraph(components[0]), max_calls=48
-            ):
-                continue
-        elif all(
-            _is_complete(neighborhood.subgraph(component)) for component in components
-        ):
-            # The preexisting disjoint-simplex link rule handles this.
-            continue
-        attempts += 1
+        max_dimension = max(
+            (d for link_type in link_types if link_type for d in link_type),
+            default=-1,
+        )
+        candidates.append((max_dimension, -len(components), ordinal, vertex))
+
+    for _, _, _, vertex in sorted(candidates)[:2]:
         verdict = _try_nullhomotopic_spherical_link_at_vertex(graph, vertex)
         if verdict is not None:
             return verdict
-        if attempts >= 2:
-            break
     return None
 
 
