@@ -75,3 +75,26 @@ def test_sphere_recognizer_rejects_partial_matchings():
     graph.add_edge(0, 1)
     assert homotopy._octahedral_sphere_dimension(graph) is None
     assert homotopy._octahedral_sphere_dimension(nx.cycle_graph(5)) is None
+
+
+def test_prebudget_recognizer_never_scans_many_large_deletions(monkeypatch):
+    count = 0
+    original = homotopy._simplify_graph_ht
+
+    def tracked(graph):
+        nonlocal count
+        count += 1
+        return original(graph)
+
+    monkeypatch.setattr(homotopy, "_simplify_graph_ht", tracked)
+    big = nx.disjoint_union_all([nx.cycle_graph(5)] * 6)
+    assert big.number_of_nodes() == 30
+    assert homotopy._try_nullhomotopic_spherical_link(big) is None
+    assert count == 0
+
+    graph = nx.octahedral_graph()
+    graph.add_edges_from([(0, 6), (6, 7)])
+    graph.add_edges_from((8, x) for x in range(6))
+    graph.add_edge(8, 7)
+    homotopy._try_nullhomotopic_spherical_link(graph)
+    assert count <= 2
