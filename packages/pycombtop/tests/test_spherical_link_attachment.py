@@ -5,7 +5,7 @@ import networkx as nx
 import pycombtop.homotopy_type as homotopy
 
 
-def test_phase2_11670395_octaheral_link_deletion_certificate():
+def test_phase2_11670395_octahedral_link_deletion_certificate():
     # Phase 1's 15-vertex pared clique graph for order-10 census index
     # 11670395. Do not replace graph6 with a relabelled isomorphic graph.
     graph = nx.from_graph6_bytes(b"N~`Xz~_tW\\jnk~M~m~w")
@@ -13,13 +13,16 @@ def test_phase2_11670395_octaheral_link_deletion_certificate():
     assert graph.number_of_edges() == 73
 
     link = graph.subgraph(graph.neighbors(0))
-    components = [link.subgraph(nodes).copy()
-                  for nodes in nx.connected_components(link)]
+    components = [
+        link.subgraph(nodes).copy() for nodes in nx.connected_components(link)
+    ]
     assert sorted(len(c) for c in components) == [1, 6]
     sphere_link = next(c for c in components if len(c) == 6)
     assert homotopy._octahedral_sphere_dimension(sphere_link) == 2
-    assert any(nx.is_isomorphic(c, nx.complete_graph(1))
-               for c in components if len(c) == 1)
+    assert any(
+        nx.is_isomorphic(c, nx.complete_graph(1))
+        for c in components if len(c) == 1
+    )
 
     deletion = graph.copy()
     deletion.remove_node(0)
