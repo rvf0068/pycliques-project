@@ -915,9 +915,7 @@ def _try_nullhomotopic_spherical_link(
             )
             for component in components
         ]
-        if any(t is None or 0 in t for t in link_types if t is not None):
-            continue
-        if any(t is None for t in link_types):
+        if any(t is None or 0 in t for t in link_types):
             continue
         if len(components) == 1 and not link_types[0]:
             # Avoid costly scans for connected contractible links.
