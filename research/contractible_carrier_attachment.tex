@@ -3,6 +3,7 @@
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}
 \usepackage{lmodern,microtype}
+\usepackage{upquote} % straight ASCII backticks in verbatim graph6 strings
 \usepackage{amsmath,amssymb,amsthm,mathtools}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,calc,fit,decorations.pathreplacing}
@@ -152,9 +153,12 @@ collapsing the contractible arc \(a_i\) gives
  Z_i/a_i\cong (Y_i/a_i)\vee S^1\simeq Y_i\vee S^1.
 \]
 Both quotient maps are homotopy equivalences by Proposition~0.17.
-Thus \(Y_i/(p\sim q)\simeq Y_i\vee S^1\). Combining the factors
-yields precisely \(r-1\) additional circles. This agrees with
-Hatcher's Chapter~0, Exercise~25 \cite{Hatcher2002}.
+Thus \(Y_i/(p\sim q)\simeq Y_i\vee S^1\). These equivalences
+can be taken as \emph{pointed} homotopy equivalences at the images
+of the suspension poles: all the spaces are path-connected CW
+complexes with well-pointed vertex basepoints. Hence their finite
+wedges preserve the homotopy equivalences, and combining the factors
+yields precisely \(r-1\) additional circles.
 \end{proof}
 
 \begin{figure}[htbp]
@@ -218,7 +222,7 @@ A vertex \(w\) of a graph \(A\) is \emph{\(s\)-dismantlable} if its open neighbo
 If \(w\) is \(s\)-dismantlable in \(A\), then the natural inclusion \(\Del(A-w)\hookrightarrow\Del(A)\) is a homotopy equivalence. Hence an explicitly verified sequence of such moves reducing \(A\) to one vertex proves \(\Del(A)\) contractible.
 \end{proposition}
 \begin{proof}
-By Lemma~\ref{lem:fold}, dismantling the open neighborhood proves that the link \(L_w=\Del(A[\N_A(w)])\) is contractible. Proposition~\ref{prop:star} gives \(\Del(A)=\Del(A-w)\cup_{L_w}(w*L_w)\). The inclusion \(L_w\hookrightarrow w*L_w\) is a homotopy equivalence because both spaces are contractible. Since \(L_w\hookrightarrow\Del(A-w)\) is a cofibration, the gluing lemma for homotopy pushouts gives a homotopy equivalence \(\Del(A-w)\simeq\Del(A)\); equivalently, use Theorem~\ref{thm:split} with a contractible link. Iterate. If the final graph is a singleton, its clique complex is a point.
+By Lemma~\ref{lem:fold}, dismantling the open neighborhood proves that the link \(L_w=\Del(A[\N_A(w)])\) is contractible. Proposition~\ref{prop:star} gives \(\Del(A)=\Del(A-w)\cup_{L_w}(w*L_w)\). The inclusion \(L_w\hookrightarrow w*L_w\) is a homotopy equivalence because both spaces are contractible. Since \(L_w\hookrightarrow\Del(A-w)\) is a cofibration, the gluing lemma for homotopy pushouts gives a homotopy equivalence \(\Del(A-w)\simeq\Del(A)\). If \(\Del(A-w)\) is path-connected, one may alternatively use Theorem~\ref{thm:split} with a contractible link. In particular, this holds when \(A\) is connected: the nonempty connected open neighborhood of \(w\) meets every component of \(A-w\), so there is just one such component. Iterate. If the final graph is a singleton, its clique complex is a point.
 \end{proof}
 
 \begin{figure}[htbp]
@@ -266,6 +270,10 @@ Thus \(D_0\) consists of a five-cycle and a path of three edges rooted at vertex
 \]
 Create six further vertices \(8,\ldots,13\), add the six-cycle \(8-9-10-11-12-13-8\), and join each vertex \(i\in\{8,\ldots,13\}\) to \(t_i\) and every neighbor of \(t_i\) in \(D_0\). No other edges are added. Denote the resulting graph on 14 vertices by \(D\). Finally add a new vertex \(v=14\) adjacent \emph{only} to \(8,\ldots,13\), obtaining the graph \(H\). The construction has \(38\) edges. Its graph6 string in the exact vertex
 order \(0,1,\ldots,14\) is \verb!Nhe?GFK`gM_X@p`g_Fw!.
+We load \texttt{upquote} so that both grave accents in this
+verbatim string render as the literal ASCII backtick (byte \texttt{0x60})
+rather than typographic opening quotes; the text can be copied and
+decoded as graph6.
 The alternative string \verb!NhEMKC@?KC|o^@M?~_?! encodes an
 \emph{isomorphic} graph, but with a different labelling. The vertex
 and edge specification above is authoritative for the fold indices.
@@ -363,7 +371,7 @@ In \texttt{pycombtop}, the present implementation makes only a bounded attempt t
 The vertex-star method is the homotopy cofiber of a specific attaching map. The contractible-carrier theorem supplies a purely combinatorial proof that this map is null: ordinary deletion folds provide a verified homotopy equivalence, while a separate certified contraction of a small induced carrier makes the composite attachment null-homotopic. In particular, the criterion avoids the false inference that vanishing homology of an image determines its homotopy type. Future improvements could use independently verified discrete Morse certificates for contractibility when neither ordinary graph folds nor bounded vertex \(s\)-dismantlings find a suitable carrier; such an extension requires a genuine contractibility certificate rather than mere acyclicity.
 
 \begin{thebibliography}{9}
-\bibitem{Hatcher2002} A. Hatcher, \emph{Algebraic Topology}, Cambridge University Press, 2002. Chapter 0, in particular Propositions 0.17 and 0.18 and Exercise~25 (suspension of disconnected CW complexes). \url{https://pi.math.cornell.edu/~hatcher/AT/AT.pdf}.
+\bibitem{Hatcher2002} A. Hatcher, \emph{Algebraic Topology}, Cambridge University Press, 2002. Chapter 0, particularly Propositions 0.17 and 0.18 (quotients by contractible subcomplexes and homotopic attachments). \url{https://pi.math.cornell.edu/~hatcher/AT/AT.pdf}.
 \bibitem{Kozlov2008} D. N. Kozlov, \emph{Combinatorial Algebraic Topology}, Algorithms and Computation in Mathematics, vol.~21, Springer, 2008. \url{https://doi.org/10.1007/978-3-540-71962-5}.
 \bibitem{BouletFieuxJouve2010} R. Boulet, E. Fieux, and B. Jouve, ``Simplicial simple-homotopy of flag complexes in terms of graphs,'' \emph{European J. Combin.} \textbf{31} (2010), no.~1, 161--176. \url{https://doi.org/10.1016/j.ejc.2009.05.003}.
 \end{thebibliography}
