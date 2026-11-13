@@ -37,19 +37,25 @@ def _replay_fold_map(
     if not set(link_vertices) <= set(current):
         return None
     images = {v: v for v in link_vertices}
-    for removed, dominator in moves:
-        if removed not in current or dominator not in current:
-            return None
-        if not current.has_edge(removed, dominator):
-            return None
-        closed_removed = set(current[removed]) | {removed}
-        closed_dominator = set(current[dominator]) | {dominator}
-        if not closed_removed <= closed_dominator:
-            return None
-        for source, target in images.items():
-            if target == removed:
-                images[source] = dominator
-        current.remove_node(removed)
+    try:
+        for move in moves:
+            if not isinstance(move, (tuple, list)) or len(move) != 2:
+                return None
+            removed, dominator = move
+            if removed not in current or dominator not in current:
+                return None
+            if not current.has_edge(removed, dominator):
+                return None
+            closed_removed = set(current[removed]) | {removed}
+            closed_dominator = set(current[dominator]) | {dominator}
+            if not closed_removed <= closed_dominator:
+                return None
+            for source, target in images.items():
+                if target == removed:
+                    images[source] = dominator
+            current.remove_node(removed)
+    except (TypeError, ValueError):
+        return None
     image = set(images.values())
     return current, tuple(v for v in current if v in image)
 
@@ -60,17 +66,23 @@ def verify_cone_image_certificate(
     certificate: ConeImageCertificate,
 ) -> bool:
     """Independent check of all folds, wedge type, image, and cone apex."""
-    replay = _replay_fold_map(deletion, link_vertices, certificate.moves)
-    if replay is None:
+    try:
+        replay = _replay_fold_map(deletion, link_vertices, certificate.moves)
+        if replay is None:
+            return False
+        core, image = replay
+        if image != certificate.image_vertices:
+            return False
+        if certified_flag_wedge(core) != certificate.spheres:
+            return False
+        if not image or certificate.apex not in image:
+            return False
+        return all(
+            v == certificate.apex or core.has_edge(v, certificate.apex)
+            for v in image
+        )
+    except (TypeError, ValueError):
         return False
-    core, image = replay
-    if image != certificate.image_vertices:
-        return False
-    if certified_flag_wedge(core) != certificate.spheres:
-        return False
-    if not image or certificate.apex not in image:
-        return False
-    return all(v == certificate.apex or core.has_edge(v, certificate.apex) for v in image)
 
 
 def bounded_cone_image_certificate(
