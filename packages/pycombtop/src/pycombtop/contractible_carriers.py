@@ -23,8 +23,8 @@ from .s_collapses import (
     verify_s_collapse_move,
 )
 
-type CarrierMove = tuple[Hashable, tuple[tuple[Hashable, Hashable], ...]]
-type CarrierProof = tuple[tuple[CarrierMove, ...], Hashable]
+CarrierMove = tuple[Hashable, tuple[tuple[Hashable, Hashable], ...]]
+CarrierProof = tuple[tuple[CarrierMove, ...], Hashable]
 
 
 def verify_contractible_carrier(
