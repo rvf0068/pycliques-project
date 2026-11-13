@@ -1,7 +1,6 @@
 """Exact, bounded contractible-image carriers strictly beyond cone images."""
 
 import networkx as nx
-
 import pycombtop.homotopy_type as homotopy
 from pycombtop.attachment_certificates import (
     ConeImageCertificate,
