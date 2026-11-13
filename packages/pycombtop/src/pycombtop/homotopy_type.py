@@ -58,7 +58,10 @@ import networkx as nx
 from pycliques import clique_graph
 from pycliques.surfaces import open_neighborhood
 
-from .attachment_certificates import bounded_cone_image_certificate
+from .attachment_certificates import (
+    ConeImageCertificate,
+    bounded_null_image_certificate,
+)
 from .morse_certificates import facet_morse_certificate
 from .s_collapses import complete_s_collapse, complete_s_collapse_edges
 from .simplex import (
@@ -131,6 +134,14 @@ class Theorem:
         "complete graphs, and deleting the vertex leaves a connected "
         "graph. The vertex star is a cone attached along r disjoint "
         "contractible simplices, producing r-1 additional circles."
+    )
+    NULLHOMOTOPIC_CONTRACTIBLE_CARRIER = (
+        "Ordinary dominated-vertex folds of the deletion define a "
+        "simplicial homotopy equivalence to a certified sphere wedge. "
+        "The entire link image lies in a small induced subcomplex with "
+        "an independently replayable s-collapse to a single vertex. "
+        "This contractible carrier makes the attaching map nullhomotopic, "
+        "even without a cone apex or a sphere-dimension inequality."
     )
     NULLHOMOTOPIC_CONE_IMAGE = (
         "Ordinary dominated-vertex folds of the deletion define a "
@@ -918,17 +929,25 @@ def _try_nullhomotopic_spherical_link_at_vertex(
         # proof can still work: ordinary vertex folds give a simplicial
         # retraction of the deletion, and the entire link must land in
         # a cone in that retract. Never infer this from Betti numbers.
-        cone_certificate = bounded_cone_image_certificate(
+        null_image_certificate = bounded_null_image_certificate(
             deletion,
             list(neighborhood),
             max_vertices=24,
             max_checks=1024,
             max_moves=18,
+            max_carrier_vertices=12,
+            max_extra_vertices=2,
+            max_carrier_candidates=36,
+            max_carrier_checks=64,
         )
-        if cone_certificate is None:
+        if null_image_certificate is None:
             return None
-        base_type = cone_certificate.spheres
-        reason = Theorem.NULLHOMOTOPIC_CONE_IMAGE
+        base_type = null_image_certificate.spheres
+        reason = (
+            Theorem.NULLHOMOTOPIC_CONE_IMAGE
+            if isinstance(null_image_certificate, ConeImageCertificate)
+            else Theorem.NULLHOMOTOPIC_CONTRACTIBLE_CARRIER
+        )
     if base_type is None:
         return None
 
