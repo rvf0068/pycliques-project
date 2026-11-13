@@ -58,6 +58,7 @@ import networkx as nx
 from pycliques import clique_graph
 from pycliques.surfaces import open_neighborhood
 
+from .attachment_certificates import bounded_cone_image_certificate
 from .morse_certificates import facet_morse_certificate
 from .s_collapses import complete_s_collapse, complete_s_collapse_edges
 from .simplex import (
@@ -68,7 +69,12 @@ from .simplex import (
     dong_matching,
 )
 from .simplex import star as star  # Public re-export
-from .wedge_certificates import certified_flag_wedge
+from .wedge_certificates import (
+    FoldedWedgeCertificate,
+    certified_flag_wedge,
+    certified_flag_wedge_after_s_collapses,
+    verify_folded_wedge_certificate,
+)
 
 # ---------------------------------------------------------------------------
 # Theorem citations
@@ -125,6 +131,15 @@ class Theorem:
         "complete graphs, and deleting the vertex leaves a connected "
         "graph. The vertex star is a cone attached along r disjoint "
         "contractible simplices, producing r-1 additional circles."
+    )
+    NULLHOMOTOPIC_CONE_IMAGE = (
+        "Ordinary dominated-vertex folds of the deletion define a "
+        "replayable simplicial retraction onto a certified sphere wedge. "
+        "Every vertex of the link maps into an induced subcomplex with "
+        "a universal vertex (a cone). Thus the link inclusion is "
+        "nullhomotopic even without a dimension gap, and its cofiber "
+        "splits into the deletion wedge, suspended link components and "
+        "r-1 circles [Hatcher, Algebraic Topology, Chapter 0]."
     )
     NULLHOMOTOPIC_SPHERICAL_LINK = (
         "Each vertex-link component has a graph-theoretically certified "
@@ -829,11 +844,15 @@ def _octahedral_sphere_dimension(graph: nx.Graph) -> int | None:
 
 
 def _try_nullhomotopic_spherical_link_at_vertex(
-    graph: nx.Graph, vertex
+    graph: nx.Graph,
+    vertex,
+    *,
+    link_certificates: tuple[FoldedWedgeCertificate, ...] | None = None,
 ) -> HomotopyVerdict | None:
     """Certify a null attaching map using explicit *homotopy* certificates.
 
-    Recognize each connected link component as a sphere wedge, and
+    Recognize each link component as a sphere wedge, allowing separately
+    replayable bounded vertex s-collapses of its flag complex, and
     s-collapse the connected deletion to a graph whose flag complex
     is independently certified as a sphere wedge. The deletion is
     contractible, or its lowest sphere dimension is d>=2, strictly
@@ -848,13 +867,25 @@ def _try_nullhomotopic_spherical_link_at_vertex(
     components = list(nx.connected_components(neighborhood))
     if not components:
         return None
+    if link_certificates is not None and len(link_certificates) != len(components):
+        return None
     link_types: list[dict[int, int]] = []
-    for component in components:
+    for i, component in enumerate(components):
         piece = neighborhood.subgraph(component)
-        certified = certified_flag_wedge(piece, max_calls=48)
-        if certified is None or 0 in certified:
+        certificate: FoldedWedgeCertificate | None
+        if link_certificates is not None:
+            # Candidate collection already spent the bounded search
+            # budget. Replay the saved witness; NEVER re-run its search.
+            certificate = link_certificates[i]
+            if not verify_folded_wedge_certificate(piece, certificate):
+                return None
+        else:
+            certificate = certified_flag_wedge_after_s_collapses(
+                piece, max_vertices=18, max_checks=48, max_moves=4
+            )
+        if certificate is None or 0 in certificate.spheres:
             return None
-        link_types.append(certified)
+        link_types.append(certificate.spheres)
     if len(components) == 1 and not link_types[0]:
         # A connected contractible link already admits cheaper folds.
         return None
@@ -866,17 +897,40 @@ def _try_nullhomotopic_spherical_link_at_vertex(
 
     core = _simplify_graph_ht(deletion)
     base_type = certified_flag_wedge(core, max_calls=48)
-    if base_type is None or 0 in base_type:
-        return None
-    if base_type:
-        min_dimension = min(base_type)
-        if min_dimension < 2 or any(
-            dimension >= min_dimension
-            for link_type in link_types
-            for dimension in link_type
-        ):
-            # Homology alone would not establish a null attaching map.
+    dimension_gap = (
+        base_type is not None
+        and 0 not in base_type
+        and (
+            not base_type
+            or (
+                min(base_type) >= 2
+                and all(
+                    dimension < min(base_type)
+                    for link_type in link_types
+                    for dimension in link_type
+                )
+            )
+        )
+    )
+    reason = Theorem.NULLHOMOTOPIC_SPHERICAL_LINK
+    if not dimension_gap:
+        # When the connectivity inequality fails, a *different* exact
+        # proof can still work: ordinary vertex folds give a simplicial
+        # retraction of the deletion, and the entire link must land in
+        # a cone in that retract. Never infer this from Betti numbers.
+        cone_certificate = bounded_cone_image_certificate(
+            deletion,
+            list(neighborhood),
+            max_vertices=24,
+            max_checks=1024,
+            max_moves=18,
+        )
+        if cone_certificate is None:
             return None
+        base_type = cone_certificate.spheres
+        reason = Theorem.NULLHOMOTOPIC_CONE_IMAGE
+    if base_type is None:
+        return None
 
     spheres = WedgeOfSpheres(base_type)
     if len(components) > 1:
@@ -886,7 +940,7 @@ def _try_nullhomotopic_spherical_link_at_vertex(
             spheres = spheres.add_spheres(dimension + 1, multiplicity)
     return HomotopyVerdict(
         wedge=spheres,
-        reason=Theorem.NULLHOMOTOPIC_SPHERICAL_LINK,
+        reason=reason,
     )
 
 
@@ -898,24 +952,45 @@ def _try_nullhomotopic_spherical_link(
     Prioritize smaller-dimensional link sphere wedges: these are more
     likely to map nullhomotopically into the deletion. The selection
     uses cheap graph-theoretic certificates only; no s-collapse is run
-    until the final two candidates. The fixed caps affect coverage,
+    until the final two candidates. Link-fold fallback scans are also
+    globally capped at six, with at most three moves each. Fixed caps affect coverage,
     not mathematical validity.
     """
     if graph.number_of_nodes() > 24:
         return None
-    candidates: list[tuple[int, int, int, object]] = []
+    candidates: list[
+        tuple[int, int, int, object, tuple[FoldedWedgeCertificate, ...]]
+    ] = []
+    link_fold_attempts = 0
     for ordinal, vertex in enumerate(graph):
         neighborhood = graph.subgraph(graph.neighbors(vertex))
         components = list(nx.connected_components(neighborhood))
         if not components:
             continue
-        link_types = [
-            certified_flag_wedge(neighborhood.subgraph(component), max_calls=48)
-            for component in components
-        ]
-        if any(t is None or 0 in t for t in link_types):
+        certificates: list[FoldedWedgeCertificate] = []
+        for component in components:
+            piece = neighborhood.subgraph(component)
+            certificate: FoldedWedgeCertificate | None
+            recognized = certified_flag_wedge(piece, max_calls=48)
+            if recognized is not None:
+                certificate = FoldedWedgeCertificate(recognized, ())
+            else:
+                # A strict GLOBAL cap: no final-candidate search may
+                # repeat these checks, because we retain the witnesses.
+                if link_fold_attempts >= 6:
+                    break
+                link_fold_attempts += 1
+                certificate = certified_flag_wedge_after_s_collapses(
+                    piece, max_vertices=18, max_checks=24, max_moves=3
+                )
+                if certificate is None:
+                    break
+            if 0 in certificate.spheres:
+                break
+            certificates.append(certificate)
+        if len(certificates) != len(components):
             continue
-        if len(components) == 1 and not link_types[0]:
+        if len(components) == 1 and not certificates[0].spheres:
             # Avoid costly scans for connected contractible links.
             continue
         if len(components) > 1 and all(
@@ -924,13 +999,19 @@ def _try_nullhomotopic_spherical_link(
             # Already handled by the disjoint-simplex link rule.
             continue
         max_dimension = max(
-            (d for link_type in link_types if link_type for d in link_type),
+            (d for cert in certificates for d in cert.spheres),
             default=-1,
         )
-        candidates.append((max_dimension, -len(components), ordinal, vertex))
+        candidates.append(
+            (max_dimension, -len(components), ordinal, vertex, tuple(certificates))
+        )
 
-    for _, _, _, vertex in sorted(candidates)[:2]:
-        verdict = _try_nullhomotopic_spherical_link_at_vertex(graph, vertex)
+    for _, _, _, vertex, selected_certificates in sorted(
+        candidates, key=lambda candidate: candidate[:3]
+    )[:2]:
+        verdict = _try_nullhomotopic_spherical_link_at_vertex(
+            graph, vertex, link_certificates=selected_certificates
+        )
         if verdict is not None:
             return verdict
     return None

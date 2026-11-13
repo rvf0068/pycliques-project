@@ -20,7 +20,101 @@ call budget fails closed, affecting only completeness, not soundness.
 
 from __future__ import annotations
 
+from collections.abc import Hashable
+from dataclasses import dataclass
+
 import networkx as nx
+
+from .s_collapses import dismantling_certificate, verify_dismantling_certificate
+
+
+@dataclass(frozen=True)
+class FoldedWedgeCertificate:
+    """Replayable vertex s-collapse and exact structural wedge recognition.
+
+    Each move stores (removed vertex, dominating-vertex pairs for its open
+    neighborhood). The final wedge type is checked again on the reduced
+    graph; neither Betti numbers nor unchecked collapses are used.
+    """
+
+    spheres: dict[int, int]
+    moves: tuple[tuple[Hashable, tuple[tuple[Hashable, Hashable], ...]], ...]
+
+
+def verify_folded_wedge_certificate(
+    graph: nx.Graph, certificate: FoldedWedgeCertificate
+) -> bool:
+    """Replay every local dismantling; reject malformed proofs, never raise."""
+    try:
+        current = graph.copy()
+        for move in certificate.moves:
+            if not isinstance(move, (tuple, list)) or len(move) != 2:
+                return False
+            vertex, local = move
+            if vertex not in current:
+                return False
+            neighborhood = current.subgraph(list(current.neighbors(vertex))).copy()
+            if not verify_dismantling_certificate(neighborhood, local):
+                return False
+            current.remove_node(vertex)
+        return certified_flag_wedge(current) == certificate.spheres
+    except (TypeError, ValueError):
+        # The verifier is a trust boundary for potentially forged proofs.
+        return False
+
+
+def certified_flag_wedge_after_s_collapses(
+    graph: nx.Graph,
+    *,
+    max_vertices: int = 18,
+    max_checks: int = 48,
+    max_moves: int = 4,
+) -> FoldedWedgeCertificate | None:
+    """Try a finite, replayable sequence of vertex s-collapses.
+
+    First try the original graph with the existing exact wedge recognizer.
+    Otherwise inspect at most max_checks vertex neighborhoods and make at
+    most max_moves certified s-dismantlings, stopping as soon as a reduced
+    graph has a recognizable wedge type. Enforce max_vertices before any
+    s-collapse work; returning None means only that this *bounded* search
+    did not find a certificate.
+
+    A vertex s-dismantling preserves the simple-homotopy type of the
+    flag complex because its open neighborhood is dismantlable.
+    """
+    direct = certified_flag_wedge(graph)
+    if direct is not None:
+        return FoldedWedgeCertificate(direct, ())
+    if graph.number_of_nodes() > max_vertices or max_checks < 1 or max_moves < 1:
+        return None
+    current = graph.copy()
+    moves: list[tuple[Hashable, tuple[tuple[Hashable, Hashable], ...]]] = []
+    checked = 0
+    for _ in range(max_moves):
+        removed = False
+        for vertex in tuple(current):
+            if checked >= max_checks:
+                return None
+            checked += 1
+            neighborhood = current.subgraph(list(current.neighbors(vertex))).copy()
+            local = dismantling_certificate(neighborhood)
+            if local is None:
+                continue
+            if not verify_dismantling_certificate(neighborhood, local):
+                return None  # Fail closed if local proof cannot be replayed.
+            moves.append((vertex, local))
+            current.remove_node(vertex)
+            removed = True
+            spheres = certified_flag_wedge(current)
+            if spheres is not None:
+                certificate = FoldedWedgeCertificate(spheres, tuple(moves))
+                if verify_folded_wedge_certificate(graph, certificate):
+                    return certificate
+                return None
+            break
+        if not removed:
+            return None
+    return None
 
 
 def certified_flag_wedge(

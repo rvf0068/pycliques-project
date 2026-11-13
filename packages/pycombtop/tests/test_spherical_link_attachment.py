@@ -2,11 +2,21 @@
 
 import networkx as nx
 import pycombtop.homotopy_type as homotopy
+from pycombtop.attachment_certificates import (
+    ConeImageCertificate,
+    bounded_cone_image_certificate,
+    verify_cone_image_certificate,
+)
 from pycombtop.s_collapses import (
     complete_s_collapse_with_certificate,
     verify_s_collapse_move,
 )
-from pycombtop.wedge_certificates import certified_flag_wedge
+from pycombtop.wedge_certificates import (
+    FoldedWedgeCertificate,
+    certified_flag_wedge,
+    certified_flag_wedge_after_s_collapses,
+    verify_folded_wedge_certificate,
+)
 
 
 def test_phase2_11670395_octahedral_link_deletion_certificate():
@@ -265,3 +275,193 @@ def test_spherical_link_rejects_uncertified_deletion_type():
     graph.add_edges_from((apex, vertex) for vertex in circle_vertices)
     assert certified_flag_wedge(graph.subgraph(circle_vertices)) == {1: 1}
     assert homotopy._try_nullhomotopic_spherical_link_at_vertex(graph, apex) is None
+
+
+def _triangle_ear_on_c5() -> nx.Graph:
+    """A flag S1 with a triangular ear, not recognized directly."""
+    graph = nx.cycle_graph(5)
+    graph.add_edges_from([(5, 0), (5, 1)])
+    return graph
+
+
+def test_link_s_collapse_finds_nonoctahedral_sphere():
+    link = _triangle_ear_on_c5()
+    assert certified_flag_wedge(link) is None
+    certificate = certified_flag_wedge_after_s_collapses(link)
+    assert certificate is not None
+    assert certificate.spheres == {1: 1}
+    assert len(certificate.moves) == 1
+    assert certificate.moves[0][0] == 5
+    assert verify_folded_wedge_certificate(link, certificate)
+
+    # Neither the claimed homotopy type nor a fabricated move is trusted.
+    assert not verify_folded_wedge_certificate(
+        link, FoldedWedgeCertificate({2: 1}, certificate.moves)
+    )
+    assert not verify_folded_wedge_certificate(
+        link, FoldedWedgeCertificate({1: 1}, ((0, ()),))
+    )
+
+
+def test_link_fold_budgets_reject_without_guessing():
+    link = _triangle_ear_on_c5()
+    assert certified_flag_wedge_after_s_collapses(link, max_vertices=5) is None
+    assert certified_flag_wedge_after_s_collapses(link, max_moves=0) is None
+    assert certified_flag_wedge_after_s_collapses(link, max_checks=1) is None
+    # A directly recognized cycle needs no reduction budget.
+    certificate = certified_flag_wedge_after_s_collapses(
+        nx.cycle_graph(5), max_checks=0
+    )
+    assert certificate is not None and certificate.moves == ()
+    assert certificate.spheres == {1: 1}
+
+
+def test_s_collapsed_link_extends_nullhomotopic_attachment():
+    link = _triangle_ear_on_c5()
+    graph, vertex = _link_attachment_fixture(link)
+    neighborhood = graph.subgraph(graph.neighbors(vertex))
+    components = list(nx.connected_components(neighborhood))
+    assert sorted(len(c) for c in components) == [1, 6]
+    assert certified_flag_wedge(neighborhood.subgraph(components[0])) is None or (
+        certified_flag_wedge(neighborhood.subgraph(components[1])) is None
+    )
+    local = homotopy._try_nullhomotopic_spherical_link_at_vertex(graph, vertex)
+    assert local is not None and local.is_exact
+    assert local.wedge.spheres == {1: 1, 2: 1, 3: 1}
+    # The bounded global heuristic need not select this vertex: other
+    # admissible candidates can consume its two-deletion search budget.
+    # The local vertex certificate above remains a complete exact proof.
+
+
+def test_bounded_link_collapse_cannot_bypass_dimension_guard():
+    link = _triangle_ear_on_c5()
+    graph = link.copy()
+    graph.add_edge(6, 0)
+    graph.add_edges_from((7, v) for v in range(6))
+    graph.add_edge(7, 6)
+    # The folded link is S1 but the deletion has type S1, so the
+    # degree-one attaching map need not be nullhomotopic.
+    assert homotopy._try_nullhomotopic_spherical_link_at_vertex(graph, 7) is None
+
+
+def test_phase2_10223998_null_attachment_via_cone_image():
+    # Another order-10 Phase-2 TIMEOUT core, 22 vertices, 189 edges.
+    graph = nx.from_graph6_bytes(
+        r"U~h\z}nV|~n~j}V|v|z}~jn|\~|v~zn~~i}nt^Vw".encode("ascii")
+    )
+    assert (graph.number_of_nodes(), graph.number_of_edges()) == (22, 189)
+    link = graph.subgraph(list(graph.neighbors(4))).copy()
+    folded = certified_flag_wedge_after_s_collapses(link)
+    assert folded is not None
+    assert folded.spheres == {6: 1}
+    assert [v for v, _local in folded.moves] == [0, 2, 20]
+    assert verify_folded_wedge_certificate(link, folded)
+
+    deletion = graph.copy()
+    deletion.remove_node(4)
+    proof = bounded_cone_image_certificate(deletion, list(link))
+    assert proof is not None
+    assert [v for v, _dominator in proof.moves] == list(range(5, 18))
+    assert proof.spheres == {3: 1}
+    assert proof.image_vertices == (0, 2, 18, 19, 20)
+    assert proof.apex == 2
+    assert verify_cone_image_certificate(deletion, list(link), proof)
+
+    result = homotopy._try_nullhomotopic_spherical_link_at_vertex(graph, 4)
+    assert result is not None and result.is_exact
+    assert result.wedge.spheres == {3: 1, 7: 1}
+    assert result.reason == homotopy.Theorem.NULLHOMOTOPIC_CONE_IMAGE
+
+    # New structural certificate executes before simplex enumeration.
+    verdict = homotopy.homotopy_type_with_verdict(
+        graph, max_vertices=22, max_simplices=50
+    )
+    assert verdict.is_exact and verdict.wedge.spheres == {3: 1, 7: 1}
+    assert homotopy.Theorem.NULLHOMOTOPIC_CONE_IMAGE in verdict.reason
+
+
+def test_cone_image_proof_is_replayable_and_budgeted():
+    graph = nx.from_graph6_bytes(
+        r"U~h\z}nV|~n~j}V|v|z}~jn|\~|v~zn~~i}nt^Vw".encode("ascii")
+    )
+    link_vertices = list(graph.neighbors(4))
+    deletion = graph.copy()
+    deletion.remove_node(4)
+    proof = bounded_cone_image_certificate(deletion, link_vertices)
+    assert proof is not None
+
+    # False cone apex, false homotopy type and invalid domination move
+    # must all be detected by a replay, even when the stored graph6 is valid.
+    assert not verify_cone_image_certificate(
+        deletion,
+        link_vertices,
+        ConeImageCertificate(proof.moves, proof.spheres, proof.image_vertices, 0),
+    )
+    assert not verify_cone_image_certificate(
+        deletion,
+        link_vertices,
+        ConeImageCertificate(proof.moves, {2: 1}, proof.image_vertices, proof.apex),
+    )
+    assert not verify_cone_image_certificate(
+        deletion,
+        link_vertices,
+        ConeImageCertificate(
+            ((0, 19),) + proof.moves, proof.spheres, proof.image_vertices, proof.apex
+        ),
+    )
+    assert (
+        bounded_cone_image_certificate(deletion, link_vertices, max_vertices=20) is None
+    )
+    assert (
+        bounded_cone_image_certificate(deletion, link_vertices, max_checks=25) is None
+    )
+    assert bounded_cone_image_certificate(deletion, link_vertices, max_moves=3) is None
+
+
+def test_forged_s_collapse_move_shapes_are_rejected():
+    link = _triangle_ear_on_c5()
+    for forged_moves in (
+        ((5,),),
+        (([], ()),),
+        ((5, None),),
+        ((5, ([],)),),
+    ):
+        forged = FoldedWedgeCertificate({1: 1}, forged_moves)
+        assert verify_folded_wedge_certificate(link, forged) is False
+
+
+def test_prebudget_search_reuses_link_certificates(monkeypatch):
+    graph, _ = _link_attachment_fixture(_triangle_ear_on_c5())
+    original = homotopy.certified_flag_wedge_after_s_collapses
+    calls = 0
+
+    def counted(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(homotopy, "certified_flag_wedge_after_s_collapses", counted)
+    homotopy._try_nullhomotopic_spherical_link(graph)
+    # Only six fallback searches are ever allowed; selected candidates
+    # must replay their certificates instead of spending another search.
+    assert 1 <= calls <= 6
+
+
+def test_forged_cone_retraction_move_shapes_are_rejected():
+    graph = nx.from_graph6_bytes(
+        r"U~h\z}nV|~n~j}V|v|z}~jn|\~|v~zn~~i}nt^Vw".encode("ascii")
+    )
+    link = list(graph.neighbors(4))
+    deletion = graph.copy()
+    deletion.remove_node(4)
+    proof = bounded_cone_image_certificate(deletion, link)
+    assert proof is not None
+    for forged_moves in (
+        ((5,),) + proof.moves,
+        (([], 19),) + proof.moves,
+        ((5, []),) + proof.moves,
+    ):
+        forged = ConeImageCertificate(
+            forged_moves, proof.spheres, proof.image_vertices, proof.apex
+        )
+        assert verify_cone_image_certificate(deletion, link, forged) is False
