@@ -171,3 +171,48 @@ def test_contractible_carrier_verifier_rejects_forged_proofs():
         bounded_null_image_certificate(deletion, link, max_moves=6, max_checks=0)
         is None
     )
+
+
+def test_carrier_can_need_two_extra_vertices_to_connect_image():
+    path = nx.path_graph(4)
+    image = (0, 3)
+    assert bounded_contractible_carrier(
+        path, image, max_extra_vertices=1
+    ) is None
+    assert bounded_contractible_carrier(
+        path, image, max_candidates=3
+    ) is None
+    result = bounded_contractible_carrier(path, image, max_candidates=4)
+    assert result is not None
+    vertices, moves, survivor = result
+    assert set(vertices) == set(path)
+    assert verify_contractible_carrier(path, moves, survivor)
+
+
+def test_carrier_budget_and_malformed_input_fail_closed():
+    path = nx.path_graph(4)
+    assert bounded_carrier_collapse(nx.Graph()) is None
+    assert bounded_carrier_collapse(nx.empty_graph(2)) is None
+    assert bounded_carrier_collapse(nx.cycle_graph(5)) is None
+    assert bounded_carrier_collapse(path, max_moves=-1) is None
+    assert bounded_contractible_carrier(path, ()) is None
+    assert bounded_contractible_carrier(path, ([],)) is None
+    assert bounded_contractible_carrier(path, (100,)) is None
+    assert bounded_contractible_carrier(
+        path, (0,), max_extra_vertices=-1
+    ) is None
+    assert bounded_contractible_carrier(
+        path, (0,), max_candidates=0
+    ) is None
+    assert bounded_contractible_carrier(
+        path, (0,), max_carrier_vertices=0
+    ) is None
+    assert bounded_null_image_certificate(
+        path, (0,), max_checks=-1
+    ) is None
+    assert bounded_null_image_certificate(
+        path, (0,), max_moves=-1
+    ) is None
+    assert bounded_null_image_certificate(
+        path, ([],)
+    ) is None
