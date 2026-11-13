@@ -441,9 +441,7 @@ def test_prebudget_search_reuses_link_certificates(monkeypatch):
         calls += 1
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(
-        homotopy, "certified_flag_wedge_after_s_collapses", counted
-    )
+    monkeypatch.setattr(homotopy, "certified_flag_wedge_after_s_collapses", counted)
     result = homotopy._try_nullhomotopic_spherical_link(graph)
     assert result is not None and result.is_exact
     assert result.wedge.spheres == {1: 1, 2: 1, 3: 1}
