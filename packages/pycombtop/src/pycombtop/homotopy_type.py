@@ -70,8 +70,10 @@ from .simplex import (
 )
 from .simplex import star as star  # Public re-export
 from .wedge_certificates import (
+    FoldedWedgeCertificate,
     certified_flag_wedge,
     certified_flag_wedge_after_s_collapses,
+    verify_folded_wedge_certificate,
 )
 
 # ---------------------------------------------------------------------------
@@ -842,7 +844,10 @@ def _octahedral_sphere_dimension(graph: nx.Graph) -> int | None:
 
 
 def _try_nullhomotopic_spherical_link_at_vertex(
-    graph: nx.Graph, vertex
+    graph: nx.Graph,
+    vertex,
+    *,
+    link_certificates: tuple[FoldedWedgeCertificate, ...] | None = None,
 ) -> HomotopyVerdict | None:
     """Certify a null attaching map using explicit *homotopy* certificates.
 
@@ -862,12 +867,21 @@ def _try_nullhomotopic_spherical_link_at_vertex(
     components = list(nx.connected_components(neighborhood))
     if not components:
         return None
+    if link_certificates is not None and len(link_certificates) != len(components):
+        return None
     link_types: list[dict[int, int]] = []
-    for component in components:
+    for i, component in enumerate(components):
         piece = neighborhood.subgraph(component)
-        certificate = certified_flag_wedge_after_s_collapses(
-            piece, max_vertices=18, max_checks=48, max_moves=4
-        )
+        if link_certificates is not None:
+            # Candidate collection already spent the bounded search
+            # budget. Replay the saved witness; NEVER re-run its search.
+            certificate = link_certificates[i]
+            if not verify_folded_wedge_certificate(piece, certificate):
+                return None
+        else:
+            certificate = certified_flag_wedge_after_s_collapses(
+                piece, max_vertices=18, max_checks=48, max_moves=4
+            )
         if certificate is None or 0 in certificate.spheres:
             return None
         link_types.append(certificate.spheres)
@@ -943,36 +957,38 @@ def _try_nullhomotopic_spherical_link(
     """
     if graph.number_of_nodes() > 24:
         return None
-    candidates: list[tuple[int, int, int, object]] = []
+    candidates: list[
+        tuple[int, int, int, object, tuple[FoldedWedgeCertificate, ...]]
+    ] = []
     link_fold_attempts = 0
     for ordinal, vertex in enumerate(graph):
         neighborhood = graph.subgraph(graph.neighbors(vertex))
         components = list(nx.connected_components(neighborhood))
         if not components:
             continue
-        link_types: list[dict[int, int]] = []
+        certificates: list[FoldedWedgeCertificate] = []
         for component in components:
             piece = neighborhood.subgraph(component)
             recognized = certified_flag_wedge(piece, max_calls=48)
-            if recognized is None:
-                # Bound *total* pre-budget fallback scans, not just each
-                # component. The final two deletion checks are capped as
-                # before, and may use a slightly larger local budget.
+            if recognized is not None:
+                certificate = FoldedWedgeCertificate(recognized, ())
+            else:
+                # A strict GLOBAL cap: no final-candidate search may
+                # repeat these checks, because we retain the witnesses.
                 if link_fold_attempts >= 6:
                     break
                 link_fold_attempts += 1
-                folded = certified_flag_wedge_after_s_collapses(
+                certificate = certified_flag_wedge_after_s_collapses(
                     piece, max_vertices=18, max_checks=24, max_moves=3
                 )
-                if folded is None:
+                if certificate is None:
                     break
-                recognized = folded.spheres
-            if 0 in recognized:
+            if 0 in certificate.spheres:
                 break
-            link_types.append(recognized)
-        if len(link_types) != len(components):
+            certificates.append(certificate)
+        if len(certificates) != len(components):
             continue
-        if len(components) == 1 and not link_types[0]:
+        if len(components) == 1 and not certificates[0].spheres:
             # Avoid costly scans for connected contractible links.
             continue
         if len(components) > 1 and all(
@@ -981,13 +997,19 @@ def _try_nullhomotopic_spherical_link(
             # Already handled by the disjoint-simplex link rule.
             continue
         max_dimension = max(
-            (d for link_type in link_types if link_type for d in link_type),
+            (d for cert in certificates for d in cert.spheres),
             default=-1,
         )
-        candidates.append((max_dimension, -len(components), ordinal, vertex))
+        candidates.append(
+            (max_dimension, -len(components), ordinal, vertex, tuple(certificates))
+        )
 
-    for _, _, _, vertex in sorted(candidates)[:2]:
-        verdict = _try_nullhomotopic_spherical_link_at_vertex(graph, vertex)
+    for _, _, _, vertex, certificates in sorted(
+        candidates, key=lambda candidate: candidate[:3]
+    )[:2]:
+        verdict = _try_nullhomotopic_spherical_link_at_vertex(
+            graph, vertex, link_certificates=certificates
+        )
         if verdict is not None:
             return verdict
     return None
