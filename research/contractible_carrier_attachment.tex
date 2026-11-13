@@ -103,27 +103,88 @@ Every complete of \(H\) either avoids \(v\), hence belongs to \(B\), or is \(\{v
 For a nonempty CW complex \(L\), let \(\SigmaU L\) denote the \emph{unreduced} suspension: the two ends of \(L\times[0,1]\) are collapsed separately. This convention matters for disconnected links.
 
 \begin{theorem}[Null-attachment splitting]\label{thm:split}
-If \(j:L\to B\) is null-homotopic, then
+Let \(L\) be a nonempty finite CW complex and \(B\) a nonempty,
+\emph{path-connected} CW complex. Let \(j:L\to B\) be a map,
+and let \(X=B\cup_j CL\) be its homotopy cofiber. If \(j\) is
+null-homotopic, then
 \[
  \boxed{X\simeq B\vee\SigmaU L.}
 \]
-If \(L\) has \(r\ge1\) nonempty connected components \(L_i\), then
+The wedge identifies a chosen point of \(B\) with \emph{one of the two poles}
+of \(\SigmaU L\). If \(L\) has \(r\ge1\) nonempty connected
+CW components \(L_1,\ldots,L_r\), then
 \[
- \SigmaU L\simeq\left(\bigvee_{i=1}^r\SigmaU L_i\right)\vee\bigvee^{r-1}S^1.
+ \boxed{\SigmaU L\simeq
+ \left(\bigvee_{i=1}^r\SigmaU L_i\right)\vee
+ \bigvee^{r-1}S^1.}
 \]
+Up to homotopy equivalence the wedge does not depend on the choice of
+points: the relevant CW spaces are path-connected.
 \end{theorem}
 \begin{proof}
-The homotopy-cofiber is \(B\cup_j CL\). Replace \(j\) by a constant attaching map using the homotopy extension property of the CW pair \((CL,L)\): homotopic attachments yield homotopy-equivalent spaces \cite[Prop.~0.18]{Hatcher2002}. For a constant attachment, the cone base \(L\) is identified to a chosen point of \(B\), producing \(B\vee(CL/L)=B\vee\SigmaU L\).
+For the first assertion, use the homotopy extension property of
+\((CL,L)\) to replace \(j\) by a constant map
+\(c:L\to\{b_0\}\subseteq B\). By Hatcher's
+Proposition~0.18, homotopic attaching maps yield homotopy-equivalent
+adjunction spaces \cite[Prop.~0.18]{Hatcher2002}. The resulting
+space is \(B\cup_c CL\cong B\vee (CL/L)\). Here \(CL/L\) is the
+\emph{unreduced} suspension of \(L\), with the collapsed copy of
+\(L\) forming the pole identified with \(b_0\).
 
-For the disconnected formula, choose one arc between the two suspension poles for each component. The union of the \(r\) arcs is a graph with first Betti number \(r-1\). Each remaining connected suspension attaches to the arcs along a contractible CW subcomplex; collapsing these arcs is a homotopy equivalence \cite[Prop.~0.17 and Ch.~0, Exercise~25]{Hatcher2002}. This gives the displayed formula.
+For the second assertion, let \(p,q\) be the suspension poles and
+write \(Y_i=\SigmaU L_i\), so all the \(Y_i\) share exactly
+\(p,q\). Choose a vertex \(z_i\) of each nonempty CW component
+\(L_i\) and let \(a_i\subseteq Y_i\) be the suspension of
+\(\{z_i\}\), a \emph{single closed interval} from \(p\) to \(q\).
+\emph{Collapse only \(a_1\)}, not the union of all the \(a_i\).
+As \(a_1\) is a contractible subcomplex, the quotient map
+\(\SigmaU L\to (\SigmaU L)/a_1\) is a homotopy equivalence
+\cite[Prop.~0.17]{Hatcher2002}. The quotient identifies the two
+poles, and it is a one-point union of \(Y_1/a_1\) and
+\(Y_i/(p\sim q)\) for \(2\le i\le r\). By the same proposition,
+\(Y_1/a_1\simeq Y_1\).
+
+For every \(i\ge2\), attach a new edge \(e_i\) from \(p\) to \(q\)
+to form \(Z_i=Y_i\cup_{\{p,q\}}e_i\). Collapsing the contractible
+edge \(e_i\) gives \(Z_i/e_i\cong Y_i/(p\sim q)\); instead,
+collapsing the contractible arc \(a_i\) gives
+\[
+ Z_i/a_i\cong (Y_i/a_i)\vee S^1\simeq Y_i\vee S^1.
+\]
+Both quotient maps are homotopy equivalences by Proposition~0.17.
+Thus \(Y_i/(p\sim q)\simeq Y_i\vee S^1\). Combining the factors
+yields precisely \(r-1\) additional circles. This agrees with
+Hatcher's Chapter~0, Exercise~25 \cite{Hatcher2002}.
 \end{proof}
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[scale=.87]
+ \node[vtx] (p) at (0,1.45) {\(p\)};
+ \node[vtx] (q) at (0,-1.45) {\(q\)};
+ \draw[tealblue,line width=1.9pt] (p) -- (q)
+    node[pos=.34,left,font=\scriptsize] {\(a_1\)};
+ \draw[redorange,line width=1.2pt] (p) to[out=145,in=215,looseness=1.0] (q)
+    node[pos=.43,left,font=\scriptsize] {\(a_2\)};
+ \draw[darkblue,line width=1.2pt] (p) to[out=35,in=-35,looseness=1.0] (q)
+    node[pos=.45,right,font=\scriptsize] {\(a_3\)};
+ \node[font=\small,align=center] at (3.9,.2)
+    {Three arcs form a graph with\\ \(\beta_1=2\), \emph{not} a contractible tree.};
+ \node[font=\small,align=center] at (3.9,-.9)
+    {Only the highlighted arc \(a_1\)\\ is collapsed in the proof.};
+\end{tikzpicture}
+\caption{The suspension of three components contains three paths
+between its two poles. Their union has two cycles and must \emph{not}
+be collapsed under Proposition~0.17. A single arc is contractible.}
+\label{fig:suspension-arcs}
+\end{figure}
 
 \begin{example}[A square, and the importance of the link map]\label{ex:square}
 Take \(H=C_4\) and \(v\) as in Figure~\ref{fig:pushout}. The deletion is a tree, hence contractible, and the link consists of two points (\(S^0\)). The attachment is null, so \(\Del(C_4)\simeq\SigmaU S^0\simeq S^1\). In contrast, if \(H\) is a four-cycle with an additional hub adjacent to all four cycle vertices, then for that hub \(B=L=\Del(C_4)\cong S^1\) and \(j\) is the identity. The star fills the cycle with a cone and \(\Del(H)\) is contractible, \emph{not} \(S^1\vee S^2\). Thus one cannot infer the cofiber from the abstract types of \(B\) and \(L\) alone.
 \end{example}
 
 \section{Ordinary graph folds and contractible carriers}
-An \emph{ordinary graph fold} is the deletion of a vertex \(x\) dominated by a distinct adjacent vertex \(y\), meaning \(\N_D[x]\subseteq\N_D[y]\) for closed neighborhoods. This is different from the graph \(s\)-dismantling used below.
+An \emph{ordinary graph fold} is the deletion of a vertex \(x\) dominated by a distinct adjacent vertex \(y\), meaning \(\N_D[x]\subseteq\N_D[y]\) for closed neighborhoods. An ordinary fold is a \emph{special case} of the graph \(s\)-dismantling used below: the dominating vertex \(y\) is universal in the \emph{open} neighborhood of \(x\), so that neighborhood is dismantlable. The distinction is that a general \(s\)-dismantling need not admit a one-vertex simplicial retraction \(x\mapsto y\). Such an explicit retraction is essential to our image-carrier certificates.
 
 \begin{lemma}[Ordinary folds produce simplicial retractions]\label{lem:fold}
 Suppose \(\N_D[x]\subseteq\N_D[y]\), \(x\ne y\). The vertex map sending \(x\) to \(y\) and fixing all other vertices induces a simplicial retraction \(p:\Del(D)\to\Del(D-x)\). Moreover \(p\) is a homotopy equivalence. A sequence of such folds therefore yields a simplicial homotopy equivalence \(r:\Del(D)\to\Del(D')\), with an explicit map on the original vertices.
@@ -151,7 +212,7 @@ If \(W\) has a universal vertex in \(D'[W]\), then \(A\) is a simplicial cone an
 \end{remark}
 
 \section{Certifying contractibility by s-dismantlings}
-A vertex \(w\) of a graph \(A\) is \emph{\(s\)-dismantlable} if its open neighborhood \(A[\N_A(w)]\) is an ordinarily dismantlable nonempty graph, that is, it reduces to one vertex by successive dominated-vertex deletions. This graph-theoretic condition is related to simplicial simple-homotopy by Boulet--Fieux--Jouve \cite{BouletFieuxJouve2010}. We record the topological argument needed here.
+A vertex \(w\) of a graph \(A\) is \emph{\(s\)-dismantlable} if its open neighborhood \(A[\N_A(w)]\) is an ordinarily dismantlable nonempty graph, that is, it reduces to one vertex by successive dominated-vertex deletions. This is the \(s\)-dismantlability condition of Boulet--Fieux--Jouve \cite[Def.~1.1]{BouletFieuxJouve2010}, who relate it to simple-homotopy of flag complexes. Our proof below is self-contained at the level of ordinary homotopy equivalence and does not depend on their stronger simple-homotopy theorem.
 
 \begin{proposition}[An \(s\)-dismantling preserves homotopy type]\label{prop:s}
 If \(w\) is \(s\)-dismantlable in \(A\), then the natural inclusion \(\Del(A-w)\hookrightarrow\Del(A)\) is a homotopy equivalence. Hence an explicitly verified sequence of such moves reducing \(A\) to one vertex proves \(\Del(A)\) contractible.
@@ -203,7 +264,11 @@ Thus \(D_0\) consists of a five-cycle and a path of three edges rooted at vertex
 \[
  (t_8,t_9,t_{10},t_{11},t_{12},t_{13})=(0,5,6,7,6,5).
 \]
-Create six further vertices \(8,\ldots,13\), add the six-cycle \(8-9-10-11-12-13-8\), and join each vertex \(i\in\{8,\ldots,13\}\) to \(t_i\) and every neighbor of \(t_i\) in \(D_0\). No other edges are added. Denote the resulting graph on 14 vertices by \(D\). Finally add a new vertex \(v=14\) adjacent \emph{only} to \(8,\ldots,13\), obtaining the graph \(H\). The construction has \(38\) edges and graph6 string \verb!NhEMKC@?KC|o^@M?~_?! (the labelled construction, rather than this optional encoding, fixes the graph unambiguously).
+Create six further vertices \(8,\ldots,13\), add the six-cycle \(8-9-10-11-12-13-8\), and join each vertex \(i\in\{8,\ldots,13\}\) to \(t_i\) and every neighbor of \(t_i\) in \(D_0\). No other edges are added. Denote the resulting graph on 14 vertices by \(D\). Finally add a new vertex \(v=14\) adjacent \emph{only} to \(8,\ldots,13\), obtaining the graph \(H\). The construction has \(38\) edges. Its graph6 string in the exact vertex
+order \(0,1,\ldots,14\) is \verb!Nhe?GFK`gM_X@p`g_Fw!.
+The alternative string \verb!NhEMKC@?KC|o^@M?~_?! encodes an
+\emph{isomorphic} graph, but with a different labelling. The vertex
+and edge specification above is authoritative for the fold indices.
 
 \begin{figure}[htbp]
 \centering
@@ -241,7 +306,14 @@ The neighbors of \(14\) are precisely \(8,\ldots,13\), inducing \(C_6\); hence \
 \]
 For example, vertex \(8\) has neighbors \(9,13\) on the upper cycle and neighbors \(0,1,4,5\) in \(D_0\). Vertex \(0\) is adjacent to all those vertices, so \(\N_D[8]\subseteq\N_D[0]\). After removing \(8\), the same check gives \(\N_{D-8}[9]\subseteq\N_{D-8}[5]\), and similarly for each remaining pair of \eqref{eq:folds}. An exact list of all closed-neighborhood inclusions can therefore be verified independently without computing homology.
 
-After the six folds, the deletion has become \(D_0\), whose pendant path ordinarily folds away, leaving \(C_5\). Hence \(\Del(D)\simeq\Del(D_0)\simeq S^1\). Tracking the original link vertices through the six folds gives the image set
+After the six folds, the deletion has become \(D_0\), whose pendant path ordinarily folds away, leaving \(C_5\). Hence \(\Del(D)\simeq\Del(D_0)\simeq S^1\). Note that
+\(\Del(D)\) is \emph{not} one-dimensional: for example
+\(\{0,5,8,9\}\) spans a \(K_4\) in \(D\), and its clique complex
+contains a tetrahedron. The statement concerns homotopy type, not
+simplicial dimension. In fact, the complete clique-complex face
+numbers of \(H\) are \((f_0,f_1,f_2,f_3)=(15,38,30,6)\),
+so \(\chi(\Del(H))=15-38+30-6=1\), consistent with
+\(S^1\vee S^2\). Tracking the original link vertices through the six folds gives the image set
 \[
  W=\{0,5,6,7\},\qquad D_0[W]=P_4.
 \]
@@ -256,6 +328,13 @@ The six-fold retraction in \eqref{eq:folds} has a \emph{nonconical} image, so it
 
 \section{A carrier with an extra vertex; search limitations}
 A carrier need not equal the subcomplex induced by the image vertices. For instance, let \(D'\) be a wheel with rim \(C_5\) and hub \(h\). If the image vertices are exactly the rim vertices, then their induced complex is a circle and is \emph{not} contractible. By adding the hub to the carrier vertex set, the induced subcomplex becomes the cone \(h*\Del(C_5)\), which is contractible. This illustrates why the implementation may test one or two vertices outside the image.
+
+\emph{This is an illustration of the carrier mechanism, not an example
+of a fold-reduced deletion target.} The wheel itself is ordinarily
+fold-reducible: every rim vertex is dominated by the hub. In the
+current greedy algorithm, the wheel need not occur as the final
+result of a maximal ordinary-fold pass. The theorem applies to any
+certified sequence of folds, including a sequence of length zero.
 
 \begin{figure}[htbp]
 \centering
@@ -274,7 +353,7 @@ A carrier need not equal the subcomplex induced by the image vertices. For insta
 \foreach \i in {0,...,4}{\draw[target] (h)--(S\i);}
 \end{scope}
 \end{tikzpicture}
-\caption{The image-induced subcomplex can be noncontractible. Adding just one target vertex produces a contractible carrier. More elaborate carriers need not have a universal vertex.}
+\caption{An illustrative carrier enlargement (not a fold-reduced target): the image-induced circle is not contractible, but adding the wheel hub yields a contractible carrier.}
 \label{fig:extra}
 \end{figure}
 
@@ -284,7 +363,7 @@ In \texttt{pycombtop}, the present implementation makes only a bounded attempt t
 The vertex-star method is the homotopy cofiber of a specific attaching map. The contractible-carrier theorem supplies a purely combinatorial proof that this map is null: ordinary deletion folds provide a verified homotopy equivalence, while a separate certified contraction of a small induced carrier makes the composite attachment null-homotopic. In particular, the criterion avoids the false inference that vanishing homology of an image determines its homotopy type. Future improvements could use independently verified discrete Morse certificates for contractibility when neither ordinary graph folds nor bounded vertex \(s\)-dismantlings find a suitable carrier; such an extension requires a genuine contractibility certificate rather than mere acyclicity.
 
 \begin{thebibliography}{9}
-\bibitem{Hatcher2002} A. Hatcher, \emph{Algebraic Topology}, Cambridge University Press, 2002. Chapter 0, in particular Propositions 0.17 and 0.18 and Exercise 25. \url{https://pi.math.cornell.edu/~hatcher/AT/AT.pdf}.
+\bibitem{Hatcher2002} A. Hatcher, \emph{Algebraic Topology}, Cambridge University Press, 2002. Chapter 0, in particular Propositions 0.17 and 0.18 and Exercise~25 (suspension of disconnected CW complexes). \url{https://pi.math.cornell.edu/~hatcher/AT/AT.pdf}.
 \bibitem{Kozlov2008} D. N. Kozlov, \emph{Combinatorial Algebraic Topology}, Algorithms and Computation in Mathematics, vol.~21, Springer, 2008. \url{https://doi.org/10.1007/978-3-540-71962-5}.
 \bibitem{BouletFieuxJouve2010} R. Boulet, E. Fieux, and B. Jouve, ``Simplicial simple-homotopy of flag complexes in terms of graphs,'' \emph{European J. Combin.} \textbf{31} (2010), no.~1, 161--176. \url{https://doi.org/10.1016/j.ejc.2009.05.003}.
 \end{thebibliography}
