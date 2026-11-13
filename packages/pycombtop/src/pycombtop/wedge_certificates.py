@@ -78,11 +78,7 @@ def certified_flag_wedge_after_s_collapses(
     direct = certified_flag_wedge(graph)
     if direct is not None:
         return FoldedWedgeCertificate(direct, ())
-    if (
-        graph.number_of_nodes() > max_vertices
-        or max_checks < 1
-        or max_moves < 1
-    ):
+    if graph.number_of_nodes() > max_vertices or max_checks < 1 or max_moves < 1:
         return None
     current = graph.copy()
     moves: list[tuple[Hashable, tuple[tuple[Hashable, Hashable], ...]]] = []
