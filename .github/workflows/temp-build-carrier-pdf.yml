@@ -1,0 +1,30 @@
+name: Build contractible-carrier PDF (temporary)
+on:
+  push:
+    branches:
+      - research/bounded-contractible-carrier-attachments
+permissions:
+  contents: write
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build PDF from the checked-in LaTeX source
+        uses: xu-cheng/latex-action@v4
+        with:
+          root_file: contractible_carrier_attachment.tex
+          working_directory: research
+          work_in_root_file_dir: true
+          latexmk_use_lualatex: false
+          args: -pdf -interaction=nonstopmode -halt-on-error -file-line-error
+      - name: Commit the compiled PDF
+        run: |
+          test -s research/contractible_carrier_attachment.pdf
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f research/contractible_carrier_attachment.pdf
+          if ! git diff --cached --quiet; then
+            git commit -m "Include compiled illustrated contractible-carrier PDF"
+            git push origin HEAD:"$GITHUB_REF_NAME"
+          fi
