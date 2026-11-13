@@ -62,7 +62,9 @@ from .attachment_certificates import (
     ConeImageCertificate,
     bounded_null_image_certificate,
 )
+from .integral_morse import bipartite_shore_facets, integral_morse_certificate
 from .morse_certificates import facet_morse_certificate
+from .recursive_wedges import recursive_wedge_certificate
 from .s_collapses import complete_s_collapse, complete_s_collapse_edges
 from .simplex import (
     Simplex,
@@ -113,6 +115,22 @@ class Theorem:
         "number forces zero cellular boundary. Hurewicz for a wedge of "
         "m-spheres makes the attaching maps nullhomotopic "
         "[Hatcher, Algebraic Topology, Section 4.2]."
+    )
+    RECURSIVE_VERTEX_STAR = (
+        "A replayed decomposition by dominated-vertex folds, joins and vertex "
+        "stars certifies the wedge. Each attaching map is null by cellular "
+        "approximation or by a contracted carrier of the folded link image."
+    )
+    INTEGRAL_MORSE = (
+        "Replayed free pairs and critical facets give a Morse CW model. "
+        "One critical vertex and one positive dimension give a wedge directly. "
+        "For two consecutive dimensions d,d+1 with d>=2, the verified integral "
+        "Morse boundary vanishes, so Hurewicz makes every attachment null."
+    )
+    BIPARTITE_SHORE = (
+        "The simplex on one side of the bipartite complement and the other "
+        "side's contractible star cluster give the suspension of their "
+        "intersection [Barmak, Star clusters in independence complexes]. "
     )
     VERTEX_DECOMPOSABLE = (
         "A checked shedding-vertex recursion certifies nonpure vertex "
@@ -1338,6 +1356,38 @@ def homotopy_type_with_verdict(
     v = _try_nullhomotopic_spherical_link(graph)
     if v:
         return v
+
+    # Reserve the recursive search for large inputs; the standard small-graph
+    # census uses cheaper methods. Both proof and search operate on graph
+    # masks, without spending the caller's simplex budget.
+    if 20 <= len(graph) <= 40:
+        recursive = recursive_wedge_certificate(graph)
+        if recursive is not None:
+            return HomotopyVerdict(
+                WedgeOfSpheres(recursive.spheres), Theorem.RECURSIVE_VERTEX_STAR
+            )
+
+        # The explicit Morse algorithm counts nonempty faces. The caller's
+        # simplex budget also includes the empty face, even for a shore.
+        face_limit = 25000 if max_simplices is None else min(25000, max_simplices - 1)
+        if face_limit > 0:
+            shore = bipartite_shore_facets(graph)
+            if shore:
+                certificate = integral_morse_certificate(shore, max_faces=face_limit)
+                if certificate is not None:
+                    spheres = {d + 1: n for d, n in certificate.spheres.items()}
+                    return HomotopyVerdict(
+                        WedgeOfSpheres(spheres),
+                        Theorem.BIPARTITE_SHORE + Theorem.INTEGRAL_MORSE,
+                    )
+            if not _graph_exceeds_simplex_budget(graph, face_limit + 1):
+                index = {v: i for i, v in enumerate(graph)}
+                facets = {sum(1 << index[v] for v in q) for q in nx.find_cliques(graph)}
+                certificate = integral_morse_certificate(facets, max_faces=face_limit)
+                if certificate is not None:
+                    return HomotopyVerdict(
+                        WedgeOfSpheres(certificate.spheres), Theorem.INTEGRAL_MORSE
+                    )
 
     # The streaming check first avoids unnecessary reductions on the common
     # within-budget path. On overflow, try all graph s-collapses before
