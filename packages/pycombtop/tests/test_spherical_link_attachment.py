@@ -6,7 +6,12 @@ from pycombtop.s_collapses import (
     complete_s_collapse_with_certificate,
     verify_s_collapse_move,
 )
-from pycombtop.wedge_certificates import certified_flag_wedge
+from pycombtop.wedge_certificates import (
+    FoldedWedgeCertificate,
+    certified_flag_wedge,
+    certified_flag_wedge_after_s_collapses,
+    verify_folded_wedge_certificate,
+)
 
 
 def test_phase2_11670395_octahedral_link_deletion_certificate():
@@ -265,3 +270,71 @@ def test_spherical_link_rejects_uncertified_deletion_type():
     graph.add_edges_from((apex, vertex) for vertex in circle_vertices)
     assert certified_flag_wedge(graph.subgraph(circle_vertices)) == {1: 1}
     assert homotopy._try_nullhomotopic_spherical_link_at_vertex(graph, apex) is None
+
+
+def _triangle_ear_on_c5() -> nx.Graph:
+    """A flag S1 with a triangular ear, not recognized directly."""
+    graph = nx.cycle_graph(5)
+    graph.add_edges_from([(5, 0), (5, 1)])
+    return graph
+
+
+def test_link_s_collapse_finds_nonoctahedral_sphere():
+    link = _triangle_ear_on_c5()
+    assert certified_flag_wedge(link) is None
+    certificate = certified_flag_wedge_after_s_collapses(link)
+    assert certificate is not None
+    assert certificate.spheres == {1: 1}
+    assert len(certificate.moves) == 1
+    assert certificate.moves[0][0] == 5
+    assert verify_folded_wedge_certificate(link, certificate)
+
+    # Neither the claimed homotopy type nor a fabricated move is trusted.
+    assert not verify_folded_wedge_certificate(
+        link, FoldedWedgeCertificate({2: 1}, certificate.moves)
+    )
+    assert not verify_folded_wedge_certificate(
+        link, FoldedWedgeCertificate({1: 1}, ((0, ()),))
+    )
+
+
+def test_link_fold_budgets_reject_without_guessing():
+    link = _triangle_ear_on_c5()
+    assert certified_flag_wedge_after_s_collapses(link, max_vertices=5) is None
+    assert certified_flag_wedge_after_s_collapses(link, max_moves=0) is None
+    assert certified_flag_wedge_after_s_collapses(link, max_checks=1) is None
+    # A directly recognized cycle needs no reduction budget.
+    certificate = certified_flag_wedge_after_s_collapses(
+        nx.cycle_graph(5), max_checks=0
+    )
+    assert certificate is not None and certificate.moves == ()
+    assert certificate.spheres == {1: 1}
+
+
+def test_s_collapsed_link_extends_nullhomotopic_attachment():
+    link = _triangle_ear_on_c5()
+    graph, vertex = _link_attachment_fixture(link)
+    neighborhood = graph.subgraph(graph.neighbors(vertex))
+    components = list(nx.connected_components(neighborhood))
+    assert sorted(len(c) for c in components) == [1, 6]
+    assert certified_flag_wedge(neighborhood.subgraph(components[0])) is None or (
+        certified_flag_wedge(neighborhood.subgraph(components[1])) is None
+    )
+    local = homotopy._try_nullhomotopic_spherical_link_at_vertex(graph, vertex)
+    assert local is not None and local.is_exact
+    assert local.wedge.spheres == {1: 1, 2: 1, 3: 1}
+    # A stringent simplex budget tests that pre-budget search can discover it.
+    exact = homotopy.homotopy_type_with_verdict(graph, max_simplices=32)
+    assert exact.is_exact
+    assert exact.wedge.spheres == {1: 1, 2: 1, 3: 1}
+
+
+def test_bounded_link_collapse_cannot_bypass_dimension_guard():
+    link = _triangle_ear_on_c5()
+    graph = link.copy()
+    graph.add_edge(6, 0)
+    graph.add_edges_from((7, v) for v in range(6))
+    graph.add_edge(7, 6)
+    # The folded link is S1 but the deletion has type S1, so the
+    # degree-one attaching map need not be nullhomotopic.
+    assert homotopy._try_nullhomotopic_spherical_link_at_vertex(graph, 7) is None
