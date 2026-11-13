@@ -417,3 +417,54 @@ def test_cone_image_proof_is_replayable_and_budgeted():
         bounded_cone_image_certificate(deletion, link_vertices, max_checks=25) is None
     )
     assert bounded_cone_image_certificate(deletion, link_vertices, max_moves=3) is None
+
+
+def test_forged_s_collapse_move_shapes_are_rejected():
+    link = _triangle_ear_on_c5()
+    for forged_moves in (
+        ((5,),),
+        (([], ()),),
+        ((5, None),),
+        ((5, ([],)),),
+    ):
+        forged = FoldedWedgeCertificate({1: 1}, forged_moves)
+        assert verify_folded_wedge_certificate(link, forged) is False
+
+
+def test_prebudget_search_reuses_link_certificates(monkeypatch):
+    graph, _ = _link_attachment_fixture(_triangle_ear_on_c5())
+    original = homotopy.certified_flag_wedge_after_s_collapses
+    calls = 0
+
+    def counted(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(
+        homotopy, "certified_flag_wedge_after_s_collapses", counted
+    )
+    result = homotopy._try_nullhomotopic_spherical_link(graph)
+    assert result is not None and result.is_exact
+    assert result.wedge.spheres == {1: 1, 2: 1, 3: 1}
+    assert 1 <= calls <= 6
+
+
+def test_forged_cone_retraction_move_shapes_are_rejected():
+    graph = nx.from_graph6_bytes(
+        r"U~h\z}nV|~n~j}V|v|z}~jn|\~|v~zn~~i}nt^Vw".encode("ascii")
+    )
+    link = list(graph.neighbors(4))
+    deletion = graph.copy()
+    deletion.remove_node(4)
+    proof = bounded_cone_image_certificate(deletion, link)
+    assert proof is not None
+    for forged_moves in (
+        ((5,),) + proof.moves,
+        (([], 19),) + proof.moves,
+        ((5, []),) + proof.moves,
+    ):
+        forged = ConeImageCertificate(
+            forged_moves, proof.spheres, proof.image_vertices, proof.apex
+        )
+        assert verify_cone_image_certificate(deletion, link, forged) is False
