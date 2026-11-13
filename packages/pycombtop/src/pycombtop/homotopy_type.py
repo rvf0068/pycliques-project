@@ -58,6 +58,7 @@ import networkx as nx
 from pycliques import clique_graph
 from pycliques.surfaces import open_neighborhood
 
+from .attachment_certificates import bounded_cone_image_certificate
 from .morse_certificates import facet_morse_certificate
 from .s_collapses import complete_s_collapse, complete_s_collapse_edges
 from .simplex import (
@@ -128,6 +129,15 @@ class Theorem:
         "complete graphs, and deleting the vertex leaves a connected "
         "graph. The vertex star is a cone attached along r disjoint "
         "contractible simplices, producing r-1 additional circles."
+    )
+    NULLHOMOTOPIC_CONE_IMAGE = (
+        "Ordinary dominated-vertex folds of the deletion define a "
+        "replayable simplicial retraction onto a certified sphere wedge. "
+        "Every vertex of the link maps into an induced subcomplex with "
+        "a universal vertex (a cone). Thus the link inclusion is "
+        "nullhomotopic even without a dimension gap, and its cofiber "
+        "splits into the deletion wedge, suspended link components and "
+        "r-1 circles [Hatcher, Algebraic Topology, Chapter 0]."
     )
     NULLHOMOTOPIC_SPHERICAL_LINK = (
         "Each vertex-link component has a graph-theoretically certified "
@@ -872,17 +882,40 @@ def _try_nullhomotopic_spherical_link_at_vertex(
 
     core = _simplify_graph_ht(deletion)
     base_type = certified_flag_wedge(core, max_calls=48)
-    if base_type is None or 0 in base_type:
-        return None
-    if base_type:
-        min_dimension = min(base_type)
-        if min_dimension < 2 or any(
-            dimension >= min_dimension
-            for link_type in link_types
-            for dimension in link_type
-        ):
-            # Homology alone would not establish a null attaching map.
+    dimension_gap = (
+        base_type is not None
+        and 0 not in base_type
+        and (
+            not base_type
+            or (
+                min(base_type) >= 2
+                and all(
+                    dimension < min(base_type)
+                    for link_type in link_types
+                    for dimension in link_type
+                )
+            )
+        )
+    )
+    reason = Theorem.NULLHOMOTOPIC_SPHERICAL_LINK
+    if not dimension_gap:
+        # When the connectivity inequality fails, a *different* exact
+        # proof can still work: ordinary vertex folds give a simplicial
+        # retraction of the deletion, and the entire link must land in
+        # a cone in that retract. Never infer this from Betti numbers.
+        cone_certificate = bounded_cone_image_certificate(
+            deletion,
+            list(neighborhood),
+            max_vertices=24,
+            max_checks=1024,
+            max_moves=18,
+        )
+        if cone_certificate is None:
             return None
+        base_type = cone_certificate.spheres
+        reason = Theorem.NULLHOMOTOPIC_CONE_IMAGE
+    if base_type is None:
+        return None
 
     spheres = WedgeOfSpheres(base_type)
     if len(components) > 1:
@@ -892,7 +925,7 @@ def _try_nullhomotopic_spherical_link_at_vertex(
             spheres = spheres.add_spheres(dimension + 1, multiplicity)
     return HomotopyVerdict(
         wedge=spheres,
-        reason=Theorem.NULLHOMOTOPIC_SPHERICAL_LINK,
+        reason=reason,
     )
 
 
