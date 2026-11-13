@@ -44,16 +44,23 @@ class FoldedWedgeCertificate:
 def verify_folded_wedge_certificate(
     graph: nx.Graph, certificate: FoldedWedgeCertificate
 ) -> bool:
-    """Replay every local dismantling and rederive the final wedge type."""
-    current = graph.copy()
-    for vertex, local in certificate.moves:
-        if vertex not in current:
-            return False
-        neighborhood = current.subgraph(list(current.neighbors(vertex))).copy()
-        if not verify_dismantling_certificate(neighborhood, local):
-            return False
-        current.remove_node(vertex)
-    return certified_flag_wedge(current) == certificate.spheres
+    """Replay every local dismantling; reject malformed proofs, never raise."""
+    try:
+        current = graph.copy()
+        for move in certificate.moves:
+            if not isinstance(move, (tuple, list)) or len(move) != 2:
+                return False
+            vertex, local = move
+            if vertex not in current:
+                return False
+            neighborhood = current.subgraph(list(current.neighbors(vertex))).copy()
+            if not verify_dismantling_certificate(neighborhood, local):
+                return False
+            current.remove_node(vertex)
+        return certified_flag_wedge(current) == certificate.spheres
+    except (TypeError, ValueError):
+        # The verifier is a trust boundary for potentially forged proofs.
+        return False
 
 
 def certified_flag_wedge_after_s_collapses(
