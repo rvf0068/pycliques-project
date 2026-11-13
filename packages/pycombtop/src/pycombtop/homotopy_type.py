@@ -872,6 +872,7 @@ def _try_nullhomotopic_spherical_link_at_vertex(
     link_types: list[dict[int, int]] = []
     for i, component in enumerate(components):
         piece = neighborhood.subgraph(component)
+        certificate: FoldedWedgeCertificate | None
         if link_certificates is not None:
             # Candidate collection already spent the bounded search
             # budget. Replay the saved witness; NEVER re-run its search.
@@ -969,6 +970,7 @@ def _try_nullhomotopic_spherical_link(
         certificates: list[FoldedWedgeCertificate] = []
         for component in components:
             piece = neighborhood.subgraph(component)
+            certificate: FoldedWedgeCertificate | None
             recognized = certified_flag_wedge(piece, max_calls=48)
             if recognized is not None:
                 certificate = FoldedWedgeCertificate(recognized, ())
@@ -1004,11 +1006,11 @@ def _try_nullhomotopic_spherical_link(
             (max_dimension, -len(components), ordinal, vertex, tuple(certificates))
         )
 
-    for _, _, _, vertex, certificates in sorted(
+    for _, _, _, vertex, selected_certificates in sorted(
         candidates, key=lambda candidate: candidate[:3]
     )[:2]:
         verdict = _try_nullhomotopic_spherical_link_at_vertex(
-            graph, vertex, link_certificates=certificates
+            graph, vertex, link_certificates=selected_certificates
         )
         if verdict is not None:
             return verdict
