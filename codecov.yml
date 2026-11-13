@@ -1,0 +1,14 @@
+# Coverage is uploaded separately by each of the 4 x 4 CI test matrix jobs.
+# Reporting project coverage on partial uploads previously generated
+# transient false failures while the slowest pycliques tests were running.
+#
+# The 'codecov-finalize' job in .github/workflows/ci.yml runs after the
+# entire matrix finishes (even if a matrix leg fails), and explicitly
+# releases the Codecov project/patch notifications with send-notifications.
+# This also handles failed legs that never produced a coverage report;
+# unlike after_n_builds, no fixed number of uploads is required.
+#
+# Do not lower coverage thresholds or change any per-package upload flags.
+codecov:
+  notify:
+    manual_trigger: true

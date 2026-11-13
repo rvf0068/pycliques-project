@@ -58,6 +58,25 @@ jobs:
           flags: ${{ matrix.package }}
           fail_ci_if_error: false # Don't break build if Codecov is down
 
+  codecov-finalize:
+    name: Publish final Codecov status
+    needs: test
+    # When any matrix leg fails, the other test jobs and available coverage
+    # uploads still finish. Notify Codecov exactly once when all legs have
+    # completed; do not require a fixed number of successful uploads.
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Publish project and patch status after all matrix jobs
+        uses: codecov/codecov-action@v5
+        with:
+          run_command: send-notifications
+          override_commit: ${{ github.event.pull_request.head.sha || github.sha }}
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+
   research:
     name: Research regression tests (Python 3.11)
     if: github.event_name != 'schedule'
