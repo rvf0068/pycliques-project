@@ -58,7 +58,10 @@ import networkx as nx
 from pycliques import clique_graph
 from pycliques.surfaces import open_neighborhood
 
-from .attachment_certificates import ConeImageCertificate, bounded_null_image_certificate
+from .attachment_certificates import (
+    ConeImageCertificate,
+    bounded_null_image_certificate,
+)
 from .morse_certificates import facet_morse_certificate
 from .s_collapses import complete_s_collapse, complete_s_collapse_edges
 from .simplex import (
