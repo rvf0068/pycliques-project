@@ -1,0 +1,30 @@
+name: Compile corrected carrier note (temporary)
+
+on:
+  push:
+    branches: [research/bounded-contractible-carrier-attachments]
+
+permissions:
+  contents: write
+
+jobs:
+  compile-pdf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile LaTeX twice
+        uses: xu-cheng/latex-action@v4
+        with:
+          root_file: contractible_carrier_attachment.tex
+          working_directory: research
+          args: -pdf -file-line-error -interaction=nonstopmode -halt-on-error
+      - name: Commit reviewed PDF
+        run: |
+          test -s research/contractible_carrier_attachment.pdf
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/contractible_carrier_attachment.pdf
+          if ! git diff --cached --quiet; then
+            git commit -m "Recompile corrected illustrated contractible-carrier note"
+            git push origin HEAD:"$GITHUB_REF_NAME"
+          fi
