@@ -68,7 +68,10 @@ from .simplex import (
     dong_matching,
 )
 from .simplex import star as star  # Public re-export
-from .wedge_certificates import certified_flag_wedge
+from .wedge_certificates import (
+    certified_flag_wedge,
+    certified_flag_wedge_after_s_collapses,
+)
 
 # ---------------------------------------------------------------------------
 # Theorem citations
@@ -833,7 +836,8 @@ def _try_nullhomotopic_spherical_link_at_vertex(
 ) -> HomotopyVerdict | None:
     """Certify a null attaching map using explicit *homotopy* certificates.
 
-    Recognize each connected link component as a sphere wedge, and
+    Recognize each link component as a sphere wedge, allowing separately
+    replayable bounded vertex s-collapses of its flag complex, and
     s-collapse the connected deletion to a graph whose flag complex
     is independently certified as a sphere wedge. The deletion is
     contractible, or its lowest sphere dimension is d>=2, strictly
@@ -851,10 +855,12 @@ def _try_nullhomotopic_spherical_link_at_vertex(
     link_types: list[dict[int, int]] = []
     for component in components:
         piece = neighborhood.subgraph(component)
-        certified = certified_flag_wedge(piece, max_calls=48)
-        if certified is None or 0 in certified:
+        certificate = certified_flag_wedge_after_s_collapses(
+            piece, max_vertices=18, max_checks=48, max_moves=4
+        )
+        if certificate is None or 0 in certificate.spheres:
             return None
-        link_types.append(certified)
+        link_types.append(certificate.spheres)
     if len(components) == 1 and not link_types[0]:
         # A connected contractible link already admits cheaper folds.
         return None
@@ -898,22 +904,40 @@ def _try_nullhomotopic_spherical_link(
     Prioritize smaller-dimensional link sphere wedges: these are more
     likely to map nullhomotopically into the deletion. The selection
     uses cheap graph-theoretic certificates only; no s-collapse is run
-    until the final two candidates. The fixed caps affect coverage,
+    until the final two candidates. Link-fold fallback scans are also
+    globally capped at six, with at most three moves each. Fixed caps affect coverage,
     not mathematical validity.
     """
     if graph.number_of_nodes() > 24:
         return None
     candidates: list[tuple[int, int, int, object]] = []
+    link_fold_attempts = 0
     for ordinal, vertex in enumerate(graph):
         neighborhood = graph.subgraph(graph.neighbors(vertex))
         components = list(nx.connected_components(neighborhood))
         if not components:
             continue
-        link_types = [
-            certified_flag_wedge(neighborhood.subgraph(component), max_calls=48)
-            for component in components
-        ]
-        if any(t is None or 0 in t for t in link_types):
+        link_types: list[dict[int, int]] = []
+        for component in components:
+            piece = neighborhood.subgraph(component)
+            recognized = certified_flag_wedge(piece, max_calls=48)
+            if recognized is None:
+                # Bound *total* pre-budget fallback scans, not just each
+                # component. The final two deletion checks are capped as
+                # before, and may use a slightly larger local budget.
+                if link_fold_attempts >= 6:
+                    break
+                link_fold_attempts += 1
+                folded = certified_flag_wedge_after_s_collapses(
+                    piece, max_vertices=18, max_checks=24, max_moves=3
+                )
+                if folded is None:
+                    break
+                recognized = folded.spheres
+            if 0 in recognized:
+                break
+            link_types.append(recognized)
+        if len(link_types) != len(components):
             continue
         if len(components) == 1 and not link_types[0]:
             # Avoid costly scans for connected contractible links.
