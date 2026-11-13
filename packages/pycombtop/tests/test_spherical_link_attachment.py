@@ -394,24 +394,26 @@ def test_cone_image_proof_is_replayable_and_budgeted():
     # False cone apex, false homotopy type and invalid domination move
     # must all be detected by a replay, even when the stored graph6 is valid.
     assert not verify_cone_image_certificate(
-        deletion, link_vertices,
-        ConeImageCertificate(proof.moves, proof.spheres, proof.image_vertices, 0)
+        deletion,
+        link_vertices,
+        ConeImageCertificate(proof.moves, proof.spheres, proof.image_vertices, 0),
     )
     assert not verify_cone_image_certificate(
-        deletion, link_vertices,
-        ConeImageCertificate(proof.moves, {2: 1}, proof.image_vertices, proof.apex)
+        deletion,
+        link_vertices,
+        ConeImageCertificate(proof.moves, {2: 1}, proof.image_vertices, proof.apex),
     )
     assert not verify_cone_image_certificate(
-        deletion, link_vertices,
-        ConeImageCertificate(((0, 19),) + proof.moves, proof.spheres,
-                             proof.image_vertices, proof.apex)
+        deletion,
+        link_vertices,
+        ConeImageCertificate(
+            ((0, 19),) + proof.moves, proof.spheres, proof.image_vertices, proof.apex
+        ),
     )
-    assert bounded_cone_image_certificate(
-        deletion, link_vertices, max_vertices=20
-    ) is None
-    assert bounded_cone_image_certificate(
-        deletion, link_vertices, max_checks=25
-    ) is None
-    assert bounded_cone_image_certificate(
-        deletion, link_vertices, max_moves=3
-    ) is None
+    assert (
+        bounded_cone_image_certificate(deletion, link_vertices, max_vertices=20) is None
+    )
+    assert (
+        bounded_cone_image_certificate(deletion, link_vertices, max_checks=25) is None
+    )
+    assert bounded_cone_image_certificate(deletion, link_vertices, max_moves=3) is None
