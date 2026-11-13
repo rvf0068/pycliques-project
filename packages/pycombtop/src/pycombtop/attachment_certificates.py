@@ -78,8 +78,7 @@ def verify_cone_image_certificate(
         if not image or certificate.apex not in image:
             return False
         return all(
-            v == certificate.apex or core.has_edge(v, certificate.apex)
-            for v in image
+            v == certificate.apex or core.has_edge(v, certificate.apex) for v in image
         )
     except (TypeError, ValueError):
         return False
