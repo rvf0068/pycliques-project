@@ -2,6 +2,11 @@
 
 import networkx as nx
 import pycombtop.homotopy_type as homotopy
+from pycombtop.attachment_certificates import (
+    ConeImageCertificate,
+    bounded_cone_image_certificate,
+    verify_cone_image_certificate,
+)
 from pycombtop.s_collapses import (
     complete_s_collapse_with_certificate,
     verify_s_collapse_move,
@@ -338,3 +343,75 @@ def test_bounded_link_collapse_cannot_bypass_dimension_guard():
     # The folded link is S1 but the deletion has type S1, so the
     # degree-one attaching map need not be nullhomotopic.
     assert homotopy._try_nullhomotopic_spherical_link_at_vertex(graph, 7) is None
+
+
+def test_phase2_10223998_null_attachment_via_cone_image():
+    # Another order-10 Phase-2 TIMEOUT core, 22 vertices, 189 edges.
+    graph = nx.from_graph6_bytes(
+        r"U~h\z}nV|~n~j}V|v|z}~jn|\~|v~zn~~i}nt^Vw".encode("ascii")
+    )
+    assert (graph.number_of_nodes(), graph.number_of_edges()) == (22, 189)
+    link = graph.subgraph(list(graph.neighbors(4))).copy()
+    folded = certified_flag_wedge_after_s_collapses(link)
+    assert folded is not None
+    assert folded.spheres == {6: 1}
+    assert [v for v, _local in folded.moves] == [0, 2, 20]
+    assert verify_folded_wedge_certificate(link, folded)
+
+    deletion = graph.copy()
+    deletion.remove_node(4)
+    proof = bounded_cone_image_certificate(deletion, list(link))
+    assert proof is not None
+    assert [v for v, _dominator in proof.moves] == list(range(5, 18))
+    assert proof.spheres == {3: 1}
+    assert proof.image_vertices == (0, 2, 18, 19, 20)
+    assert proof.apex == 2
+    assert verify_cone_image_certificate(deletion, list(link), proof)
+
+    result = homotopy._try_nullhomotopic_spherical_link_at_vertex(graph, 4)
+    assert result is not None and result.is_exact
+    assert result.wedge.spheres == {3: 1, 7: 1}
+    assert result.reason == homotopy.Theorem.NULLHOMOTOPIC_CONE_IMAGE
+
+    # New structural certificate executes before simplex enumeration.
+    verdict = homotopy.homotopy_type_with_verdict(
+        graph, max_vertices=22, max_simplices=50
+    )
+    assert verdict.is_exact and verdict.wedge.spheres == {3: 1, 7: 1}
+    assert homotopy.Theorem.NULLHOMOTOPIC_CONE_IMAGE in verdict.reason
+
+
+def test_cone_image_proof_is_replayable_and_budgeted():
+    graph = nx.from_graph6_bytes(
+        r"U~h\z}nV|~n~j}V|v|z}~jn|\~|v~zn~~i}nt^Vw".encode("ascii")
+    )
+    link_vertices = list(graph.neighbors(4))
+    deletion = graph.copy()
+    deletion.remove_node(4)
+    proof = bounded_cone_image_certificate(deletion, link_vertices)
+    assert proof is not None
+
+    # False cone apex, false homotopy type and invalid domination move
+    # must all be detected by a replay, even when the stored graph6 is valid.
+    assert not verify_cone_image_certificate(
+        deletion, link_vertices,
+        ConeImageCertificate(proof.moves, proof.spheres, proof.image_vertices, 0)
+    )
+    assert not verify_cone_image_certificate(
+        deletion, link_vertices,
+        ConeImageCertificate(proof.moves, {2: 1}, proof.image_vertices, proof.apex)
+    )
+    assert not verify_cone_image_certificate(
+        deletion, link_vertices,
+        ConeImageCertificate(((0, 19),) + proof.moves, proof.spheres,
+                             proof.image_vertices, proof.apex)
+    )
+    assert bounded_cone_image_certificate(
+        deletion, link_vertices, max_vertices=20
+    ) is None
+    assert bounded_cone_image_certificate(
+        deletion, link_vertices, max_checks=25
+    ) is None
+    assert bounded_cone_image_certificate(
+        deletion, link_vertices, max_moves=3
+    ) is None
