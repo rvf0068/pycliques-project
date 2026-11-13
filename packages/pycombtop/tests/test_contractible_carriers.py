@@ -47,10 +47,7 @@ def _cycle_to_path_deletion() -> tuple[nx.Graph, tuple[int, ...]]:
 
 def test_path_carrier_is_contractible_but_not_a_cone():
     path = nx.path_graph(4)
-    assert not any(
-        all(u == v or path.has_edge(u, v) for u in path)
-        for v in path
-    )
+    assert not any(all(u == v or path.has_edge(u, v) for u in path) for v in path)
     proof = bounded_carrier_collapse(path)
     assert proof is not None
     moves, survivor = proof
@@ -69,9 +66,7 @@ def test_a_carrier_can_include_a_vertex_outside_the_image():
     # outside the image supplies a contractible wheel as a carrier.
     wheel = nx.wheel_graph(6)
     cycle = tuple(range(1, 6))
-    assert bounded_contractible_carrier(
-        wheel, cycle, max_extra_vertices=0
-    ) is None
+    assert bounded_contractible_carrier(wheel, cycle, max_extra_vertices=0) is None
     proof = bounded_contractible_carrier(wheel, cycle)
     assert proof is not None
     carrier, moves, survivor = proof
@@ -83,16 +78,21 @@ def test_a_carrier_can_include_a_vertex_outside_the_image():
 
 def test_exact_same_dimensional_cofiber_uses_noncone_carrier(monkeypatch):
     deletion, link = _cycle_to_path_deletion()
-    assert bounded_cone_image_certificate(
-        deletion, link, max_checks=128, max_moves=6
-    ) is None
+    assert (
+        bounded_cone_image_certificate(deletion, link, max_checks=128, max_moves=6)
+        is None
+    )
     certificate = bounded_null_image_certificate(
         deletion, link, max_checks=128, max_moves=6, max_extra_vertices=0
     )
     assert isinstance(certificate, ContractibleCarrierCertificate)
     assert certificate.moves == (
-        (8, 0), (9, 5), (10, 6),
-        (11, 7), (12, 6), (13, 5),
+        (8, 0),
+        (9, 5),
+        (10, 6),
+        (11, 7),
+        (12, 6),
+        (13, 5),
     )
     assert certificate.spheres == {1: 1}
     assert set(certificate.image_vertices) == {0, 5, 6, 7}
@@ -110,9 +110,7 @@ def test_exact_same_dimensional_cofiber_uses_noncone_carrier(monkeypatch):
     def bounded_six_folds(target, images, **kwargs):
         return original_search(target, images, **(kwargs | {"max_moves": 6}))
 
-    monkeypatch.setattr(
-        homotopy, "bounded_null_image_certificate", bounded_six_folds
-    )
+    monkeypatch.setattr(homotopy, "bounded_null_image_certificate", bounded_six_folds)
     verdict = homotopy._try_nullhomotopic_spherical_link_at_vertex(graph, apex)
     assert verdict is not None and verdict.is_exact
     assert verdict.reason == homotopy.Theorem.NULLHOMOTOPIC_CONTRACTIBLE_CARRIER
@@ -152,17 +150,24 @@ def test_contractible_carrier_verifier_rejects_forged_proofs():
         with_change(moves=(([], 0),)),
     ]
     assert all(
-        verify_contractible_image_certificate(deletion, link, valid) and
-        not verify_contractible_image_certificate(deletion, link, bad)
+        verify_contractible_image_certificate(deletion, link, valid)
+        and not verify_contractible_image_certificate(deletion, link, bad)
         for bad in forged
     )
 
-    assert bounded_null_image_certificate(
-        deletion, link, max_moves=6, max_carrier_candidates=0
-    ) is None
-    assert bounded_null_image_certificate(
-        deletion, link, max_moves=6, max_carrier_vertices=3
-    ) is None
-    assert bounded_null_image_certificate(
-        deletion, link, max_moves=6, max_checks=0
-    ) is None
+    assert (
+        bounded_null_image_certificate(
+            deletion, link, max_moves=6, max_carrier_candidates=0
+        )
+        is None
+    )
+    assert (
+        bounded_null_image_certificate(
+            deletion, link, max_moves=6, max_carrier_vertices=3
+        )
+        is None
+    )
+    assert (
+        bounded_null_image_certificate(deletion, link, max_moves=6, max_checks=0)
+        is None
+    )

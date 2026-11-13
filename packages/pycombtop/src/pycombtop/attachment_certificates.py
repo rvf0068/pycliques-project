@@ -113,12 +113,15 @@ def _bounded_folded_target(
     max_vertices: int,
     max_checks: int,
     max_moves: int,
-) -> tuple[
-    tuple[tuple[Hashable, Hashable], ...],
-    nx.Graph,
-    tuple[Hashable, ...],
-    dict[int, int],
-] | None:
+) -> (
+    tuple[
+        tuple[tuple[Hashable, Hashable], ...],
+        nx.Graph,
+        tuple[Hashable, ...],
+        dict[int, int],
+    ]
+    | None
+):
     """One bounded ordinary-fold search shared by all image certificates.
 
     The bounds apply to closed-neighborhood domination comparisons.
