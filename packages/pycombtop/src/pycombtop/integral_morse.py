@@ -115,13 +115,21 @@ def _replay(
         vertices |= f
     critical: Counter[int] = Counter()
     for low, high in steps:
+        # Zero is the critical-face marker. Check both masks before any
+        # bit iteration, including Python values that compare equal to 0 or 1.
+        if type(low) is not int or type(high) is not int:
+            return None
+        if not 0 < high <= vertices or high & vertices != high:
+            return None
+        if not 0 <= low <= high or low & high != low:
+            return None
+        if low and (low not in active or (high ^ low).bit_count() != 1):
+            return None
         if high not in active or any(
             high | b in active for b in _bit_list(vertices ^ high)
         ):
             return None
         if low:
-            if low not in active or low & high != low or (high ^ low).bit_count() != 1:
-                return None
             if any(low | b in active for b in _bit_list(vertices ^ high)):
                 return None
             active.remove(low)

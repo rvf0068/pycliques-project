@@ -20,7 +20,8 @@ RESULTS = Path(__file__).parent / "results/order10_remaining_types.jsonl"
 
 def reconstructed_clique_graph(graph6: str) -> nx.Graph:
     graph = nx.from_graph6_bytes(graph6.encode("ascii"))
-    assert len(graph) == 10 and nx.is_connected(graph)
+    if len(graph) != 10 or not nx.is_connected(graph):
+        raise ValueError(f"Expected a connected graph of order 10 for {graph6!r}")
     cliques = [set(q) for q in sorted(tuple(sorted(q)) for q in nx.find_cliques(graph))]
     result = nx.empty_graph(len(cliques))
     result.add_edges_from(
@@ -29,24 +30,38 @@ def reconstructed_clique_graph(graph6: str) -> nx.Graph:
     return result
 
 
-def main() -> None:
+def load_rows() -> list[dict]:
     rows = [json.loads(line) for line in RESULTS.read_text().splitlines()]
-    assert len(rows) == len({row["index"] for row in rows}) == 20
+    if len(rows) != 20 or len({row["index"] for row in rows}) != 20:
+        raise ValueError("Expected 20 distinct order-10 census indices")
+    return rows
+
+
+def replay_row(row: dict) -> str:
+    index = row["index"]
+    graph = reconstructed_clique_graph(row["graph6"])
+    if len(graph) != row["k_order"]:
+        raise ValueError(f"Unexpected clique-graph order at index {index}")
+    result = homotopy_type_with_verdict(graph, max_vertices=64, max_simplices=25000)
+    expected = {int(d): n for d, n in row["spheres"].items()}
+    if not result.is_exact or result.is_limited or result.wedge.spheres != expected:
+        raise ValueError(f"Exact wedge verdict differs at index {index}: {result}")
     methods = {
         "vertex_star": Theorem.RECURSIVE_VERTEX_STAR,
         "morse": Theorem.INTEGRAL_MORSE,
         "morse_shore": Theorem.BIPARTITE_SHORE + Theorem.INTEGRAL_MORSE,
     }
+    if result.reason != methods[row["method"]]:
+        raise ValueError(
+            f"Certificate method differs at index {index}: {result.reason}"
+        )
+    return result.verdict
+
+
+def main() -> None:
+    rows = load_rows()
     for row in rows:
-        graph = reconstructed_clique_graph(row["graph6"])
-        assert len(graph) == row["k_order"]
-        result = homotopy_type_with_verdict(graph, max_vertices=64, max_simplices=25000)
-        expected = {int(d): n for d, n in row["spheres"].items()}
-        assert result.is_exact and not result.is_limited, row["index"]
-        assert (
-            result.wedge.spheres == expected and result.reason == methods[row["method"]]
-        ), row["index"]
-        print(row["index"], row["graph6"], result.verdict)
+        print(row["index"], row["graph6"], replay_row(row))
     print(f"{len(rows)}/{len(rows)} exact clique-graph types verified")
 
 

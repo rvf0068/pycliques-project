@@ -80,12 +80,12 @@ def _cofiber(base: dict[int, int], link: dict[int, int]) -> dict[int, int]:
 
 
 def _check_carrier(deletion: nx.Graph, link: nx.Graph, proof: ImageCarrier) -> bool:
-    # Ordinary folds on the source allow us to restrict the inclusion to
-    # the surviving link vertices, before applying the target retraction.
-    source = _replay_fold_map(link, (), proof.link_folds)
+    # Track every original link vertex through both retractions.
+    source = _replay_fold_map(link, tuple(link), proof.link_folds)
     if source is None:
         return False
-    target = _replay_fold_map(deletion, tuple(source[0]), proof.deletion_folds)
+    _, link_image = source
+    target = _replay_fold_map(deletion, link_image, proof.deletion_folds)
     if target is None:
         return False
     core, image = target
