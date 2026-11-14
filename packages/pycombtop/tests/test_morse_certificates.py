@@ -34,7 +34,12 @@ def test_order9_clique_graph_morse_certificates(index, g6, expected, hurewicz):
     assert certificate.matching_pairs > 0
 
 
-def test_classifier_uses_early_facet_morse_certificate():
+def test_classifier_uses_early_facet_morse_certificate(monkeypatch):
+    # Exercise the facet fallback even when the recursive star proof succeeds.
+    import pycombtop.homotopy_type as ht
+
+    monkeypatch.setattr(ht, "recursive_wedge_certificate", lambda graph: None)
+    monkeypatch.setattr(ht, "integral_morse_certificate", lambda *args, **kw: None)
     # This clique graph has high dimension and at least 20 facets.
     g = nx.from_graph6_bytes(b"H?~vf~}")
     k = clique_graph(g)

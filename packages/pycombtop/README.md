@@ -250,3 +250,34 @@ script preserves the old runner and checksum provenance.
 References: R. Forman, *Morse theory for cell complexes*, Adv. Math.
 **134** (1998), 90--145; A. Hatcher, *Algebraic Topology* (2002),
 Section 4.2 (Hurewicz theorem).
+
+## Recursive vertex stars and integral Morse boundaries
+
+`recursive_wedge_certificate(G)` takes a finite simple graph with arbitrary
+hashable vertex labels. It searches for a proof by dominated-vertex folds,
+joins, and vertex-star decompositions. A split requires a proof that the
+link inclusion into the deletion is nullhomotopic. The optional
+`max_vertices` and `max_states` bound the search.
+
+`integral_morse_certificate(facets)` takes the facets of any finite
+simplicial complex as a set of positive integer bitmasks. Bit position \(i\) represents
+vertex \(i\). It replays free pairs and critical faces and, when the positive
+critical dimensions are consecutive and the lower one is at least two,
+checks the signed integral Morse boundary. The optional `max_faces` bounds
+the number of nonempty faces. For a graph with connected bipartite
+complement, `bipartite_shore_facets(G)` can supply a smaller complex whose
+suspension has the desired homotopy type.
+
+Both searches return a certificate with a `spheres` dictionary on success
+and `None` when the search is inconclusive. The corresponding verifiers
+can replay a certificate independently of the search.
+
+```python
+import networkx as nx
+from pycombtop import recursive_wedge_certificate, verify_recursive_wedge
+
+graph = nx.complete_bipartite_graph(2, 3)
+proof = recursive_wedge_certificate(graph)
+assert proof is not None and proof.spheres == {1: 2}
+assert verify_recursive_wedge(graph, proof)
+```
