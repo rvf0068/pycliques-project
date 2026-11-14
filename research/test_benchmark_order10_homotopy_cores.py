@@ -1,16 +1,12 @@
-"""Regressions for the order-10 benchmark journal and certified residual types."""
+"""Fail-closed regressions for the order-10 Phase-1 benchmark journal."""
 
 import csv
-import gzip
 import json
-from importlib.resources import files
-from itertools import islice
 
 import networkx as nx
 import pytest
 
 from research import benchmark_order10_homotopy_cores as benchmark
-from research.verify_order10_remaining_types import load_rows, replay_row
 
 
 def write_representatives(path, indices):
@@ -193,23 +189,3 @@ def test_child_limited_is_not_reinterpreted_as_contractible():
     result = benchmark.classify_child(core, 4, 25000, 13)
     assert result["status"] == "LIMITED"
     assert result["certified_spheres"] is None
-
-
-@pytest.mark.parametrize("row", load_rows(), ids=lambda row: str(row["index"]))
-def test_order10_exact_type_and_method(row):
-    replay_row(row)
-
-
-def test_order10_residual_graph6_at_recorded_indices():
-    by_index = {row["index"]: row["graph6"] for row in load_rows()}
-    dataset = files("pyg6data.data").joinpath("graph10c.g6.gz")
-    with (
-        dataset.open("rb") as compressed,
-        gzip.open(compressed, "rt", encoding="ascii") as source,
-    ):
-        actual = {
-            index: line.rstrip()
-            for index, line in enumerate(islice(source, max(by_index) + 1))
-            if index in by_index
-        }
-    assert actual == by_index

@@ -1283,6 +1283,40 @@ def homotopy_type_sc_with_verdict(
     )
 
 
+def _try_recursive_or_integral_wedge(
+    graph: nx.Graph, max_simplices: int | None
+) -> HomotopyVerdict | None:
+    """Try a graph decomposition, then bounded integral Morse proofs."""
+    recursive = recursive_wedge_certificate(graph)
+    if recursive is not None:
+        return HomotopyVerdict(
+            WedgeOfSpheres(recursive.spheres), Theorem.RECURSIVE_VERTEX_STAR
+        )
+
+    # The explicit Morse algorithm counts nonempty faces. The caller's
+    # simplex budget also includes the empty face, even for a shore.
+    face_limit = 25000 if max_simplices is None else min(25000, max_simplices - 1)
+    if face_limit > 0:
+        shore = bipartite_shore_facets(graph)
+        if shore:
+            certificate = integral_morse_certificate(shore, max_faces=face_limit)
+            if certificate is not None:
+                spheres = {d + 1: n for d, n in certificate.spheres.items()}
+                return HomotopyVerdict(
+                    WedgeOfSpheres(spheres),
+                    Theorem.BIPARTITE_SHORE + Theorem.INTEGRAL_MORSE,
+                )
+        if not _graph_exceeds_simplex_budget(graph, face_limit + 1):
+            index = {v: i for i, v in enumerate(graph)}
+            facets = {sum(1 << index[v] for v in q) for q in nx.find_cliques(graph)}
+            certificate = integral_morse_certificate(facets, max_faces=face_limit)
+            if certificate is not None:
+                return HomotopyVerdict(
+                    WedgeOfSpheres(certificate.spheres), Theorem.INTEGRAL_MORSE
+                )
+    return None
+
+
 def homotopy_type_with_verdict(
     graph: nx.Graph,
     max_vertices: int | None = None,
@@ -1357,37 +1391,13 @@ def homotopy_type_with_verdict(
     if v:
         return v
 
-    # Reserve the recursive search for large inputs; the standard small-graph
-    # census uses cheaper methods. Both proof and search operate on graph
-    # masks, without spending the caller's simplex budget.
-    if 20 <= len(graph) <= 40:
-        recursive = recursive_wedge_certificate(graph)
-        if recursive is not None:
-            return HomotopyVerdict(
-                WedgeOfSpheres(recursive.spheres), Theorem.RECURSIVE_VERTEX_STAR
-            )
-
-        # The explicit Morse algorithm counts nonempty faces. The caller's
-        # simplex budget also includes the empty face, even for a shore.
-        face_limit = 25000 if max_simplices is None else min(25000, max_simplices - 1)
-        if face_limit > 0:
-            shore = bipartite_shore_facets(graph)
-            if shore:
-                certificate = integral_morse_certificate(shore, max_faces=face_limit)
-                if certificate is not None:
-                    spheres = {d + 1: n for d, n in certificate.spheres.items()}
-                    return HomotopyVerdict(
-                        WedgeOfSpheres(spheres),
-                        Theorem.BIPARTITE_SHORE + Theorem.INTEGRAL_MORSE,
-                    )
-            if not _graph_exceeds_simplex_budget(graph, face_limit + 1):
-                index = {v: i for i, v in enumerate(graph)}
-                facets = {sum(1 << index[v] for v in q) for q in nx.find_cliques(graph)}
-                certificate = integral_morse_certificate(facets, max_faces=face_limit)
-                if certificate is not None:
-                    return HomotopyVerdict(
-                        WedgeOfSpheres(certificate.spheres), Theorem.INTEGRAL_MORSE
-                    )
+    # Prioritize bounded proofs on mid-sized graphs before enumerating faces.
+    # Other sizes first go through the usual reductions and cheap recognizers.
+    early_wedge_search = 20 <= len(graph) <= 40
+    if early_wedge_search:
+        v = _try_recursive_or_integral_wedge(graph, max_simplices)
+        if v:
+            return v
 
     # The streaming check first avoids unnecessary reductions on the common
     # within-budget path. On overflow, try all graph s-collapses before
@@ -1481,6 +1491,11 @@ def homotopy_type_with_verdict(
     v = _try_facet_morse(sc2)
     if v:
         return v
+
+    if not early_wedge_search:
+        v = _try_recursive_or_integral_wedge(graph2, max_simplices)
+        if v:
+            return v
 
     # 9. Disconnected contractible vertex link
     v = _try_contractible_link_components(sc2)

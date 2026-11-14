@@ -40,10 +40,21 @@ from .homotopy_type import (
     star,
     star_cluster,
 )
+from .integral_morse import (
+    IntegralMorseCertificate,
+    bipartite_shore_facets,
+    integral_morse_certificate,
+    verify_integral_morse,
+)
 from .morse_certificates import (
     MorseCertificate,
     facet_morse_certificate,
     graph_morse_certificate,
+)
+from .recursive_wedges import (
+    RecursiveWedgeCertificate,
+    recursive_wedge_certificate,
+    verify_recursive_wedge,
 )
 from .relative_collapse import (
     CollapseResult,
@@ -123,6 +134,13 @@ __all__ = [
     "MorseCertificate",
     "facet_morse_certificate",
     "graph_morse_certificate",
+    "IntegralMorseCertificate",
+    "integral_morse_certificate",
+    "verify_integral_morse",
+    "bipartite_shore_facets",
+    "RecursiveWedgeCertificate",
+    "recursive_wedge_certificate",
+    "verify_recursive_wedge",
     "HomotopyVerdict",
     "Theorem",
     "betti_numbers_graph",

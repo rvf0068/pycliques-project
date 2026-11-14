@@ -1,11 +1,10 @@
 """Regression tests for replayable recursive cofibers and signed Morse chains."""
 
 from dataclasses import replace
-from itertools import combinations
 
 import networkx as nx
 import pytest
-from pycombtop import Theorem, homotopy_type_with_verdict
+from pycombtop import homotopy_type_with_verdict
 from pycombtop.integral_morse import (
     IntegralMorseCertificate,
     bipartite_shore_facets,
@@ -22,25 +21,22 @@ from pycombtop.recursive_wedges import (
 )
 
 
-def test_source_folded_carrier_on_residual_census_core():
-    # McKay 11661360. Rebuild K(G) using the census ordering of cliques.
-    graph = nx.from_graph6_bytes(b"IFzfvr~~o")
-    cliques = sorted(tuple(sorted(q)) for q in nx.find_cliques(graph))
-    h = nx.empty_graph(len(cliques))
-    h.add_edges_from(
-        (i, j)
-        for i, j in combinations(h, 2)
-        if set(cliques[i]).intersection(cliques[j])
-    )
-    cert = recursive_wedge_certificate(h)
-    assert cert and cert.spheres == {3: 4, 5: 6, 7: 16}
-    root = (1 << len(h)) - 1
-    split = cert.steps[root]
-    assert split.carrier and split.carrier.extra
-    bad = replace(split, carrier=replace(split.carrier, extra=()))
-    assert not verify_recursive_wedge(h, replace(cert, steps={**cert.steps, root: bad}))
-    assert not verify_recursive_wedge(h, replace(cert, spheres={5: 26}))
-    assert not verify_recursive_wedge(h, replace(cert, steps={root: split}))
+def test_discrete_link_carried_by_a_path_in_a_square():
+    # Three disjoint length-two paths between vertices 0 and 2 form K_{2,3}.
+    # Deleting 4 leaves a square. Its path 0-1-2 contracts the two-point link.
+    h = nx.cycle_graph(4)
+    h.add_edges_from([(4, 0), (4, 2)])
+    carrier = ImageCarrier((), (), (1,), ((0, 1), (2, 1)))
+    split = WedgeStep("split", (15, 5), vertex=4, carrier=carrier)
+    steps = {5: WedgeStep("leaf"), 15: WedgeStep("leaf"), 31: split}
+    cert = RecursiveWedgeCertificate(tuple(h), steps, {1: 2})
+    assert verify_recursive_wedge(h, cert)
+    bad = replace(split, carrier=replace(carrier, extra=()))
+    assert not verify_recursive_wedge(h, replace(cert, steps={**steps, 31: bad}))
+    assert not verify_recursive_wedge(h, replace(cert, spheres={1: 1}))
+    assert not verify_recursive_wedge(h, replace(cert, steps={31: split}))
+    found = recursive_wedge_certificate(h)
+    assert found and found.spheres == cert.spheres
     assert recursive_wedge_certificate(h, max_states=1) is None
     assert recursive_wedge_certificate(h, max_vertices=len(h) - 1) is None
 
@@ -133,16 +129,28 @@ def test_signed_boundary_detects_suspended_projective_plane():
     assert integral_morse_certificate(suspension) is None
 
 
-def test_mixed_degree_morse_on_residual_index_11716425():
-    g = nx.from_graph6_bytes(b"IUzrv~}~_")
-    cliques = sorted(tuple(sorted(q)) for q in nx.find_cliques(g))
-    h = nx.empty_graph(len(cliques))
-    h.add_edges_from(
-        (i, j)
-        for i, j in combinations(h, 2)
-        if set(cliques[i]).intersection(cliques[j])
-    )
-    verdict = homotopy_type_with_verdict(h, max_vertices=64, max_simplices=25000)
-    assert verdict.is_exact and verdict.wedge.spheres == {3: 1, 4: 3}
-    assert verdict.reason == Theorem.INTEGRAL_MORSE
-    assert homotopy_type_with_verdict(h, max_vertices=20).is_limited
+@pytest.mark.parametrize("d", [2, 3])
+def test_mixed_degree_morse_on_two_simplex_boundaries(d):
+    # The boundaries of a (d+1)- and a (d+2)-simplex meet at vertex 0.
+    left = set(range(d + 2))
+    right = {0, *range(d + 2, 2 * d + 4)}
+    facets = {
+        sum(1 << v for v in simplex - {missing})
+        for simplex in (left, right)
+        for missing in simplex
+    }
+    cert = integral_morse_certificate(facets)
+    assert cert and cert.spheres == {d: 1, d + 1: 1}
+    assert verify_integral_morse(facets, cert)
+    assert not verify_integral_morse(facets, replace(cert, spheres={d: 2}))
+
+
+def test_shore_of_even_cycle_complement():
+    graph = nx.complement(nx.cycle_graph(8))
+    shore = bipartite_shore_facets(graph)
+    assert shore and len(shore) == 4 and all(f.bit_count() == 2 for f in shore)
+    cert = integral_morse_certificate(shore)
+    assert cert and cert.spheres == {1: 1}
+    verdict = homotopy_type_with_verdict(graph)
+    assert verdict.is_exact and verdict.wedge.spheres == {2: 1}
+    assert homotopy_type_with_verdict(graph, max_vertices=7).is_limited
