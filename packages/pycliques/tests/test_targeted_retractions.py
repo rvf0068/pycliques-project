@@ -268,3 +268,36 @@ def test_positive_witness_always_verified_before_return(monkeypatch):
     monkeypatch.setattr(search, "verify_targeted_retraction", lambda *_: False)
     with pytest.raises(AssertionError, match="witness failed replay"):
         search_targeted_retractions(octahedron(3), families=("octahedra",))
+
+
+@pytest.mark.parametrize("n", [5, 6, 7])
+def test_nondivergent_cycle_complements_are_not_search_targets(n):
+    graph = complement_of_cycle(n)
+    result = search_targeted_retractions(
+        graph, families=("cycle_complements",), max_target_order=16
+    )["cycle_complements"]
+    assert result.status is TargetSearchStatus.EXHAUSTED
+    assert result.patterns_checked == 0
+    assert result.induced_targets_checked == 0
+
+
+def test_historical_order10_c6_retraction_remains_verifiable_but_unsearched():
+    # The previously saved order-10 index 2318241, pared K(G), has a genuine
+    # C_6-complement retraction. It does not establish K-divergence.
+    graph = nx.from_graph6_bytes(b"O~~~xepAWJqNO~W~yCuCN")
+    old_projection = [2, 2, 2, 2, 4, 5, 2, 7, 7, 9, 10, 7, 7, 7, 2, 2]
+    historical = TargetRetractionResult(
+        "cycle_complements",
+        TargetSearchStatus.FOUND,
+        target_kind="cycle_complements:6",
+        target_vertices=(2, 4, 5, 7, 9, 10),
+        projection=dict(enumerate(old_projection)),
+    )
+    assert verify_targeted_retraction(graph, historical)
+
+    # With only sub-8 target orders, the new search must not rediscover C_6.
+    excluded = search_targeted_retractions(
+        graph, families=("cycle_complements",), max_target_order=7
+    )["cycle_complements"]
+    assert excluded.status is TargetSearchStatus.EXHAUSTED
+    assert excluded.patterns_checked == 0
