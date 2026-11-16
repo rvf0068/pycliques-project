@@ -1,6 +1,8 @@
 """Tests for explicitly bounded triangular-cover divergence discovery."""
 
 from collections.abc import Hashable
+from itertools import product
+from random import Random
 
 import networkx as nx
 from pycliques.clockwork_search import CertificateVerificationStatus
@@ -164,7 +166,9 @@ def test_pair_morphism_search_exhausts_unsatisfiable_instance() -> None:
 
     assert mapping is None
     assert states == 1
-    assert attempts == 2
+    # Unary orbit constraint: the source mates are adjacent but the
+    # target mates are not. AC-3 proves impossibility without guessing.
+    assert attempts == 0
     assert not limited
 
 
@@ -234,3 +238,201 @@ def test_search_finds_and_replays_the_known_covering_certificate() -> None:
         verify_triangular_cover_divergence_certificate(damaged_certificate).status
         is CertificateVerificationStatus.INVALID
     )
+
+
+def _brute_force_pair_morphism(
+    source_pair: CoaffinePair, target_pair: CoaffinePair
+) -> dict[Hashable, Hashable] | None:
+    """Independent exhaustive reference for small involutive pairs."""
+    source = source_pair.graph
+    sigma = source_pair.coaffination
+    target = target_pair.graph
+    tau = target_pair.coaffination
+    seen: set[Hashable] = set()
+    orbits: list[tuple[Hashable, ...]] = []
+    for vertex in source:
+        if vertex in seen:
+            continue
+        partner = sigma[vertex]
+        orbit = (vertex,) if partner == vertex else (vertex, partner)
+        orbits.append(orbit)
+        seen.update(orbit)
+    for choice in product(tuple(target), repeat=len(orbits)):
+        values = {
+            member: (value if pos == 0 else tau[value])
+            for orbit, value in zip(orbits, choice)
+            for pos, member in enumerate(orbit)
+        }
+        if any(values[sigma[u]] != tau[values[u]] for u in source):
+            continue
+        if all(
+            values[u] == values[v] or target.has_edge(values[u], values[v])
+            for u, v in source.edges()
+        ):
+            return values
+    return None
+
+
+def _pair_from_involutive_graph(
+    labels: tuple[Hashable, ...], seed: int
+) -> CoaffinePair:
+    """Generate small graph automorphisms with deterministic fixed/mate orbits."""
+    rng = Random(seed)
+    graph = nx.Graph()
+    graph.add_nodes_from(labels)
+    n = len(labels)
+    sigma = {labels[i]: labels[i ^ 1] for i in range(n - n % 2)}
+    if n % 2:
+        sigma[labels[-1]] = labels[-1]
+    # Close each random edge orbit under the involution, so sigma
+    # really is a graph automorphism (including fixed vertices).
+    for i in range(n):
+        for j in range(i + 1, n):
+            if rng.random() < 0.34:
+                u, v = labels[i], labels[j]
+                graph.add_edge(u, v)
+                if sigma[u] != sigma[v]:
+                    graph.add_edge(sigma[u], sigma[v])
+    return CoaffinePair(graph, sigma)
+
+
+def test_pair_morphism_matches_independent_exhaustive_reference() -> None:
+    """AC-3/MRV must neither lose maps nor invent graphs morphisms."""
+    for seed in range(80):
+        # Alternate between fixed points and 2-cycles, with both integer
+        # and nonnumeric labels in the source and target.
+        source_labels = tuple(f"s{j}" for j in range(4 + seed % 3))
+        target_labels = tuple(f"t{j}" for j in range(3 + seed % 4))
+        source = _pair_from_involutive_graph(source_labels, seed)
+        target = _pair_from_involutive_graph(target_labels, seed + 1000)
+        expected = _brute_force_pair_morphism(source, target)
+        found, states, attempts, limited = _bounded_pair_morphism(
+            source, target, max_states=200_000, max_assignments=200_000
+        )
+        assert not limited, seed
+        assert (found is not None) == (expected is not None), seed
+        assert states >= 1
+        assert 0 <= attempts <= 200_000
+        if found is not None:
+            assert set(found) == set(source.graph)
+            assert all(
+                found[source.coaffination[u]] == target.coaffination[found[u]]
+                for u in source.graph
+            )
+            assert all(
+                found[u] == found[v] or target.graph.has_edge(found[u], found[v])
+                for u, v in source.graph.edges()
+            )
+
+
+def test_pair_morphism_prunes_inconsistent_cross_orbit_edges() -> None:
+    # Two source 2-cycles linked by a square's edges, mapping into an
+    # edgeless two-vertex target swapped by tau. Every possible orbit
+    # choice violates at least one edge, so AC-3 can prove unsat early.
+    source = nx.cycle_graph(4)
+    sigma: dict[Hashable, Hashable] = {0: 2, 2: 0, 1: 3, 3: 1}
+    target = nx.empty_graph(2)
+    tau: dict[Hashable, Hashable] = {0: 1, 1: 0}
+    mapping, states, attempts, limited = _bounded_pair_morphism(
+        CoaffinePair(source, sigma),
+        CoaffinePair(target, tau),
+        max_states=10,
+        max_assignments=10,
+    )
+    assert mapping is None
+    assert not limited
+    assert states == 1
+    assert attempts == 0
+
+
+def test_pair_morphism_allows_adjacent_vertices_to_map_equal() -> None:
+    source = nx.Graph([(0, 1)])
+    target = nx.empty_graph(1)
+    mapping, states, attempts, limited = _bounded_pair_morphism(
+        CoaffinePair(source, {0: 1, 1: 0}),
+        CoaffinePair(target, {0: 0}),
+        max_states=10,
+        max_assignments=10,
+    )
+    assert mapping == {0: 0, 1: 0}
+    assert not limited
+    assert states == 2
+    assert attempts == 1
+
+
+def test_pair_morphism_respects_tight_budgets_after_propagation() -> None:
+    source = nx.empty_graph(4)
+    target = nx.empty_graph(2)
+    sigma: dict[Hashable, Hashable] = {0: 1, 1: 0, 2: 3, 3: 2}
+    tau: dict[Hashable, Hashable] = {0: 1, 1: 0}
+    source_pair = CoaffinePair(source, sigma)
+    target_pair = CoaffinePair(target, tau)
+    for max_states, max_assignments in ((0, 10), (1, 10), (10, 0), (10, 1)):
+        result, states, attempts, limited = _bounded_pair_morphism(
+            source_pair,
+            target_pair,
+            max_states=max_states,
+            max_assignments=max_assignments,
+        )
+        assert result is None
+        assert limited
+        assert states <= max_states
+        assert attempts <= max_assignments
+
+
+def test_pair_morphism_rejects_non_involutive_pair_maps() -> None:
+    # The bounded double-cover search is specifically for involutive
+    # coaffinations. Formerly longer orbits were silently omitted.
+    source = nx.empty_graph(3)
+    target = nx.empty_graph(2)
+    source_pair = CoaffinePair(source, {0: 1, 1: 2, 2: 0})
+    target_pair = CoaffinePair(target, {0: 1, 1: 0})
+    import pytest
+
+    with pytest.raises(ValueError, match="involution"):
+        _bounded_pair_morphism(
+            source_pair,
+            target_pair,
+            max_states=100,
+            max_assignments=100,
+        )
+
+
+def test_pair_morphism_missing_map_keys_for_nonnumeric_vertices() -> None:
+    """An incomplete involution fails even with arbitrary hashable labels.
+
+    NetworkX rejects a literal None vertex; tuples containing None are
+    valid hashable node identifiers and still exercise explicit key checks.
+    """
+    import pytest
+
+    first = ("source", None)
+    second = ("target", None)
+    source = nx.Graph()
+    source.add_nodes_from((first, 0))
+    target = nx.Graph()
+    target.add_nodes_from((second, 1))
+    valid_source = CoaffinePair(source, {first: 0, 0: first})
+    valid_target = CoaffinePair(target, {second: 1, 1: second})
+    for invalid_source, invalid_target in (
+        (CoaffinePair(source, {0: first}), valid_target),
+        (valid_source, CoaffinePair(target, {1: second})),
+    ):
+        with pytest.raises(ValueError, match="involution"):
+            _bounded_pair_morphism(
+                invalid_source,
+                invalid_target,
+                max_states=100,
+                max_assignments=100,
+            )
+    # A complete involution including None is valid.
+    mapping, states, attempts, limited = _bounded_pair_morphism(
+        valid_source,
+        valid_target,
+        max_states=100,
+        max_assignments=100,
+    )
+    assert not limited
+    assert mapping is not None
+    assert states > 0
+    assert attempts > 0

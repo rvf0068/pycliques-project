@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Hashable
 from dataclasses import dataclass
 from enum import Enum
@@ -50,12 +51,11 @@ class CoveringSearchResult:
 
 @dataclass
 class _PairMorphismSearchFrame:
-    """One orbit-assignment level in the iterative pair-morphism search."""
+    """One reversible orbit-assignment level of the constraint search."""
 
     orbit_index: int
-    candidates: tuple[Hashable, ...]
-    introduced_assignments: tuple[Hashable, ...] = ()
-    next_candidate: int = 0
+    remaining: int
+    checkpoint: int
 
 
 def _triangles(graph: nx.Graph) -> tuple[tuple[Hashable, Hashable, Hashable], ...]:
@@ -209,99 +209,236 @@ def _bounded_pair_morphism(
     max_states: int,
     max_assignments: int,
 ) -> tuple[dict[Hashable, Hashable] | None, int, int, bool]:
-    """Search coaffination orbits with explicit state and assignment budgets."""
+    """Find a coaffine graph morphism by a bounded, deterministic CSP.
+
+    The variables are involution orbits in the source. Each variable's
+    domain is a bit set of possible images of its first vertex; the
+    coaffination determines the image of its partner. Compatibility masks
+    encode *all* source edges between two orbits. AC-3 arc consistency and
+    a minimum-remaining-values (MRV) branch order eliminate unsupported
+    orbit images before trying them individually.
+
+    This remains a search for graph morphisms, not induced embeddings:
+    adjacent source vertices may have equal target images. There is no
+    injectivity requirement. All complete assignments are verified before
+    return. Budgets count attempted orbit images and successfully propagated
+    partial-assignment states, and stop without asserting nonexistence.
+    An exhaustive failure (including AC-3 contradiction) is not a
+    certificate about clique convergence.
+    """
     source = source_pair.graph
     sigma = source_pair.coaffination
     target = target_pair.graph
     tau = target_pair.coaffination
+    source_nodes = tuple(source)
     target_nodes = tuple(target)
-    fixed_targets = tuple(vertex for vertex in target if tau[vertex] == vertex)
+    node_to_target = {node: i for i, node in enumerate(target_nodes)}
+    target_count = len(target_nodes)
 
-    unprocessed = set(source)
-    orbits: list[tuple[Hashable, ...]] = []
-    while unprocessed:
-        vertex = next(node for node in source if node in unprocessed)
-        partner = sigma[vertex]
-        orbit: tuple[Hashable, ...] = (
-            (vertex,) if partner == vertex else (vertex, partner)
-        )
-        unprocessed.difference_update(orbit)
-        orbits.append(orbit)
-    node_order = {vertex: index for index, vertex in enumerate(source)}
-    orbits.sort(
-        key=lambda orbit: (
-            -sum(source.degree(vertex) for vertex in orbit),
-            min(node_order[vertex] for vertex in orbit),
-        )
-    )
-
-    assignment: dict[Hashable, Hashable] = {}
     states = 0
-    assignments_tried = 0
+    attempts = 0
+    if max_states < 1:
+        return None, states, attempts, True
+    states = 1
 
-    def consistent(additions: dict[Hashable, Hashable]) -> bool:
-        partial = assignment | additions
-        for vertex, image in additions.items():
-            for neighbor in source.neighbors(vertex):
-                if neighbor in partial:
-                    other_image = partial[neighbor]
-                    if image != other_image and not target.has_edge(image, other_image):
-                        return False
+    # A coaffination for this double-cover procedure is an involution.
+    # Reject malformed inputs rather than silently omit a longer orbit.
+    if any(
+        vertex not in sigma
+        or sigma[vertex] not in source
+        or sigma[vertex] not in sigma
+        or sigma[sigma[vertex]] != vertex
+        for vertex in source_nodes
+    ):
+        raise ValueError("Source coaffination must be an involution")
+    if any(
+        vertex not in tau
+        or tau[vertex] not in target
+        or tau[vertex] not in tau
+        or tau[tau[vertex]] != vertex
+        for vertex in target_nodes
+    ):
+        raise ValueError("Target coaffination must be an involution")
+
+    seen: set[Hashable] = set()
+    orbits: list[tuple[Hashable, ...]] = []
+    orbit_of: dict[Hashable, tuple[int, int]] = {}
+    for vertex in source_nodes:
+        if vertex in seen:
+            continue
+        mate = sigma[vertex]
+        orbit: tuple[Hashable, ...] = (vertex,) if mate == vertex else (vertex, mate)
+        orbit_index = len(orbits)
+        orbits.append(orbit)
+        for role, member in enumerate(orbit):
+            seen.add(member)
+            orbit_of[member] = orbit_index, role
+    if not orbits:
+        return {}, states, attempts, False
+
+    tau_indices = [node_to_target[tau[v]] for v in target_nodes]
+    full_domain = (1 << target_count) - 1
+    fixed_domain = sum(
+        1 << index for index, partner in enumerate(tau_indices) if partner == index
+    )
+    closed = [
+        (1 << index)
+        | sum(1 << node_to_target[neighbor] for neighbor in target.neighbors(vertex))
+        for index, vertex in enumerate(target_nodes)
+    ]
+    # When the second endpoint of a source edge is a mate, the target
+    # representative must lie in tau^{-1}(closed_neighborhood[image]).
+    inverse_closed = [
+        sum(1 << index for index, mate in enumerate(tau_indices) if mask >> mate & 1)
+        for mask in closed
+    ]
+
+    domains = []
+    for orbit in orbits:
+        candidates = fixed_domain if len(orbit) == 1 else full_domain
+        if len(orbit) == 2 and source.has_edge(orbit[0], orbit[1]):
+            # An internal orbit edge must also map to an edge or equality.
+            candidates &= sum(
+                1 << index
+                for index, partner in enumerate(tau_indices)
+                if closed[index] >> partner & 1
+            )
+        domains.append(candidates)
+    if any(mask == 0 for mask in domains):
+        return None, states, attempts, False
+
+    # Each source edge imposes a binary relation on its two orbit variables.
+    # The roles identify whether a source endpoint uses the representative
+    # target image (0) or its coaffine mate (1).
+    constraints: dict[tuple[int, int], list[tuple[int, int]]] = {}
+    for u, v in source.edges():
+        first, u_role = orbit_of[u]
+        second, v_role = orbit_of[v]
+        if first == second:
+            continue  # The internal edge was handled by the unary domain.
+        constraints.setdefault((first, second), []).append((u_role, v_role))
+        constraints.setdefault((second, first), []).append((v_role, u_role))
+
+    neighbors: list[set[int]] = [set() for _ in orbits]
+    compatibility: dict[tuple[int, int], tuple[int, ...]] = {}
+    for (i, j), edges in constraints.items():
+        neighbors[i].add(j)
+        support_masks = []
+        for index in range(target_count):
+            supported = full_domain
+            for source_role, target_role in edges:
+                image = index if source_role == 0 else tau_indices[index]
+                supported &= (
+                    closed[image] if target_role == 0 else inverse_closed[image]
+                )
+            support_masks.append(supported)
+        compatibility[i, j] = tuple(support_masks)
+    linked = [tuple(sorted(around)) for around in neighbors]
+    degrees = [sum(source.degree(member) for member in orbit) for orbit in orbits]
+
+    # Store only changed domains on a trail, so backtracking is O(changes),
+    # not O(number of source orbits) per state. This is also safe for 1100+
+    # orbits, where a recursive Python search would exceed its stack limit.
+    trail: list[tuple[int, int]] = []
+
+    def bits(mask: int):
+        while mask:
+            bit = mask & -mask
+            yield bit.bit_length() - 1
+            mask ^= bit
+
+    def revise(i: int, j: int) -> bool:
+        """Remove target images of orbit i lacking support in orbit j."""
+        current = domains[i]
+        support = compatibility[i, j]
+        filtered = sum(
+            1 << image for image in bits(current) if support[image] & domains[j]
+        )
+        if filtered == current:
+            return False
+        trail.append((i, current))
+        domains[i] = filtered
         return True
 
-    if max_states < 1:
-        return None, states, assignments_tried, True
-    states += 1
-    if not orbits:
-        return {}, states, assignments_tried, False
+    def propagate(arcs: deque[tuple[int, int]]) -> bool:
+        while arcs:
+            i, j = arcs.popleft()
+            if revise(i, j):
+                if domains[i] == 0:
+                    return False
+                for k in linked[i]:
+                    if k != j:
+                        arcs.append((k, i))
+        return True
 
-    frames = [
-        _PairMorphismSearchFrame(
-            0,
-            fixed_targets if len(orbits[0]) == 1 else target_nodes,
+    # Initial AC-3, even before the first attempted assignment, finds
+    # contradictions from pairs of orbits with disjoint support.
+    if not propagate(deque(sorted(compatibility))):
+        return None, states, attempts, False
+    trail.clear()
+
+    def choose_orbit(assigned: dict[int, int]) -> int:
+        return min(
+            (i for i in range(len(orbits)) if i not in assigned),
+            key=lambda i: (
+                domains[i].bit_count(),
+                -sum(j in assigned for j in linked[i]),
+                -degrees[i],
+                i,
+            ),
         )
-    ]
+
+    def restore(checkpoint: int) -> None:
+        while len(trail) > checkpoint:
+            orbit, old_domain = trail.pop()
+            domains[orbit] = old_domain
+
+    assignment: dict[int, int] = {}
+    first = choose_orbit(assignment)
+    frames = [_PairMorphismSearchFrame(first, domains[first], len(trail))]
     while frames:
         frame = frames[-1]
-        if frame.next_candidate >= len(frame.candidates):
+        restore(frame.checkpoint)
+        assignment.pop(frame.orbit_index, None)
+        if frame.remaining == 0:
             frames.pop()
-            for vertex in frame.introduced_assignments:
-                del assignment[vertex]
             continue
-        if assignments_tried >= max_assignments:
-            return None, states, assignments_tried, True
+        if attempts >= max_assignments:
+            return None, states, attempts, True
 
-        image = frame.candidates[frame.next_candidate]
-        frame.next_candidate += 1
-        assignments_tried += 1
-        orbit = orbits[frame.orbit_index]
-        additions = (
-            {orbit[0]: image}
-            if len(orbit) == 1
-            else {orbit[0]: image, orbit[1]: tau[image]}
-        )
-        if not consistent(additions):
+        candidate_bit = frame.remaining & -frame.remaining
+        frame.remaining ^= candidate_bit
+        candidate = candidate_bit.bit_length() - 1
+        attempts += 1
+        i = frame.orbit_index
+        if domains[i] != candidate_bit:
+            trail.append((i, domains[i]))
+            domains[i] = candidate_bit
+        if not propagate(deque((j, i) for j in linked[i])):
             continue
 
-        assignment.update(additions)
         if states >= max_states:
-            for vertex in additions:
-                del assignment[vertex]
-            return None, states, assignments_tried, True
+            return None, states, attempts, True
         states += 1
-        next_index = frame.orbit_index + 1
-        if next_index == len(orbits):
-            return dict(assignment), states, assignments_tried, False
-        next_orbit = orbits[next_index]
-        frames.append(
-            _PairMorphismSearchFrame(
-                next_index,
-                fixed_targets if len(next_orbit) == 1 else target_nodes,
-                tuple(additions),
-            )
-        )
-
-    return None, states, assignments_tried, False
+        assignment[i] = candidate
+        if len(assignment) == len(orbits):
+            result: dict[Hashable, Hashable] = {}
+            for orbit_index, orbit in enumerate(orbits):
+                image = assignment[orbit_index]
+                result[orbit[0]] = target_nodes[image]
+                if len(orbit) == 2:
+                    result[orbit[1]] = target_nodes[tau_indices[image]]
+            if any(
+                result[u] != result[v] and not target.has_edge(result[u], result[v])
+                for u, v in source.edges()
+            ):
+                raise AssertionError("AC-3 returned a map that fails adjacency")
+            if any(result[sigma[u]] != tau[result[u]] for u in source):
+                raise AssertionError("AC-3 returned a map that fails equivariance")
+            return result, states, attempts, False
+        next_i = choose_orbit(assignment)
+        frames.append(_PairMorphismSearchFrame(next_i, domains[next_i], len(trail)))
+    return None, states, attempts, False
 
 
 def search_covering_divergence(
