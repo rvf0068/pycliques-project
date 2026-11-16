@@ -1,4 +1,5 @@
 """General finite target-family retractions, positive/negative/bounded cases."""
+
 from __future__ import annotations
 
 import networkx as nx
@@ -11,7 +12,9 @@ from pycliques.named import (
     suspension_of_cycle,
 )
 from pycliques.targeted_retractions import (
-    TargetSearchStatus, search_targeted_retractions, verify_targeted_retraction,
+    TargetSearchStatus,
+    search_targeted_retractions,
+    verify_targeted_retraction,
 )
 
 
