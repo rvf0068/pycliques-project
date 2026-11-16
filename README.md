@@ -269,3 +269,38 @@ sc = clique_complex(g)
 # Character of the identity permutation on H_0 equals 1 (one connected component)
 print(character_p_homology(sc, 0, Permutation()))   # 1
 ```
+## Homology-guided targeted graph retractions
+
+The reusable `pycliques.search_targeted_retractions` enumerates **all induced
+targets** in three bounded families: octahedra (O_d), cycle suspensions,
+and complements of cycles. It uses induced matchings or chordless cycles
+in an appropriate graph, then runs the existing bounded retraction CSP
+and independently verifies positive maps (including collapsed edges).
+
+Optional **exact reduced mod-2 Betti numbers** rule out target dimensions
+before enumeration, without requiring `pycliques` to import `pycombtop`:
+
+```python
+from pycliques import search_targeted_retractions, snub_disphenoid
+from pycombtop.bounded_betti import bounded_reduced_betti_mod2
+
+graph = snub_disphenoid()
+homology = bounded_reduced_betti_mod2(graph, max_faces=100_000)
+result = search_targeted_retractions(graph, betti_numbers=homology)
+for family, outcome in result.items():
+    print(family, outcome.status.name, outcome.induced_targets_checked)
+```
+
+In a batch census, compute and **persist** the Betti profile once per
+actual graph/iterate, and feed it to subsequent searches. The
+`bounded_reduced_betti_mod2` function returns `None` on face-budget
+overflow; it never invents zeros. Its optional `max_degree` argument
+computes exact Betti numbers only through that degree, so dimensions
+not supplied must be treated as unknown.
+
+`FOUND` includes an explicitly replayable retraction witness.
+`EXHAUSTED` means the specified target family and order window were
+fully examined; `LIMIT_REACHED` means that a cap interrupted
+enumeration or a retraction search; `HOMOLOGY_EXCLUDED` is valid only
+conditional on the trusted supplied Betti profile. None of these
+statuses alone classifies clique divergence of the source graph.
