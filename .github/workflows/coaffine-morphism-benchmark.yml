@@ -1,0 +1,39 @@
+name: Coaffine morphism optimization benchmark
+
+on:
+  pull_request:
+    paths:
+      - "packages/pycombtop/src/pycombtop/covering_divergence_search.py"
+      - "packages/pycombtop/tests/test_covering_divergence_search.py"
+      - "research/benchmark_coaffine_morphism.py"
+      - ".github/workflows/coaffine-morphism-benchmark.yml"
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - name: Prepare uv workspace with exact lockfile
+        run: |
+          uv python install 3.11
+          uv sync --frozen
+      - name: Show exact Ruff formatting changes for inspection
+        run: |
+          uv run ruff format --diff \
+            packages/pycombtop/src/pycombtop/covering_divergence_search.py \
+            packages/pycombtop/tests/test_covering_divergence_search.py || true
+      - name: Independent exhaustive and known positive certificate tests
+        run: |
+          uv run pytest packages/pycombtop/tests/test_covering_divergence_search.py -v
+      - name: Replay eight frozen nine-core covering-search benchmarks
+        run: |
+          uv run python research/benchmark_coaffine_morphism.py \
+            --output research/results/benchmark_coaffine_morphism_pr14.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eight-nine-core-coaffine-benchmark
+          path: research/results/benchmark_coaffine_morphism_pr14.json
+          if-no-files-found: error
