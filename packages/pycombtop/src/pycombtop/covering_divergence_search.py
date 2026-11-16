@@ -244,14 +244,12 @@ def _bounded_pair_morphism(
     # A coaffination for this double-cover procedure is an involution.
     # Reject malformed inputs rather than silently omit a longer orbit.
     if any(
-        sigma.get(vertex) not in source
-        or sigma.get(sigma[vertex]) != vertex
+        sigma.get(vertex) not in source or sigma.get(sigma[vertex]) != vertex
         for vertex in source_nodes
     ):
         raise ValueError("Source coaffination must be an involution")
     if any(
-        tau.get(vertex) not in target
-        or tau.get(tau[vertex]) != vertex
+        tau.get(vertex) not in target or tau.get(tau[vertex]) != vertex
         for vertex in target_nodes
     ):
         raise ValueError("Target coaffination must be an involution")
@@ -275,22 +273,17 @@ def _bounded_pair_morphism(
     tau_indices = [node_to_target[tau[v]] for v in target_nodes]
     full_domain = (1 << target_count) - 1
     fixed_domain = sum(
-        1 << index for index, partner in enumerate(tau_indices)
-        if partner == index
+        1 << index for index, partner in enumerate(tau_indices) if partner == index
     )
     closed = [
-        (1 << index) | sum(
-            1 << node_to_target[neighbor] for neighbor in target.neighbors(vertex)
-        )
+        (1 << index)
+        | sum(1 << node_to_target[neighbor] for neighbor in target.neighbors(vertex))
         for index, vertex in enumerate(target_nodes)
     ]
     # When the second endpoint of a source edge is a mate, the target
     # representative must lie in tau^{-1}(closed_neighborhood[image]).
     inverse_closed = [
-        sum(
-            1 << index for index, mate in enumerate(tau_indices)
-            if mask >> mate & 1
-        )
+        sum(1 << index for index, mate in enumerate(tau_indices) if mask >> mate & 1)
         for mask in closed
     ]
 
@@ -300,7 +293,8 @@ def _bounded_pair_morphism(
         if len(orbit) == 2 and source.has_edge(orbit[0], orbit[1]):
             # An internal orbit edge must also map to an edge or equality.
             candidates &= sum(
-                1 << index for index, partner in enumerate(tau_indices)
+                1 << index
+                for index, partner in enumerate(tau_indices)
                 if closed[index] >> partner & 1
             )
         domains.append(candidates)
@@ -334,9 +328,7 @@ def _bounded_pair_morphism(
             support_masks.append(supported)
         compatibility[i, j] = tuple(support_masks)
     linked = [tuple(sorted(around)) for around in neighbors]
-    degrees = [
-        sum(source.degree(member) for member in orbit) for orbit in orbits
-    ]
+    degrees = [sum(source.degree(member) for member in orbit) for orbit in orbits]
 
     # Store only changed domains on a trail, so backtracking is O(changes),
     # not O(number of source orbits) per state. This is also safe for 1100+
@@ -354,8 +346,7 @@ def _bounded_pair_morphism(
         current = domains[i]
         support = compatibility[i, j]
         filtered = sum(
-            1 << image for image in bits(current)
-            if support[image] & domains[j]
+            1 << image for image in bits(current) if support[image] & domains[j]
         )
         if filtered == current:
             return False
@@ -440,9 +431,7 @@ def _bounded_pair_morphism(
                 raise AssertionError("AC-3 returned a map that fails equivariance")
             return result, states, attempts, False
         next_i = choose_orbit(assignment)
-        frames.append(
-            _PairMorphismSearchFrame(next_i, domains[next_i], len(trail))
-        )
+        frames.append(_PairMorphismSearchFrame(next_i, domains[next_i], len(trail)))
     return None, states, attempts, False
 
 
