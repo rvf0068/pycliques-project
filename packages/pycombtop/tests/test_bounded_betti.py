@@ -2,7 +2,6 @@
 
 import networkx as nx
 import pytest
-
 from pycliques.named import complement_of_cycle, octahedron, snub_disphenoid
 from pycombtop.bounded_betti import bounded_reduced_betti_mod2
 from pycombtop.homotopy_type import betti_numbers_graph
