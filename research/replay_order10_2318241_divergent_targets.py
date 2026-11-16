@@ -8,6 +8,7 @@ with n >= 8. The saved v1 result and environment are not modified.
 from __future__ import annotations
 
 import json
+from collections import Counter
 
 import networkx as nx
 
@@ -35,6 +36,18 @@ def main() -> None:
     if calculated is None or not nx.is_isomorphic(calculated, saved):
         raise AssertionError("Saved first pared iterate disagrees with input graph")
 
+    # Independent direct enumeration, without the Betti-number pruning used
+    # by search_targeted_retractions. A chordless cycle in the complement
+    # is precisely an induced cycle-complement target.
+    chordless = Counter(
+        len(cycle)
+        for cycle in nx.chordless_cycles(
+            nx.complement(saved), length_bound=len(saved)
+        )
+    )
+    if any(length >= 8 for length in chordless):
+        raise AssertionError("Unexpected induced divergent cycle complement")
+
     known = bounded_reduced_betti_mod2(saved, max_faces=150_000)
     mode = "full"
     if known is None:
@@ -58,6 +71,7 @@ def main() -> None:
     found = result.status is TargetSearchStatus.FOUND
     details = {
         "index": 2318241,
+        "induced_cycle_complement_lengths": dict(sorted(chordless.items())),
         "original_graph6": ORIGINAL,
         "pared_iterate": 1,
         "pared_graph6": SAVED_PARED_G1,
