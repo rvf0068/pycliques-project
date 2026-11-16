@@ -364,7 +364,7 @@ def test_pair_morphism_respects_tight_budgets_after_propagation() -> None:
     source = nx.empty_graph(4)
     target = nx.empty_graph(2)
     sigma: dict[Hashable, Hashable] = {0: 1, 1: 0, 2: 3, 3: 2}
-    tau = {0: 1, 1: 0}
+    tau: dict[Hashable, Hashable] = {0: 1, 1: 0}
     source_pair = CoaffinePair(source, sigma)
     target_pair = CoaffinePair(target, tau)
     for max_states, max_assignments in ((0, 10), (1, 10), (10, 0), (10, 1)):
