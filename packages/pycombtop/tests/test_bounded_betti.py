@@ -1,4 +1,5 @@
 """Independent bounded GF(2) Betti consistency and resource tests."""
+
 import networkx as nx
 import pytest
 
