@@ -91,10 +91,14 @@ def benchmark():
             raw = betti_numbers_graph(graph)
             mogutda_seconds=time.monotonic()-started
             existing={i:value for i,value in enumerate(raw)}
-            if any(existing.get(d,0)!=v for d,v in via_gudhi.items()):
-                raise AssertionError(f"Existing mogutda mismatch at {name}")
+            # Do not equate coefficients without verification. Preserve any
+            # disagreement for mathematical diagnosis rather than hiding it.
+            mogutda_matches_gudhi = not any(
+                existing.get(d, 0) != v for d, v in via_gudhi.items()
+            )
         else:
             mogutda_seconds=None
+            mogutda_matches_gudhi=None
         results.append({
             "graph":name,"order":len(graph),"edges":graph.number_of_edges(),
             "gudhi_reduced_betti":via_gudhi,"gudhi_simplices":count,
@@ -102,10 +106,16 @@ def benchmark():
             "bounded_seconds":round(bounded_seconds,4),
             "mogutda_seconds":None if mogutda_seconds is None else round(mogutda_seconds,4),
             "bounded_within_face_budget":via_bounded is not None,
+            "bounded_reduced_betti":via_bounded,
+            "mogutda_reduced_betti":existing,
+            "mogutda_matches_gudhi":mogutda_matches_gudhi,
         })
     return {
         "schema":1,"gudhi_version":getattr(gudhi,"__version__","unknown"),
-        "all_cross_checks_passed":True,"results":results,
+        "gudhi_matches_exact_binary_boundaries":True,
+        "mogutda_disagreements":[x["graph"] for x in results
+            if x["mogutda_matches_gudhi"] is False],
+        "results":results,
     }
 
 
