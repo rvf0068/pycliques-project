@@ -244,12 +244,18 @@ def _bounded_pair_morphism(
     # A coaffination for this double-cover procedure is an involution.
     # Reject malformed inputs rather than silently omit a longer orbit.
     if any(
-        sigma.get(vertex) not in source or sigma.get(sigma[vertex]) != vertex
+        vertex not in sigma
+        or sigma[vertex] not in source
+        or sigma[vertex] not in sigma
+        or sigma[sigma[vertex]] != vertex
         for vertex in source_nodes
     ):
         raise ValueError("Source coaffination must be an involution")
     if any(
-        tau.get(vertex) not in target or tau.get(tau[vertex]) != vertex
+        vertex not in tau
+        or tau[vertex] not in target
+        or tau[vertex] not in tau
+        or tau[tau[vertex]] != vertex
         for vertex in target_nodes
     ):
         raise ValueError("Target coaffination must be an involution")
