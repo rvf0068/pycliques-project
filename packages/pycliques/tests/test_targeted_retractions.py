@@ -159,7 +159,8 @@ def test_target_replay_rejects_tampering_and_false_family_claims():
     # O4 is not a suspension of a cycle, even though 8=6+2.
     h = octahedron(4)
     false_target = TargetRetractionResult(
-        "suspensions", TargetSearchStatus.FOUND,
+        "suspensions",
+        TargetSearchStatus.FOUND,
         target_kind="suspensions:6",
         target_vertices=tuple(h),
         projection={v: v for v in h},
@@ -180,21 +181,27 @@ def test_invalid_host_graph_is_rejected(bad_graph):
         search_targeted_retractions(bad_graph)
 
 
-@pytest.mark.parametrize("family_names",[
-    ("octahedra", "octahedra"),
-    ("invalid_family",),
-])
+@pytest.mark.parametrize(
+    "family_names",
+    [
+        ("octahedra", "octahedra"),
+        ("invalid_family",),
+    ],
+)
 def test_invalid_target_family_names_are_rejected(family_names):
     with pytest.raises(ValueError, match="target family"):
         search_targeted_retractions(octahedron(3), families=family_names)
 
 
-@pytest.mark.parametrize("kwargs",[
-    {"max_patterns": 0},
-    {"max_states": 0},
-    {"max_assignments": 0},
-    {"max_target_order": 0},
-])
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"max_patterns": 0},
+        {"max_states": 0},
+        {"max_assignments": 0},
+        {"max_target_order": 0},
+    ],
+)
 def test_invalid_search_budgets_are_rejected(kwargs):
     with pytest.raises(ValueError, match="Search bounds"):
         search_targeted_retractions(octahedron(3), **kwargs)
@@ -235,6 +242,7 @@ def test_repeated_pattern_does_not_duplicate_target_csp(monkeypatch):
     import pycliques.targeted_retractions as search
 
     vertices = frozenset(range(6))
+
     def repeated(_graph, _allowed):
         yield 3, vertices
         yield 3, vertices
@@ -246,9 +254,9 @@ def test_repeated_pattern_does_not_duplicate_target_csp(monkeypatch):
 
     monkeypatch.setitem(search._GENERATORS, "octahedra", repeated)
     monkeypatch.setattr(search, "bounded_retraction", no_retraction)
-    result = search_targeted_retractions(
-        octahedron(4), families=("octahedra",)
-    )["octahedra"]
+    result = search_targeted_retractions(octahedron(4), families=("octahedra",))[
+        "octahedra"
+    ]
     assert result.status is TargetSearchStatus.EXHAUSTED
     assert result.patterns_checked == 2
     assert result.induced_targets_checked == 1
