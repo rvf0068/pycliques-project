@@ -275,9 +275,10 @@ The reusable `pycliques.search_targeted_retractions` enumerates **all induced
 targets** in three bounded families: octahedra (O_d), cycle suspensions,
 and complements of cycles **of length at least eight**. This restriction
 excludes nondivergent cycle-complement targets, particularly the previously
-found \\(\\overline{C_6}\\) retraction in the order-ten census. The search uses
-induced matchings or chordless cycles in an appropriate graph, then runs the existing bounded retraction CSP
-and independently verifies positive maps (including collapsed edges).
+found \(\overline{C_6}\) retraction in the order-ten census. The search uses
+induced matchings or chordless cycles in an appropriate graph, then
+runs the existing bounded retraction CSP and independently verifies
+positive maps (including collapsed edges).
 
 Optional **exact reduced mod-2 Betti numbers** rule out target dimensions
 before enumeration, without requiring `pycliques` to import `pycombtop`:
@@ -306,8 +307,8 @@ fully examined; `LIMIT_REACHED` means that a cap interrupted
 enumeration or a retraction search; `HOMOLOGY_EXCLUDED` is valid only
 conditional on the trusted supplied Betti profile.
 Neither `EXHAUSTED` nor `HOMOLOGY_EXCLUDED` is a divergence verdict.
-A verified graph retraction of `G` or one of its clique iterates onto
-a **proved K-divergent target** certifies divergence of `G` by the
+A verified graph retraction of \(G\) or one of its clique iterates onto
+a **proved K-divergent target** certifies divergence of \(G\) by the
 retraction theorem. This search therefore excludes cycle complements of
 length below eight, whose divergence is not established.
 
