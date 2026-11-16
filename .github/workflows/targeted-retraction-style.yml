@@ -1,0 +1,28 @@
+name: Targeted retraction style diagnostic
+
+on:
+  pull_request:
+    paths:
+      - 'packages/pycliques/src/pycliques/targeted_retractions.py'
+      - 'packages/pycliques/src/pycliques/__init__.py'
+      - 'packages/pycliques/tests/test_targeted_retractions.py'
+      - 'packages/pycombtop/src/pycombtop/bounded_betti.py'
+      - 'packages/pycombtop/tests/test_bounded_betti.py'
+      - '.github/workflows/targeted-retraction-style.yml'
+
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv sync --frozen --python 3.11
+      - name: Ruff import fix preview
+        run: uv run ruff check --diff packages/pycliques/tests/test_targeted_retractions.py packages/pycombtop/tests/test_bounded_betti.py || true
+      - name: Ruff formatter preview
+        run: uv run ruff format --diff packages/pycliques/src/pycliques/targeted_retractions.py packages/pycombtop/src/pycombtop/bounded_betti.py packages/pycliques/tests/test_targeted_retractions.py packages/pycombtop/tests/test_bounded_betti.py
+      - name: Targeted module line-coverage report
+        run: |
+          uv run pytest packages/pycliques/tests/test_targeted_retractions.py packages/pycombtop/tests/test_bounded_betti.py \
+            --cov=pycliques.targeted_retractions --cov=pycombtop.bounded_betti \
+            --cov-report=term-missing -q

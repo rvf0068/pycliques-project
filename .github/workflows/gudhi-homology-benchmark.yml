@@ -1,0 +1,22 @@
+name: Benchmark shared GUDHI homology backend
+
+on:
+  pull_request:
+    paths:
+      - "research/benchmark_gudhi_target_betti.py"
+      - ".github/workflows/gudhi-homology-benchmark.yml"
+      - "packages/pycombtop/src/pycombtop/bounded_betti.py"
+  workflow_dispatch:
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv sync --frozen --python 3.11
+      - name: Install GUDHI only in benchmark environment
+        run: uv pip install --python .venv/bin/python 'gudhi==3.13.0'
+      - name: Compare GUDHI, mogutda and bounded exact GF2
+        run: .venv/bin/python research/benchmark_gudhi_target_betti.py
