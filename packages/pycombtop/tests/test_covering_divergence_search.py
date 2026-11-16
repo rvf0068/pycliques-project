@@ -240,7 +240,6 @@ def test_search_finds_and_replays_the_known_covering_certificate() -> None:
     )
 
 
-
 def _brute_force_pair_morphism(
     source_pair: CoaffinePair, target_pair: CoaffinePair
 ) -> dict[Hashable, Hashable] | None:
@@ -282,9 +281,7 @@ def _pair_from_involutive_graph(
     graph = nx.Graph()
     graph.add_nodes_from(labels)
     n = len(labels)
-    sigma = {
-        labels[i]: labels[i ^ 1] for i in range(n - n % 2)
-    }
+    sigma = {labels[i]: labels[i ^ 1] for i in range(n - n % 2)}
     if n % 2:
         sigma[labels[-1]] = labels[-1]
     # Close each random edge orbit under the involution, so sigma
@@ -323,8 +320,7 @@ def test_pair_morphism_matches_independent_exhaustive_reference() -> None:
                 for u in source.graph
             )
             assert all(
-                found[u] == found[v]
-                or target.graph.has_edge(found[u], found[v])
+                found[u] == found[v] or target.graph.has_edge(found[u], found[v])
                 for u, v in source.graph.edges()
             )
 
@@ -338,8 +334,10 @@ def test_pair_morphism_prunes_inconsistent_cross_orbit_edges() -> None:
     target = nx.empty_graph(2)
     tau = {0: 1, 1: 0}
     mapping, states, attempts, limited = _bounded_pair_morphism(
-        CoaffinePair(source, sigma), CoaffinePair(target, tau),
-        max_states=10, max_assignments=10,
+        CoaffinePair(source, sigma),
+        CoaffinePair(target, tau),
+        max_states=10,
+        max_assignments=10,
     )
     assert mapping is None
     assert not limited
@@ -353,7 +351,8 @@ def test_pair_morphism_allows_adjacent_vertices_to_map_equal() -> None:
     mapping, states, attempts, limited = _bounded_pair_morphism(
         CoaffinePair(source, {0: 1, 1: 0}),
         CoaffinePair(target, {0: 0}),
-        max_states=10, max_assignments=10,
+        max_states=10,
+        max_assignments=10,
     )
     assert mapping == {0: 0, 1: 0}
     assert not limited
@@ -370,8 +369,10 @@ def test_pair_morphism_respects_tight_budgets_after_propagation() -> None:
     target_pair = CoaffinePair(target, tau)
     for max_states, max_assignments in ((0, 10), (1, 10), (10, 0), (10, 1)):
         result, states, attempts, limited = _bounded_pair_morphism(
-            source_pair, target_pair,
-            max_states=max_states, max_assignments=max_assignments,
+            source_pair,
+            target_pair,
+            max_states=max_states,
+            max_assignments=max_assignments,
         )
         assert result is None
         assert limited
@@ -390,6 +391,8 @@ def test_pair_morphism_rejects_non_involutive_pair_maps() -> None:
 
     with pytest.raises(ValueError, match="involution"):
         _bounded_pair_morphism(
-            source_pair, target_pair,
-            max_states=100, max_assignments=100,
+            source_pair,
+            target_pair,
+            max_states=100,
+            max_assignments=100,
         )
