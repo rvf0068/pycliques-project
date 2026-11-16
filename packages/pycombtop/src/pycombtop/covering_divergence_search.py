@@ -267,9 +267,7 @@ def _bounded_pair_morphism(
         if vertex in seen:
             continue
         mate = sigma[vertex]
-        orbit: tuple[Hashable, ...] = (
-            (vertex,) if mate == vertex else (vertex, mate)
-        )
+        orbit: tuple[Hashable, ...] = (vertex,) if mate == vertex else (vertex, mate)
         orbit_index = len(orbits)
         orbits.append(orbit)
         for role, member in enumerate(orbit):
