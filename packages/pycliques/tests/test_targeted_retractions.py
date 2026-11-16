@@ -5,7 +5,10 @@ import networkx as nx
 import pytest
 
 from pycliques.named import (
-    complement_of_cycle, octahedron, snub_disphenoid, suspension_of_cycle,
+    complement_of_cycle,
+    octahedron,
+    snub_disphenoid,
+    suspension_of_cycle,
 )
 from pycliques.targeted_retractions import (
     TargetSearchStatus, search_targeted_retractions, verify_targeted_retraction,
