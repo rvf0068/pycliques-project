@@ -273,7 +273,10 @@ print(character_p_homology(sc, 0, Permutation()))   # 1
 
 The reusable `pycliques.search_targeted_retractions` enumerates **all induced
 targets** in three bounded families: octahedra (O_d), cycle suspensions,
-and complements of cycles. It uses induced matchings or chordless cycles
+and complements of cycles **of length at least eight**. This restriction
+excludes nondivergent cycle-complement targets, particularly the previously
+found \(\\overline{C_6}\) retraction in the order-ten census. The search uses
+induced matchings or chordless cycles
 in an appropriate graph, then runs the existing bounded retraction CSP
 and independently verifies positive maps (including collapsed edges).
 
@@ -302,5 +305,15 @@ not supplied must be treated as unknown.
 `EXHAUSTED` means the specified target family and order window were
 fully examined; `LIMIT_REACHED` means that a cap interrupted
 enumeration or a retraction search; `HOMOLOGY_EXCLUDED` is valid only
-conditional on the trusted supplied Betti profile. None of these
-statuses alone classifies clique divergence of the source graph.
+conditional on the trusted supplied Betti profile. Neither \`EXHAUSTED\` nor \`HOMOLOGY_EXCLUDED\` is a divergence verdict. negative statuses alone classifies clique divergence. A verified graph
+retraction (of G or of one of its K-iterates) onto a **proved K-divergent
+target** certifies divergence of G by the retraction theorem. Search
+results are structural certificates, so the cited target-divergence
+theorem remains part of the mathematical justification.
+
+Historical \`cycle_complements:5\` through \`cycle_complements:7\` witnesses
+remain independently verifiable as ordinary graph retractions, but they
+are no longer returned by new searches. The one-off validation
+\`research/replay_order10_2318241_divergent_targets.py\` reproduces the
+saved pared first iterate and reruns its cycle-complement search with
+the new lower bound.
