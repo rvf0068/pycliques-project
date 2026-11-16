@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import networkx as nx
 import pytest
-
 from pycliques.named import (
     complement_of_cycle,
     octahedron,
