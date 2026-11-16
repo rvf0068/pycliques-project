@@ -273,9 +273,12 @@ print(character_p_homology(sc, 0, Permutation()))   # 1
 
 The reusable `pycliques.search_targeted_retractions` enumerates **all induced
 targets** in three bounded families: octahedra (O_d), cycle suspensions,
-and complements of cycles. It uses induced matchings or chordless cycles
-in an appropriate graph, then runs the existing bounded retraction CSP
-and independently verifies positive maps (including collapsed edges).
+and complements of cycles **of length at least eight**. This restriction
+excludes nondivergent cycle-complement targets, particularly the previously
+found \(\overline{C_6}\) retraction in the order-ten census. The search uses
+induced matchings or chordless cycles in an appropriate graph, then
+runs the existing bounded retraction CSP and independently verifies
+positive maps (including collapsed edges).
 
 Optional **exact reduced mod-2 Betti numbers** rule out target dimensions
 before enumeration, without requiring `pycliques` to import `pycombtop`:
@@ -302,5 +305,16 @@ not supplied must be treated as unknown.
 `EXHAUSTED` means the specified target family and order window were
 fully examined; `LIMIT_REACHED` means that a cap interrupted
 enumeration or a retraction search; `HOMOLOGY_EXCLUDED` is valid only
-conditional on the trusted supplied Betti profile. None of these
-statuses alone classifies clique divergence of the source graph.
+conditional on the trusted supplied Betti profile.
+Neither `EXHAUSTED` nor `HOMOLOGY_EXCLUDED` is a divergence verdict.
+A verified graph retraction of \(G\) or one of its clique iterates onto
+a **proved K-divergent target** certifies divergence of \(G\) by the
+retraction theorem. This search therefore excludes cycle complements of
+length below eight, which are not K-divergent.
+
+Historical `cycle_complements:5` through `cycle_complements:7` witnesses
+remain independently verifiable as ordinary graph retractions, but new
+searches do not return them. The reproducible
+`research/replay_order10_2318241_divergent_targets.py` study constructs the
+saved first pared clique iterate and reruns its cycle-complement search
+with the corrected lower bound.

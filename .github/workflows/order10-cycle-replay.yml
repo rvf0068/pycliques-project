@@ -1,0 +1,23 @@
+name: Order10 divergent cycle-complement regression
+
+on:
+  pull_request:
+    paths:
+      - "packages/pycliques/src/pycliques/targeted_retractions.py"
+      - "packages/pycliques/tests/test_targeted_retractions.py"
+      - "research/replay_order10_2318241_divergent_targets.py"
+      - ".github/workflows/order10-cycle-replay.yml"
+  workflow_dispatch:
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - name: Prepare frozen monorepo environment
+        run: uv sync --frozen --python 3.11
+      - name: Rerun order10 index 2318241 with C_n complements for n >= 8
+        run: |
+          uv run python research/replay_order10_2318241_divergent_targets.py

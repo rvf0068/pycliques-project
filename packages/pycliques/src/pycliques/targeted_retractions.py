@@ -2,7 +2,8 @@
 
 Independent of pycombtop. Betti input consists only of degrees for which
 exact reduced homology over GF(2) has been determined. Missing means unknown.
-No clique-divergence verdict is inferred from a structural retraction.
+The built-in target families search only targets with established divergence.
+Verification of older retractions remains valid, including nondivergent targets.
 """
 
 from __future__ import annotations
@@ -62,7 +63,10 @@ def _parameters(family: str, n: int, limit: int) -> range:
         return range(3, order // 2 + 1)
     if family == "suspensions":
         return range(4, order - 1)
-    return range(5, order + 1)
+    # Complements of cycles are K-divergent only from C_8 onward.
+    # Searching C_5, C_6 or C_7 can produce an irrelevant first witness,
+    # prematurely ending the search before an induced divergent target.
+    return range(8, order + 1)
 
 
 def _octahedra(graph: nx.Graph, accepted: set[int]) -> Iterable[tuple[int, frozenset]]:
@@ -180,7 +184,11 @@ def search_targeted_retractions(
     max_states: int = 100_000,
     max_assignments: int = 500_000,
 ) -> dict[str, TargetRetractionResult]:
-    """Find ordinary graph retractions to octahedra and cycle-based targets.
+    """Find ordinary graph retractions to known divergent target families.
+
+    Cycle complements are searched only for C_n with n >= 8; smaller
+    complements are not K-divergent. The independent witness verifier
+    deliberately remains valid for previously saved C_5--C_7 retractions.
 
     The supplied reduced GF(2) Betti numbers are trusted to be EXACT,
     may cover only selected dimensions, and are never computed here.
