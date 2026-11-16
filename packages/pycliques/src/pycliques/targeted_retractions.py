@@ -13,7 +13,9 @@ from enum import Enum, auto
 import networkx as nx
 
 from .retractions import (
-    RetractionSearchStatus, bounded_retraction, verify_retraction_witness,
+    RetractionSearchStatus,
+    bounded_retraction,
+    verify_retraction_witness,
 )
 
 
@@ -214,7 +216,8 @@ def search_targeted_retractions(
                 else TargetSearchStatus.EXHAUSTED
             )
             results[family] = TargetRetractionResult(
-                family, status, reason="No admissible target given bounds/known homology"
+                family, status,
+                reason="No admissible target given bounds/known homology"
             )
             continue
         patterns = targets = states = assignments = 0
