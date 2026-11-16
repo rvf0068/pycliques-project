@@ -4,6 +4,7 @@ Independent of pycombtop. Betti input consists only of degrees for which
 exact reduced homology over GF(2) has been determined. Missing means unknown.
 No clique-divergence verdict is inferred from a structural retraction.
 """
+
 from __future__ import annotations
 
 from collections.abc import Hashable, Iterable, Mapping, Sequence
@@ -82,7 +83,8 @@ def _octahedra(graph: nx.Graph, accepted: set[int]) -> Iterable[tuple[int, froze
             if a in excluded or b in excluded:
                 continue
             yield from walk(
-                index + 1, chosen + (index,),
+                index + 1,
+                chosen + (index,),
                 excluded | forbidden[a] | forbidden[b],
             )
 
@@ -119,13 +121,12 @@ _GENERATORS = {
 }
 
 
-def verify_targeted_retraction(
-    graph: nx.Graph, result: TargetRetractionResult
-) -> bool:
+def verify_targeted_retraction(graph: nx.Graph, result: TargetRetractionResult) -> bool:
     """Independently verify both the graph retraction and named target shape."""
     if (
         result.status is not TargetSearchStatus.FOUND
-        or result.target_vertices is None or result.projection is None
+        or result.target_vertices is None
+        or result.projection is None
         or result.target_kind is None
     ):
         return False
@@ -146,9 +147,13 @@ def verify_targeted_retraction(
         )
     if family == "cycle_complements":
         complement = nx.complement(target)
-        return len(target) == parameter and parameter >= 5 and (
-            nx.is_connected(complement)
-            and all(degree == 2 for _, degree in complement.degree())
+        return (
+            len(target) == parameter
+            and parameter >= 5
+            and (
+                nx.is_connected(complement)
+                and all(degree == 2 for _, degree in complement.degree())
+            )
         )
     if family == "suspensions":
         if len(target) != parameter + 2 or parameter < 4:
@@ -159,8 +164,7 @@ def verify_targeted_retraction(
             if (
                 nx.is_connected(cycle)
                 and all(degree == 2 for _, degree in cycle.degree())
-                and all(target.has_edge(a, v) and target.has_edge(b, v)
-                        for v in cycle)
+                and all(target.has_edge(a, v) and target.has_edge(b, v) for v in cycle)
             ):
                 return True
     return False
@@ -186,8 +190,10 @@ def search_targeted_retractions(
     reported as exhaustive absence. Positive witnesses are replayed.
     """
     if (
-        not isinstance(graph, nx.Graph) or graph.is_multigraph()
-        or graph.is_directed() or nx.number_of_selfloops(graph)
+        not isinstance(graph, nx.Graph)
+        or graph.is_multigraph()
+        or graph.is_directed()
+        or nx.number_of_selfloops(graph)
     ):
         raise ValueError("Require an undirected simple loopless graph")
     if len(set(families)) != len(families) or any(f not in FAMILIES for f in families):
@@ -196,8 +202,7 @@ def search_targeted_retractions(
         raise ValueError("Search bounds must be positive")
     known = {} if betti_numbers is None else dict(betti_numbers)
     if any(
-        type(degree) is not int or degree < 0
-        or type(rank) is not int or rank < 0
+        type(degree) is not int or degree < 0 or type(rank) is not int or rank < 0
         for degree, rank in known.items()
     ):
         raise ValueError("Exact Betti degree and rank must be nonnegative integers")
@@ -206,18 +211,21 @@ def search_targeted_retractions(
     for family in families:
         all_params = set(_parameters(family, len(graph), max_target_order))
         allowed = {
-            p for p in all_params
+            p
+            for p in all_params
             if (dimension := _target_betti(family, p)[0]) not in known
             or known[dimension] >= _target_betti(family, p)[1]
         }
         if not allowed:
             status = (
-                TargetSearchStatus.HOMOLOGY_EXCLUDED if all_params
+                TargetSearchStatus.HOMOLOGY_EXCLUDED
+                if all_params
                 else TargetSearchStatus.EXHAUSTED
             )
             results[family] = TargetRetractionResult(
-                family, status,
-                reason="No admissible target given bounds/known homology"
+                family,
+                status,
+                reason="No admissible target given bounds/known homology",
             )
             continue
         patterns = targets = states = assignments = 0
@@ -240,9 +248,10 @@ def search_targeted_retractions(
                 reason = "Exceeded total retraction-search budget"
                 break
             check = bounded_retraction(
-                graph, graph.subgraph(vertices),
-                max_states=max_states-states,
-                max_assignments=max_assignments-assignments,
+                graph,
+                graph.subgraph(vertices),
+                max_states=max_states - states,
+                max_assignments=max_assignments - assignments,
             )
             states += check.states_explored
             assignments += check.assignments_tried
@@ -252,8 +261,12 @@ def search_targeted_retractions(
                 break
             if check.status is RetractionSearchStatus.FOUND:
                 hit = TargetRetractionResult(
-                    family, TargetSearchStatus.FOUND,
-                    patterns, targets, states, assignments,
+                    family,
+                    TargetSearchStatus.FOUND,
+                    patterns,
+                    targets,
+                    states,
+                    assignments,
                     f"{family}:{parameter}",
                     tuple(v for v in graph if v in vertices),
                     check.retraction,
@@ -263,7 +276,12 @@ def search_targeted_retractions(
                     raise AssertionError("Positive retraction witness failed replay")
                 break
         results[family] = hit or TargetRetractionResult(
-            family, status, patterns, targets, states, assignments,
+            family,
+            status,
+            patterns,
+            targets,
+            states,
+            assignments,
             reason=reason,
         )
     return results
