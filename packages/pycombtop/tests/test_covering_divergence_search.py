@@ -396,3 +396,38 @@ def test_pair_morphism_rejects_non_involutive_pair_maps() -> None:
             max_states=100,
             max_assignments=100,
         )
+
+
+
+def test_pair_morphism_none_labeled_vertex_with_missing_map_key() -> None:
+    """Incomplete involutions must fail consistently, even when None is a node."""
+    import pytest
+
+    source = nx.Graph()
+    source.add_nodes_from((None, 0))
+    target = nx.Graph()
+    target.add_nodes_from((None, 1))
+    valid_source = CoaffinePair(source, {None: 0, 0: None})
+    valid_target = CoaffinePair(target, {None: 1, 1: None})
+    for invalid_source, invalid_target in (
+        (CoaffinePair(source, {0: None}), valid_target),
+        (valid_source, CoaffinePair(target, {1: None})),
+    ):
+        with pytest.raises(ValueError, match="involution"):
+            _bounded_pair_morphism(
+                invalid_source,
+                invalid_target,
+                max_states=100,
+                max_assignments=100,
+            )
+    # A complete involution including None is valid.
+    mapping, states, attempts, limited = _bounded_pair_morphism(
+        valid_source,
+        valid_target,
+        max_states=100,
+        max_assignments=100,
+    )
+    assert not limited
+    assert mapping is not None
+    assert states > 0
+    assert attempts > 0
