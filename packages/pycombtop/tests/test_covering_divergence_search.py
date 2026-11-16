@@ -398,19 +398,25 @@ def test_pair_morphism_rejects_non_involutive_pair_maps() -> None:
         )
 
 
-def test_pair_morphism_none_labeled_vertex_with_missing_map_key() -> None:
-    """Incomplete involutions must fail consistently, even when None is a node."""
+def test_pair_morphism_missing_map_keys_for_nonnumeric_vertices() -> None:
+    """An incomplete involution fails even with arbitrary hashable labels.
+
+    NetworkX rejects a literal None vertex; tuples containing None are
+    valid hashable node identifiers and still exercise explicit key checks.
+    """
     import pytest
 
+    first = ("source", None)
+    second = ("target", None)
     source = nx.Graph()
-    source.add_nodes_from((None, 0))
+    source.add_nodes_from((first, 0))
     target = nx.Graph()
-    target.add_nodes_from((None, 1))
-    valid_source = CoaffinePair(source, {None: 0, 0: None})
-    valid_target = CoaffinePair(target, {None: 1, 1: None})
+    target.add_nodes_from((second, 1))
+    valid_source = CoaffinePair(source, {first: 0, 0: first})
+    valid_target = CoaffinePair(target, {second: 1, 1: second})
     for invalid_source, invalid_target in (
-        (CoaffinePair(source, {0: None}), valid_target),
-        (valid_source, CoaffinePair(target, {1: None})),
+        (CoaffinePair(source, {0: first}), valid_target),
+        (valid_source, CoaffinePair(target, {1: second})),
     ):
         with pytest.raises(ValueError, match="involution"):
             _bounded_pair_morphism(
