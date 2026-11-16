@@ -267,7 +267,9 @@ def _bounded_pair_morphism(
         if vertex in seen:
             continue
         mate = sigma[vertex]
-        orbit = (vertex,) if mate == vertex else (vertex, mate)
+        orbit: tuple[Hashable, ...] = (
+            (vertex,) if mate == vertex else (vertex, mate)
+        )
         orbit_index = len(orbits)
         orbits.append(orbit)
         for role, member in enumerate(orbit):
@@ -319,7 +321,7 @@ def _bounded_pair_morphism(
         constraints.setdefault((first, second), []).append((u_role, v_role))
         constraints.setdefault((second, first), []).append((v_role, u_role))
 
-    neighbors = [set() for _ in orbits]
+    neighbors: list[set[int]] = [set() for _ in orbits]
     compatibility: dict[tuple[int, int], tuple[int, ...]] = {}
     for (i, j), edges in constraints.items():
         neighbors[i].add(j)
