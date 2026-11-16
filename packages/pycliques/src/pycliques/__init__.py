@@ -175,12 +175,6 @@ from .retractions import (
     verify_retraction_witness,
     verify_special_octahedron_witness,
 )
-from .targeted_retractions import (
-    TargetRetractionResult,
-    TargetSearchStatus,
-    search_targeted_retractions,
-    verify_targeted_retraction,
-)
 from .small import (
     Certificate,
     CliqueBehavior,
@@ -207,6 +201,12 @@ from .surfaces import (
     is_regular,
     is_surface,
     open_neighborhood,
+)
+from .targeted_retractions import (
+    TargetRetractionResult,
+    TargetSearchStatus,
+    search_targeted_retractions,
+    verify_targeted_retraction,
 )
 
 __all__ = [
