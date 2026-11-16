@@ -330,9 +330,9 @@ def test_pair_morphism_prunes_inconsistent_cross_orbit_edges() -> None:
     # edgeless two-vertex target swapped by tau. Every possible orbit
     # choice violates at least one edge, so AC-3 can prove unsat early.
     source = nx.cycle_graph(4)
-    sigma = {0: 2, 2: 0, 1: 3, 3: 1}
+    sigma: dict[Hashable, Hashable] = {0: 2, 2: 0, 1: 3, 3: 1}
     target = nx.empty_graph(2)
-    tau = {0: 1, 1: 0}
+    tau: dict[Hashable, Hashable] = {0: 1, 1: 0}
     mapping, states, attempts, limited = _bounded_pair_morphism(
         CoaffinePair(source, sigma),
         CoaffinePair(target, tau),
@@ -363,7 +363,7 @@ def test_pair_morphism_allows_adjacent_vertices_to_map_equal() -> None:
 def test_pair_morphism_respects_tight_budgets_after_propagation() -> None:
     source = nx.empty_graph(4)
     target = nx.empty_graph(2)
-    sigma = {0: 1, 1: 0, 2: 3, 3: 2}
+    sigma: dict[Hashable, Hashable] = {0: 1, 1: 0, 2: 3, 3: 2}
     tau = {0: 1, 1: 0}
     source_pair = CoaffinePair(source, sigma)
     target_pair = CoaffinePair(target, tau)
@@ -396,7 +396,6 @@ def test_pair_morphism_rejects_non_involutive_pair_maps() -> None:
             max_states=100,
             max_assignments=100,
         )
-
 
 
 def test_pair_morphism_none_labeled_vertex_with_missing_map_key() -> None:
