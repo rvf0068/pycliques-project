@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import networkx as nx
 import pytest
 from pycliques.named import (
@@ -10,7 +12,9 @@ from pycliques.named import (
     snub_disphenoid,
     suspension_of_cycle,
 )
+from pycliques.retractions import BoundedRetractionResult, RetractionSearchStatus
 from pycliques.targeted_retractions import (
+    TargetRetractionResult,
     TargetSearchStatus,
     search_targeted_retractions,
     verify_targeted_retraction,
@@ -130,3 +134,129 @@ def test_no_circular_homology_dependency():
     import pycliques.targeted_retractions as module
 
     assert "pycombtop" not in module.__dict__
+
+
+def test_target_replay_rejects_tampering_and_false_family_claims():
+    g = octahedron(3)
+    original = search_targeted_retractions(g, families=("octahedra",))["octahedra"]
+    assert verify_targeted_retraction(g, original)
+    assert not verify_targeted_retraction(
+        g, replace(original, status=TargetSearchStatus.EXHAUSTED)
+    )
+    bad_map = dict(original.projection)
+    bad_map[0] = 9999
+    assert not verify_targeted_retraction(g, replace(original, projection=bad_map))
+    assert not verify_targeted_retraction(
+        g, replace(original, target_kind="invalid_kind")
+    )
+    assert not verify_targeted_retraction(
+        g, replace(original, target_kind="suspensions:5")
+    )
+    assert not verify_targeted_retraction(
+        g, replace(original, target_kind="octahedra:4")
+    )
+
+    # O4 is not a suspension of a cycle, even though 8=6+2.
+    h = octahedron(4)
+    false_target = TargetRetractionResult(
+        "suspensions", TargetSearchStatus.FOUND,
+        target_kind="suspensions:6",
+        target_vertices=tuple(h),
+        projection={v: v for v in h},
+    )
+    assert not verify_targeted_retraction(h, false_target)
+
+
+@pytest.mark.parametrize(
+    "bad_graph",
+    [
+        nx.MultiGraph(),
+        nx.DiGraph(),
+        nx.Graph([(0, 0)]),
+    ],
+)
+def test_invalid_host_graph_is_rejected(bad_graph):
+    with pytest.raises(ValueError, match="simple loopless"):
+        search_targeted_retractions(bad_graph)
+
+
+@pytest.mark.parametrize("family_names",[
+    ("octahedra", "octahedra"),
+    ("invalid_family",),
+])
+def test_invalid_target_family_names_are_rejected(family_names):
+    with pytest.raises(ValueError, match="target family"):
+        search_targeted_retractions(octahedron(3), families=family_names)
+
+
+@pytest.mark.parametrize("kwargs",[
+    {"max_patterns": 0},
+    {"max_states": 0},
+    {"max_assignments": 0},
+    {"max_target_order": 0},
+])
+def test_invalid_search_budgets_are_rejected(kwargs):
+    with pytest.raises(ValueError, match="Search bounds"):
+        search_targeted_retractions(octahedron(3), **kwargs)
+
+
+def test_actual_pattern_and_csp_budget_limits():
+    graph = octahedron(4)
+    # O4 contains induced O3, but homology forbids a retraction onto O3.
+    pattern_limited = search_targeted_retractions(
+        graph, families=("octahedra",), max_patterns=1
+    )["octahedra"]
+    assert pattern_limited.status is TargetSearchStatus.LIMIT_REACHED
+    assert pattern_limited.induced_targets_checked == 1
+
+    csp_limited = search_targeted_retractions(
+        graph, families=("octahedra",), max_states=1
+    )["octahedra"]
+    assert csp_limited.status is TargetSearchStatus.LIMIT_REACHED
+
+
+def test_global_state_budget_applies_across_distinct_induced_targets(monkeypatch):
+    import pycliques.targeted_retractions as search
+
+    def exhausted_one_state(*_args, **_kwargs):
+        return BoundedRetractionResult(
+            RetractionSearchStatus.EXHAUSTED, None, None, 1, 0
+        )
+
+    monkeypatch.setattr(search, "bounded_retraction", exhausted_one_state)
+    result = search_targeted_retractions(
+        octahedron(4), families=("octahedra",), max_states=1
+    )["octahedra"]
+    assert result.status is TargetSearchStatus.LIMIT_REACHED
+    assert result.induced_targets_checked == 2
+
+
+def test_repeated_pattern_does_not_duplicate_target_csp(monkeypatch):
+    import pycliques.targeted_retractions as search
+
+    vertices = frozenset(range(6))
+    def repeated(_graph, _allowed):
+        yield 3, vertices
+        yield 3, vertices
+
+    def no_retraction(*_args, **_kwargs):
+        return BoundedRetractionResult(
+            RetractionSearchStatus.EXHAUSTED, None, None, 1, 0
+        )
+
+    monkeypatch.setitem(search._GENERATORS, "octahedra", repeated)
+    monkeypatch.setattr(search, "bounded_retraction", no_retraction)
+    result = search_targeted_retractions(
+        octahedron(4), families=("octahedra",)
+    )["octahedra"]
+    assert result.status is TargetSearchStatus.EXHAUSTED
+    assert result.patterns_checked == 2
+    assert result.induced_targets_checked == 1
+
+
+def test_positive_witness_always_verified_before_return(monkeypatch):
+    import pycliques.targeted_retractions as search
+
+    monkeypatch.setattr(search, "verify_targeted_retraction", lambda *_: False)
+    with pytest.raises(AssertionError, match="witness failed replay"):
+        search_targeted_retractions(octahedron(3), families=("octahedra",))
