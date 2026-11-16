@@ -78,7 +78,7 @@ def main() -> None:
             raise AssertionError("Missing target kind")
         length = int(result.target_kind.split(":")[1])
         if length < 8:
-            raise AssertionError("Nond divergent cycle-complement target found")
+            raise AssertionError("Nondivergent cycle-complement target found")
         vertices = list(saved)
         position = {v: i for i, v in enumerate(vertices)}
         details.update(
