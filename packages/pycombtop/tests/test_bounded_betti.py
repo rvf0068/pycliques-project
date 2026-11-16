@@ -34,7 +34,8 @@ def test_snub_k1_k2_regression_against_exact_boundary_calculation():
         graph = clique_graph(graph, bound=1200)
         assert graph is not None
         assert (len(graph), graph.number_of_edges()) == (
-            expected_order, expected_edges,
+            expected_order,
+            expected_edges,
         )
         ranks = bounded_reduced_betti_mod2(graph)
         assert ranks is not None
