@@ -44,7 +44,7 @@ def bounded_reduced_betti_mod2(
     cache the returned mapping, but should never infer ranks in omitted
     dimensions when max_degree was specified.
     """
-    if max_faces < 1 or max_degree is not None and max_degree < 0:
+    if max_faces < 1 or (max_degree is not None and max_degree < 0):
         raise ValueError("max_faces must be positive, max_degree nonnegative")
     if graph.number_of_nodes() == 0:
         return {}
@@ -52,6 +52,7 @@ def bounded_reduced_betti_mod2(
     order = {v:i for i,v in enumerate(graph)}
     by_dimension: dict[int,set[frozenset]] = defaultdict(set)
     max_facet_dimension = -1
+    faces_seen = 0
     for maximal_clique in nx.find_cliques(graph):
         vertices = tuple(sorted(maximal_clique,key=order.__getitem__))
         max_facet_dimension = max(max_facet_dimension,len(vertices)-1)
@@ -61,9 +62,12 @@ def bounded_reduced_betti_mod2(
         for k in range(1,max_size+1):
             for face in combinations(vertices,k):
                 container = by_dimension[k-1]
-                container.add(frozenset(face))
-        if sum(map(len,by_dimension.values())) > max_faces:
-            return None
+                signature = frozenset(face)
+                if signature not in container:
+                    container.add(signature)
+                    faces_seen += 1
+                    if faces_seen > max_faces:
+                        return None
 
     last_degree = (
         max_facet_dimension if max_degree is None else max_degree
