@@ -310,7 +310,7 @@ Neither `EXHAUSTED` nor `HOMOLOGY_EXCLUDED` is a divergence verdict.
 A verified graph retraction of \(G\) or one of its clique iterates onto
 a **proved K-divergent target** certifies divergence of \(G\) by the
 retraction theorem. This search therefore excludes cycle complements of
-length below eight, whose divergence is not established.
+length below eight, which are not K-divergent.
 
 Historical `cycle_complements:5` through `cycle_complements:7` witnesses
 remain independently verifiable as ordinary graph retractions, but new
