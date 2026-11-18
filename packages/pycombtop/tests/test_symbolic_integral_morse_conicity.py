@@ -98,6 +98,16 @@ def test_weighted_conicity_integer_witness_and_solver():
     assert recovered == certificate
 
 
+def test_self_loops_do_not_fake_conicity():
+    graph = nx.empty_graph(2)
+    graph.add_edges_from([(0, 0), (1, 1)])
+    weights = {0: 1, 1: 1}
+    certificate = verify_weighted_conicity(graph, weights)
+    assert certificate.max_closed_non_neighbor_weight == 2
+    assert certificate.conicity == 0
+    assert find_weighted_conicity_certificate(graph).conicity == 0
+
+
 def test_weighted_conicity_validation_and_fallback():
     graph = nx.complete_graph(9)
     certificate = verify_weighted_conicity(graph, dict.fromkeys(graph, 1))
