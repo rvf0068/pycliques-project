@@ -53,7 +53,6 @@ from dataclasses import dataclass, field
 from itertools import combinations
 from typing import cast
 
-from .homology_backend import HomologyResourceLimit, reduced_betti_facets_mod2
 import networkx as nx
 from pycliques import clique_graph
 from pycliques.surfaces import open_neighborhood
@@ -62,6 +61,7 @@ from .attachment_certificates import (
     ConeImageCertificate,
     bounded_null_image_certificate,
 )
+from .homology_backend import HomologyResourceLimit, reduced_betti_facets_mod2
 from .integral_morse import bipartite_shore_facets, integral_morse_certificate
 from .morse_certificates import facet_morse_certificate
 from .recursive_wedges import recursive_wedge_certificate
@@ -226,8 +226,8 @@ class Theorem:
         "numbers alone do not determine the homotopy type."
     )
     LARGE_GRAPH_BETTI = (
-        "Graph too large for the combinatorial shortcuts; reduced "
-        "Reduced mod-2 Betti numbers computed exactly by GUDHI; not a homotopy certificate."
+        "Graph too large for combinatorial shortcuts; exact mod-2 Betti "
+        "numbers computed by GUDHI, not a homotopy certificate."
     )
     LIMIT_EXCEEDED = "Configured size limit exceeded; no homotopy type established."
 
