@@ -2,6 +2,7 @@
 
 import base64
 import gzip
+from collections import Counter
 from dataclasses import replace
 from itertools import combinations
 
@@ -76,6 +77,25 @@ def test_contractible_link_not_necessarily_cone():
     assert not verify_flag_reduction(noncontractible, proof)
 
 
+def _explicit_critical_faces(graph):
+    """Independent augmented matching on all explicit clique faces."""
+    labels = sorted(graph)
+    indexed = nx.relabel_nodes(graph, {v: i for i, v in enumerate(labels)})
+    faces = {0}
+    faces.update(
+        sum(1 << i for i in face) for face in nx.enumerate_all_cliques(indexed)
+    )
+    for pivot in range(len(indexed)):
+        bit = 1 << pivot
+        matching = set()
+        for face in faces:
+            if not face & bit and face | bit in faces:
+                matching.add(face)
+                matching.add(face | bit)
+        faces.difference_update(matching)
+    return dict(Counter(face.bit_count() - 1 for face in faces))
+
+
 def test_core_star_wedge_and_tamper_detection():
     graph = c9_core()
     assert (len(graph), graph.number_of_edges()) == (54, 491)
@@ -83,6 +103,11 @@ def test_core_star_wedge_and_tamper_detection():
     assert certificate is not None
     assert certificate.deletion_critical == {0: 1, 1: 1, 6: 1}
     assert certificate.link_critical == {1: 1, 5: 1}
+    deleted = graph.copy()
+    deleted.remove_node(22)
+    link = graph.subgraph(graph[22])
+    assert _explicit_critical_faces(deleted) == certificate.deletion_critical
+    assert _explicit_critical_faces(link) == certificate.link_critical
     assert certificate.deletion_spheres == {6: 1}
     assert certificate.link_spheres == {1: 1, 5: 1}
     assert certificate.spheres == {2: 1, 6: 2}
@@ -106,6 +131,11 @@ def test_small_graph_fail_closed_limits_and_loops():
     looped = nx.Graph([(0, 0), (0, 1)])
     assert reduce_flag_graph(looped) is None
     assert vertex_star_wedge_certificate(looped) is None
+    mixed = nx.Graph()
+    mixed.add_edges_from([(1, "two"), ("two", (3,)), ((3,), 1)])
+    reduced = reduce_flag_graph(mixed, cone_passes=2)
+    assert reduced is not None
+    assert verify_flag_reduction(mixed, reduced[1])
 
 
 def _clique_graph(graph):
