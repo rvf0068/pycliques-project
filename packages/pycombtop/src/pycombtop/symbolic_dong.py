@@ -16,9 +16,9 @@ Caps on the ZDD and graph order return None rather than an unproved verdict.
 
 from __future__ import annotations
 
+from collections.abc import Hashable, Iterable
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Hashable, Iterable
 
 import networkx as nx
 
