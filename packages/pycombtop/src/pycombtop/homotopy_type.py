@@ -575,9 +575,7 @@ def betti_numbers_graph(graph: nx.Graph) -> list[int]:
     """Exact reduced mod-2 Betti numbers of the graph's clique complex."""
     if not graph:
         return []
-    return _simplify_betti_list(
-        reduced_betti_facets_mod2(nx.find_cliques(graph))
-    )
+    return _simplify_betti_list(reduced_betti_facets_mod2(nx.find_cliques(graph)))
 
 
 def _read_dong(dong: set[Simplex]) -> WedgeOfSpheres | None:

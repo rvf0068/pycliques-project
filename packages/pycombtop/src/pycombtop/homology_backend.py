@@ -8,6 +8,7 @@ simplicial complexes are represented correctly.
 The separate bounded_betti module independently computes GF(2) homology
 from integer-bitset boundary matrices for flag complexes of graphs.
 """
+
 from __future__ import annotations
 
 from collections.abc import Hashable, Iterable
@@ -64,10 +65,7 @@ def reduced_betti_facets_mod2(
         persistence_dim_max=True,
     )
     ordinary = tree.betti_numbers()
-    result = [
-        int(ordinary[i]) if i < len(ordinary) else 0
-        for i in range(top + 1)
-    ]
+    result = [int(ordinary[i]) if i < len(ordinary) else 0 for i in range(top + 1)]
     result[0] -= 1
     if any(n < 0 for n in result):
         raise AssertionError("Invalid negative reduced Betti number from GUDHI")

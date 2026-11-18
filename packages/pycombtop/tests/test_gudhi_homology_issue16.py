@@ -4,6 +4,7 @@ GUDHI is the production backend. The integer-bitset matrix reduction in
 bounded_betti is an independent exact GF(2) implementation for graph flag
 complexes. Keep these checks even if the homology API later changes.
 """
+
 from __future__ import annotations
 
 import networkx as nx
@@ -13,7 +14,7 @@ from pycliques.named import snub_disphenoid
 from pycombtop.bounded_betti import bounded_reduced_betti_mod2
 from pycombtop.homology_backend import HomologyResourceLimit, reduced_betti_facets_mod2
 from pycombtop.homotopy_type import betti_numbers_graph, betti_numbers_sc
-from pycombtop.simplex import SimplicialComplex, Simplex
+from pycombtop.simplex import Simplex, SimplicialComplex
 
 
 def test_snub_iterates_independently_certified_gf2():
