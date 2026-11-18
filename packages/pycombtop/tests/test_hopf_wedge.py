@@ -255,10 +255,11 @@ def test_hopf_public_limits_and_inconclusive_reduction():
     """No invalid graph or budget is accepted as a proof."""
     assert hopf_wedge_certificate(nx.DiGraph([(0, 1)])) is None
     assert hopf_wedge_certificate(nx.MultiGraph([(0, 1)])) is None
-    assert hopf_wedge_certificate(nx.cycle_graph(5), max_vertices=-1) is None
-    assert hopf_wedge_certificate(nx.cycle_graph(5), max_nodes=0) is None
-    assert hopf_wedge_certificate(nx.cycle_graph(5), max_gradient_states=0) is None
-    assert hopf_wedge_certificate(nx.cycle_graph(5), max_gradient_states=200_001) is None
+    cycle = nx.cycle_graph(5)
+    assert hopf_wedge_certificate(cycle, max_vertices=-1) is None
+    assert hopf_wedge_certificate(cycle, max_nodes=0) is None
+    assert hopf_wedge_certificate(cycle, max_gradient_states=0) is None
+    assert hopf_wedge_certificate(cycle, max_gradient_states=200_001) is None
     assert reduced_hopf_wedge_certificate(nx.Graph()) is None
     assert reduced_hopf_wedge_certificate(nx.empty_graph(1001)) is None
     assert reduced_hopf_wedge_certificate(nx.cycle_graph(5)) is None
