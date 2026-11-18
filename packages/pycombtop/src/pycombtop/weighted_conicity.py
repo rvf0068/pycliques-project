@@ -46,7 +46,10 @@ def verify_weighted_conicity(
     if set(weights) != set(graph):
         raise ValueError("weights must have exactly the graph vertices as keys")
     vertices = tuple(sorted(graph, key=_stable_vertex_key))
-    if any(isinstance(weights[v], bool) or not isinstance(weights[v], int) for v in vertices):
+    if any(
+        isinstance(weights[v], bool) or not isinstance(weights[v], int)
+        for v in vertices
+    ):
         raise ValueError("weights must be nonnegative integers")
     values = tuple(weights[v] for v in vertices)
     if any(x < 0 for x in values):
