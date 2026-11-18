@@ -116,6 +116,7 @@ def test_classifier_uses_symbolic_matching_before_simplex_budget():
     assert result.wedge.spheres == {7: 11}
     assert result.reason == Theorem.SYMBOLIC_DONG_MATCHING
 
+
 def test_diagrams_released_after_success_and_node_limit(monkeypatch):
     """Neither a successful calculation nor a refusal may retain a ZDD."""
     references = []
@@ -159,5 +160,3 @@ def test_final_face_count_cache_cleared_on_late_exception(monkeypatch):
     gc.collect()
     assert all(reference() is None for reference in references)
     assert original.face_size_counts.cache_info().currsize == 0
-
-
