@@ -1,0 +1,37 @@
+name: Audit historical homotopy certificates for issue 16
+
+on:
+  pull_request:
+    paths:
+      - "research/audit_issue16_homotopy_census.py"
+      - ".github/workflows/issue16-historical-census-audit.yml"
+      - "packages/pycombtop/src/pycombtop/homology_backend.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - name: Install verified GUDHI backend
+        run: uv sync --frozen --python 3.11
+      - name: Retrieve immutable historical homotopy census records (read-only)
+        run: git clone --depth 1 --filter=blob:none https://github.com/rvf0068/pycliques-homotopy-census.git "$RUNNER_TEMP/homotopy-census"
+      - name: Count all legacy-Betti-dependent exact and inexact saved verdicts
+        run: |
+          .venv/bin/python research/audit_issue16_homotopy_census.py \
+            --root "$RUNNER_TEMP/homotopy-census" \
+            --orders 6 7 8 9 10 --recheck 20 \
+            --output "$RUNNER_TEMP/issue16-historical-census-audit.json"
+      - name: Upload read-only audit with affected indices and sample results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue16-historical-homotopy-audit
+          path: ${{ runner.temp }}/issue16-historical-census-audit.json
+          if-no-files-found: warn
