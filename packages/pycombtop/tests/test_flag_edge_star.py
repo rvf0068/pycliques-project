@@ -10,8 +10,8 @@ import pytest
 from pycombtop import (
     FlagMove,
     FlagReductionCertificate,
-    reduced_star_wedge_certificate,
     reduce_flag_graph,
+    reduced_star_wedge_certificate,
     verify_flag_reduction,
     verify_reduced_star_wedge,
     verify_vertex_star_wedge,
