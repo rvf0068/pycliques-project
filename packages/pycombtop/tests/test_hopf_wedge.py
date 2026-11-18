@@ -2,20 +2,25 @@
 
 import base64
 from dataclasses import replace
+from importlib import import_module
 
 import networkx as nx
 from pycombtop import (
+    FlagReductionCertificate,
     Theorem,
     homotopy_type_with_verdict,
     hopf_wedge_certificate,
     symbolic_integral_morse_certificate,
     verify_hopf_wedge,
+    verify_reduced_hopf_wedge,
+    reduced_hopf_wedge_certificate,
 )
 from pycombtop.hopf_wedge import (
     _cup_witness,
     _hopf_shape,
     _mod2_coboundary_basis,
     _not_coboundary,
+    _unit_boundary,
 )
 from pycombtop.symbolic_integral_morse import SymbolicIntegralMorseCertificate
 
@@ -145,6 +150,41 @@ def test_proof_rejects_bad_morse_boundary_or_torsion():
     ]
     for changes in cases:
         assert _hopf_shape(_fake_morse(**changes)) is None
+
+
+def test_bad_rectangular_boundary_and_missing_certificate():
+    assert not _unit_boundary(((1, 0), (0, 1), (0, 0)), 3, 2)
+    critical = {0: 1, 1: 1, 2: 1, 3: 9, 4: 8}
+    boundaries = {
+        1: ((-1,),),
+        2: ((0,),),
+        3: (tuple(0 for _ in range(9)),),
+        4: tuple((0,) * 8 for _ in range(9)),
+    }
+    assert _hopf_shape(_fake_morse(critical=critical, boundaries=boundaries)) is None
+    assert not verify_hopf_wedge(c10_core(), None)
+    assert hopf_wedge_certificate(c10_core(), max_triangles=20_001) is None
+    assert hopf_wedge_certificate(c10_core(), max_nodes=250_001) is None
+
+
+def test_opt_in_reduced_hopf_proof_and_replay(monkeypatch):
+    graph = c10_core()
+    identity = FlagReductionCertificate((), tuple(graph), tuple(graph.edges))
+    hopf_module = import_module("pycombtop.hopf_wedge")
+    monkeypatch.setattr(
+        hopf_module, "reduce_flag_graph", lambda *args, **kwargs: (graph, identity)
+    )
+    proof = reduced_hopf_wedge_certificate(graph)
+    assert proof is not None
+    assert proof.spheres == {2: 1, 4: 6}
+    assert verify_reduced_hopf_wedge(graph, proof)
+    assert not verify_reduced_hopf_wedge(
+        graph, replace(proof, spheres={2: 1, 4: 7})
+    )
+    altered = replace(identity, remaining_vertices=(0,))
+    assert not verify_reduced_hopf_wedge(
+        graph, replace(proof, reduction=altered)
+    )
 
 
 def test_cup_witness_rejects_null_class_and_large_inputs():
