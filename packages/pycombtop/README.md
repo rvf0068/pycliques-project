@@ -100,6 +100,62 @@ The function avoids constructing `K(G)` itself, but does compute
   *Proceedings of the London Mathematical Society* (2) **45**
   (1939), 243--327.
 
+## Certified dense flag-edge reductions and vertex-star wedges
+
+The opt-in API \`reduce_flag_graph(G)\` combines three independently
+replayable homotopy-preserving moves:
+
+- **Cone-link edge removal:** for an edge uv, a stored apex is adjacent
+  to every other vertex in the common-neighbor graph, making its flag
+  complex contractible.
+- **Dominated-vertex fold:** a recorded adjacent vertex has a superset of
+  the removed vertex's closed neighborhood.
+- **Contractible-link edge removal:** once the graph has at most 80
+  vertices, a zero-critical-cell augmented Dong matching certifies that
+  an edge's *nonempty common-neighbor clique complex* is contractible.
+  This extends cone-link removal to contractible links without an apex.
+
+In a flag complex, deleting an edge with contractible link preserves
+the homotopy type via the homotopy pushout
+\(\Delta(G-e)\cup(e*\Delta(N(u)\cap N(v)))\).
+The reduction certificate records **all** moves and the final graph.
+\`verify_flag_reduction(G, certificate)\` replays local proofs on the
+changing graph; it never trusts the search's cached adjacency bitsets.
+
+For a small residual core, \`vertex_star_wedge_certificate\` computes
+augmented Dong matching critical-cell counts for a deletion and its
+link, and accepts the resulting CW models only when these patterns
+prove exact wedges. In particular, a *connected* CW model with two
+0-cells, a single 1-cell, and higher critical cells has a contractible
+1-skeleton; with one 0-cell, circles, and cells only in dimension
+at least 3, the higher attachments are null since higher homotopy
+groups of a wedge of circles vanish.
+
+When the deletion has a certified wedge whose lowest sphere dimension
+is **strictly higher** than every link sphere dimension and is at
+least 2, the link inclusion is nullhomotopic. Vertex-star cofiber
+splitting then gives a verified wedge for the core. The wrapper
+\`reduced_star_wedge_certificate(G)\` combines both steps and
+\`verify_reduced_star_wedge(G, proof)\` checks the whole proof again.
+
+\`\`\`python
+from pycombtop import reduced_star_wedge_certificate, verify_reduced_star_wedge
+
+proof = reduced_star_wedge_certificate(G, max_vertices=1000)
+if proof is not None:
+    assert verify_reduced_star_wedge(G, proof)
+    print(proof.spheres)  # exact clique-complex homotopy type
+\`\`\`
+
+This search is **opt-in**, with caps on moves, Dong diagram nodes,
+and allowable residual graph/link order; failure is inconclusive and
+does not change the normal homotopy census classifier. The optional
+\`candidates\` argument specifies vertex indices in the canonically
+relabelled reduced core. In the regression for the 801-vertex factor
+of \`K^4(Susp(C_9))\`, this strategy reduces to 54 vertices and
+491 edges and certifies \`S^2 vee 2 S^6\`; suspending yields
+\`S^3 vee 2 S^7\` for the original fourth clique iterate.
+
 ## Symbolic Dong matching via zero-suppressed decision diagrams
 
 The public `symbolic_dong_certificate(G)` implements **the same vertex-ordered
