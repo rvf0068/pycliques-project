@@ -17,7 +17,7 @@ import networkx as nx
 
 from ._symbolic_morse_gradient import _MorseLimit, morse_boundaries
 from .simplex import _stable_vertex_key
-from .symbolic_dong import _DiagramLimit, _ZDD
+from .symbolic_dong import _ZDD, _DiagramLimit
 
 
 @dataclass(frozen=True)
