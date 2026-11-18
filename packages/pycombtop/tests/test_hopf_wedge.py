@@ -1,0 +1,160 @@
+"""Integral Morse plus genuine cup-product obstruction for 2/4-cell complexes."""
+
+import base64
+from dataclasses import replace
+
+import networkx as nx
+from pycombtop import (
+    Theorem,
+    homotopy_type_with_verdict,
+    hopf_wedge_certificate,
+    symbolic_integral_morse_certificate,
+    verify_hopf_wedge,
+)
+from pycombtop.hopf_wedge import (
+    _cup_witness,
+    _hopf_shape,
+    _mod2_coboundary_basis,
+    _not_coboundary,
+)
+from pycombtop.symbolic_integral_morse import SymbolicIntegralMorseCertificate
+
+# Fixed canonical 61-vertex, 417-edge core of K^4(Susp(C10)).
+# No census-specific logic is included in pycombtop itself.
+C10_CORE_GRAPH6_B64 = (
+    "fGBDRz8/fkd4eGNCTm4/WV92ez8/bz8/Pz9HP3s/Pz8/Pz8/Xz9GWz8/eXc/QkY/Pz8/Pz8/"
+    "RD8/P0VHPz9BeT8/P0NXPz8/UFc/Pz9JXz8/R29jPz9LfX4/Pz9OXndBb0M/P0NGT08/"
+    "QG8/RlZTcz9dbz8/Qj8/QUo/P09CXz8/P1k/P0NMV0NfQXE/Pz9DQHdeQz8/WUM/"
+    "P2FyeEBCPz9HWz9fQD9dT0A/QU9lPz9gV0BkUm8/QUVtU0BMP09PPz9BT2M/Pz9HXmtBUkNR"
+    "c09fQF9xZT8/eWFmRFJXTmd3Pz9AUF9HQGA/Pz9MQUFHQlE/Pz9ZYz9HPz9ZT2JkQU9f"
+    "Qm9fPz9LVT9tPz8/QE97YUJTUEBvPz8/R0NAVEZua08/QD9SdHRPP0FCP0dfSUNP"
+)
+
+
+def c10_core():
+    return nx.from_graph6_bytes(base64.b64decode(C10_CORE_GRAPH6_B64))
+
+
+def _fake_morse(**overrides):
+    args = dict(
+        critical={0: 1, 1: 1, 2: 1, 3: 2, 4: 8},
+        boundaries={
+            1: ((-1,),),
+            2: ((0,),),
+            3: ((0, 0),),
+            4: ((1, 0, -1, 0, 0, 0, 0, 0), (0, 0, 0, 0, -1, 0, 0, 1)),
+        },
+        betti={2: 1, 4: 6},
+        torsion={},
+        wedge_spheres=None,
+        total_faces=3717,
+        diagram_nodes=1,
+        gradient_states=1,
+        critical_masks=(7,),
+    )
+    args.update(overrides)
+    return SymbolicIntegralMorseCertificate(**args)
+
+
+def test_c10_exact_morse_hopf_cup_square_and_homotopy_classifier():
+    graph = c10_core()
+    assert (len(graph), graph.number_of_edges()) == (61, 417)
+    morse = symbolic_integral_morse_certificate(graph)
+    assert morse is not None
+    assert morse.critical == {0: 1, 1: 1, 2: 1, 3: 2, 4: 8}
+    assert morse.betti == {2: 1, 4: 6}
+    assert morse.torsion == {}
+    assert morse.boundaries[4] == (
+        (1, 0, -1, 0, 0, 0, 0, 0),
+        (0, 0, 0, 0, -1, 0, 0, 1),
+    )
+    assert morse.wedge_spheres is None  # boundary ranks alone are inadequate
+    proof = hopf_wedge_certificate(graph)
+    assert proof is not None
+    assert proof.spheres == {2: 1, 4: 6}
+    assert proof.critical == morse.critical
+    assert proof.triangle_indices == (47, 50, 59)
+    assert verify_hopf_wedge(graph, proof)
+    verdict = homotopy_type_with_verdict(
+        graph, max_vertices=80, max_simplices=15_000
+    )
+    assert verdict.is_exact
+    assert verdict.wedge.spheres == {2: 1, 4: 6}
+    assert verdict.reason == Theorem.SYMBOLIC_HOPF_CUP_SQUARE
+
+
+def test_certificate_tampering_and_label_independence():
+    graph = c10_core()
+    proof = hopf_wedge_certificate(graph)
+    assert proof is not None
+    assert not verify_hopf_wedge(graph, replace(proof, spheres={2: 1, 4: 5}))
+    assert not verify_hopf_wedge(graph, replace(proof, betti={2: 1}))
+    assert not verify_hopf_wedge(
+        graph, replace(proof, triangle_indices=(0, 1, 2))
+    )
+    assert not verify_hopf_wedge(graph, replace(proof, triangle_count=1))
+    changed = graph.copy()
+    changed.add_edge(*next(nx.non_edges(changed)))
+    assert not verify_hopf_wedge(changed, proof)
+    mixed = nx.relabel_nodes(
+        graph, {v: ("node", v) if v % 2 else v for v in graph}
+    )
+    renamed = hopf_wedge_certificate(mixed)
+    assert renamed is not None
+    assert renamed.spheres == proof.spheres
+    assert verify_hopf_wedge(mixed, renamed)
+
+
+def test_proof_rejects_bad_morse_boundary_or_torsion():
+    assert _hopf_shape(_fake_morse()) == {2: 1, 4: 6}
+    cases = [
+        {"critical": {2: 1, 3: 2, 4: 8, 5: 1}},
+        {"critical": {0: 2, 1: 1, 2: 1, 3: 2, 4: 8}},
+        {"critical": {2: 2, 3: 2, 4: 8}},
+        {"critical": {0: 1, 1: 1, 2: 1, 3: 2}},
+        {"boundaries": {1: ((2,),), 2: ((0,),), 3: ((0, 0),),
+                       4: ((1, 0, -1, 0, 0, 0, 0, 0), (0, 0, 0, 0, -1, 0, 0, 1))}},
+        {"boundaries": {1: ((-1,),), 2: ((1,),), 3: ((0, 0),),
+                       4: ((1, 0, -1, 0, 0, 0, 0), (0, 0, 0, 0, -1, 0, 0, 1))}},
+        {"boundaries": {1: ((-1,),), 2: ((0,),), 3: ((1, 0),),
+                       4: ((1, 0, -1, 0, 0, 0, 0), (0, 0, 0, 0, -1, 0, 0, 1))}},
+        {"boundaries": {1: ((-1,),), 2: ((0,),), 3: ((0, 0),),
+                       4: ((2, 0, -2, 0, 0, 0, 0, 0), (0, 0, 0, 0, -1, 0, 0, 1))}},
+        {"torsion": {3: (2,)}},
+        {"betti": {2: 1, 4: 5}},
+    ]
+    for changes in cases:
+        assert _hopf_shape(_fake_morse(**changes)) is None
+
+
+def test_cup_witness_rejects_null_class_and_large_inputs():
+    sphere = nx.octahedral_graph()
+    morse = symbolic_integral_morse_certificate(sphere)
+    assert morse is not None
+    witness = _cup_witness(sphere, morse, max_triangles=100)
+    assert witness is not None  # a maximal triangle is an H^2 generator
+    assert witness[1] == 8
+    assert _cup_witness(sphere, morse, max_triangles=0) is None
+    assert _cup_witness(sphere, morse, max_triangles=1) is None
+    tetra = nx.complete_graph(4)
+    assert _cup_witness(tetra, morse, max_triangles=10) is None
+    contractible = nx.complete_graph(4)
+    contractible.add_edges_from(((4, 0), (4, 1)))
+    # Maximal triangle (0,1,4) exists but its indicator is a coboundary.
+    assert _cup_witness(contractible, morse, max_triangles=20) is None
+    basis = _mod2_coboundary_basis(
+        [(0, 1), (0, 2), (1, 2)], [(0, 1, 2)]
+    )
+    assert not _not_coboundary(basis, 1)
+    assert _not_coboundary({}, 1)
+
+
+def test_cup_strategy_fails_closed_when_not_applicable():
+    assert hopf_wedge_certificate(nx.Graph()) is None
+    assert hopf_wedge_certificate(nx.complete_graph(4)) is None
+    assert hopf_wedge_certificate(nx.octahedral_graph()) is None
+    assert hopf_wedge_certificate(nx.empty_graph(81)) is None
+    assert hopf_wedge_certificate(nx.cycle_graph(5), max_triangles=0) is None
+    looped = nx.Graph([(0, 0), (0, 1)])
+    assert hopf_wedge_certificate(looped) is None
+    assert not verify_hopf_wedge(looped, None)
