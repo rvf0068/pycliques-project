@@ -120,4 +120,9 @@ def benchmark():
 
 
 if __name__ == "__main__":
-    print(json.dumps(benchmark(),indent=2,sort_keys=True))
+    report = benchmark()
+    print(json.dumps(report, indent=2, sort_keys=True))
+    # Print diagnostics first, then fail if the production exact backend
+    # ever disagrees with the independently constructed GUDHI complex.
+    if report["pycombtop_disagreements"]:
+        raise SystemExit("Production GUDHI Betti numbers disagree with benchmark")
