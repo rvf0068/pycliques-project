@@ -114,9 +114,10 @@ def audit(root: Path, orders: list[int], *, recheck: int = 0, faces: int = 250_0
                                 "index": int(row["index"]), "graph6": row["graph6"],
                                 "betti": row[f"betti_{suffix}"],
                             })
+                        # Count ALL flagged records, even with --recheck 0.
+                        seen[key] += 1
                         if not recheck:
                             continue
-                        seen[key] += 1
                         if key not in rngs:
                             rngs[key] = random.Random(1600 + order * 17 + (suffix == "kg"))
                         bucket = samples[key]
@@ -150,8 +151,9 @@ def audit(root: Path, orders: list[int], *, recheck: int = 0, faces: int = 250_0
         "sample_checks": dict(sorted(checks.items())),
         "sample_size_cap_per_category": recheck,
         "unverified_count_lower_bound": sum(
-            max(0, seen[k] - len(v)) for k, v in samples.items()
+            max(0, n - len(samples[k])) for k, n in seen.items()
         ),
+        "recheck_problem_count": len(problems),
         "recheck_problems": problems[:200],
         "remaining_problems_truncated": max(0, len(problems) - 200),
     }
@@ -163,6 +165,10 @@ def main() -> None:
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--orders", type=int, nargs="+", default=[6, 7, 8, 9, 10])
     parser.add_argument("--recheck", type=int, default=0)
+    parser.add_argument(
+        "--require-complete", action="store_true",
+        help="Fail if any flagged record lacks a complete independent recheck",
+    )
     parser.add_argument("--max-faces", type=int, default=250_000)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -177,6 +183,12 @@ def main() -> None:
         ),
         "unverified_count_lower_bound": result["unverified_count_lower_bound"],
     }, sort_keys=True))
+    # Never let a failed or incomplete mathematical validation produce
+    # a green CI check. The diagnostic JSON has already been written.
+    if result["recheck_problem_count"]:
+        raise SystemExit("Issue16 audit found failed or incomplete exact checks")
+    if args.require_complete and result["unverified_count_lower_bound"]:
+        raise SystemExit("Issue16 audit did not recheck every flagged record")
 
 
 if __name__ == "__main__":
