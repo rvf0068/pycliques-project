@@ -15,10 +15,10 @@ from pycombtop import (
 # Fixed graph6 of K^3(Susp(C7)); deterministic vertex order matters.
 C7_K3_B64 = (
     "d35+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn"
-    "5+fn5+fn5+fn5vY3Fefj9CSn59XmU/Xn1EZUB+fkVyP15+b0tvfn59P0B+fn53P0h+fj9O"
-    "fn5Cfj9Ofk5ifmNGfn1AfnhQfn4/Xn5tTn5vQn57X359dU5+eHh+bj9efnx4fmU/Xn57P"
-    "35Lfn5+fj9Oek5yfn5+eF5lP15+fn5sdVdCfn5+P25aTnp+fn4/bVJOfn5+fnddQGZ+fn5"
-    "+d0ZhWH5+fn5+UHNSTn5+fn5+Rj9Lfn5+fn59bT9Qfn5+fn59fT9Rfn5+fn57"
+    "5+fn5+fn5+fn5+fn5vY3Fefj9CSn59XmU/Xn1EZUB+fkVyP15+b0tvfn59P0B+fn53P0h+"
+    "fj9Ofn5Cfj9Ofk5ifmNGfn1AfnhQfn4/Xn5tTn5vQn57X359dU5+eHh+bj9efnx4fmU/Xn"
+    "57P35Lfn5+fj9Oek5yfn5+eF5lP15+fn5sdVdCfn5+P25aTnp+fn4/bVJOfn5+fnddQGZ+"
+    "fn5+d0ZhWH5+fn5+UHNSTn5+fn5+Rj9Lfn5+fn59bT9Qfn5+fn59fT9Rfn5+fn57"
 )
 
 
