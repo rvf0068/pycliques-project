@@ -12,10 +12,7 @@ import pytest
 from pycliques.cliques import clique_graph
 from pycliques.named import snub_disphenoid
 from pycombtop.bounded_betti import bounded_reduced_betti_mod2
-from pycombtop.homology_backend import (
-    HomologyResourceLimit,
-    reduced_betti_facets_mod2,
-)
+from pycombtop.homology_backend import HomologyResourceLimit, reduced_betti_facets_mod2
 from pycombtop.homotopy_type import betti_numbers_graph, betti_numbers_sc
 from pycombtop.simplex import SimplicialComplex, Simplex
 
