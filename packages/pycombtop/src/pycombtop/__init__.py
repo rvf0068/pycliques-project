@@ -33,6 +33,14 @@ from .fundamental_group import (
     fundamental_group_as_permutation_group,
 )
 from .hom_complex import graph_homomorphisms, hom_graph
+from .hopf_wedge import (
+    HopfWedgeCertificate,
+    ReducedHopfWedgeCertificate,
+    hopf_wedge_certificate,
+    reduced_hopf_wedge_certificate,
+    verify_hopf_wedge,
+    verify_reduced_hopf_wedge,
+)
 
 # homotopy_type
 from .homotopy_type import (
@@ -133,6 +141,13 @@ __all__ = [
     "verify_vertex_star_wedge",
     "reduced_star_wedge_certificate",
     "verify_reduced_star_wedge",
+    # Hopf attaching-map and cup-square certificates
+    "HopfWedgeCertificate",
+    "ReducedHopfWedgeCertificate",
+    "hopf_wedge_certificate",
+    "verify_hopf_wedge",
+    "reduced_hopf_wedge_certificate",
+    "verify_reduced_hopf_wedge",
     # simplex
     "Simplex",
     "SimplicialComplex",
