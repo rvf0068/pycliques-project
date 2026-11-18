@@ -75,6 +75,7 @@ from .simplex import (
 )
 from .simplex import star as star  # Public re-export
 from .symbolic_dong import symbolic_dong_certificate
+from .symbolic_integral_morse import symbolic_integral_morse_certificate
 from .wedge_certificates import (
     FoldedWedgeCertificate,
     certified_flag_wedge,
@@ -108,6 +109,14 @@ class Theorem:
         "The sequential matching is acyclic, the empty face is matched, "
         "and all remaining cells have a common dimension; thus the Morse "
         "complex is a wedge of spheres [Dong2003, Forman1998]."
+    )
+    SYMBOLIC_INTEGRAL_MORSE = (
+        "Dong's sequential augmented matching is acyclic. Exact signed "
+        "gradient paths yield its integral Morse boundary. Critical cells "
+        "lie in consecutive dimensions d,d+1 with d>=2; unit Smith "
+        "invariants permit integral cancellation, and all remaining "
+        "attaching maps are nullhomotopic by pi_d(wedge S^d)=Z^r "
+        "[Dong2003, Forman1998, Hatcher]."
     )
     FACET_MORSE = (
         "Verified facet-greedy discrete Morse matching: free pairs are "
@@ -709,10 +718,18 @@ def _try_symbolic_dong(graph: nx.Graph) -> HomotopyVerdict | None:
     if certificate is None:
         return None
     critical = certificate.critical
-    if critical and (len(critical) != 1 or -1 in critical):
+    if not critical or (len(critical) == 1 and -1 not in critical):
+        return HomotopyVerdict(
+            wedge=WedgeOfSpheres(critical), reason=Theorem.SYMBOLIC_DONG_MATCHING
+        )
+    # Mixed critical dimensions can still admit an exact integral Morse
+    # boundary proof. Never infer a wedge from Betti numbers alone.
+    integral = symbolic_integral_morse_certificate(graph)
+    if integral is None or integral.wedge_spheres is None:
         return None
     return HomotopyVerdict(
-        wedge=WedgeOfSpheres(critical), reason=Theorem.SYMBOLIC_DONG_MATCHING
+        wedge=WedgeOfSpheres(integral.wedge_spheres),
+        reason=Theorem.SYMBOLIC_INTEGRAL_MORSE,
     )
 
 
