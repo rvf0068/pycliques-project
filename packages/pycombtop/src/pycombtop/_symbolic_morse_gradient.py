@@ -13,7 +13,9 @@ class _MorseLimit(Exception):
     """The gradient recursion exceeded a resource budget."""
 
 
-def morse_boundaries(diagram, roots: Sequence[int], faces: dict[int, list[int]], max_states: int):
+def morse_boundaries(
+    diagram, roots: Sequence[int], faces: dict[int, list[int]], max_states: int
+):
     """Return (integral boundaries, ranks, torsion factors, visited states).
 
     No original simplices are enumerated. A face's matching pivot is the
