@@ -6,6 +6,9 @@ on:
       - "research/benchmark_gudhi_target_betti.py"
       - ".github/workflows/gudhi-homology-benchmark.yml"
       - "packages/pycombtop/src/pycombtop/bounded_betti.py"
+      - "packages/pycombtop/src/pycombtop/homology_backend.py"
+      - "packages/pycombtop/src/pycombtop/homotopy_type.py"
+      - "packages/pycombtop/tests/test_gudhi_homology_issue16.py"
   workflow_dispatch:
 
 jobs:
