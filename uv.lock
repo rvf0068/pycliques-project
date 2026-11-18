@@ -2146,7 +2146,7 @@ requires-dist = [
     { name = "mogutda" },
     { name = "networkx", specifier = ">=3.6" },
     { name = "pycliques", editable = "packages/pycliques" },
-    { name = "scipy" },
+    { name = "scipy", specifier = ">=1.11" },
     { name = "sympy" },
 ]
 
