@@ -59,8 +59,7 @@ def verify_weighted_conicity(
         raise ValueError("total weight must be positive")
     # N_complement[v] = V(graph) \ N_graph(v).
     max_closed = max(
-        total - sum(weights[u] for u in graph[v] if u != v)
-        for v in vertices
+        total - sum(weights[u] for u in graph[v] if u != v) for v in vertices
     )
     if max_closed <= 0:
         raise ArithmeticError("nonpositive closed non-neighborhood weight")
