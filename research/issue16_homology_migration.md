@@ -68,9 +68,11 @@ uv sync --frozen --python 3.11
 uv run pytest packages/pycombtop/tests/test_gudhi_homology_issue16.py
 git clone --depth 1 --filter=blob:none \
   https://github.com/rvf0068/pycliques-homotopy-census.git ../pycliques-homotopy-census
+git -C ../pycliques-homotopy-census fetch --depth 1 origin 40f486903b60f34ee16b2f8aaea7545883be54b4
+git -C ../pycliques-homotopy-census checkout --detach 40f486903b60f34ee16b2f8aaea7545883be54b4
 uv run python research/audit_issue16_homotopy_census.py \
   --root ../pycliques-homotopy-census --orders 6 7 8 9 10 \
-  --recheck 1000 --output issue16-audit.json
+  --recheck 1000 --require-complete --output issue16-audit.json
 ```
 
 The audit script is read-only. Its `--recheck 1000` ceiling exceeds
