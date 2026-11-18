@@ -115,5 +115,10 @@ def morse_boundaries(
             if diag[i, i] != 0
         )
         ranks[degree] = len(factors)
+        # This computes torsion of H_(degree-1), even if the next
+        # boundary is nonzero: the exact sequence
+        # 0 -> H_k -> coker(D_(k+1)) -> im(D_k) -> 0
+        # has torsion-free quotient im(D_k) (a subgroup of free C_(k-1)).
+        # Thus H_k and coker(D_(k+1)) have identical torsion subgroups.
         torsion[degree - 1] = tuple(x for x in factors if x > 1)
     return boundaries, ranks, {d: x for d, x in torsion.items() if x}, states
