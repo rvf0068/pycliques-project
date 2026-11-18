@@ -10,7 +10,7 @@ Dependencies
 ------------
 - networkx
 - sympy
-- mogutda
+- gudhi (exact finite-field simplicial homology)
 - pycliques (for :mod:`pycliques.dominated`, :mod:`pycliques.surfaces`)
 
 References
@@ -53,7 +53,7 @@ from dataclasses import dataclass, field
 from itertools import combinations
 from typing import cast
 
-import mogutda
+from .homology_backend import HomologyResourceLimit, reduced_betti_facets_mod2
 import networkx as nx
 from pycliques import clique_graph
 from pycliques.surfaces import open_neighborhood
@@ -227,7 +227,7 @@ class Theorem:
     )
     LARGE_GRAPH_BETTI = (
         "Graph too large for the combinatorial shortcuts; reduced "
-        "Betti numbers computed via mogutda, not a homotopy certificate."
+        "Reduced mod-2 Betti numbers computed exactly by GUDHI; not a homotopy certificate."
     )
     LIMIT_EXCEEDED = "Configured size limit exceeded; no homotopy type established."
 
@@ -563,25 +563,21 @@ def _simplify_betti_list(bettis: list[int]) -> list[int]:
 
 
 def betti_numbers_sc(s_complex: SimplicialComplex) -> list[int]:
-    """Reduced Betti numbers of *s_complex* using mogutda."""
-    simplices = [tuple(c) for c in s_complex.facet_set]
-    mc = mogutda.SimplicialComplex(simplices=simplices)
-    dim = max((len(f) - 1 for f in s_complex.facet_set), default=-1)
-    if dim < 0:
-        return []
-    numbers = [int(mc.betti_number(i)) for i in range(dim + 1)]
-    numbers[0] -= 1  # reduced beta_0
-    return _simplify_betti_list(numbers)
+    """Exact reduced mod-2 Betti numbers of a general simplicial complex.
+
+    Its actual facets are inserted: completing its one-skeleton could
+    incorrectly add simplices to a nonflag complex.
+    """
+    return _simplify_betti_list(reduced_betti_facets_mod2(s_complex.facet_set))
 
 
 def betti_numbers_graph(graph: nx.Graph) -> list[int]:
-    """Reduced Betti numbers of the clique complex of *graph* via mogutda."""
-    simplices = [tuple(c) for c in nx.find_cliques(graph)]
-    mc = mogutda.SimplicialComplex(simplices=simplices)
-    dim = max((len(s) - 1 for s in simplices), default=-1)
-    numbers = [int(mc.betti_number(i)) for i in range(dim + 1)]
-    numbers[0] -= 1
-    return _simplify_betti_list(numbers)
+    """Exact reduced mod-2 Betti numbers of the graph's clique complex."""
+    if not graph:
+        return []
+    return _simplify_betti_list(
+        reduced_betti_facets_mod2(nx.find_cliques(graph))
+    )
 
 
 def _read_dong(dong: set[Simplex]) -> WedgeOfSpheres | None:
@@ -794,7 +790,12 @@ def _try_vertex_decomposable(
     """Try vertex decomposability to justify Betti-number-based homotopy type."""
     collapsed = collapse(s_complex)
     if is_vertex_decomposable(collapsed):
-        bettis = betti_numbers_sc(collapsed)
+        try:
+            bettis = betti_numbers_sc(collapsed)
+        except HomologyResourceLimit:
+            # Shellability is not enough to certify sphere multiplicities
+            # when the homology computation does not finish.
+            return None
         w = WedgeOfSpheres.from_betti(bettis)
         reason = Theorem.VERTEX_DECOMPOSABLE
         if extra_reasons:
@@ -1317,7 +1318,10 @@ def homotopy_type_sc_with_verdict(
         return v
 
     # 4. Betti numbers only
-    bettis = betti_numbers_sc(collapse(s_complex))
+    try:
+        bettis = betti_numbers_sc(collapse(s_complex))
+    except HomologyResourceLimit:
+        return _limited_verdict()
     return HomotopyVerdict(
         wedge=WedgeOfSpheres.from_betti(bettis),
         reason=Theorem.BETTI_ONLY,
@@ -1558,7 +1562,10 @@ def homotopy_type_with_verdict(
         return v
 
     # 10. Betti numbers only
-    bettis = betti_numbers_sc(collapse(sc2))
+    try:
+        bettis = betti_numbers_sc(collapse(sc2))
+    except HomologyResourceLimit:
+        return _limited_verdict()
     return HomotopyVerdict(
         wedge=WedgeOfSpheres.from_betti(bettis),
         reason=Theorem.BETTI_ONLY,
@@ -1584,7 +1591,10 @@ def homotopy_type_large_graph(graph: nx.Graph, bound: int = 100) -> HomotopyVerd
     """
     if graph.order() < bound:
         return homotopy_type_with_verdict(graph)
-    bettis = betti_numbers_graph(graph)
+    try:
+        bettis = betti_numbers_graph(graph)
+    except HomologyResourceLimit:
+        return _limited_verdict()
     return HomotopyVerdict(
         wedge=WedgeOfSpheres.from_betti(bettis),
         reason=Theorem.LARGE_GRAPH_BETTI,
