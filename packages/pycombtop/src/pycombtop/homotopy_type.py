@@ -103,7 +103,7 @@ class Theorem:
         "spheres [Dong2003, Forman1998]."
     )
     SYMBOLIC_DONG_MATCHING = (
-        "Dong\'s augmented vertex-ordered matching is evaluated exactly on a "
+        "Dong's augmented vertex-ordered matching is evaluated exactly on a "
         "zero-suppressed decision diagram without enumerating simplices. "
         "The sequential matching is acyclic, the empty face is matched, "
         "and all remaining cells have a common dimension; thus the Morse "
