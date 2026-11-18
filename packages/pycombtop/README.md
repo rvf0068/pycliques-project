@@ -100,6 +100,58 @@ The function avoids constructing `K(G)` itself, but does compute
   *Proceedings of the London Mathematical Society* (2) **45**
   (1939), 243--327.
 
+## Symbolic Dong matching via zero-suppressed decision diagrams
+
+The public `symbolic_dong_certificate(G)` implements **the same vertex-ordered
+augmented discrete Morse matching** as `dong_matching` [Dong2003]. Its
+zero-suppressed decision diagram (ZDD) stores a family of simplices exactly,
+without materializing individual simplices. At each pivot `v`, if the
+remaining face family is `F_minus union (v * F_plus)`, it removes both copies
+of `F_minus intersection F_plus`; the remaining branches are the two set
+differences. Dong's sequential matching theorem proves acyclicity, while
+the ZDD operations compute the resulting critical cells exactly.
+
+The certificate records the critical-cell counts by dimension, including
+dimension -1 for an unmatched empty face, the number of faces (including the
+empty face), the number of ZDD nodes, and all critical-face bitmasks when
+there are at most 256. The default ordering is numeric for integer-labeled
+graphs and stable for other labels; specify `vertex_order` to replay a
+particular matching. The search has conservative graph-order and ZDD-node
+caps; an exceeded cap returns `None`, not a proof.
+
+```python
+from pycombtop import symbolic_dong_certificate, homotopy_type_with_verdict
+import networkx as nx
+
+g = nx.cycle_graph(5)
+certificate = symbolic_dong_certificate(g)
+assert certificate is not None and certificate.critical == {1: 1}
+assert homotopy_type_with_verdict(g).is_exact
+```
+
+For graphs with **32 to 80 vertices**, `homotopy_type_with_verdict`
+automatically tries this bounded symbolic proof **before** imposing the
+ordinary `max_simplices` limit. If the empty face is paired and either no
+critical cells remain or all surviving cells have one nonnegative dimension,
+the corresponding wedge of spheres is exact. Mixed-dimensional critical
+cells alone do *not* establish a wedge, and the ordinary classifier continues
+with its other methods when symbolic matching is inconclusive.
+
+For example, the fixed 56-vertex graph
+`K^3(Susp(C_6))` has 657,325,163 faces including the empty face, but the
+symbolic matching returns precisely eleven critical 7-cells, establishing
+`Delta(K^3(Susp(C_6))) ~= wedge_11 S^7`. This case is covered by a
+reproducible fixed-graph6 regression, which also checks
+`homotopy_type_with_verdict(G, max_vertices=64, max_simplices=25000)`.
+
+This is **an optimized implementation of Dong's matching, not a new
+discrete Morse matching theorem**. Unlike the explicit matcher, it does not
+materialize all face pairs for an independent DAG acyclicity check; its
+acyclicity guarantee comes from the mathematically established sequential
+rule. Tests compare the symbolic critical faces against both an independent
+face-set implementation and `dong_matching` on randomly generated small
+graphs.
+
 ## Phase-2 budget recovery and reproducible Dong search
 
 For graph inputs, `homotopy_type_with_verdict` retains the strict

@@ -96,6 +96,7 @@ from .simplex import (
     oriented_complex,
     relative_betti_numbers,
 )
+from .symbolic_dong import SymbolicDongCertificate, symbolic_dong_certificate
 
 # Explicitly declare the public API.
 # This controls what happens if someone runs `from pycombtop import *`
@@ -105,6 +106,8 @@ __all__ = [
     "SimplicialComplex",
     "all_subsets",
     "dong_matching",
+    "SymbolicDongCertificate",
+    "symbolic_dong_certificate",
     "nerve_of_sets",
     "clique_complex",
     "nerve_of_cliques",
