@@ -58,7 +58,10 @@ def verify_weighted_conicity(
     if total <= 0:
         raise ValueError("total weight must be positive")
     # N_complement[v] = V(graph) \ N_graph(v).
-    max_closed = max(total - sum(weights[u] for u in graph[v]) for v in vertices)
+    max_closed = max(
+        total - sum(weights[u] for u in graph[v] if u != v)
+        for v in vertices
+    )
     if max_closed <= 0:
         raise ArithmeticError("nonpositive closed non-neighborhood weight")
     r = (total - 1) // max_closed
@@ -106,6 +109,7 @@ def find_weighted_conicity_certificate(
     cols: list[int] = []
     for i, v in enumerate(vertices):
         neighbors = set(graph[v])
+        neighbors.discard(v)  # loops do not count as clique-complex adjacency
         for u in vertices:
             if u not in neighbors:
                 rows.append(i)
