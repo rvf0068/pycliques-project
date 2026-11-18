@@ -74,6 +74,8 @@ def _unit_boundary(
     """Require a surjective integer differential with unit Smith invariants."""
     if rows == 0:
         return True
+    if rows > cols:
+        return False
     if boundary is None or len(boundary) != rows:
         return False
     if any(len(row) != cols for row in boundary):
@@ -106,6 +108,8 @@ def _hopf_shape(
     if n3 and morse.boundaries.get(3) != (tuple(0 for _ in range(n3)),):
         return None
     n4 = critical[4]
+    if n3 > n4:
+        return None
     if n3 and not _unit_boundary(morse.boundaries.get(4), n3, n4):
         return None
     if morse.torsion:
@@ -257,14 +261,15 @@ def hopf_wedge_certificate(
 
 def verify_hopf_wedge(
     graph: nx.Graph,
-    proof: HopfWedgeCertificate,
+    proof: HopfWedgeCertificate | None,
     *,
     max_triangles: int = 20_000,
 ) -> bool:
     """Independently recompute both exact integral and mod-2 certificates."""
     try:
         if (
-            not graph
+            proof is None
+            or not graph
             or graph.is_directed()
             or graph.is_multigraph()
             or nx.number_of_selfloops(graph)
