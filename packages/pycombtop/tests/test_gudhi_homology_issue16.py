@@ -17,7 +17,7 @@ from pycombtop.homology_backend import (
     reduced_betti_facets_mod2,
 )
 from pycombtop.homotopy_type import betti_numbers_graph, betti_numbers_sc
-from pycombtop.simplex import Simplex, SimplicialComplex
+from pycombtop.simplex import SimplicialComplex, Simplex
 
 
 def test_snub_iterates_independently_certified_gf2():
