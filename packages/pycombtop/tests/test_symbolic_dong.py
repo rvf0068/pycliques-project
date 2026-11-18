@@ -8,8 +8,8 @@ from collections import Counter
 from itertools import combinations
 
 import networkx as nx
-import pytest
 import pycombtop.symbolic_dong as symbolic_dong
+import pytest
 from pycombtop import (
     Theorem,
     clique_complex,
