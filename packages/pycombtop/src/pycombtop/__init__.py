@@ -97,6 +97,15 @@ from .simplex import (
     relative_betti_numbers,
 )
 from .symbolic_dong import SymbolicDongCertificate, symbolic_dong_certificate
+from .symbolic_integral_morse import (
+    SymbolicIntegralMorseCertificate,
+    symbolic_integral_morse_certificate,
+)
+from .weighted_conicity import (
+    WeightedConicityCertificate,
+    find_weighted_conicity_certificate,
+    verify_weighted_conicity,
+)
 
 # Explicitly declare the public API.
 # This controls what happens if someone runs `from pycombtop import *`
@@ -108,6 +117,11 @@ __all__ = [
     "dong_matching",
     "SymbolicDongCertificate",
     "symbolic_dong_certificate",
+    "SymbolicIntegralMorseCertificate",
+    "symbolic_integral_morse_certificate",
+    "WeightedConicityCertificate",
+    "find_weighted_conicity_certificate",
+    "verify_weighted_conicity",
     "nerve_of_sets",
     "clique_complex",
     "nerve_of_cliques",
