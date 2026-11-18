@@ -220,7 +220,9 @@ def reduce_flag_graph(
         or cone_passes < 1
         or contractible_passes < 0
         or max_contractible_vertices < 0
-        or min(max_moves, max_nodes, max_link_vertices) < 1
+        or not 1 <= max_link_vertices <= 80
+        or not 1 <= max_nodes <= 250_000
+        or max_moves < 1
     ):
         return None
     try:
