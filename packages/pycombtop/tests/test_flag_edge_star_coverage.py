@@ -47,9 +47,7 @@ def test_dense_passes_and_replay():
 
     # Triangle-free graphs have no cone-link edge, and no fold on a cycle.
     cycle = nx.cycle_graph(6)
-    cycle_core, cycle_moves = _cone_fold_passes(
-        cycle, passes=3, max_moves=10
-    )
+    cycle_core, cycle_moves = _cone_fold_passes(cycle, passes=3, max_moves=10)
     assert not cycle_moves
     assert nx.is_isomorphic(cycle_core, cycle)
 
@@ -65,13 +63,11 @@ def test_contractible_link_search_with_exact_replay():
     assert verify_flag_reduction(graph, proof)
     with pytest.raises(OverflowError, match="move limit"):
         _contractible_edge_passes(
-            graph, passes=1, max_moves=0, max_link_vertices=20,
-            max_nodes=30_000
+            graph, passes=1, max_moves=0, max_link_vertices=20, max_nodes=30_000
         )
     # Forbid larger common links without claiming a negative topological result.
     untouched, no_moves = _contractible_edge_passes(
-        nx.cycle_graph(5), passes=2, max_moves=10,
-        max_link_vertices=1, max_nodes=30_000
+        nx.cycle_graph(5), passes=2, max_moves=10, max_link_vertices=1, max_nodes=30_000
     )
     assert not no_moves
     assert untouched.number_of_edges() == 5
@@ -81,12 +77,8 @@ def test_bad_reduction_proofs_fail_closed():
     graph = nx.complete_graph(3)
     empty = FlagReductionCertificate((), tuple(graph), tuple(graph.edges))
     assert verify_flag_reduction(graph, empty)
-    assert not verify_flag_reduction(
-        graph, replace(empty, remaining_vertices=(0, 1))
-    )
-    assert not verify_flag_reduction(
-        graph, replace(empty, remaining_edges=((0, 1),))
-    )
+    assert not verify_flag_reduction(graph, replace(empty, remaining_vertices=(0, 1)))
+    assert not verify_flag_reduction(graph, replace(empty, remaining_edges=((0, 1),)))
     bad = [
         FlagMove("unknown_kind", 0, 1),
         FlagMove("cone_edge", 0, 1, 99),
@@ -100,12 +92,14 @@ def test_bad_reduction_proofs_fail_closed():
     path = nx.path_graph(4)
     invalid_fold = FlagReductionCertificate(
         (FlagMove("fold_vertex", 1, 2),),
-        tuple(path), tuple(path.edges),
+        tuple(path),
+        tuple(path.edges),
     )
     assert not verify_flag_reduction(path, invalid_fold)
     invalid_link = FlagReductionCertificate(
         (FlagMove("contractible_edge", 0, 1),),
-        tuple(path), tuple(path.edges),
+        tuple(path),
+        tuple(path.edges),
     )
     assert not verify_flag_reduction(path, invalid_link)
     assert not verify_flag_reduction(nx.DiGraph([(0, 1)]), empty)
@@ -128,18 +122,12 @@ def test_vertex_star_exact_small_wedge_and_wrapper():
     assert whole is not None
     assert whole.spheres == {2: 2}
     assert verify_reduced_star_wedge(graph, whole)
-    assert not verify_reduced_star_wedge(
-        graph, replace(whole, spheres={2: 3})
-    )
-    wrong_reduction = replace(
-        whole.reduction, remaining_vertices=(0, 1)
-    )
+    assert not verify_reduced_star_wedge(graph, replace(whole, spheres={2: 3}))
+    wrong_reduction = replace(whole.reduction, remaining_vertices=(0, 1))
     assert not verify_reduced_star_wedge(
         graph, replace(whole, reduction=wrong_reduction)
     )
-    assert not verify_vertex_star_wedge(
-        graph, replace(result, vertex=999)
-    )
+    assert not verify_vertex_star_wedge(graph, replace(result, vertex=999))
 
 
 def test_vertex_star_inconclusive_conditions():
@@ -168,9 +156,7 @@ def test_vertex_star_inconclusive_conditions():
     # A disconnected two-vertex link is outside the connected-link proof.
     disconnected_link = nx.octahedral_graph()
     disconnected_link.add_edges_from(((6, 0), (6, 5)))
-    assert vertex_star_wedge_certificate(
-        disconnected_link, candidates=[6]
-    ) is None
+    assert vertex_star_wedge_certificate(disconnected_link, candidates=[6]) is None
 
 
 def test_opt_in_resource_rejections_and_empty_search():
