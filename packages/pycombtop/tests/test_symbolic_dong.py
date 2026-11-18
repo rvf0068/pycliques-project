@@ -7,7 +7,6 @@ from itertools import combinations
 
 import networkx as nx
 import pytest
-
 from pycombtop import (
     Theorem,
     clique_complex,
