@@ -257,10 +257,7 @@ def verify_flag_reduction(
             if move.kind == "cone_edge":
                 common = set(current[u]) & set(current[v])
                 apex = move.apex
-                if (
-                    apex not in common
-                    or not common - {apex} <= set(current[apex])
-                ):
+                if apex not in common or not common - {apex} <= set(current[apex]):
                     return False
                 current.remove_edge(u, v)
             elif move.kind == "fold_vertex":
@@ -311,11 +308,7 @@ def _dong_wedge(
         return critical, {d: count for d, count in critical.items() if d > 1}
     # The remaining 1-skeleton is a wedge of circles. Since pi_k of this
     # space vanishes for k >= 2, d>=3 cells attach trivially.
-    if (
-        len(critical) == 2
-        and 1 in critical
-        and all(d == 1 or d >= 3 for d in critical)
-    ):
+    if len(critical) == 2 and 1 in critical and all(d == 1 or d >= 3 for d in critical):
         return critical, dict(critical)
     return None
 
@@ -350,9 +343,7 @@ def vertex_star_wedge_certificate(
             continue
         base_critical, base = deletion_data
         link_critical, source = link_data
-        if base and (
-            min(base) < 2 or (source and max(source) >= min(base))
-        ):
+        if base and (min(base) < 2 or (source and max(source) >= min(base)):
             continue
         spheres = dict(Counter(base) + Counter({d + 1: c for d, c in source.items()}))
         certificate = VertexStarWedgeCertificate(
@@ -380,9 +371,7 @@ def verify_vertex_star_wedge(
         return False
     critical_a, base = deletion_data
     critical_b, source = link_data
-    if base and (
-        min(base) < 2 or (source and max(source) >= min(base))
-    ):
+    if base and (min(base) < 2 or (source and max(source) >= min(base)):
         return False
     expected = dict(Counter(base) + Counter({d + 1: c for d, c in source.items()}))
     return (
