@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import networkx as nx
 import pytest
-
 from pycliques.cliques import clique_graph
 from pycliques.named import snub_disphenoid
 from pycombtop.bounded_betti import bounded_reduced_betti_mod2
