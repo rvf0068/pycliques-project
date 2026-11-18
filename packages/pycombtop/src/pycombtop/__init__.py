@@ -77,6 +77,7 @@ from .s_collapses import (
     verify_dismantling_certificate,
     verify_s_collapse_move,
 )
+from .symbolic_dong import SymbolicDongCertificate, symbolic_dong_certificate
 from .simplex import (
     Simplex,
     SimplicialComplex,
@@ -105,6 +106,8 @@ __all__ = [
     "SimplicialComplex",
     "all_subsets",
     "dong_matching",
+    "SymbolicDongCertificate",
+    "symbolic_dong_certificate",
     "nerve_of_sets",
     "clique_complex",
     "nerve_of_cliques",
