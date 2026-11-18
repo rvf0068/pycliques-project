@@ -136,6 +136,9 @@ def test_small_graph_fail_closed_limits_and_loops():
     reduced = reduce_flag_graph(mixed, cone_passes=2)
     assert reduced is not None
     assert verify_flag_reduction(mixed, reduced[1])
+    assert reduced_star_wedge_certificate(mixed) is None
+    assert reduce_flag_graph(graph, max_link_vertices=81) is None
+    assert reduce_flag_graph(graph, max_nodes=250_001) is None
 
 
 def _clique_graph(graph):
