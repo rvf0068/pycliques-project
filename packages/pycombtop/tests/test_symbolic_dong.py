@@ -57,9 +57,7 @@ def test_symbolic_matches_independent_enumeration_and_dong():
     rng = random.Random(84217)
     for n in range(1, 9):
         for _ in range(30):
-            graph = nx.gnp_random_graph(
-                n, rng.random(), seed=rng.randrange(1 << 30)
-            )
+            graph = nx.gnp_random_graph(n, rng.random(), seed=rng.randrange(1 << 30))
             order = list(graph)
             rng.shuffle(order)
             certificate = symbolic_dong_certificate(graph, vertex_order=order)
@@ -110,9 +108,7 @@ def test_c6_third_iterate_certificate():
 
 def test_classifier_uses_symbolic_matching_before_simplex_budget():
     graph = c6_third_iterate()
-    result = homotopy_type_with_verdict(
-        graph, max_vertices=64, max_simplices=25_000
-    )
+    result = homotopy_type_with_verdict(graph, max_vertices=64, max_simplices=25_000)
     assert result.is_exact and not result.is_limited
     assert result.wedge.spheres == {7: 11}
     assert result.reason == Theorem.SYMBOLIC_DONG_MATCHING
