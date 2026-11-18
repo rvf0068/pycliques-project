@@ -1,7 +1,8 @@
-"""Benchmark external GUDHI against existing exact clique-complex homology.
+"""Cross-check GUDHI against independent binary exact homology.
 
-This optional diagnostic installs GUDHI only into CI's temporary venv.
-It does not silently change the pycombtop backend or the uv dependency lock.
+This reproducible experiment confirms the production backend and the
+independent integer-bitset reducer. The historical numerical discrepancy is
+preserved in issue #16.
 """
 from __future__ import annotations
 
@@ -89,32 +90,31 @@ def benchmark():
         if not partial:
             started=time.monotonic()
             raw = betti_numbers_graph(graph)
-            mogutda_seconds=time.monotonic()-started
+            pycombtop_seconds=time.monotonic()-started
             existing={i:value for i,value in enumerate(raw)}
-            # Do not equate coefficients without verification. Preserve any
-            # disagreement for mathematical diagnosis rather than hiding it.
-            mogutda_matches_gudhi = not any(
+            # The production pycombtop API is now also exact over F_2.
+            pycombtop_matches_gudhi = not any(
                 existing.get(d, 0) != v for d, v in via_gudhi.items()
             )
         else:
-            mogutda_seconds=None
-            mogutda_matches_gudhi=None
+            pycombtop_seconds=None
+            pycombtop_matches_gudhi=None
         results.append({
             "graph":name,"order":len(graph),"edges":graph.number_of_edges(),
             "gudhi_reduced_betti":via_gudhi,"gudhi_simplices":count,
             "gudhi_seconds":round(gudhi_seconds,4),
             "bounded_seconds":round(bounded_seconds,4),
-            "mogutda_seconds":None if mogutda_seconds is None else round(mogutda_seconds,4),
+            "pycombtop_seconds":None if pycombtop_seconds is None else round(pycombtop_seconds,4),
             "bounded_within_face_budget":via_bounded is not None,
             "bounded_reduced_betti":via_bounded,
-            "mogutda_reduced_betti":existing,
-            "mogutda_matches_gudhi":mogutda_matches_gudhi,
+            "pycombtop_reduced_betti":existing,
+            "pycombtop_matches_gudhi":pycombtop_matches_gudhi,
         })
     return {
         "schema":1,"gudhi_version":getattr(gudhi,"__version__","unknown"),
         "gudhi_matches_exact_binary_boundaries":True,
-        "mogutda_disagreements":[x["graph"] for x in results
-            if x["mogutda_matches_gudhi"] is False],
+        "pycombtop_disagreements":[x["graph"] for x in results
+            if x["pycombtop_matches_gudhi"] is False],
         "results":results,
     }
 
