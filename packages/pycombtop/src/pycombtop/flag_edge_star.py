@@ -357,7 +357,7 @@ def vertex_star_wedge_certificate(
             continue
         base_critical, base = deletion_data
         link_critical, source = link_data
-        if base and (min(base) < 2 or (source and max(source) >= min(base)):
+        if base and (min(base) < 2 or (source and max(source) >= min(base))):
             continue
         spheres = dict(Counter(base) + Counter({d + 1: c for d, c in source.items()}))
         certificate = VertexStarWedgeCertificate(
@@ -385,7 +385,7 @@ def verify_vertex_star_wedge(
         return False
     critical_a, base = deletion_data
     critical_b, source = link_data
-    if base and (min(base) < 2 or (source and max(source) >= min(base)):
+    if base and (min(base) < 2 or (source and max(source) >= min(base))):
         return False
     expected = dict(Counter(base) + Counter({d + 1: c for d, c in source.items()}))
     return (
