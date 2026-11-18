@@ -11,9 +11,10 @@ F^- intersection F^+ from both halves. The exact remainder is
 used by pycombtop.simplex.dong_matching, represented symbolically.
 Its acyclicity follows from the sequential matching theorem, not homology.
 
-Fixed-size memo tables are cleared between matching pivots; the ZDD node cap
-bounds the persistent diagram, while caches have independent finite caps.
-Caps on the ZDD and graph order return None rather than an unproved verdict.
+Fixed-size memo tables are cleared between matching pivots and at exit,
+including exceptional exits. The ZDD node cap bounds the persistent diagram,
+while caches have independent finite caps. Caps on the ZDD and graph order
+return None rather than an unproved verdict.
 """
 
 from __future__ import annotations
@@ -217,6 +218,7 @@ def symbolic_dong_certificate(
         vertices = list(vertex_order)
         if len(vertices) != n or len(set(vertices)) != n or set(vertices) != set(graph):
             raise ValueError("vertex_order must be a permutation of graph vertices")
+    diagram = None
     try:
         diagram = _ZDD(n, max_nodes)
         root = diagram.clique_faces(graph, vertices)
@@ -245,3 +247,14 @@ def symbolic_dong_certificate(
         )
     except (MemoryError, _DiagramLimit, RecursionError):
         return None
+    finally:
+        # @lru_cache on a method is shared by all instances, and its keys
+        # retain references to self. Clean up even if diagram construction,
+        # matching, or critical-cell extraction raises an exception.
+        if diagram is not None:
+            diagram.without_vertices.cache_clear()
+            diagram.contains_empty.cache_clear()
+            diagram.remove_empty.cache_clear()
+            diagram.difference.cache_clear()
+            diagram.pivot.cache_clear()
+            diagram.face_size_counts.cache_clear()
