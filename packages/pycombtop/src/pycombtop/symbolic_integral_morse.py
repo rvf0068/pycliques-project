@@ -14,6 +14,7 @@ from collections.abc import Hashable, Iterable
 from dataclasses import dataclass
 
 import networkx as nx
+from sympy import Matrix
 
 from ._symbolic_morse_gradient import _MorseLimit, morse_boundaries
 from .simplex import _stable_vertex_key
@@ -100,6 +101,14 @@ def symbolic_integral_morse_certificate(
         boundaries, ranks, torsion, states = morse_boundaries(
             diagram, roots, faces, max_gradient_states
         )
+        # An independent chain-complex consistency check: d^2 must vanish.
+        for degree in boundaries:
+            if degree - 1 in boundaries:
+                product = Matrix(boundaries[degree - 1]) * Matrix(
+                    boundaries[degree]
+                )
+                if any(entry != 0 for entry in product):
+                    raise ArithmeticError("symbolic Morse differential has d^2 != 0")
         betti = {
             d: c - ranks.get(d, 0) - ranks.get(d + 1, 0)
             for d, c in critical.items()
