@@ -75,9 +75,7 @@ def test_c10_exact_morse_hopf_cup_square_and_homotopy_classifier():
     assert proof.critical == morse.critical
     assert proof.triangle_indices == (47, 50, 59)
     assert verify_hopf_wedge(graph, proof)
-    verdict = homotopy_type_with_verdict(
-        graph, max_vertices=80, max_simplices=15_000
-    )
+    verdict = homotopy_type_with_verdict(graph, max_vertices=80, max_simplices=15_000)
     assert verdict.is_exact
     assert verdict.wedge.spheres == {2: 1, 4: 6}
     assert verdict.reason == Theorem.SYMBOLIC_HOPF_CUP_SQUARE
@@ -89,16 +87,12 @@ def test_certificate_tampering_and_label_independence():
     assert proof is not None
     assert not verify_hopf_wedge(graph, replace(proof, spheres={2: 1, 4: 5}))
     assert not verify_hopf_wedge(graph, replace(proof, betti={2: 1}))
-    assert not verify_hopf_wedge(
-        graph, replace(proof, triangle_indices=(0, 1, 2))
-    )
+    assert not verify_hopf_wedge(graph, replace(proof, triangle_indices=(0, 1, 2)))
     assert not verify_hopf_wedge(graph, replace(proof, triangle_count=1))
     changed = graph.copy()
     changed.add_edge(*next(nx.non_edges(changed)))
     assert not verify_hopf_wedge(changed, proof)
-    mixed = nx.relabel_nodes(
-        graph, {v: ("node", v) if v % 2 else v for v in graph}
-    )
+    mixed = nx.relabel_nodes(graph, {v: ("node", v) if v % 2 else v for v in graph})
     # Dong matchings depend on vertex order. Relabeling may change
     # which matching is found, but must never produce an invalid verdict.
     renamed = hopf_wedge_certificate(mixed)
@@ -114,14 +108,38 @@ def test_proof_rejects_bad_morse_boundary_or_torsion():
         {"critical": {0: 2, 1: 1, 2: 1, 3: 2, 4: 8}},
         {"critical": {2: 2, 3: 2, 4: 8}},
         {"critical": {0: 1, 1: 1, 2: 1, 3: 2}},
-        {"boundaries": {1: ((2,),), 2: ((0,),), 3: ((0, 0),),
-                       4: ((1, 0, -1, 0, 0, 0, 0, 0), (0, 0, 0, 0, -1, 0, 0, 1))}},
-        {"boundaries": {1: ((-1,),), 2: ((1,),), 3: ((0, 0),),
-                       4: ((1, 0, -1, 0, 0, 0, 0), (0, 0, 0, 0, -1, 0, 0, 1))}},
-        {"boundaries": {1: ((-1,),), 2: ((0,),), 3: ((1, 0),),
-                       4: ((1, 0, -1, 0, 0, 0, 0), (0, 0, 0, 0, -1, 0, 0, 1))}},
-        {"boundaries": {1: ((-1,),), 2: ((0,),), 3: ((0, 0),),
-                       4: ((2, 0, -2, 0, 0, 0, 0, 0), (0, 0, 0, 0, -1, 0, 0, 1))}},
+        {
+            "boundaries": {
+                1: ((2,),),
+                2: ((0,),),
+                3: ((0, 0),),
+                4: ((1, 0, -1, 0, 0, 0, 0, 0), (0, 0, 0, 0, -1, 0, 0, 1)),
+            }
+        },
+        {
+            "boundaries": {
+                1: ((-1,),),
+                2: ((1,),),
+                3: ((0, 0),),
+                4: ((1, 0, -1, 0, 0, 0, 0, 0), (0, 0, 0, 0, -1, 0, 0, 1)),
+            }
+        },
+        {
+            "boundaries": {
+                1: ((-1,),),
+                2: ((0,),),
+                3: ((1, 0),),
+                4: ((1, 0, -1, 0, 0, 0, 0, 0), (0, 0, 0, 0, -1, 0, 0, 1)),
+            }
+        },
+        {
+            "boundaries": {
+                1: ((-1,),),
+                2: ((0,),),
+                3: ((0, 0),),
+                4: ((2, 0, -2, 0, 0, 0, 0, 0), (0, 0, 0, 0, -1, 0, 0, 1)),
+            }
+        },
         {"torsion": {3: (2,)}},
         {"betti": {2: 1, 4: 5}},
     ]
@@ -144,9 +162,7 @@ def test_cup_witness_rejects_null_class_and_large_inputs():
     contractible.add_edges_from(((4, 0), (4, 1)))
     # Maximal triangle (0,1,4) exists but its indicator is a coboundary.
     assert _cup_witness(contractible, morse, max_triangles=20) is None
-    basis = _mod2_coboundary_basis(
-        [(0, 1), (0, 2), (1, 2)], [(0, 1, 2)]
-    )
+    basis = _mod2_coboundary_basis([(0, 1), (0, 2), (1, 2)], [(0, 1, 2)])
     assert not _not_coboundary(basis, 1)
     assert _not_coboundary({}, 1)
 
