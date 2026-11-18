@@ -13,6 +13,18 @@ from .covering_divergence_search import (
     CoveringSearchStatus,
     search_covering_divergence,
 )
+from .flag_edge_star import (
+    FlagMove,
+    FlagReductionCertificate,
+    ReducedStarWedgeCertificate,
+    VertexStarWedgeCertificate,
+    reduce_flag_graph,
+    reduced_star_wedge_certificate,
+    verify_flag_reduction,
+    verify_reduced_star_wedge,
+    verify_vertex_star_wedge,
+    vertex_star_wedge_certificate,
+)
 from .fundamental_group import (
     FundamentalRecord,
     covering_graph,
@@ -110,6 +122,17 @@ from .weighted_conicity import (
 # Explicitly declare the public API.
 # This controls what happens if someone runs `from pycombtop import *`
 __all__ = [
+    # certified flag-edge reductions and vertex-star homotopy
+    "FlagMove",
+    "FlagReductionCertificate",
+    "VertexStarWedgeCertificate",
+    "ReducedStarWedgeCertificate",
+    "reduce_flag_graph",
+    "verify_flag_reduction",
+    "vertex_star_wedge_certificate",
+    "verify_vertex_star_wedge",
+    "reduced_star_wedge_certificate",
+    "verify_reduced_star_wedge",
     # simplex
     "Simplex",
     "SimplicialComplex",
