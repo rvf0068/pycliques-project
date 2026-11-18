@@ -11,6 +11,8 @@ F^- intersection F^+ from both halves. The exact remainder is
 used by pycombtop.simplex.dong_matching, represented symbolically.
 Its acyclicity follows from the sequential matching theorem, not homology.
 
+Fixed-size memo tables are cleared between matching pivots; the ZDD node cap
+bounds the persistent diagram, while caches have independent finite caps.
 Caps on the ZDD and graph order return None rather than an unproved verdict.
 """
 
@@ -70,7 +72,7 @@ class _ZDD:
         self.unique[key] = node
         return node
 
-    @lru_cache(maxsize=500_000)
+    @lru_cache(maxsize=65_536)
     def without_vertices(self, root: int, forbidden: int) -> int:
         """Retain only faces that avoid the forbidden vertices."""
         if root < 2 or not forbidden:
@@ -106,13 +108,13 @@ class _ZDD:
             root = self.node(i, root, high)
         return root
 
-    @lru_cache(maxsize=500_000)
+    @lru_cache(maxsize=65_536)
     def contains_empty(self, root: int) -> bool:
         while root > 1:
             root = self.low[root]
         return root == 1
 
-    @lru_cache(maxsize=500_000)
+    @lru_cache(maxsize=65_536)
     def remove_empty(self, root: int) -> int:
         if root < 2:
             return 0
@@ -120,7 +122,7 @@ class _ZDD:
             self.variables[root], self.remove_empty(self.low[root]), self.high[root]
         )
 
-    @lru_cache(maxsize=500_000)
+    @lru_cache(maxsize=65_536)
     def difference(self, a: int, b: int) -> int:
         """Exact difference of two ZDD-encoded set families."""
         if a == 0 or a == b:
@@ -142,7 +144,7 @@ class _ZDD:
             self.difference(self.high[a], self.high[b]),
         )
 
-    @lru_cache(maxsize=500_000)
+    @lru_cache(maxsize=65_536)
     def pivot(self, root: int, vertex: int) -> int:
         """Remove all currently available Dong matching pairs at vertex."""
         if root < 2 or self.variables[root] > vertex:
@@ -160,7 +162,7 @@ class _ZDD:
             self.difference(self.high[root], self.low[root]),
         )
 
-    @lru_cache(maxsize=500_000)
+    @lru_cache(maxsize=65_536)
     def face_size_counts(self, root: int) -> tuple[int, ...]:
         if root == 0:
             return ()
@@ -218,9 +220,19 @@ def symbolic_dong_certificate(
     try:
         diagram = _ZDD(n, max_nodes)
         root = diagram.clique_faces(graph, vertices)
+        # Restriction memoization is no longer useful after constructing
+        # the initial family; discard it before starting the matching.
+        diagram.without_vertices.cache_clear()
         total = sum(diagram.face_size_counts(root))
+        diagram.face_size_counts.cache_clear()
         for pivot in range(n):
             root = diagram.pivot(root, pivot)
+            # Only the current pivot needs these temporary memo tables.
+            # This bounds auxiliary memory separately from the ZDD node cap.
+            diagram.difference.cache_clear()
+            diagram.pivot.cache_clear()
+            diagram.contains_empty.cache_clear()
+            diagram.remove_empty.cache_clear()
         sizes = diagram.face_size_counts(root)
         critical = {size - 1: count for size, count in enumerate(sizes) if count}
         critical_count = sum(critical.values())
