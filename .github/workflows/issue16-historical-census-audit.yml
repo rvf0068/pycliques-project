@@ -6,6 +6,9 @@ on:
       - "research/audit_issue16_homotopy_census.py"
       - ".github/workflows/issue16-historical-census-audit.yml"
       - "packages/pycombtop/src/pycombtop/homology_backend.py"
+      - "packages/pycombtop/src/pycombtop/homotopy_type.py"
+      - "packages/pycombtop/src/pycombtop/bounded_betti.py"
+      - "uv.lock"
   workflow_dispatch:
 
 permissions:
@@ -20,13 +23,16 @@ jobs:
       - uses: astral-sh/setup-uv@v4
       - name: Install verified GUDHI backend
         run: uv sync --frozen --python 3.11
-      - name: Retrieve immutable historical homotopy census records (read-only)
-        run: git clone --depth 1 --filter=blob:none https://github.com/rvf0068/pycliques-homotopy-census.git "$RUNNER_TEMP/homotopy-census"
+      - name: Retrieve PINNED historical homotopy census records (read-only)
+        run: |
+          git clone --depth 1 --filter=blob:none https://github.com/rvf0068/pycliques-homotopy-census.git "$RUNNER_TEMP/homotopy-census"
+          git -C "$RUNNER_TEMP/homotopy-census" fetch --depth 1 origin 40f486903b60f34ee16b2f8aaea7545883be54b4
+          git -C "$RUNNER_TEMP/homotopy-census" checkout --detach 40f486903b60f34ee16b2f8aaea7545883be54b4
       - name: Count all legacy-Betti-dependent exact and inexact saved verdicts
         run: |
           .venv/bin/python research/audit_issue16_homotopy_census.py \
             --root "$RUNNER_TEMP/homotopy-census" \
-            --orders 6 7 8 9 10 --recheck 1000 \
+            --orders 6 7 8 9 10 --recheck 1000 --require-complete \
             --output "$RUNNER_TEMP/issue16-historical-census-audit.json"
       - name: Upload read-only audit with affected indices and sample results
         if: always()
