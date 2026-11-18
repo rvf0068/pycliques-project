@@ -152,6 +152,89 @@ rule. Tests compare the symbolic critical faces against both an independent
 face-set implementation and `dong_matching` on randomly generated small
 graphs.
 
+## Integral Morse homology from symbolic Dong matchings
+
+`symbolic_integral_morse_certificate(G)` extends the ZDD-backed Dong
+matching to **mixed-dimensional critical cells** without expanding its face
+poset. It retains the decreasing family of remaining faces at each pivot;
+an exact face-membership lookup identifies which pivot matched a face.
+Signed gradient-path recursion then computes integral Morse boundary matrices.
+Smith normal form gives **reduced integral Betti numbers and torsion**.
+
+The certificate reports `critical`, `boundaries` (rows indexed by lower
+critical masks, columns by upper critical masks), `betti`, `torsion`,
+`wedge_spheres` (possibly `None`), and resource counts. ZDD-node,
+critical-cell, and gradient-state limits fail closed: `None` means no
+certificate, not a vanishing invariant.
+
+One positive-dimensional critical degree certifies a wedge immediately.
+For **exactly two consecutive critical dimensions** `d,d+1` with
+`d>=2`, the attaching maps are classified by their degree vectors in
+`pi_d(wedge S^d)`. If all nonzero Smith invariants of the integral
+Morse boundary are **units**, elementary cellular cancellations give
+a wedge of spheres. In every other mixed-dimensional situation the
+boundary still computes integral homology but does **not** determine
+the homotopy type. A matrix with zero boundary is not, in general,
+a proof of nullhomotopic higher attaching maps.
+
+```python
+from pycombtop import symbolic_integral_morse_certificate
+
+certificate = symbolic_integral_morse_certificate(G)
+if certificate is not None:
+    print(certificate.betti, certificate.torsion)
+    if certificate.wedge_spheres is not None:
+        print("Certified wedge:", certificate.wedge_spheres)
+```
+
+For the 56-vertex graph `K^3(Susp(C_7))`, comprising **546,132,471**
+augmented faces, the integral matching has critical cells in dimensions
+3 (one) and 4 (two), with `boundaries[4] == ((0, 0),)`.
+It certifies `S^3 wedge S^4 wedge S^4`; the standard
+`homotopy_type_with_verdict` automatically uses this method when
+a 32–80 vertex symbolic matching has mixed critical dimensions.
+Tests use a fixed graph6 encoding and also check a nonzero Morse
+differential, ensuring that integral boundary computations are not
+silently replaced with Betti-based guesses.
+
+## Weighted conicity and certified connectivity
+
+`verify_weighted_conicity(G, weights)` uses **integer arithmetic only**.
+Let `W` be the positive sum of nonnegative vertex weights and `M`
+the maximum weight of `N_complement[v]`, the closed neighborhood
+of `v` in the complement of `G`. If `r*M < W`, no `r` closed
+neighborhoods can cover all vertices; hence every set of at most
+`r` vertices has an external common neighbor in `G`. The clique
+complex is `r`-conic, and for `r>=2`, Barmak's conicity
+theorem makes it `(floor(r/2)-1)`-connected.
+
+`find_weighted_conicity_certificate` optionally uses SciPy's HiGHS linear
+program to propose optimized weights. The candidate is rounded to
+integers and **reverified exactly** before return, and a uniform weight
+certificate is retained when optimization is inconclusive. These are
+connectivity results, **not certificates of an exact homotopy type**.
+
+```python
+from pycombtop import find_weighted_conicity_certificate
+
+proof = find_weighted_conicity_certificate(G, time_limit=10)
+if proof is not None:
+    print(proof.conicity, proof.connectivity)
+```
+
+For the 679-vertex suspension factor `H` in
+`K^4(Susp(C_7)) = Susp(H)`, a verified integer-weight witness gives
+`W=10,000,010`, `M=1,665,331`, thus 6-conicity of `H`
+and 2-connectivity of its clique complex. Suspension implies
+3-connectivity of `Delta(K^4(Susp(C_7)))`.
+
+References: Forman, *Morse Theory for Cell Complexes* (1998);
+Dong, *Topology of Bounded-Degree Graph Complexes* (2003);
+Hatcher, *Algebraic Topology*, Section 4.2;
+Barmak, *Connectivity of Ample, Conic, and Random Simplicial
+Complexes*, IMRN (2023), and Farber, *Large Simplicial Complexes*
+(2024), connectivity appendix.
+
 ## Phase-2 budget recovery and reproducible Dong search
 
 For graph inputs, `homotopy_type_with_verdict` retains the strict
