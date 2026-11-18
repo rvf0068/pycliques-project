@@ -100,6 +100,67 @@ The function avoids constructing `K(G)` itself, but does compute
   *Proceedings of the London Mathematical Society* (2) **45**
   (1939), 243--327.
 
+## Certified Hopf cup-square obstructions for nonconsecutive Morse cells
+
+`hopf_wedge_certificate(G)` closes a specific gap left by ordinary integral
+Morse boundaries: a connected flag complex with an augmented, acyclic
+symbolic Dong matching whose Morse CW model has **one essential 2-cell**
+and some **4-cells**, possibly with cancelling 0/1 and 3/4 pairs.
+The verifier demands all of:
+
+1. Exactly one critical 2-cell; at most one critical 0/1 pair, whose
+   differential has degree one; no critical cells above degree 4
+   or in other dimensions.
+2. The integral 2- and 3-cellular boundaries vanish; the
+   4-to-3 differential has **surjective unit Smith invariants**.
+   Thus the 3-cells can be cancelled, yielding a CW model consisting
+   of `S^2` with `k` 4-cells attached. The integral homology is
+   torsion-free with `H_2=Z` and `H_4=Z^k`.
+3. A maximal triangle whose indicator defines an integral 2-cocycle
+   representing a **nonzero** class modulo 2. This is checked using
+   exact bitset Gaussian elimination on the simplicial
+   coboundary `C^1(F_2) -> C^2(F_2)`, not Betti numbers alone.
+
+The triangle indicator's integral Alexander–Whitney cup square is
+**identically zero as a cochain**: the initial and final 2-faces of an
+ordered 4-simplex cannot both equal that same triangle. The indicator
+is an *odd* multiple of the integral `H^2=Z` generator, so its square
+vanishing in torsion-free `H^4` forces the generator's square to vanish.
+That square records the Hopf invariant of each attaching map in
+`pi_3(S^2)=Z`. Therefore **all** 4-cells attach trivially, and the
+replayer certifies exactly `S^2 vee k*S^4`.
+
+```python
+from pycombtop import hopf_wedge_certificate, verify_hopf_wedge
+
+proof = hopf_wedge_certificate(core)
+if proof is not None:
+    assert verify_hopf_wedge(core, proof)
+    print(proof.spheres)  # exact homotopy type, e.g. {2: 1, 4: 6}
+```
+
+The usual `homotopy_type_with_verdict` now invokes this *only if* its
+symbolic integral Morse matching is otherwise inconclusive and the
+narrow 2/4-dimensional pattern applies. The optional
+`reduced_hopf_wedge_certificate` first executes the existing
+replayable edge/vertex reductions on a large graph, then verifies
+the Hopf wedge on the small remaining core. None of the large-graph
+search is enabled implicitly in the homotopy census.
+
+The new regression uses the 61-vertex, 417-edge core obtained from
+`K^4(Susp(C_10))`: exact critical cells
+`{0:1,1:1,2:1,3:2,4:8}`, unit rank-two `d_4`, and a
+maximal triangle `(47,50,59)` representing an odd cohomology
+generator. The resulting type is `S^2 vee 6*S^4` for the core,
+or `S^3 vee 6*S^5` after the independent suspension reduction.
+
+The method deliberately returns **None** for general higher-dimensional
+attachments (including nontrivial Hopf invariants), insufficient
+cohomology witnesses, unsupported CW patterns, and resource limits.
+
+References: Forman (1998), Hatcher *Algebraic Topology*, Section 4.B
+(Hopf invariant and cup square), and the Alexander–Whitney cup product.
+
 ## Certified dense flag-edge reductions and vertex-star wedges
 
 The opt-in API `reduce_flag_graph(G)` combines three independently
