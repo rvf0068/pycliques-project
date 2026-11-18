@@ -237,7 +237,10 @@ def hopf_wedge_certificate(
         or graph.is_multigraph()
         or nx.number_of_selfloops(graph)
         or len(graph) > max_vertices
-        or max_triangles < 1
+        or not 0 <= max_vertices <= 80
+        or not 1 <= max_triangles <= 20_000
+        or not 1 <= max_nodes <= 250_000
+        or not 1 <= max_gradient_states <= 200_000
     ):
         return None
     morse = symbolic_integral_morse_certificate(
@@ -293,6 +296,7 @@ def verify_hopf_wedge(
         ValueError,
         MemoryError,
         RecursionError,
+        AttributeError,
     ):
         return False
 
