@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from functools import lru_cache
 
-from sympy import Matrix, ZZ
+from sympy import ZZ, Matrix
 from sympy.matrices.normalforms import smith_normal_form
 
 
