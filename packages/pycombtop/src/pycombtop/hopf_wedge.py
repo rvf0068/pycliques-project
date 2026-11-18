@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from collections.abc import Hashable, Iterable
 from dataclasses import dataclass
+from typing import cast
 
 import networkx as nx
 from sympy import ZZ, Matrix
@@ -188,7 +189,10 @@ def _cup_witness(
     basis = _mod2_coboundary_basis(edges, triangles)
 
     critical_triangles = [
-        tuple(i for i in range(len(indexed)) if mask >> i & 1)
+        cast(
+            tuple[int, int, int],
+            tuple(i for i in range(len(indexed)) if mask >> i & 1),
+        )
         for mask in morse.critical_masks
         if mask.bit_count() == 3
     ]
