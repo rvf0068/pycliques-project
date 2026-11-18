@@ -16,7 +16,7 @@ wrapper is opt-in and does not change default census heuristics.
 
 from __future__ import annotations
 
-from collections.abc import Hashable, Iterable
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import cast
 
@@ -30,7 +30,6 @@ from .flag_edge_star import (
     reduce_flag_graph,
     verify_flag_reduction,
 )
-from .simplex import _stable_vertex_key
 from .symbolic_integral_morse import (
     SymbolicIntegralMorseCertificate,
     symbolic_integral_morse_certificate,
@@ -61,12 +60,6 @@ class ReducedHopfWedgeCertificate:
     reduction: FlagReductionCertificate
     hopf: HopfWedgeCertificate
     spheres: dict[int, int]
-
-
-def _ordered_vertices(graph: nx.Graph) -> list[Hashable]:
-    if all(isinstance(v, int) for v in graph):
-        return sorted(graph)
-    return sorted(graph, key=_stable_vertex_key)
 
 
 def _unit_boundary(
