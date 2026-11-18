@@ -68,9 +68,7 @@ def _canonical_core(graph: nx.Graph) -> nx.Graph:
         labels = sorted(graph)
     else:
         labels = sorted(graph, key=_stable_vertex_key)
-    return nx.relabel_nodes(
-        graph, {v: i for i, v in enumerate(labels)}, copy=True
-    )
+    return nx.relabel_nodes(graph, {v: i for i, v in enumerate(labels)}, copy=True)
 
 
 def _valid_graph(graph: nx.Graph) -> bool:
