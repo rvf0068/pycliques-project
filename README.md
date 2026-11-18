@@ -228,7 +228,7 @@ Combinatorial topology tools for graphs and simplicial complexes:
 - `complete_s_collapse` — strong collapses
 - `hom_graph` / `graph_homomorphisms` — Hom complexes
 
-**Dependencies:** `networkx`, `pycliques`, `sympy`, `mogutda`
+**Dependencies:** `networkx`, `pycliques`, `sympy`, `gudhi`
 
 ### Example
 
