@@ -74,6 +74,7 @@ from .simplex import (
     dong_matching,
 )
 from .simplex import star as star  # Public re-export
+from .symbolic_dong import symbolic_dong_certificate
 from .wedge_certificates import (
     FoldedWedgeCertificate,
     certified_flag_wedge,
@@ -100,6 +101,13 @@ class Theorem:
         "augmented face poset. Its critical nonempty faces all have one "
         "dimension, so Forman's discrete Morse CW model is a wedge of "
         "spheres [Dong2003, Forman1998]."
+    )
+    SYMBOLIC_DONG_MATCHING = (
+        "Dong\'s augmented vertex-ordered matching is evaluated exactly on a "
+        "zero-suppressed decision diagram without enumerating simplices. "
+        "The sequential matching is acyclic, the empty face is matched, "
+        "and all remaining cells have a common dimension; thus the Morse "
+        "complex is a wedge of spheres [Dong2003, Forman1998]."
     )
     FACET_MORSE = (
         "Verified facet-greedy discrete Morse matching: free pairs are "
@@ -689,6 +697,23 @@ def _try_trivial(graph: nx.Graph) -> HomotopyVerdict | None:
             reason=Theorem.CONTRACTIBLE_POINT,
         )
     return None
+
+
+def _try_symbolic_dong(graph: nx.Graph) -> HomotopyVerdict | None:
+    """Bounded symbolic version of the same sequential Dong matching.
+
+    Only a single critical dimension, with the augmented empty face paired,
+    proves an exact wedge. Mixed critical dimensions are inconclusive.
+    """
+    certificate = symbolic_dong_certificate(graph)
+    if certificate is None:
+        return None
+    critical = certificate.critical
+    if critical and (len(critical) != 1 or -1 in critical):
+        return None
+    return HomotopyVerdict(
+        wedge=WedgeOfSpheres(critical), reason=Theorem.SYMBOLIC_DONG_MATCHING
+    )
 
 
 def _try_dong(
@@ -1383,6 +1408,14 @@ def homotopy_type_with_verdict(
     )
     if v:
         return v
+
+    # Dong matching can resolve enormous face families via a bounded ZDD.
+    # Its node cap is independent of max_simplices; on failure the usual
+    # pre-budget and explicit-simplex strategy cascade remains unchanged.
+    if 32 <= len(graph) <= 80:
+        v = _try_symbolic_dong(graph)
+        if v:
+            return v
 
     # A structural vertex-link certificate may resolve large complexes
     # *before* materializing their simplices, with an explicit
