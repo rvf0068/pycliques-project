@@ -26,7 +26,7 @@ jobs:
         run: |
           .venv/bin/python research/audit_issue16_homotopy_census.py \
             --root "$RUNNER_TEMP/homotopy-census" \
-            --orders 6 7 8 9 10 --recheck 20 \
+            --orders 6 7 8 9 10 --recheck 1000 \
             --output "$RUNNER_TEMP/issue16-historical-census-audit.json"
       - name: Upload read-only audit with affected indices and sample results
         if: always()
