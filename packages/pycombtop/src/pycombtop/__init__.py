@@ -33,14 +33,6 @@ from .fundamental_group import (
     fundamental_group_as_permutation_group,
 )
 from .hom_complex import graph_homomorphisms, hom_graph
-from .hopf_wedge import (
-    HopfWedgeCertificate,
-    ReducedHopfWedgeCertificate,
-    hopf_wedge_certificate,
-    reduced_hopf_wedge_certificate,
-    verify_hopf_wedge,
-    verify_reduced_hopf_wedge,
-)
 
 # homotopy_type
 from .homotopy_type import (
@@ -59,6 +51,14 @@ from .homotopy_type import (
     is_vertex_decomposable,
     star,
     star_cluster,
+)
+from .hopf_wedge import (
+    HopfWedgeCertificate,
+    ReducedHopfWedgeCertificate,
+    hopf_wedge_certificate,
+    reduced_hopf_wedge_certificate,
+    verify_hopf_wedge,
+    verify_reduced_hopf_wedge,
 )
 from .integral_morse import (
     IntegralMorseCertificate,
