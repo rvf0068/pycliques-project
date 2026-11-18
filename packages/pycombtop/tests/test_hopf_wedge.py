@@ -233,9 +233,10 @@ def test_hopf_boundary_and_topological_rejection_branches():
     )
     assert _hopf_shape(bare) == {2: 1, 4: 2}
     assert _hopf_shape(_fake_morse(critical={})) is None
-    assert _hopf_shape(
-        _fake_morse(boundaries={1: ((-1,),), 2: ((0,),), 3: ((0, 0),)})
-    ) is None
+    assert (
+        _hopf_shape(_fake_morse(boundaries={1: ((-1,),), 2: ((0,),), 3: ((0, 0),)}))
+        is None
+    )
 
     # The obstruction requires a *connected* complex with a genuine
     # maximal triangular cocycle; no unverified homotopy verdict is returned.
@@ -246,9 +247,10 @@ def test_hopf_boundary_and_topological_rejection_branches():
     assert morse is not None
     assert _cup_witness(nx.Graph(), morse, max_triangles=20) is None
     assert _cup_witness(nx.cycle_graph(5), morse, max_triangles=20) is None
-    assert _cup_witness(
-        reference, morse, max_triangles=20, preferred=((97, 98, 99),)
-    ) is not None
+    assert (
+        _cup_witness(reference, morse, max_triangles=20, preferred=((97, 98, 99),))
+        is not None
+    )
 
 
 def test_hopf_public_limits_and_inconclusive_reduction():
