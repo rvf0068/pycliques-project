@@ -286,7 +286,14 @@ def verify_hopf_wedge(
             and expected.betti == proof.betti
             and expected.spheres == proof.spheres
         )
-    except (ArithmeticError, KeyError, TypeError, ValueError, MemoryError, RecursionError):
+    except (
+        ArithmeticError,
+        KeyError,
+        TypeError,
+        ValueError,
+        MemoryError,
+        RecursionError,
+    ):
         return False
 
 
