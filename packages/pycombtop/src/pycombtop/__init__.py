@@ -77,7 +77,6 @@ from .s_collapses import (
     verify_dismantling_certificate,
     verify_s_collapse_move,
 )
-from .symbolic_dong import SymbolicDongCertificate, symbolic_dong_certificate
 from .simplex import (
     Simplex,
     SimplicialComplex,
@@ -97,6 +96,7 @@ from .simplex import (
     oriented_complex,
     relative_betti_numbers,
 )
+from .symbolic_dong import SymbolicDongCertificate, symbolic_dong_certificate
 
 # Explicitly declare the public API.
 # This controls what happens if someone runs `from pycombtop import *`
