@@ -10,10 +10,10 @@ from pycombtop import (
     Theorem,
     homotopy_type_with_verdict,
     hopf_wedge_certificate,
+    reduced_hopf_wedge_certificate,
     symbolic_integral_morse_certificate,
     verify_hopf_wedge,
     verify_reduced_hopf_wedge,
-    reduced_hopf_wedge_certificate,
 )
 from pycombtop.hopf_wedge import (
     _cup_witness,
