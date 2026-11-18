@@ -17,6 +17,7 @@ from pycombtop import (
 )
 from pycombtop.hopf_wedge import (
     _cup_witness,
+    _from_morse,
     _hopf_shape,
     _mod2_coboundary_basis,
     _not_coboundary,
@@ -212,3 +213,52 @@ def test_cup_strategy_fails_closed_when_not_applicable():
     looped = nx.Graph([(0, 0), (0, 1)])
     assert hopf_wedge_certificate(looped) is None
     assert not verify_hopf_wedge(looped, None)
+
+
+def test_hopf_boundary_and_topological_rejection_branches():
+    """Cover false positives at the integral Morse / cup-product boundary."""
+    # A zero-row boundary is vacuously surjective; malformed or
+    # nonunit matrices must not certify cellular cancellation.
+    assert _unit_boundary(None, 0, 2)
+    assert not _unit_boundary(None, 1, 1)
+    assert not _unit_boundary(((1,),), 2, 2)
+    assert not _unit_boundary(((1, 0),), 1, 1)
+    assert not _unit_boundary(((2,),), 1, 1)
+
+    # Genuine 2/4-cell models can have no 0/1 or 3/4 cancellation pairs.
+    bare = _fake_morse(
+        critical={2: 1, 4: 2},
+        boundaries={},
+        betti={2: 1, 4: 2},
+    )
+    assert _hopf_shape(bare) == {2: 1, 4: 2}
+    assert _hopf_shape(_fake_morse(critical={})) is None
+    assert _hopf_shape(
+        _fake_morse(boundaries={1: ((-1,),), 2: ((0,),), 3: ((0, 0),)})
+    ) is None
+
+    # The obstruction requires a *connected* complex with a genuine
+    # maximal triangular cocycle; no unverified homotopy verdict is returned.
+    disconnected = nx.empty_graph(2)
+    assert _from_morse(disconnected, _fake_morse(), max_triangles=20) is None
+    reference = nx.octahedral_graph()
+    morse = symbolic_integral_morse_certificate(reference)
+    assert morse is not None
+    assert _cup_witness(nx.Graph(), morse, max_triangles=20) is None
+    assert _cup_witness(nx.cycle_graph(5), morse, max_triangles=20) is None
+    assert _cup_witness(
+        reference, morse, max_triangles=20, preferred=((97, 98, 99),)
+    ) is not None
+
+
+def test_hopf_public_limits_and_inconclusive_reduction():
+    """No invalid graph or budget is accepted as a proof."""
+    assert hopf_wedge_certificate(nx.DiGraph([(0, 1)])) is None
+    assert hopf_wedge_certificate(nx.MultiGraph([(0, 1)])) is None
+    assert hopf_wedge_certificate(nx.cycle_graph(5), max_vertices=-1) is None
+    assert hopf_wedge_certificate(nx.cycle_graph(5), max_nodes=0) is None
+    assert hopf_wedge_certificate(nx.cycle_graph(5), max_gradient_states=0) is None
+    assert hopf_wedge_certificate(nx.cycle_graph(5), max_gradient_states=200_001) is None
+    assert reduced_hopf_wedge_certificate(nx.Graph()) is None
+    assert reduced_hopf_wedge_certificate(nx.empty_graph(1001)) is None
+    assert reduced_hopf_wedge_certificate(nx.cycle_graph(5)) is None
