@@ -18,12 +18,11 @@ from pycombtop import (
 
 # Reproducible graph6 of K^3(Susp(C6)), encoded to avoid literal backslashes.
 C6_K3_G6_B64 = (
-    "d35+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+"
-    "fn5+fn5+fn5+fn5+fn5+fn54e0tefmQ/fn5+SWBufn4/Rn5+fmZzY35+eFxAfn5+TnhI"
-    "Xn58Xmtgfn55bnV2fj9Gfn5+fl9Ofn54fn5bfnt2fn5hfn59Qn5+bl57Y25+e15+fkde"
-    "fnxefnpHXn57Qn5+fU5+fkJ+fnJifn53YHxefn5+fmFOVn56fn5+fXV9fV5+fn57TmF9"
-    "fn5+fmlGcH5+fn5+en1yfV5+fn5+XE5Cdn5+fn5+c3tCfn5+fn5+e2lEfn5+fn5+eGdG"
-    "fn5+fn5+eGdGfn5+fn57"
+    "d35+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn"
+    "5+fn5+fn5+fn5+fn54e0tefmQ/fn5+SWBufn4/Rn5+fmZzY35+eFxAfn5+TnhIXn58Xmtg"
+    "fn55bnV2fj9Gfn5+fl9Ofn54fn5bfnt2fn5hfn59Qn5+bl57Y25+e15+fkdefnxefnpHXn"
+    "57Qn5+fU5+fkJ+fnJifn53YHxefn5+fmFOVn56fn5+fXV9fV5+fn57TmF9fn5+fmlGcH5+"
+    "fn5+en1yfV5+fn5+XE5Cdn5+fn5+c3tCfn5+fn5+e2lEfn5+fn5+eGdGfn5+fn57"
 )
 
 
