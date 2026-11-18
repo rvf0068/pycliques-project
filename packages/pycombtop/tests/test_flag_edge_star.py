@@ -72,9 +72,7 @@ def test_contractible_link_not_necessarily_cone():
     assert verify_flag_reduction(graph, proof)
     noncontractible = nx.cycle_graph(4)
     noncontractible.add_edge(4, 5)
-    noncontractible.add_edges_from(
-        (u, v) for u in (4, 5) for v in range(4)
-    )
+    noncontractible.add_edges_from((u, v) for u in (4, 5) for v in range(4))
     assert not verify_flag_reduction(noncontractible, proof)
 
 
@@ -133,7 +131,8 @@ def test_full_c9_fourth_iterate_homotopy_certificate():
     assert (len(graph), graph.number_of_edges()) == (803, 183_222)
     complement = nx.complement(graph)
     apices = [
-        u for u in complement
+        u
+        for u in complement
         if complement.degree[u] == 1
         and complement.degree[next(iter(complement[u]))] == 1
     ]
