@@ -110,9 +110,7 @@ def morse_boundaries(
         boundaries[degree] = rows
         diag = smith_normal_form(Matrix(rows), domain=ZZ)
         factors = tuple(
-            abs(int(diag[i, i]))
-            for i in range(min(*diag.shape))
-            if diag[i, i] != 0
+            abs(int(diag[i, i])) for i in range(min(*diag.shape)) if diag[i, i] != 0
         )
         ranks[degree] = len(factors)
         # This computes torsion of H_(degree-1), even if the next
