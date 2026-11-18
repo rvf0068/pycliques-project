@@ -34,9 +34,7 @@ def test_symbolic_integral_morse_c7_k3_and_classifier():
     assert proof.torsion == {}
     assert proof.wedge_spheres == {3: 1, 4: 2}
     assert proof.gradient_states > 0
-    verdict = homotopy_type_with_verdict(
-        graph, max_vertices=64, max_simplices=25_000
-    )
+    verdict = homotopy_type_with_verdict(graph, max_vertices=64, max_simplices=25_000)
     assert verdict.is_exact and not verdict.is_limited
     assert verdict.wedge.spheres == {3: 1, 4: 2}
     assert verdict.reason == Theorem.SYMBOLIC_INTEGRAL_MORSE
@@ -45,9 +43,7 @@ def test_symbolic_integral_morse_c7_k3_and_classifier():
 def test_nonzero_integer_morse_boundary_is_not_misread_as_wedge():
     # A nonzero incidence between a critical vertex and critical edge.
     graph = nx.from_graph6_bytes(b"E`MW")
-    result = symbolic_integral_morse_certificate(
-        graph, vertex_order=[0, 2, 5, 3, 1, 4]
-    )
+    result = symbolic_integral_morse_certificate(graph, vertex_order=[0, 2, 5, 3, 1, 4])
     assert result is not None
     assert result.critical == {0: 1, 1: 1}
     assert result.boundaries == {1: ((1,),)}
@@ -78,9 +74,7 @@ def test_symbolic_integral_resource_limits():
     assert symbolic_integral_morse_certificate(graph, max_gradient_states=1) is None
     assert symbolic_integral_morse_certificate(graph, max_nodes=10) is None
     with pytest.raises(ValueError, match="vertex_order"):
-        symbolic_integral_morse_certificate(
-            nx.cycle_graph(5), vertex_order=[0, 1]
-        )
+        symbolic_integral_morse_certificate(nx.cycle_graph(5), vertex_order=[0, 1])
 
 
 def test_weighted_conicity_integer_witness_and_solver():
