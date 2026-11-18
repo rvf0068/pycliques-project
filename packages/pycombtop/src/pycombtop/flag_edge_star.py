@@ -20,6 +20,7 @@ from dataclasses import dataclass
 
 import networkx as nx
 
+from .simplex import _stable_vertex_key
 from .symbolic_dong import symbolic_dong_certificate
 
 
@@ -59,6 +60,17 @@ class ReducedStarWedgeCertificate:
     reduction: FlagReductionCertificate
     star: VertexStarWedgeCertificate
     spheres: dict[int, int]
+
+
+def _canonical_core(graph: nx.Graph) -> nx.Graph:
+    """Reindex an arbitrary hashable-labelled core reproducibly."""
+    if all(isinstance(v, int) for v in graph):
+        labels = sorted(graph)
+    else:
+        labels = sorted(graph, key=_stable_vertex_key)
+    return nx.relabel_nodes(
+        graph, {v: i for i, v in enumerate(labels)}, copy=True
+    )
 
 
 def _valid_graph(graph: nx.Graph) -> bool:
@@ -190,6 +202,7 @@ def reduce_flag_graph(
     contractible_passes: int = 5,
     max_moves: int = 250_000,
     max_contractible_vertices: int = 80,
+    max_vertices: int = 1000,
     max_link_vertices: int = 48,
     max_nodes: int = 100_000,
 ) -> tuple[nx.Graph, FlagReductionCertificate] | None:
@@ -203,6 +216,7 @@ def reduce_flag_graph(
     """
     if (
         not _valid_graph(graph)
+        or len(graph) > max_vertices
         or cone_passes < 1
         or contractible_passes < 0
         or max_contractible_vertices < 0
@@ -401,7 +415,7 @@ def reduced_star_wedge_certificate(
     if result is None:
         return None
     core, reduction = result
-    core = nx.convert_node_labels_to_integers(core, ordering="sorted")
+    core = _canonical_core(core)
     star = vertex_star_wedge_certificate(core, candidates=candidates)
     if star is None:
         return None
@@ -418,7 +432,7 @@ def verify_reduced_star_wedge(
     core = nx.Graph()
     core.add_nodes_from(certificate.reduction.remaining_vertices)
     core.add_edges_from(certificate.reduction.remaining_edges)
-    core = nx.convert_node_labels_to_integers(core, ordering="sorted")
+    core = _canonical_core(core)
     return (
         verify_vertex_star_wedge(core, certificate.star)
         and certificate.spheres == certificate.star.spheres
