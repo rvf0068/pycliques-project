@@ -1,9 +1,9 @@
 """Cross-check symbolic Dong matching against explicit simplex matching."""
 
 import base64
+import random
 from collections import Counter
 from itertools import combinations
-import random
 
 import networkx as nx
 import pytest
