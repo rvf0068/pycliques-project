@@ -1,12 +1,15 @@
 """Cross-check symbolic Dong matching against explicit simplex matching."""
 
 import base64
+import gc
 import random
+import weakref
 from collections import Counter
 from itertools import combinations
 
 import networkx as nx
 import pytest
+import pycombtop.symbolic_dong as symbolic_dong
 from pycombtop import (
     Theorem,
     clique_complex,
@@ -112,3 +115,49 @@ def test_classifier_uses_symbolic_matching_before_simplex_budget():
     assert result.is_exact and not result.is_limited
     assert result.wedge.spheres == {7: 11}
     assert result.reason == Theorem.SYMBOLIC_DONG_MATCHING
+
+def test_diagrams_released_after_success_and_node_limit(monkeypatch):
+    """Neither a successful calculation nor a refusal may retain a ZDD."""
+    references = []
+    original = symbolic_dong._ZDD
+
+    class TrackingZDD(original):
+        def __init__(self, n, node_limit):
+            super().__init__(n, node_limit)
+            references.append(weakref.ref(self))
+
+    monkeypatch.setattr(symbolic_dong, "_ZDD", TrackingZDD)
+    graph = nx.cycle_graph(6)
+    for _ in range(5):
+        assert symbolic_dong_certificate(graph) is not None
+        assert symbolic_dong_certificate(graph, max_nodes=1) is None
+        gc.collect()
+        assert all(reference() is None for reference in references)
+        assert original.face_size_counts.cache_info().currsize == 0
+        assert original.without_vertices.cache_info().currsize == 0
+        assert original.pivot.cache_info().currsize == 0
+        assert original.difference.cache_info().currsize == 0
+        assert original.contains_empty.cache_info().currsize == 0
+        assert original.remove_empty.cache_info().currsize == 0
+
+
+def test_final_face_count_cache_cleared_on_late_exception(monkeypatch):
+    """An exception after counting critical faces also releases the ZDD."""
+    references = []
+    original = symbolic_dong._ZDD
+
+    class FailingZDD(original):
+        def __init__(self, n, node_limit):
+            super().__init__(n, node_limit)
+            references.append(weakref.ref(self))
+
+        def masks(self, root, prefix=0):
+            raise symbolic_dong._DiagramLimit
+
+    monkeypatch.setattr(symbolic_dong, "_ZDD", FailingZDD)
+    assert symbolic_dong_certificate(nx.cycle_graph(5)) is None
+    gc.collect()
+    assert all(reference() is None for reference in references)
+    assert original.face_size_counts.cache_info().currsize == 0
+
+
