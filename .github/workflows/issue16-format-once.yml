@@ -1,0 +1,39 @@
+# One-time CI formatter, restricted to this same-repository PR branch.
+# The workflow deletes itself in the formatting commit.
+name: Format issue16 GUDHI code once
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/issue16-format-once.yml"
+permissions:
+  contents: write
+jobs:
+  format:
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.head_ref == 'fix/issue16-gudhi-exact-homology'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: astral-sh/setup-uv@v4
+      - run: uv sync --frozen --python 3.11
+      - name: Apply repository Ruff defaults to edited Python files
+        run: |
+          uv run ruff check --fix \
+            packages/pycombtop/src/pycombtop/homology_backend.py \
+            packages/pycombtop/src/pycombtop/homotopy_type.py \
+            packages/pycombtop/tests/test_gudhi_homology_issue16.py
+          uv run ruff format \
+            packages/pycombtop/src/pycombtop/homology_backend.py \
+            packages/pycombtop/src/pycombtop/homotopy_type.py \
+            packages/pycombtop/tests/test_gudhi_homology_issue16.py
+      - name: Commit corrected formatting and remove temporary workflow
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add packages/pycombtop/src/pycombtop/homology_backend.py packages/pycombtop/src/pycombtop/homotopy_type.py packages/pycombtop/tests/test_gudhi_homology_issue16.py
+          git rm .github/workflows/issue16-format-once.yml
+          git commit -m 'Apply Ruff import and formatting conventions to GUDHI migration'
+          git push origin HEAD:fix/issue16-gudhi-exact-homology
