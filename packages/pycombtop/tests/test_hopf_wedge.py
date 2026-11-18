@@ -178,13 +178,9 @@ def test_opt_in_reduced_hopf_proof_and_replay(monkeypatch):
     assert proof is not None
     assert proof.spheres == {2: 1, 4: 6}
     assert verify_reduced_hopf_wedge(graph, proof)
-    assert not verify_reduced_hopf_wedge(
-        graph, replace(proof, spheres={2: 1, 4: 7})
-    )
+    assert not verify_reduced_hopf_wedge(graph, replace(proof, spheres={2: 1, 4: 7}))
     altered = replace(identity, remaining_vertices=(0,))
-    assert not verify_reduced_hopf_wedge(
-        graph, replace(proof, reduction=altered)
-    )
+    assert not verify_reduced_hopf_wedge(graph, replace(proof, reduction=altered))
 
 
 def test_cup_witness_rejects_null_class_and_large_inputs():
