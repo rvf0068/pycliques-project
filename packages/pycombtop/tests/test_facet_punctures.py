@@ -93,6 +93,39 @@ def test_replay_rejects_forged_faces_and_honors_face_budgets():
     assert facet_puncture_wedge_certificate(source, max_faces=8) is not None
 
 
+def test_input_shape_limits_and_no_false_certificates():
+    empty = SimplicialComplex(set(), facet_set=[])
+    assert facet_puncture_wedge_certificate(empty) is None
+    assert not verify_facet_puncture_wedge(empty, object())
+
+    # The bit-mask engine deliberately fails closed beyond 64 vertices.
+    large_discrete = clique_complex(nx.empty_graph(65))
+    assert facet_puncture_wedge_certificate(large_discrete) is None
+
+    # The homological lower bound requires three deleted top facets.
+    prism = clique_complex(nx.complement(nx.circular_ladder_graph(8)))
+    assert (
+        facet_puncture_wedge_certificate(prism, max_removed_facets=2) is None
+    )
+
+    # Reject removed facets that are nonmaximal, absent, or wrong-sized.
+    circle = clique_complex(nx.cycle_graph(4))
+    proof = facet_puncture_wedge_certificate(circle)
+    assert proof is not None
+    assert not verify_facet_puncture_wedge(
+        circle, replace(proof, removed_facets=(Simplex({0}),))
+    )
+    assert not verify_facet_puncture_wedge(
+        circle, replace(proof, removed_facets=(Simplex({0, 2}),))
+    )
+    assert not verify_facet_puncture_wedge(
+        circle, replace(proof, initial_pairs=((Simplex({0}), Simplex({1, 2})),))
+    )
+    assert not verify_facet_puncture_wedge(
+        circle, replace(proof, final_pairs=proof.final_pairs[:-1])
+    )
+
+
 def test_contractible_simplex_is_not_false_wedge():
     complex_ = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1, 2}])
     assert facet_puncture_wedge_certificate(complex_) is None
