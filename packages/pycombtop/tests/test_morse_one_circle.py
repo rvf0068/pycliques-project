@@ -172,7 +172,7 @@ def test_one_loop_primitive_attaching_maps_have_exact_wedges():
         {"boundaries": {**BASE_BOUNDARIES, 2: ((0, 0, 0),) * 3}},
         {"boundaries": {**BASE_BOUNDARIES, 2: ((0, 0, 0), (0, 0, 0), (2, 0, 0))}},
         {"boundaries": {**BASE_BOUNDARIES, 3: ((0, 0), (2, 0), (0, 0))}},
-        {"boundaries": {**BASE_BOUNDARIES, 3: ((0, 0), (1, 0), (1, 0))}},
+        {"boundaries": {**BASE_BOUNDARIES, 3: ((1, 0), (0, 0), (0, 0))}},
         {"boundaries": {**BASE_BOUNDARIES, 2: ((1, 0, 0), (0, 0, 0), (1, 0, 0))}},
         {"betti": {2: 2}},
         {"torsion": {1: (2,)}},
