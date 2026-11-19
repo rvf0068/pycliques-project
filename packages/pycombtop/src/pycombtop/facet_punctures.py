@@ -6,9 +6,9 @@ A failed search is inconclusive, not evidence of nonexistence.
 """
 from __future__ import annotations
 
+import heapq
 from collections import Counter
 from dataclasses import dataclass
-import heapq
 from itertools import combinations
 
 from .simplex import Simplex, SimplicialComplex
