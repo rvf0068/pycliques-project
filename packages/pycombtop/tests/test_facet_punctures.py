@@ -104,9 +104,7 @@ def test_input_shape_limits_and_no_false_certificates():
 
     # The homological lower bound requires three deleted top facets.
     prism = clique_complex(nx.complement(nx.circular_ladder_graph(8)))
-    assert (
-        facet_puncture_wedge_certificate(prism, max_removed_facets=2) is None
-    )
+    assert facet_puncture_wedge_certificate(prism, max_removed_facets=2) is None
 
     # Reject removed facets that are nonmaximal, absent, or wrong-sized.
     circle = clique_complex(nx.cycle_graph(4))
