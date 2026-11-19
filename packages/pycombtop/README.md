@@ -605,14 +605,14 @@ Section 4.2 (Hurewicz theorem).
 The function `facet_puncture_wedge_certificate(complex_)` implements a
 bounded, exact topological recognition strategy for arbitrary finite
 simplicial complexes (not only flag complexes). It first performs
-genuine elementary collapses to a residual complex (R), then tries
+genuine elementary collapses to a residual complex \(R\), then tries
 removing several **maximal facets of one dimension**. If the remaining
 complex collapses to a single vertex, it returns a certificate.
 `verify_facet_puncture_wedge` independently replays every free
 face--coface pair and checks the facet deletions.
 
-**Theorem.** Suppose (X\searrow R), and (d\ge1) and distinct
-maximal (d)-simplices \(\sigma_1,\ldots,\sigma_m\) of (R)
+**Theorem.** Suppose \(X\searrow R\)
+maximal \(d\)-simplices \(\sigma_1,\ldots,\sigma_m\) of \(R\)
 have the property that
 \(A=R\setminus\{\sigma_1,\ldots,\sigma_m\}\) is a subcomplex
 collapsing to a vertex. Then
@@ -620,13 +620,13 @@ collapsing to a vertex. Then
 X\simeq R\simeq R/A\simeq \bigvee^m S^d.
 \]
 Here only the maximal simplices are removed: **all proper faces
-remain**. Since (A) is contractible and (A\hookrightarrow R) is
+remain**. Since \(A\) is contractible and \(A\hookrightarrow R\) is
 a CW-cofibration, the quotient map is a homotopy equivalence. The
-quotient is exactly (m) (d)-cells with their boundaries collapsed
+quotient is exactly \(m\) \(d\)-cells with their boundaries collapsed
 to one point, giving the stated wedge.
 
-The necessary number (m) of removed facets equals the highest
-mod-2 Betti number (\widetilde\beta_d(R;\mathbb F_2)). The
+The necessary number \(m\) of removed facets equals the highest
+mod-2 Betti number \(\widetilde\beta_d(R;\mathbb F_2)\). The
 implementation calculates this rank exactly to avoid searching all
 possible subset sizes. Failure to find a certificate within
 `max_candidates`, `max_faces` or `max_removed_facets`
