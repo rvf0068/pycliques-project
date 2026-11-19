@@ -119,6 +119,18 @@ class Theorem:
         "attaching maps are nullhomotopic by pi_d(wedge S^d)=Z^r "
         "[Dong2003, Forman1998, Hatcher]."
     )
+    SYMBOLIC_INTEGRAL_MORSE_ONE_CIRCLE = (
+        "An acyclic augmented Dong matching gives an integral Morse CW "
+        "model with c0+1 vertices, c0+1 edges, and critical cells only "
+        "through dimension 3. The full unit rank of d1 makes the "
+        "1-skeleton connected with one circle. The unit Smith rank-one "
+        "d2 kills its fundamental group (not merely H1). The simply "
+        "connected 2-skeleton is a wedge of 2-spheres by Hurewicz and "
+        "Whitehead. Unit Smith invariants of d3 then classify and "
+        "cancel the higher attaching maps in pi2=H2; remaining cells "
+        "give an exact wedge of 2- and 3-spheres "
+        "[Forman1998; Hatcher, Algebraic Topology]."
+    )
     SYMBOLIC_INTEGRAL_MORSE_01_CANCELLATION = (
         "Dong's augmented sequential matching is acyclic and its empty "
         "face is paired. The exact integral Morse differential has one "
@@ -745,11 +757,14 @@ def _try_symbolic_dong(graph: nx.Graph) -> HomotopyVerdict | None:
     if integral is None:
         return None
     if integral.wedge_spheres is not None:
-        reason = (
-            Theorem.SYMBOLIC_INTEGRAL_MORSE_01_CANCELLATION
-            if integral.critical.get(0) == integral.critical.get(1) == 1
-            else Theorem.SYMBOLIC_INTEGRAL_MORSE
-        )
+        c0 = integral.critical.get(0, 0)
+        c1 = integral.critical.get(1, 0)
+        if c0 == c1 == 1:
+            reason = Theorem.SYMBOLIC_INTEGRAL_MORSE_01_CANCELLATION
+        elif c1 == c0 + 1 and integral.critical.get(2, 0) > 0:
+            reason = Theorem.SYMBOLIC_INTEGRAL_MORSE_ONE_CIRCLE
+        else:
+            reason = Theorem.SYMBOLIC_INTEGRAL_MORSE
         return HomotopyVerdict(
             wedge=WedgeOfSpheres(integral.wedge_spheres),
             reason=reason,
