@@ -70,6 +70,29 @@ def test_octagonal_prism_complement_is_three_sphere_wedge():
     )
 
 
+def test_replay_rejects_forged_faces_and_honors_face_budgets():
+    """A list with duplicated vertices can alias a different bitmask."""
+    source = clique_complex(nx.cycle_graph(4))
+    proof = facet_puncture_wedge_certificate(source)
+    assert proof is not None
+    # This would encode as 1+1=2 without requiring a genuine Simplex.
+    altered = list(proof.final_pairs)
+    altered[0] = ([0, 0], altered[0][1])
+    assert not verify_facet_puncture_wedge(
+        source, replace(proof, final_pairs=tuple(altered))
+    )
+
+    assert not verify_facet_puncture_wedge(
+        source, replace(proof, removed_facets=([0, 1],))
+    )
+
+    # Four vertices and four edges: no hidden 500,000-face verifier limit.
+    assert verify_facet_puncture_wedge(source, proof, max_faces=8)
+    assert not verify_facet_puncture_wedge(source, proof, max_faces=7)
+    assert verify_facet_puncture_wedge(source, proof)
+    assert facet_puncture_wedge_certificate(source, max_faces=8) is not None
+
+
 def test_contractible_simplex_is_not_false_wedge():
     complex_ = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1, 2}])
     assert facet_puncture_wedge_certificate(complex_) is None
