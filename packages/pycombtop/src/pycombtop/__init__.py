@@ -52,6 +52,14 @@ from .homotopy_type import (
     star,
     star_cluster,
 )
+from .hopf_wedge import (
+    HopfWedgeCertificate,
+    ReducedHopfWedgeCertificate,
+    hopf_wedge_certificate,
+    reduced_hopf_wedge_certificate,
+    verify_hopf_wedge,
+    verify_reduced_hopf_wedge,
+)
 from .integral_morse import (
     IntegralMorseCertificate,
     bipartite_shore_facets,
@@ -133,6 +141,13 @@ __all__ = [
     "verify_vertex_star_wedge",
     "reduced_star_wedge_certificate",
     "verify_reduced_star_wedge",
+    # Hopf attaching-map and cup-square certificates
+    "HopfWedgeCertificate",
+    "ReducedHopfWedgeCertificate",
+    "hopf_wedge_certificate",
+    "verify_hopf_wedge",
+    "reduced_hopf_wedge_certificate",
+    "verify_reduced_hopf_wedge",
     # simplex
     "Simplex",
     "SimplicialComplex",

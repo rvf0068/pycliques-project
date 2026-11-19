@@ -62,6 +62,7 @@ from .attachment_certificates import (
     bounded_null_image_certificate,
 )
 from .homology_backend import HomologyResourceLimit, reduced_betti_facets_mod2
+from .hopf_wedge import _from_morse, verify_hopf_wedge
 from .integral_morse import bipartite_shore_facets, integral_morse_certificate
 from .morse_certificates import facet_morse_certificate
 from .recursive_wedges import recursive_wedge_certificate
@@ -117,6 +118,16 @@ class Theorem:
         "invariants permit integral cancellation, and all remaining "
         "attaching maps are nullhomotopic by pi_d(wedge S^d)=Z^r "
         "[Dong2003, Forman1998, Hatcher]."
+    )
+    SYMBOLIC_HOPF_CUP_SQUARE = (
+        "Acyclic symbolic Dong matching and exact integral Morse matrices "
+        "reduce the cellular model to S^2 with 4-cells. Full unit Smith "
+        "rank cancels its 3-cells; a maximal triangle defines an integral "
+        "2-cocycle representing an odd H^2 generator, with identically "
+        "zero Alexander-Whitney cup square. Torsion-free H^4 forces the "
+        "generator's square to vanish. Its coefficients are Hopf invariants "
+        "of all attaching maps in pi_3(S^2)=Z, so the complex is a wedge "
+        "[Forman1998; Hatcher, Algebraic Topology, Section 4.B]."
     )
     FACET_MORSE = (
         "Verified facet-greedy discrete Morse matching: free pairs are "
@@ -719,12 +730,22 @@ def _try_symbolic_dong(graph: nx.Graph) -> HomotopyVerdict | None:
     # Mixed critical dimensions can still admit an exact integral Morse
     # boundary proof. Never infer a wedge from Betti numbers alone.
     integral = symbolic_integral_morse_certificate(graph)
-    if integral is None or integral.wedge_spheres is None:
+    if integral is None:
         return None
-    return HomotopyVerdict(
-        wedge=WedgeOfSpheres(integral.wedge_spheres),
-        reason=Theorem.SYMBOLIC_INTEGRAL_MORSE,
-    )
+    if integral.wedge_spheres is not None:
+        return HomotopyVerdict(
+            wedge=WedgeOfSpheres(integral.wedge_spheres),
+            reason=Theorem.SYMBOLIC_INTEGRAL_MORSE,
+        )
+    # Only the narrow, independently checkable 2/4-cell Hopf case.
+    # Neither Betti ranks nor an arbitrary vanishing boundary suffice.
+    hopf = _from_morse(graph, integral, max_triangles=20_000)
+    if hopf is not None and verify_hopf_wedge(graph, hopf):
+        return HomotopyVerdict(
+            wedge=WedgeOfSpheres(hopf.spheres),
+            reason=Theorem.SYMBOLIC_HOPF_CUP_SQUARE,
+        )
+    return None
 
 
 def _try_dong(
