@@ -168,9 +168,7 @@ def _wedge_after_one_circle_cancellation(
             return None
         normal = smith_normal_form(Matrix(matrix), domain=ZZ)
         factors = [
-            abs(int(normal[i, i]))
-            for i in range(min(rows, cols))
-            if normal[i, i] != 0
+            abs(int(normal[i, i])) for i in range(min(rows, cols)) if normal[i, i] != 0
         ]
         return len(factors) if all(value == 1 for value in factors) else None
 
