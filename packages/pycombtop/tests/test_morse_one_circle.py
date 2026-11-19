@@ -31,9 +31,7 @@ def c12_core():
 def _explicit_augmented_matching(graph):
     """Check a fully enumerated sequential matching, not the ZDD search."""
     faces = {0}
-    faces.update(
-        sum(1 << i for i in face) for face in nx.enumerate_all_cliques(graph)
-    )
+    faces.update(sum(1 << i for i in face) for face in nx.enumerate_all_cliques(graph))
     remaining = faces.copy()
     match_low = {}
     for pivot in sorted(graph):
@@ -81,11 +79,7 @@ def _triangle_closure_proves_simply_connected(graph):
 
 def _smith_factors(boundary):
     smith = smith_normal_form(Matrix(boundary), domain=ZZ)
-    return tuple(
-        abs(int(smith[i, i]))
-        for i in range(min(smith.shape))
-        if smith[i, i]
-    )
+    return tuple(abs(int(smith[i, i])) for i in range(min(smith.shape)) if smith[i, i])
 
 
 def test_c12_core_one_circle_morse_classification():
@@ -108,9 +102,7 @@ def test_c12_core_one_circle_morse_classification():
     assert result.torsion == {}
     assert result.betti == {2: 15}
     assert result.wedge_spheres == {2: 15}
-    verdict = homotopy_type_with_verdict(
-        graph, max_vertices=80, max_simplices=100
-    )
+    verdict = homotopy_type_with_verdict(graph, max_vertices=80, max_simplices=100)
     assert verdict.is_exact
     assert verdict.wedge.spheres == {2: 15}
     assert verdict.reason == Theorem.SYMBOLIC_INTEGRAL_MORSE_ONE_CIRCLE
@@ -125,9 +117,7 @@ BASE_BOUNDARIES = {
 BASE_BETTI = {2: 1, 3: 1}
 
 
-def _recognize(
-    *, critical=None, boundaries=None, betti=None, torsion=None
-):
+def _recognize(*, critical=None, boundaries=None, betti=None, torsion=None):
     return _wedge_after_one_circle_cancellation(
         BASE_CRITICAL if critical is None else critical,
         BASE_BOUNDARIES if boundaries is None else boundaries,
