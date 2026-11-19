@@ -611,9 +611,9 @@ complex collapses to a single vertex, it returns a certificate.
 `verify_facet_puncture_wedge` independently replays every free
 face--coface pair and checks the facet deletions.
 
-**Theorem.** Suppose \(X\searrow R\)
-maximal \(d\)-simplices \(\sigma_1,\ldots,\sigma_m\) of \(R\)
-have the property that
+**Theorem.** Suppose \(X\searrow R\), and let \(d\geq 1\).
+Suppose further that distinct maximal \(d\)-simplices
+\(\sigma_1,\ldots,\sigma_m\) of \(R\) have the property that
 \(A=R\setminus\{\sigma_1,\ldots,\sigma_m\}\) is a subcomplex
 collapsing to a vertex. Then
 \[
