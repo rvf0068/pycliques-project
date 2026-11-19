@@ -14,7 +14,8 @@ from collections.abc import Hashable, Iterable
 from dataclasses import dataclass
 
 import networkx as nx
-from sympy import Matrix
+from sympy import ZZ, Matrix
+from sympy.matrices.normalforms import smith_normal_form
 
 from ._symbolic_morse_gradient import _MorseLimit, morse_boundaries
 from .simplex import _stable_vertex_key
@@ -41,6 +42,83 @@ class SymbolicIntegralMorseCertificate:
     critical_masks: tuple[int, ...]
 
 
+def _wedge_after_01_cancellation(
+    critical: dict[int, int],
+    boundaries: dict[int, tuple[tuple[int, ...], ...]],
+    betti: dict[int, int],
+    torsion: dict[int, tuple[int, ...]],
+) -> dict[int, int] | None:
+    """Certify a wedge after cancelling a critical 0--1 Morse cell pair.
+
+    Assumes the caller has already certified an *acyclic augmented*
+    matching, paired the empty simplex, and computed exact integral
+    cellular Morse boundaries. Restoring the empty-face partner yields
+    two 0-cells joined by one 1-cell. A unit d_1 makes this a tree,
+    which is collapsed before considering the positive-dimensional
+    cells.
+
+    The remaining critical cells must occur in one dimension d >= 2,
+    or exactly two consecutive dimensions d,d+1. For d,d+1, all
+    nonzero Smith invariants of d_(d+1) must be units. Homotopy
+    classification then follows from pi_d(vee S^d) = H_d(vee S^d)
+    for d >= 2. This is not a conclusion from homology alone.
+    """
+    if (
+        torsion
+        or critical.get(0) != 1
+        or critical.get(1) != 1
+        or any(d < 0 or count <= 0 for d, count in critical.items())
+        or boundaries.get(1) not in (((1,),), ((-1,),))
+    ):
+        return None
+    positive = sorted(d for d in critical if d >= 2)
+    if (
+        not positive
+        or len(positive) > 2
+        or (len(positive) == 2 and positive[1] != positive[0] + 1)
+    ):
+        return None
+
+    base = positive[0]
+    allowed = {1}
+    if base == 2:
+        allowed.add(2)
+        if boundaries.get(2) != ((0,) * critical[2],):
+            return None
+
+    rank = 0
+    if len(positive) == 2:
+        top = positive[1]
+        allowed.add(top)
+        lower_count, upper_count = critical[base], critical[top]
+        matrix = boundaries.get(top)
+        if (
+            matrix is None
+            or len(matrix) != lower_count
+            or any(len(row) != upper_count for row in matrix)
+        ):
+            return None
+        smith = smith_normal_form(Matrix(matrix), domain=ZZ)
+        diagonal = [
+            abs(int(smith[i, i]))
+            for i in range(min(lower_count, upper_count))
+            if smith[i, i] != 0
+        ]
+        if any(value != 1 for value in diagonal):
+            return None
+        rank = len(diagonal)
+    if set(boundaries) != allowed:
+        return None
+
+    expected = {base: critical[base] - rank}
+    if len(positive) == 2:
+        expected[positive[1]] = critical[positive[1]] - rank
+    if any(count < 0 for count in expected.values()):
+        return None
+    spheres = {d: count for d, count in expected.items() if count}
+    return spheres if spheres == betti else None
+
+
 def symbolic_integral_morse_certificate(
     graph: nx.Graph,
     *,
@@ -52,10 +130,12 @@ def symbolic_integral_morse_certificate(
 ) -> SymbolicIntegralMorseCertificate | None:
     """Compute an exact integral Morse complex without listing its faces.
 
-    A resource limit returns None. For more than two critical dimensions,
-    homology is still exact but no wedge homotopy type is claimed. For two
-    consecutive dimensions d,d+1, d>=2, Smith factors all equal to one
-    certify cancellation of all nonzero-degree attaching maps.
+    A resource limit returns None. Two consecutive critical dimensions
+    d,d+1, with d>=2 and unit Smith factors, determine a wedge. Four
+    critical dimensions 0,1,d,d+1 may also give a certified wedge when
+    the 0--1 boundary is a unit, all intermediate boundaries vanish,
+    and the upper Smith factors are units. Unsupported patterns give
+    exact homology but no asserted wedge.
     """
     if min(max_nodes, max_critical, max_gradient_states) < 1 or max_vertices < 0:
         raise ValueError("resource limits must be positive; max_vertices >= 0")
@@ -120,6 +200,13 @@ def symbolic_integral_morse_certificate(
         elif len(degrees) == 2 and degrees[0] >= 2 and degrees[1] == degrees[0] + 1:
             if not torsion:  # integer Smith invariants are all 1 or 0
                 wedge = {d: b for d, b in betti.items() if b}
+        else:
+            wedge = _wedge_after_01_cancellation(
+                critical,
+                boundaries,
+                {d: b for d, b in betti.items() if b},
+                torsion,
+            )
         return SymbolicIntegralMorseCertificate(
             critical=critical,
             boundaries=boundaries,

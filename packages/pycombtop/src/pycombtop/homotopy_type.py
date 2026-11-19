@@ -119,6 +119,18 @@ class Theorem:
         "attaching maps are nullhomotopic by pi_d(wedge S^d)=Z^r "
         "[Dong2003, Forman1998, Hatcher]."
     )
+    SYMBOLIC_INTEGRAL_MORSE_01_CANCELLATION = (
+        "Dong's augmented sequential matching is acyclic and its empty "
+        "face is paired. The exact integral Morse differential has one "
+        "critical 0-cell and one critical 1-cell with boundary ±1. "
+        "After restoring the base vertex, these form a contractible "
+        "tree and cancel, leaving positive critical cells only in "
+        "dimensions d and optionally d+1, with d>=2. All nonzero "
+        "integer Smith invariants of the upper differential are units. "
+        "Cellular cancellation and pi_d(vee S^d)=H_d(vee S^d;Z) "
+        "therefore certify the wedge of spheres "
+        "[Dong2003, Forman1998, Hatcher]."
+    )
     SYMBOLIC_HOPF_CUP_SQUARE = (
         "Acyclic symbolic Dong matching and exact integral Morse matrices "
         "reduce the cellular model to S^2 with 4-cells. Full unit Smith "
@@ -733,9 +745,14 @@ def _try_symbolic_dong(graph: nx.Graph) -> HomotopyVerdict | None:
     if integral is None:
         return None
     if integral.wedge_spheres is not None:
+        reason = (
+            Theorem.SYMBOLIC_INTEGRAL_MORSE_01_CANCELLATION
+            if integral.critical.get(0) == integral.critical.get(1) == 1
+            else Theorem.SYMBOLIC_INTEGRAL_MORSE
+        )
         return HomotopyVerdict(
             wedge=WedgeOfSpheres(integral.wedge_spheres),
-            reason=Theorem.SYMBOLIC_INTEGRAL_MORSE,
+            reason=reason,
         )
     # Only the narrow, independently checkable 2/4-cell Hopf case.
     # Neither Betti ranks nor an arbitrary vanishing boundary suffice.

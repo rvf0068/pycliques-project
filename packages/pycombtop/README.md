@@ -100,6 +100,50 @@ The function avoids constructing `K(G)` itself, but does compute
   *Proceedings of the London Mathematical Society* (2) **45**
   (1939), 243--327.
 
+## A unit 0--1 Morse pair followed by consecutive-dimensional cells
+
+An exact augmented Dong matching may leave one critical vertex, one
+critical edge, and critical simplices in dimensions `d,d+1` with
+`d >= 2`. The new symbolic integral Morse recognition rule also
+handles this case.
+
+The checker requires a **unit** integral differential
+`d_1 = (+1)` or `d_1 = (-1)`, zero intermediate differentials,
+and a `d_(d+1)` whose every nonzero Smith invariant is `1`.
+There must be no other critical dimensions and all integral homology
+torsion must vanish. These conditions are verified on the already
+certified **acyclic** augmented matching; the check never infers a
+homotopy type just from Betti numbers.
+
+After restoring the vertex paired with the augmented empty face,
+the two 0-cells and the critical 1-cell form a **contractible tree**.
+Collapsing it leaves a pointed CW complex with cells only in dimensions
+`d` and optionally `d+1`. Because `d >= 2`,
+`pi_d(vee S^d) = H_d(vee S^d; Z)`; unit Smith invariants make
+the nonzero attaching degrees cancellable. Hence the remaining
+critical cells determine a wedge of spheres.
+
+```python
+from pycombtop import symbolic_integral_morse_certificate
+
+proof = symbolic_integral_morse_certificate(core)
+if proof is not None and proof.wedge_spheres is not None:
+    print(proof.wedge_spheres)  # proven wedge multiplicities
+```
+
+For the fixed **70-vertex, 342-edge** core of the suspension factor
+of `K^4(Susp(C_11))`, the augmented matching has
+`{0:1,1:1,2:3,3:4}` critical cells and integral boundaries
+`d_1=(1)`, `d_2=0`, `d_3=0`. After cancelling the 0--1 pair, the **certified**
+core homotopy type is `(vee_3 S^2) vee (vee_4 S^3)`.
+Suspending recovers
+`(vee_3 S^3) vee (vee_4 S^4)` for the fourth clique iterate.
+
+The verification tests independently enumerate all **1,215** augmented
+faces of that core, check acyclicity of the explicit matching's
+reoriented Hasse graph, and compare exact symbolic integral Morse
+boundaries and the classifier verdict.
+
 ## Certified Hopf cup-square obstructions for nonconsecutive Morse cells
 
 `hopf_wedge_certificate(G)` closes a specific gap left by ordinary integral
