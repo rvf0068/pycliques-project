@@ -134,11 +134,9 @@ if proof is not None and proof.wedge_spheres is not None:
 For the fixed **70-vertex, 342-edge** core of the suspension factor
 of `K^4(Susp(C_11))`, the augmented matching has
 `{0:1,1:1,2:3,3:4}` critical cells and integral boundaries
-`d_1=(1)`, `d_2=0`, `d_3=0`. The result is
-`S^2 vee 3*S^2` only if the two low-dimensional cells are
-incorrectly treated as sphere cells: the **correct** core homotopy
-type, after cancelling the 0--1 pair, is
-`(vee_3 S^2) vee (vee_4 S^3)`. Suspending recovers
+`d_1=(1)`, `d_2=0`, `d_3=0`. After cancelling the 0--1 pair, the **certified**
+core homotopy type is `(vee_3 S^2) vee (vee_4 S^3)`.
+Suspending recovers
 `(vee_3 S^3) vee (vee_4 S^4)` for the fourth clique iterate.
 
 The verification tests independently enumerate all **1,215** augmented
