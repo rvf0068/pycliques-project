@@ -4,6 +4,7 @@ If X collapses to R, and R with m maximal d-facets removed collapses
 to a vertex, X is homotopy equivalent to the wedge of m d-spheres.
 A failed search is inconclusive, not evidence of nonexistence.
 """
+
 from __future__ import annotations
 
 import heapq
@@ -156,11 +157,14 @@ def _replay(
             if not high & (1 << i)
         ):
             return None
-        if sum(
-            (low | (1 << i)) in faces
-            for i in range(len(vertices))
-            if not low & (1 << i)
-        ) != 1:
+        if (
+            sum(
+                (low | (1 << i)) in faces
+                for i in range(len(vertices))
+                if not low & (1 << i)
+            )
+            != 1
+        ):
             return None
         faces.difference_update((low, high))
     return faces
@@ -220,9 +224,7 @@ def verify_facet_puncture_wedge(
         if len(removed) != len(set(removed)):
             return False
         # Only maximal facets are deleted, so boundaries remain.
-        terminal = _replay(
-            core - set(removed), certificate.final_pairs, vertices
-        )
+        terminal = _replay(core - set(removed), certificate.final_pairs, vertices)
         return (
             terminal is not None
             and len(terminal) == 1
@@ -263,9 +265,7 @@ def facet_puncture_wedge_certificate(
     for i, chosen in enumerate(combinations(top, required)):
         if i >= max_candidates:
             break
-        terminal, final_pairs = _greedy_collapse(
-            core - set(chosen), len(vertices)
-        )
+        terminal, final_pairs = _greedy_collapse(core - set(chosen), len(vertices))
         if len(terminal) != 1 or next(iter(terminal)).bit_count() != 1:
             continue
         witness = FacetPunctureWedgeCertificate(
