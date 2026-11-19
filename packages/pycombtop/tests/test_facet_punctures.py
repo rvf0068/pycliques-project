@@ -1,4 +1,5 @@
 """Exact multi-facet wedge certification and adversarial replay tests."""
+
 from dataclasses import replace
 
 import networkx as nx
