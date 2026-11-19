@@ -119,6 +119,90 @@ def _wedge_after_01_cancellation(
     return spheres if spheres == betti else None
 
 
+def _wedge_after_one_circle_cancellation(
+    critical: dict[int, int],
+    boundaries: dict[int, tuple[tuple[int, ...], ...]],
+    betti: dict[int, int],
+    torsion: dict[int, tuple[int, ...]],
+) -> dict[int, int] | None:
+    """Certify a 2/3-dimensional wedge when the Morse 1-skeleton has one loop.
+
+    The caller has an acyclic *augmented* Morse matching with the empty
+    simplex paired. Restoring its partner adds the base 0-cell: the
+    unaugmented Morse 1-skeleton has c0+1 vertices and c1 edges.
+    Requiring c1=c0+1 and a full-unit-rank d1 proves this graph is
+    connected with precisely one independent loop. Requiring d2 to
+    have one unit Smith factor makes the 2-cell attaching degrees on
+    that loop relatively prime, so the resulting fundamental group
+    Z / gcd(degrees) is trivial.
+
+    Its simply connected 2-skeleton is a wedge of 2-spheres by
+    Hurewicz and Whitehead. The exact d3 then represents the 3-cell
+    attaching maps in pi2=H2. Unit Smith factors permit cellular
+    cancellation, leaving wedge summands in dimensions 2 and 3.
+    No conclusion is drawn for multiple independent loops.
+    """
+    if torsion or any(d not in {0, 1, 2, 3} or c <= 0 for d, c in critical.items()):
+        return None
+    c0 = critical.get(0, 0)
+    c1 = critical.get(1, 0)
+    c2 = critical.get(2, 0)
+    c3 = critical.get(3, 0)
+    if c1 != c0 + 1 or c2 == 0:
+        return None
+    needed = {2}
+    if c0:
+        needed.add(1)
+    if c3:
+        needed.add(3)
+    if set(boundaries) != needed:
+        return None
+
+    def unit_rank(degree: int, rows: int, cols: int) -> int | None:
+        matrix = boundaries.get(degree)
+        if (
+            matrix is None
+            or len(matrix) != rows
+            or any(len(row) != cols for row in matrix)
+        ):
+            return None
+        normal = smith_normal_form(Matrix(matrix), domain=ZZ)
+        factors = [
+            abs(int(normal[i, i]))
+            for i in range(min(rows, cols))
+            if normal[i, i] != 0
+        ]
+        return len(factors) if all(value == 1 for value in factors) else None
+
+    if c0 and unit_rank(1, c0, c1) != c0:
+        return None
+    if unit_rank(2, c1, c2) != 1:
+        return None
+    r3 = 0
+    if c3:
+        rank = unit_rank(3, c2, c3)
+        if rank is None:
+            return None
+        r3 = rank
+
+    # Reject fabricated boundary data even when its individual Smith
+    # factors are all units. The production Morse pipeline also checks d²=0.
+    for low, high in ((1, 2), (2, 3)):
+        if low in boundaries and high in boundaries:
+            if any(
+                entry != 0
+                for entry in Matrix(boundaries[low]) * Matrix(boundaries[high])
+            ):
+                return None
+
+    h2 = c2 - 1 - r3
+    h3 = c3 - r3
+    if min(h2, h3) < 0:
+        return None
+    spheres = {d: n for d, n in ((2, h2), (3, h3)) if n}
+    return spheres if spheres == betti else None
+
+
 def symbolic_integral_morse_certificate(
     graph: nx.Graph,
     *,
@@ -134,8 +218,10 @@ def symbolic_integral_morse_certificate(
     d,d+1, with d>=2 and unit Smith factors, determine a wedge. Four
     critical dimensions 0,1,d,d+1 may also give a certified wedge when
     the 0--1 boundary is a unit, all intermediate boundaries vanish,
-    and the upper Smith factors are units. Unsupported patterns give
-    exact homology but no asserted wedge.
+    and the upper Smith factors are units. A separate one-circle
+    criterion handles critical cells in dimensions 0 through 3 when
+    the 1-skeleton has one loop and primitive 2- and 3-cell attaching
+    degrees. Unsupported patterns give exact homology but no wedge.
     """
     if min(max_nodes, max_critical, max_gradient_states) < 1 or max_vertices < 0:
         raise ValueError("resource limits must be positive; max_vertices >= 0")
@@ -201,12 +287,14 @@ def symbolic_integral_morse_certificate(
             if not torsion:  # integer Smith invariants are all 1 or 0
                 wedge = {d: b for d, b in betti.items() if b}
         else:
+            positive_betti = {d: b for d, b in betti.items() if b}
             wedge = _wedge_after_01_cancellation(
-                critical,
-                boundaries,
-                {d: b for d, b in betti.items() if b},
-                torsion,
+                critical, boundaries, positive_betti, torsion
             )
+            if wedge is None:
+                wedge = _wedge_after_one_circle_cancellation(
+                    critical, boundaries, positive_betti, torsion
+                )
         return SymbolicIntegralMorseCertificate(
             critical=critical,
             boundaries=boundaries,
