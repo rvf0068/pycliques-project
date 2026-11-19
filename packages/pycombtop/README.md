@@ -100,6 +100,59 @@ The function avoids constructing `K(G)` itself, but does compute
   *Proceedings of the London Mathematical Society* (2) **45**
   (1939), 243--327.
 
+## One Morse 1-circle killed by a primitive 2-dimensional attachment
+
+This extends the preceding critical-0/1-pair rule to an augmented
+Morse matching with **multiple** critical 0- and 1-cells, provided the
+restored 1-skeleton has *exactly one independent circle*. In the exact
+Morse CW model, write `c_j` for critical `j`-cells and `D_j` for
+the integral cellular boundary, remembering that unaugmenting the
+matched empty face adds one base 0-cell.
+
+The new recognition check requires:
+- No critical cells above dimension 3, `c_1 = c_0 + 1`, and
+  `c_2 > 0`.
+- `D_1` has full row rank `c_0` with all nonzero Smith invariants
+  equal to one. Thus the 1-skeleton is a *connected graph with
+  exactly one circle*.
+- `D_2` has rank **one** with its only nonzero Smith factor equal
+  to one. The 2-cells attach by powers of the circle generator with
+  greatest common divisor one, so **pi_1 of the 2-skeleton is
+  trivial**. This is a fundamental-group argument, *not* an inference
+  from vanishing `H_1` for an arbitrary graph presentation.
+- `D_3` has only unit nonzero Smith factors. All matrices have the
+  expected shape, their consecutive products vanish, and the exact
+  torsion/Betti data are consistent.
+
+A simply connected 2-dimensional CW complex with free `H_2` is
+homotopy equivalent to a wedge of 2-spheres, by Hurewicz and
+Whitehead. Since `pi_2 = H_2`, the primitive higher degree vectors
+can be reduced by unimodular cellular changes of basis. If `r_3`
+is the rank of `D_3`, the certified type is
+
+```
+(c_2 - 1 - r_3) copies of S^2
+(c_3 - r_3) copies of S^3
+```
+
+Negative multiplicities, nonunit invariants, more than one circle,
+or any unsupported attachment pattern return an *inconclusive* result.
+
+The 48-vertex, 163-edge reduced core of
+`K^4(Susp(C_12))` is the regression example. Its critical counts
+are `{0:5, 1:6, 2:17, 3:1}`; the Smith diagonals of
+`D_1,D_2,D_3` are respectively
+`(1,1,1,1,1)`, `(1)`, and `(1)`. Thus its clique complex is
+`vee_15 S^2`, and suspending the independently certified large
+factor reduction yields `vee_15 S^3` for the fourth iterate.
+
+Tests independently enumerate its 387 augmented simplices, verify
+the full reoriented matching Hasse DAG, and check simple connectivity
+by spanning-tree triangle relations, in addition to checking the
+exact integral Morse matrices. This rule is applied only when the
+bounded symbolic integral Morse search already runs; it does not
+introduce expensive graph reductions into the default classifier.
+
 ## A unit 0--1 Morse pair followed by consecutive-dimensional cells
 
 An exact augmented Dong matching may leave one critical vertex, one
