@@ -4,7 +4,6 @@ from dataclasses import replace
 
 import networkx as nx
 import pytest
-
 from pycombtop import (
     Simplex,
     SimplicialComplex,
