@@ -600,6 +600,64 @@ References: R. Forman, *Morse theory for cell complexes*, Adv. Math.
 **134** (1998), 90--145; A. Hatcher, *Algebraic Topology* (2002),
 Section 4.2 (Hurewicz theorem).
 
+## Multi-facet puncture certificates for wedges of spheres
+
+The function `facet_puncture_wedge_certificate(complex_)` implements a
+bounded, exact topological recognition strategy for arbitrary finite
+simplicial complexes (not only flag complexes). It first performs
+genuine elementary collapses to a residual complex (R), then tries
+removing several **maximal facets of one dimension**. If the remaining
+complex collapses to a single vertex, it returns a certificate.
+`verify_facet_puncture_wedge` independently replays every free
+face--coface pair and checks the facet deletions.
+
+**Theorem.** Suppose (X\searrow R), and (d\ge1) and distinct
+maximal (d)-simplices \(\sigma_1,\ldots,\sigma_m\) of (R)
+have the property that
+\(A=R\setminus\{\sigma_1,\ldots,\sigma_m\}\) is a subcomplex
+collapsing to a vertex. Then
+\[
+X\simeq R\simeq R/A\simeq \bigvee^m S^d.
+\]
+Here only the maximal simplices are removed: **all proper faces
+remain**. Since (A) is contractible and (A\hookrightarrow R) is
+a CW-cofibration, the quotient map is a homotopy equivalence. The
+quotient is exactly (m) (d)-cells with their boundaries collapsed
+to one point, giving the stated wedge.
+
+The necessary number (m) of removed facets equals the highest
+mod-2 Betti number (\widetilde\beta_d(R;\mathbb F_2)). The
+implementation calculates this rank exactly to avoid searching all
+possible subset sizes. Failure to find a certificate within
+`max_candidates`, `max_faces` or `max_removed_facets`
+is **inconclusive**, not a non-wedge proof.
+
+The following reproduces the common 16-vertex graph encountered in
+the two unresolved nine-vertex sphere calculations of
+`pycliques-census`:
+
+```python
+import networkx as nx
+from pycombtop import (
+    clique_complex, facet_puncture_wedge_certificate,
+    verify_facet_puncture_wedge,
+)
+
+prism_complement = nx.complement(nx.circular_ladder_graph(8))
+complex_ = clique_complex(prism_complement)
+certificate = facet_puncture_wedge_certificate(complex_)
+assert certificate is not None
+assert certificate.spheres == {3: 3}
+assert verify_facet_puncture_wedge(complex_, certificate)
+```
+
+The algorithm detects a wedge of three 3-spheres from 1,154
+nonempty simplices by retaining complete, replayable certificates.
+A separate s-collapse preprocessing stage, already available as
+`complete_s_collapse_with_certificate`, can reduce a larger flag
+complex to a tractable core before this general simplicial method
+is applied.
+
 ## Recursive vertex stars and integral Morse boundaries
 
 `recursive_wedge_certificate(G)` takes a finite simple graph with arbitrary
