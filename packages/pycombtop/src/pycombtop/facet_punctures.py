@@ -34,8 +34,8 @@ def _stable_key(vertex):
     return (type(vertex).__module__, type(vertex).__qualname__, repr(vertex))
 
 
-def _encode_complex(complex_: SimplicialComplex, max_faces: int):
-    if max_faces < 1:
+def _encode_complex(complex_: SimplicialComplex, max_faces: int | None):
+    if max_faces is not None and max_faces < 1:
         raise ValueError("max_faces must be positive")
     facets = tuple(complex_.facet_set)
     if not facets or any(not f for f in facets):
@@ -46,13 +46,13 @@ def _encode_complex(complex_: SimplicialComplex, max_faces: int):
     positions = {v: 1 << i for i, v in enumerate(vertices)}
     faces: set[int] = set()
     for facet in facets:
-        if (1 << len(facet)) - 1 > max_faces:
+        if max_faces is not None and (1 << len(facet)) - 1 > max_faces:
             return None
         mask = sum(positions[v] for v in facet)
         sub = mask
         while sub:
             faces.add(sub)
-            if len(faces) > max_faces:
+            if max_faces is not None and len(faces) > max_faces:
                 return None
             sub = (sub - 1) & mask
     return vertices, faces
@@ -139,6 +139,8 @@ def _replay(
     for pair in pairs:
         if not isinstance(pair, (tuple, list)) or len(pair) != 2:
             return None
+        if not all(isinstance(face, Simplex) for face in pair):
+            return None
         try:
             low, high = (sum(positions[v] for v in f) for f in pair)
         except (TypeError, ValueError, KeyError):
@@ -194,12 +196,14 @@ def _decode(mask: int, vertices: list) -> Simplex:
 def verify_facet_puncture_wedge(
     complex_: SimplicialComplex,
     certificate: FacetPunctureWedgeCertificate,
+    *,
+    max_faces: int | None = None,
 ) -> bool:
     """Independently certify a wedge of spheres; reject invalid witnesses."""
     if not isinstance(certificate, FacetPunctureWedgeCertificate):
         return False
     try:
-        encoded = _encode_complex(complex_, max_faces=500_000)
+        encoded = _encode_complex(complex_, max_faces=max_faces)
         if encoded is None or certificate.dimension < 1:
             return False
         vertices, original = encoded
@@ -209,6 +213,8 @@ def verify_facet_puncture_wedge(
         positions = {v: 1 << i for i, v in enumerate(vertices)}
         removed = []
         for facet in certificate.removed_facets:
+            if not isinstance(facet, Simplex):
+                return False
             mask = sum(positions[v] for v in facet)
             if (
                 mask not in core
@@ -280,6 +286,6 @@ def facet_puncture_wedge_certificate(
                 for low, high in final_pairs
             ),
         )
-        if verify_facet_puncture_wedge(complex_, witness):
+        if verify_facet_puncture_wedge(complex_, witness, max_faces=max_faces):
             return witness
     return None
