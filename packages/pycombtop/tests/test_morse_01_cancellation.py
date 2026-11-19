@@ -125,11 +125,14 @@ def test_unit_smith_cancellation_for_nonzero_upper_boundary():
         betti={5: 2},
     ) == {5: 2}
     # The 0/1 pair alone must not be confused with two positive sphere cells.
-    assert _proof(
-        critical={0: 1, 1: 1},
-        boundaries={1: ((1,),)},
-        betti={},
-    ) is None
+    assert (
+        _proof(
+            critical={0: 1, 1: 1},
+            boundaries={1: ((1,),)},
+            betti={},
+        )
+        is None
+    )
 
 
 @pytest.mark.parametrize(
