@@ -13,6 +13,11 @@ from .covering_divergence_search import (
     CoveringSearchStatus,
     search_covering_divergence,
 )
+from .facet_punctures import (
+    FacetPunctureWedgeCertificate,
+    facet_puncture_wedge_certificate,
+    verify_facet_puncture_wedge,
+)
 from .flag_edge_star import (
     FlagMove,
     FlagReductionCertificate,
@@ -65,11 +70,6 @@ from .integral_morse import (
     bipartite_shore_facets,
     integral_morse_certificate,
     verify_integral_morse,
-)
-from .facet_punctures import (
-    FacetPunctureWedgeCertificate,
-    facet_puncture_wedge_certificate,
-    verify_facet_puncture_wedge,
 )
 from .morse_certificates import (
     MorseCertificate,
