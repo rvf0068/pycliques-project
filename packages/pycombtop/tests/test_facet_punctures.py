@@ -29,9 +29,7 @@ def test_o3_is_two_sphere():
     assert witness is not None
     assert witness.spheres == {2: 1}
     assert verify_facet_puncture_wedge(source, witness)
-    assert not verify_facet_puncture_wedge(
-        source, replace(witness, dimension=3)
-    )
+    assert not verify_facet_puncture_wedge(source, replace(witness, dimension=3))
 
 
 def test_octagonal_prism_complement_is_three_sphere_wedge():
@@ -82,11 +80,14 @@ def test_disconnected_graph_is_not_false_wedge():
     assert facet_puncture_wedge_certificate(complex_) is None
 
 
-@pytest.mark.parametrize("kw", [
-    {"max_faces": 0},
-    {"max_candidates": 0},
-    {"max_removed_facets": 0},
-])
+@pytest.mark.parametrize(
+    "kw",
+    [
+        {"max_faces": 0},
+        {"max_candidates": 0},
+        {"max_removed_facets": 0},
+    ],
+)
 def test_invalid_search_budget(kw):
     complex_ = clique_complex(nx.cycle_graph(4))
     with pytest.raises(ValueError, match="positive"):
