@@ -66,6 +66,11 @@ from .integral_morse import (
     integral_morse_certificate,
     verify_integral_morse,
 )
+from .facet_punctures import (
+    FacetPunctureWedgeCertificate,
+    facet_puncture_wedge_certificate,
+    verify_facet_puncture_wedge,
+)
 from .morse_certificates import (
     MorseCertificate,
     facet_morse_certificate,
@@ -130,6 +135,9 @@ from .weighted_conicity import (
 # Explicitly declare the public API.
 # This controls what happens if someone runs `from pycombtop import *`
 __all__ = [
+    "FacetPunctureWedgeCertificate",
+    "facet_puncture_wedge_certificate",
+    "verify_facet_puncture_wedge",
     # certified flag-edge reductions and vertex-star homotopy
     "FlagMove",
     "FlagReductionCertificate",
