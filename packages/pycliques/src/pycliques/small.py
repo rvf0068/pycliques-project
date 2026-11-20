@@ -1320,6 +1320,12 @@ def _test_iterate_certificates(
     for i in range(tries):
         graph = seq[i]
         if graph is None:
+            if octahedron_limited:
+                return (
+                    Verdict.INDETERMINATE,
+                    "optional octahedral retraction search reached its resource limits",
+                    None,
+                )
             return None
 
         if is_clique_helly(graph):
