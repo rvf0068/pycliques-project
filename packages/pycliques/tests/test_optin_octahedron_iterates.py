@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import networkx as nx
-import pytest
-
 import pycliques.small as small
+import pytest
 from pycliques.retractions import verify_retraction_witness
 from pycliques.targeted_retractions import (
     TargetSearchStatus,
