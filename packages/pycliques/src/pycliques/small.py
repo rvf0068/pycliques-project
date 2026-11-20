@@ -52,16 +52,16 @@ from pycliques.cutpoints import (
 from pycliques.dominated import completely_pared_graph, find_dominated_vertex
 from pycliques.helly import is_clique_helly
 from pycliques.named import complement_of_cycle, snub_disphenoid, suspension_of_cycle
-from pycliques.targeted_retractions import (
-    TargetSearchStatus,
-    search_targeted_retractions,
-    verify_targeted_retraction,
-)
 from pycliques.retractions import (
     SpecialOctahedronWitness,
     find_special_octahedron_witness,
     retracts,
     special_octahedra_dimension,
+)
+from pycliques.targeted_retractions import (
+    TargetSearchStatus,
+    search_targeted_retractions,
+    verify_targeted_retraction,
 )
 
 _logger = logging.getLogger(__name__)
