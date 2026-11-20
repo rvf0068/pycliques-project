@@ -104,6 +104,51 @@ graph, then reuses the general `coaffinations(H, 2)` machinery. It does not
 search arbitrary induced subgraphs or require the coaffination to be an
 involution. A clique is understood here as a maximal complete subgraph.
 
+### Optional deep-iterate octahedral retractions
+
+The fast classifier **does not** search for general octahedral
+retractions by default. An expensive search can be enabled at
+**specific pared clique-iterate indices** and **specific dimensions**.
+Candidate-pattern, backtracking-state and assignment budgets are
+independent and positive. Exhaustion of a budget means
+`INDETERMINATE`, never a negative mathematical conclusion.
+
+For the nine-vertex sphere `HEher^{` (McKay index 248687),
+an independently verified retraction of the third clique iterate onto
+`O_4` gives a new unconditional K-divergence certificate:
+
+```python
+import networkx as nx
+from pycliques.small import Verdict, classify_clique_behavior
+from pycliques.retractions import verify_retraction_witness
+
+G = nx.from_graph6_bytes(b"HEher^{")
+result = classify_clique_behavior(
+    G,
+    tries=4, bound=80,
+    clockwork_depth=0, retraction_depth=0,
+    octahedron_retract_iterates=(3,),
+    octahedron_dimensions=(4,),
+    octahedron_max_patterns=5000,
+    octahedron_max_states=100000,
+    octahedron_max_assignments=500000,
+)
+assert result.verdict is Verdict.DIVERGENT
+proof = result.certificate
+assert proof is not None and proof.rule == "octahedron_retraction"
+assert proof.iterate_index == 3 and proof.target_label == "O_4"
+assert verify_retraction_witness(proof.source, proof.target, proof.map)
+```
+
+The opt-in parameters are also accepted by
+`classify_clique_behavior_with_clockwork_pair_search`. They do not
+modify the `small-behavior` CLI's historical default census
+classification. They use the ordinary graph-morphism convention that
+an edge may map to an edge **or equality**. A retraction of the
+*completely pared* third iterate onto `O_4` proves divergence
+by Neumann-Lara's retraction theorem and the fact that
+`K(O_d) ≅ O_{2^(d-1)}`.
+
 ### Two-level classification: fast pass vs. clockwork-pair search
 
 `classify_clique_behavior` (and the `small-behavior` CLI) is the **fast
