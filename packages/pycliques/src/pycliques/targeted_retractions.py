@@ -179,6 +179,7 @@ def search_targeted_retractions(
     *,
     families: Sequence[str] = FAMILIES,
     betti_numbers: Mapping[int, int] | None = None,
+    octahedron_dimensions: Sequence[int] | None = None,
     max_target_order: int = 16,
     max_patterns: int = 50_000,
     max_states: int = 100_000,
@@ -196,6 +197,9 @@ def search_targeted_retractions(
     is relative to these supplied facts, not an independent certificate.
     Budgets apply separately to each family and LIMIT_REACHED is never
     reported as exhaustive absence. Positive witnesses are replayed.
+    ``octahedron_dimensions`` optionally restricts the octahedral family
+    to exactly the requested dimensions; None preserves the historical
+    all-dimensions search. This is especially useful for K^3 -> O_4.
     """
     if (
         not isinstance(graph, nx.Graph)
@@ -208,6 +212,12 @@ def search_targeted_retractions(
         raise ValueError("Unknown or duplicated target family")
     if min(max_target_order, max_patterns, max_states, max_assignments) < 1:
         raise ValueError("Search bounds must be positive")
+    if octahedron_dimensions is not None and (
+        not octahedron_dimensions
+        or any(type(d) is not int or d < 3 for d in octahedron_dimensions)
+        or len(set(octahedron_dimensions)) != len(octahedron_dimensions)
+    ):
+        raise ValueError("Octahedron dimensions must be distinct integers >= 3")
     known = {} if betti_numbers is None else dict(betti_numbers)
     if any(
         type(degree) is not int or degree < 0 or type(rank) is not int or rank < 0
@@ -218,6 +228,8 @@ def search_targeted_retractions(
     results = {}
     for family in families:
         all_params = set(_parameters(family, len(graph), max_target_order))
+        if family == "octahedra" and octahedron_dimensions is not None:
+            all_params.intersection_update(octahedron_dimensions)
         allowed = {
             p
             for p in all_params

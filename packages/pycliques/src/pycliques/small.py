@@ -58,6 +58,11 @@ from pycliques.retractions import (
     retracts,
     special_octahedra_dimension,
 )
+from pycliques.targeted_retractions import (
+    TargetSearchStatus,
+    search_targeted_retractions,
+    verify_targeted_retraction,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -1294,6 +1299,12 @@ def _test_iterate_certificates(
     tries: int,
     retraction_depth: int,
     targets: tuple[tuple[nx.Graph, str], ...],
+    *,
+    octahedron_retract_iterates: tuple[int, ...] = (),
+    octahedron_dimensions: tuple[int, ...] = (4,),
+    octahedron_max_patterns: int = 5_000,
+    octahedron_max_states: int = 100_000,
+    octahedron_max_assignments: int = 500_000,
 ) -> ClassifierResult | None:
     """Inspect each pared iterate fully before constructing the next.
 
@@ -1302,10 +1313,19 @@ def _test_iterate_certificates(
     check avoids unnecessary clique-graph construction when a sufficient
     certificate is already present. Fixed-target retraction tests are
     restricted to the first two pared iterates, regardless of `tries`.
+    An octahedral retraction search is opt-in at explicitly selected
+    iterate indices and dimensions, with independent replay and budgets.
     """
+    octahedron_limited = False
     for i in range(tries):
         graph = seq[i]
         if graph is None:
+            if octahedron_limited:
+                return (
+                    Verdict.INDETERMINATE,
+                    "optional octahedral retraction search reached its resource limits",
+                    None,
+                )
             return None
 
         if is_clique_helly(graph):
@@ -1341,6 +1361,48 @@ def _test_iterate_certificates(
                 f"eventually has a special octahedron (index {i}, dimension {dim})",
                 _special_octahedron_certificate(graph, i),
             )
+
+        if i in octahedron_retract_iterates:
+            result = search_targeted_retractions(
+                graph,
+                families=("octahedra",),
+                octahedron_dimensions=octahedron_dimensions,
+                max_target_order=2 * max(octahedron_dimensions),
+                max_patterns=octahedron_max_patterns,
+                max_states=octahedron_max_states,
+                max_assignments=octahedron_max_assignments,
+            )["octahedra"]
+            if result.status is TargetSearchStatus.FOUND:
+                if not verify_targeted_retraction(graph, result):
+                    raise AssertionError("Octahedral retraction witness failed replay")
+                assert result.target_vertices is not None
+                assert result.projection is not None
+                assert result.target_kind is not None
+                target = graph.subgraph(result.target_vertices).copy()
+                dimension = int(result.target_kind.split(":")[1])
+                certificate = Certificate(
+                    rule="octahedron_retraction",
+                    source=graph,
+                    target=target,
+                    target_status="proven_divergent",
+                    target_label=f"O_{dimension}",
+                    map=(result.projection, {v: v for v in target}),
+                    iterate_index=i,
+                )
+                return (
+                    Verdict.DIVERGENT,
+                    f"pared iterate {i} retracts onto O_{dimension}",
+                    certificate,
+                )
+            octahedron_limited |= (
+                result.status is TargetSearchStatus.LIMIT_REACHED
+            )
+    if octahedron_limited:
+        return (
+            Verdict.INDETERMINATE,
+            "optional octahedral retraction search reached its resource limits",
+            None,
+        )
     return None
 
 
@@ -1352,6 +1414,11 @@ def _default_classifiers(
     clockwork_fallback: bool = False,
     clockwork_fallback_max_order: int = 12,
     clockwork_fallback_max_candidates: int = 5000,
+    octahedron_retract_iterates: tuple[int, ...] = (),
+    octahedron_dimensions: tuple[int, ...] = (4,),
+    octahedron_max_patterns: int = 5_000,
+    octahedron_max_states: int = 100_000,
+    octahedron_max_assignments: int = 500_000,
 ) -> list[Classifier]:
     """Check clockwork, then Helly/retractions/special octahedra per iterate.
 
@@ -1375,7 +1442,15 @@ def _default_classifiers(
             fallback_max_candidates=clockwork_fallback_max_candidates,
         ),
         lambda seq: _test_iterate_certificates(
-            seq, tries, retraction_depth, targets
+            seq,
+            tries,
+            retraction_depth,
+            targets,
+            octahedron_retract_iterates=octahedron_retract_iterates,
+            octahedron_dimensions=octahedron_dimensions,
+            octahedron_max_patterns=octahedron_max_patterns,
+            octahedron_max_states=octahedron_max_states,
+            octahedron_max_assignments=octahedron_max_assignments,
         ),
     ]
 
@@ -1398,6 +1473,11 @@ def classify_clique_behavior(
     clockwork_max_retraction_attempts: int = 20,
     clockwork_max_retraction_states: int = 100_000,
     clockwork_max_retraction_assignments: int = 1_000_000,
+    octahedron_retract_iterates: tuple[int, ...] = (),
+    octahedron_dimensions: tuple[int, ...] = (4,),
+    octahedron_max_patterns: int = 5_000,
+    octahedron_max_states: int = 100_000,
+    octahedron_max_assignments: int = 500_000,
 ) -> CliqueBehavior:
     """Classify the observed clique behavior of an undirected graph.
 
@@ -1465,6 +1545,16 @@ def classify_clique_behavior(
         Maximum divergent candidate targets tested per iterate.
     clockwork_max_retraction_states, clockwork_max_retraction_assignments
         Per-target limits on internal retraction backtracking.
+    octahedron_retract_iterates : tuple[int, ...], optional
+        Explicit indices of pared clique iterates to inspect for ordinary
+        retractions onto O_d (default: empty, so no search at all).
+        Use (3,) to inspect only K^3(G). Requires tries >= 4.
+    octahedron_dimensions : tuple[int, ...], optional
+        Exact dimensions d >= 3 to test (default: (4,)).
+    octahedron_max_patterns, octahedron_max_states,
+    octahedron_max_assignments : int, optional
+        Positive bounds for each selected iterate's candidate and CSP search.
+        Reaching a limit never establishes the absence of a retraction.
 
     .. rubric:: Returns
 
@@ -1508,6 +1598,24 @@ def classify_clique_behavior(
         raise ValueError("clockwork_max_retraction_states must be at least 1")
     if clockwork_max_retraction_assignments < 1:
         raise ValueError("clockwork_max_retraction_assignments must be at least 1")
+    if (
+        any(type(i) is not int or i < 0 or i >= tries
+            for i in octahedron_retract_iterates)
+        or len(set(octahedron_retract_iterates)) != len(octahedron_retract_iterates)
+    ):
+        raise ValueError("octahedron_retract_iterates must be distinct indices < tries")
+    if (
+        not octahedron_dimensions
+        or any(type(d) is not int or d < 3 for d in octahedron_dimensions)
+        or len(set(octahedron_dimensions)) != len(octahedron_dimensions)
+    ):
+        raise ValueError("octahedron_dimensions must be distinct integers >= 3")
+    if min(
+        octahedron_max_patterns,
+        octahedron_max_states,
+        octahedron_max_assignments,
+    ) < 1:
+        raise ValueError("octahedron search budgets must be positive")
 
     pared_graph = completely_pared_graph(graph)
     seq = CliqueSequence(pared_graph, bound=bound)
@@ -1542,6 +1650,11 @@ def classify_clique_behavior(
         clockwork_fallback=clockwork_fallback,
         clockwork_fallback_max_order=clockwork_fallback_max_order,
         clockwork_fallback_max_candidates=clockwork_fallback_max_candidates,
+        octahedron_retract_iterates=octahedron_retract_iterates,
+        octahedron_dimensions=octahedron_dimensions,
+        octahedron_max_patterns=octahedron_max_patterns,
+        octahedron_max_states=octahedron_max_states,
+        octahedron_max_assignments=octahedron_max_assignments,
     ):
         result = classifier(seq)
         if result is not None:
@@ -1738,6 +1851,11 @@ def classify_clique_behavior_with_clockwork_pair_search(
     clockwork_max_retraction_attempts: int = 20,
     clockwork_max_retraction_states: int = 100_000,
     clockwork_max_retraction_assignments: int = 1_000_000,
+    octahedron_retract_iterates: tuple[int, ...] = (),
+    octahedron_dimensions: tuple[int, ...] = (4,),
+    octahedron_max_patterns: int = 5_000,
+    octahedron_max_states: int = 100_000,
+    octahedron_max_assignments: int = 500_000,
     max_m: int = 3,
     max_n: int = 3,
     max_coaffinations: int = 20,
@@ -1787,6 +1905,11 @@ def classify_clique_behavior_with_clockwork_pair_search(
         clockwork_max_retraction_attempts=clockwork_max_retraction_attempts,
         clockwork_max_retraction_states=clockwork_max_retraction_states,
         clockwork_max_retraction_assignments=clockwork_max_retraction_assignments,
+        octahedron_retract_iterates=octahedron_retract_iterates,
+        octahedron_dimensions=octahedron_dimensions,
+        octahedron_max_patterns=octahedron_max_patterns,
+        octahedron_max_states=octahedron_max_states,
+        octahedron_max_assignments=octahedron_max_assignments,
     )
     if fast.verdict is not Verdict.INDETERMINATE:
         return fast

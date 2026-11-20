@@ -50,6 +50,15 @@ direct clockwork fallback is disabled by default; enable it explicitly with
 ``classify_clique_behavior`` or
 ``classify_clique_behavior_with_clockwork_pair_search``.
 
+The ordinary classifier's optional ``octahedron_retract_iterates=(3,)``
+search inspects only its completely pared third clique iterate, rather than
+automatically searching every iterate. Set ``octahedron_dimensions=(4,)``
+to restrict targets to exactly ``O_4``; budget each chosen iterate with
+``octahedron_max_patterns``, ``octahedron_max_states``, and
+``octahedron_max_assignments``. The default empty iterate tuple
+performs **no** octahedral retraction search. Every positive witness is
+independently replayed; reaching a resource limit is inconclusive.
+
 Positive-iterate retraction searches require a complete labelled prefix and
 its origin graph. Use ``verify_clockwork_retraction_certificate_detailed``
 for independent replay with optional clique-count and edge bounds; its
