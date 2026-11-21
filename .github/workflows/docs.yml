@@ -11,19 +11,13 @@ concurrency:
   group: github-pages
   cancel-in-progress: false
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 jobs:
-  deploy:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       PAGES_ARTIFACT_NAME: docs-pages-${{ github.run_id }}-${{ github.run_attempt }}
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,8 +26,7 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Install Workspace and Doc Dependencies
-        run: |
-          uv sync --group dev
+        run: uv sync --group dev
 
       - name: Build Sphinx
         run: |
@@ -46,6 +39,39 @@ jobs:
         with:
           name: ${{ env.PAGES_ARTIFACT_NAME }}
           path: docs/_build/html
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      pages: write
+      id-token: write
+    env:
+      PAGES_ARTIFACT_NAME: docs-pages-${{ github.run_id }}-${{ github.run_attempt }}
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # An uploaded artifact can take a few seconds to become visible to
+      # the Actions API. deploy-pages searches this API and otherwise fails
+      # with "No artifacts named ... were found" even after a good upload.
+      - name: Wait for Pages artifact indexing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 20); do
+            count=$(gh api               "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100"               --jq ".artifacts | map(select(.name == \"$PAGES_ARTIFACT_NAME\" and .expired == false)) | length"               2>/dev/null) || count=0
+            if [ "$count" -gt 0 ]; then
+              echo "Pages artifact $PAGES_ARTIFACT_NAME is indexed (attempt $attempt)."
+              exit 0
+            fi
+            echo "Artifact not yet indexed (attempt $attempt/20)."
+            sleep 3
+          done
+          echo "::error::Pages artifact $PAGES_ARTIFACT_NAME was not found after retries"
+          exit 1
 
       - name: Deploy to GitHub Pages
         id: deployment
