@@ -1532,6 +1532,7 @@ def classify_clique_behavior(
     octahedron_max_patterns: int = 5_000,
     octahedron_max_states: int = 100_000,
     octahedron_max_assignments: int = 500_000,
+    octahedron_retract_presets: tuple[str, ...] = (),
 ) -> CliqueBehavior:
     """Classify the observed clique behavior of an undirected graph.
 
@@ -1609,6 +1610,15 @@ def classify_clique_behavior(
     octahedron_max_assignments : int, optional
         Positive bounds for each selected iterate's candidate and CSP search.
         Reaching a limit never establishes the absence of a retraction.
+    octahedron_retract_presets : tuple[str, ...], optional
+        Opt-in known-embedding search. Currently "snub_o24" is supported:
+        for a snub disphenoid (any vertex labeling), construct K^4(G),
+        transport the independently known induced O_24 embedding, and
+        search afresh for a retraction using the specialized bitset solver.
+        Requires tries >= 5 and bound >= 1076. This does not replay a saved
+        projection and does not discover the O_24 embedding from scratch.
+        The per-target budget is octahedron_max_states; the generic pattern
+        and assignment budgets do not apply to this seeded solver.
 
     .. rubric:: Returns
 
@@ -1670,6 +1680,13 @@ def classify_clique_behavior(
         octahedron_max_assignments,
     ) < 1:
         raise ValueError("octahedron search budgets must be positive")
+    if (
+        len(set(octahedron_retract_presets)) != len(octahedron_retract_presets)
+        or any(preset != "snub_o24" for preset in octahedron_retract_presets)
+    ):
+        raise ValueError("Unknown or duplicated octahedron retraction preset")
+    if "snub_o24" in octahedron_retract_presets and (tries < 5 or bound < 1076):
+        raise ValueError("snub_o24 requires tries >= 5 and bound >= 1076")
 
     pared_graph = completely_pared_graph(graph)
     seq = CliqueSequence(pared_graph, bound=bound)
@@ -1709,6 +1726,7 @@ def classify_clique_behavior(
         octahedron_max_patterns=octahedron_max_patterns,
         octahedron_max_states=octahedron_max_states,
         octahedron_max_assignments=octahedron_max_assignments,
+        octahedron_retract_presets=octahedron_retract_presets,
     ):
         result = classifier(seq)
         if result is not None:
@@ -1910,6 +1928,7 @@ def classify_clique_behavior_with_clockwork_pair_search(
     octahedron_max_patterns: int = 5_000,
     octahedron_max_states: int = 100_000,
     octahedron_max_assignments: int = 500_000,
+    octahedron_retract_presets: tuple[str, ...] = (),
     max_m: int = 3,
     max_n: int = 3,
     max_coaffinations: int = 20,
@@ -1964,6 +1983,7 @@ def classify_clique_behavior_with_clockwork_pair_search(
         octahedron_max_patterns=octahedron_max_patterns,
         octahedron_max_states=octahedron_max_states,
         octahedron_max_assignments=octahedron_max_assignments,
+        octahedron_retract_presets=octahedron_retract_presets,
     )
     if fast.verdict is not Verdict.INDETERMINATE:
         return fast
