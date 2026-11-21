@@ -46,7 +46,8 @@ def find_octahedral_retraction(
     ``FOUND`` carries a checked retraction. ``EXHAUSTED`` proves that no
     retraction fixes this particular induced target. ``LIMIT_REACHED`` gives
     no conclusion. The search is seeded for reproducible tie breaking and
-    limits are imposed on explored states, not on wall-clock time.
+    the initial state and every attempted branch (including rejected choices)
+    count toward ``max_states``; wall-clock time is not bounded.
 
     This method does *not* find an induced octahedron automatically; the
     embedding must already have been identified. Graph edges may collapse
@@ -212,11 +213,11 @@ def find_octahedral_retraction(
         choice = frame.choices[frame.next_choice]
         frame.next_choice += 1
         assignments_tried += 1
+        states_explored += 1  # Count rejected propagation branches, too.
         trail.append((frame.vertex, domains[frame.vertex]))
         domains[frame.vertex] = 1 << choice
         if not propagate([frame.vertex]):
             continue
-        states_explored += 1
         child = choose_frame()
         if child is None:
             return found()
