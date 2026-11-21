@@ -64,6 +64,8 @@ Tools for studying the **clique graph operator** K(G). Given a graph G, the cliq
   induced octahedron; [snub O24 proof and replay](docs/snub_o24_retraction.md)
 - `classify_clique_behavior` — apply the fast standard convergence/divergence
   tests to one graph
+  (opt-in `octahedron_retract_presets=("snub_o24",)` reconstructs K^4(snub)
+  and rediscovers the certified O24 retraction; see the proof guide above)
 - `classify_clockwork_pair_map` — the separate, more expensive clockwork-pair
   (coaffination) search based on [LNP06, Theorems 2.6 and 3.1]
 - `classify_clique_behavior_with_clockwork_pair_search` — runs the fast pass, then

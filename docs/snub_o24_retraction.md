@@ -54,6 +54,51 @@ generic `retracts(G, H)` search, which also searches over embeddings.
 The fast certificate test belongs to normal CI; the rediscovery test
 is marked `slow`, in accordance with the repository's pytest settings.
 
+## Fresh search through classify_clique_behavior
+
+This opt-in classifier mode is available from the Python API:
+
+```python
+import networkx as nx
+from pycliques.small import classify_clique_behavior
+
+G = nx.from_graph6_bytes(b"GQyuzw")
+result = classify_clique_behavior(
+    G,
+    tries=5,
+    bound=1200,
+    clockwork_depth=0,
+    retraction_depth=0,
+    octahedron_retract_presets=("snub_o24",),
+    octahedron_max_states=5000,
+)
+print(result.verdict)
+print(result.reason)
+print(result.certificate.rule if result.certificate else None)
+```
+
+The seeded mode uses the *induced O24 embedding*, transported from the
+original labeled F(4,4) to the input labeling (including graph6) and then
+through the nested clique labels. It searches for a **new** retraction: the
+previously published projection/images are not loaded. Since all five
+snub iterates through K^4 are stiff, paring leaves the target intact.
+
+The preset requires `tries >= 5`, `bound >= 1076`. The specialized
+search respects `octahedron_max_states`; the generic
+`octahedron_max_patterns` and `octahedron_max_assignments` settings
+do not apply to it. A bound hit is inconclusive, not proof that a
+retraction does not exist.
+
+Without the preset, the snub is now immediately recognized as a
+**proven** divergent reference (following the certified retraction in
+PR #27), and the expensive fourth-iterate search is not repeated.
+
+The existing unseeded options, for example
+`octahedron_retract_iterates=(3,)` and `octahedron_dimensions=(4,)`,
+continue to search for *unknown* octahedral embeddings. These should
+not be used to enumerate arbitrary O24 embeddings in the enormous K4
+snub graph.
+
 ## Literature
 
 F. Larrión, M. A. Pizaña, and R. Villarroel-Flores,
