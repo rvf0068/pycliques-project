@@ -19,7 +19,7 @@ def test_recheck_preserves_saved_certificate_when_rule_is_inconclusive() -> None
     saved = Certificate(
         rule="reference", target_status="conjectured_divergent", target_label="example"
     )
-    entries = [(7, graph, saved)]
+    entries: list[tuple[int, nx.Graph, Certificate | None]] = [(7, graph, saved)]
     assert (
         _recheck_indeterminate_file(entries, 12, classifier=lambda seq: None) == entries
     )
@@ -27,7 +27,7 @@ def test_recheck_preserves_saved_certificate_when_rule_is_inconclusive() -> None
 
 def test_recheck_discards_classified_graph() -> None:
     graph = nx.path_graph(3)
-    entries = [(9, graph, None)]
+    entries: list[tuple[int, nx.Graph, Certificate | None]] = [(9, graph, None)]
     assert (
         _recheck_indeterminate_file(
             entries,
