@@ -39,7 +39,7 @@ def test_rejects_other_invalid_graphs(kind: str) -> None:
 )
 def test_invalid_pair_specs(pairs: list[tuple[int, ...]], match: str) -> None:
     with pytest.raises(ValueError, match=match):
-        _check_pairs(pycliques.octahedron(3), pairs)
+        _check_pairs(pycliques.octahedron(3), pairs)  # type: ignore[arg-type]
 
 
 def test_missing_cross_edge_is_rejected() -> None:
@@ -105,7 +105,7 @@ def test_augmentation_rejects_invalid_parameters(
     kwargs: dict[str, object], match: str
 ) -> None:
     with pytest.raises(ValueError, match=match):
-        augment_induced_octahedron(pycliques.octahedron(3), _pairs(3), **kwargs)
+        augment_induced_octahedron(pycliques.octahedron(3), _pairs(3), **kwargs)  # type: ignore[arg-type]
 
 
 def test_augmentation_random_walk_without_possible_growth() -> None:
