@@ -29,6 +29,9 @@ jobs:
       - name: Ruff check
         run: uv run ruff check packages/
 
+      - name: Show proposed formatting for research PR
+        run: uv run ruff format --diff packages/pycliques/src/pycliques/octahedral_compatibility_search.py packages/pycliques/tests/test_octahedral_compatibility_search.py || true
+
       - name: Ruff format check
         run: uv run ruff format --check packages/
 
