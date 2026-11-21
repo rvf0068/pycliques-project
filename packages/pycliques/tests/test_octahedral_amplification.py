@@ -51,15 +51,14 @@ def test_amplification_rejects_universal_outside_neighbor() -> None:
 
 def test_one_for_two_augments_smaller_octahedron() -> None:
     graph = pycliques.octahedron(4)
-    grown = augment_induced_octahedron(
-        graph, _pairs(3), max_walk_steps=0
-    )
+    grown = augment_induced_octahedron(graph, _pairs(3), max_walk_steps=0)
     assert grown is not None
     assert len(grown) == 4
     assert is_dominating_octahedron(graph, grown)
-    assert augment_induced_octahedron(
-        pycliques.octahedron(3), _pairs(3), max_walk_steps=0
-    ) is None
+    assert (
+        augment_induced_octahedron(pycliques.octahedron(3), _pairs(3), max_walk_steps=0)
+        is None
+    )
 
 
 def test_augmentation_can_be_non_dominating() -> None:
@@ -70,9 +69,12 @@ def test_augmentation_can_be_non_dominating() -> None:
     assert grown is not None
     assert len(grown) == 4
     assert not is_dominating_octahedron(graph, grown)
-    assert augment_induced_octahedron(
-        graph, _pairs(3), max_walk_steps=0, require_dominating=True
-    ) is None
+    assert (
+        augment_induced_octahedron(
+            graph, _pairs(3), max_walk_steps=0, require_dominating=True
+        )
+        is None
+    )
 
 
 def test_augmented_octahedron_handles_arbitrary_labels() -> None:
@@ -81,9 +83,7 @@ def test_augmented_octahedron_handles_arbitrary_labels() -> None:
         {i: f"v{i}" for i in range(8)},
     )
     start = [(f"v{i}", f"v{i + 1}") for i in (0, 2, 4)]
-    result = augment_induced_octahedron(
-        graph, start, max_walk_steps=0
-    )
+    result = augment_induced_octahedron(graph, start, max_walk_steps=0)
     assert result is not None
     assert is_dominating_octahedron(graph, result)
 
@@ -122,12 +122,8 @@ def test_directed_graph_rejected(operation: str) -> None:
 
 def test_explicit_resource_limits() -> None:
     with pytest.raises(ValueError, match="max_facets"):
-        amplify_induced_octahedron(
-            pycliques.octahedron(3), _pairs(3), max_facets=7
-        )
+        amplify_induced_octahedron(pycliques.octahedron(3), _pairs(3), max_facets=7)
     with pytest.raises(ValueError, match="max_checks"):
-        augment_induced_octahedron(
-            pycliques.octahedron(3), _pairs(3), max_checks=0
-        )
+        augment_induced_octahedron(pycliques.octahedron(3), _pairs(3), max_checks=0)
     with pytest.raises(ValueError, match="max_states"):
         find_induced_octahedron(pycliques.octahedron(3), 3, max_states=0)
