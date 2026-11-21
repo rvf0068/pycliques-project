@@ -186,14 +186,17 @@ def augment_induced_octahedron(
     max_walk_steps: int = 1000,
     max_checks: int = 200_000,
     seed: int = 9883,
+    require_dominating: bool = False,
 ) -> tuple[tuple[Hashable, Hashable], ...] | None:
-    """Heuristically grow an induced O_d into a complement-dominating O_(d+1).
+    """Heuristically grow an induced O_d into an induced O_(d+1).
 
     One-for-two augmentation replaces one antipodal pair by two pairs
     adjacent to all the retained vertices. When no immediate augmentation
     exists, randomly replace one pair and retry, within explicit budgets.
-    Returns a *validated* pair list or None (INCONCLUSIVE, never a proof
-    that no larger octahedron exists). No vertices are hardcoded.
+    Set require_dominating=True to demand that the *new* octahedron
+    have no external common neighbor. Returns a validated pair list or
+    None (INCONCLUSIVE, never proof that no larger octahedron exists).
+    No graph-specific vertices are hardcoded.
     """
     pairs = _check_pairs(graph, antipodal_pairs)
     if type(max_walk_steps) is not int or max_walk_steps < 0:
@@ -237,7 +240,7 @@ def augment_induced_octahedron(
                             if not charge():
                                 return None
                             grown = rest + [(a, b), (c, d)]
-                            if common(grown) == 0:
+                            if not require_dominating or common(grown) == 0:
                                 answer = tuple(
                                     (nodes[u], nodes[v]) for u, v in grown
                                 )
