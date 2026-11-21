@@ -9,7 +9,6 @@ from pathlib import Path
 
 import networkx as nx
 import pytest
-
 from pycliques import (
     RetractionSearchStatus,
     clique_graph,
