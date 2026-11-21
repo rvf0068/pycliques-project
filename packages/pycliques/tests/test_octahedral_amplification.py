@@ -3,7 +3,6 @@
 import networkx as nx
 import pycliques
 import pytest
-
 from pycliques.octahedral_amplification import (
     amplify_induced_octahedron,
     augment_induced_octahedron,
