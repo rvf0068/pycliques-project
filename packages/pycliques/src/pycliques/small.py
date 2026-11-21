@@ -51,9 +51,16 @@ from pycliques.cutpoints import (
 )
 from pycliques.dominated import completely_pared_graph, find_dominated_vertex
 from pycliques.helly import is_clique_helly
+from pycliques.known_octahedral_witnesses import (
+    snub_o24_matches_source,
+    snub_o24_pairs_for_iterates,
+)
 from pycliques.named import complement_of_cycle, snub_disphenoid, suspension_of_cycle
+from pycliques.octahedral_retractions import find_octahedral_retraction
 from pycliques.retractions import (
+    RetractionSearchStatus,
     SpecialOctahedronWitness,
+    verify_retraction_witness,
     find_special_octahedron_witness,
     retracts,
     special_octahedra_dimension,
@@ -1305,6 +1312,7 @@ def _test_iterate_certificates(
     octahedron_max_patterns: int = 5_000,
     octahedron_max_states: int = 100_000,
     octahedron_max_assignments: int = 500_000,
+    octahedron_retract_presets: tuple[str, ...] = (),
 ) -> ClassifierResult | None:
     """Inspect each pared iterate fully before constructing the next.
 
@@ -1317,6 +1325,10 @@ def _test_iterate_certificates(
     iterate indices and dimensions, with independent replay and budgets.
     """
     octahedron_limited = False
+    snub_seeded = (
+        "snub_o24" in octahedron_retract_presets
+        and snub_o24_matches_source(seq[0])
+    )
     for i in range(tries):
         graph = seq[i]
         if graph is None:
@@ -1327,6 +1339,46 @@ def _test_iterate_certificates(
                     None,
                 )
             return None
+
+        # Try the supplied octahedral embedding before expensive
+        # general Helly/special-octahedron recognition. No projection
+        # is preloaded; the solver must discover a valid retraction.
+        if i == 4 and snub_seeded:
+            prefix = [seq[j] for j in range(5)]
+            if all(step is not None for step in prefix):
+                pared_iterates = cast(list[nx.Graph], prefix)
+                pairs = snub_o24_pairs_for_iterates(pared_iterates)
+                if pairs is not None:
+                    seeded = find_octahedral_retraction(
+                        graph,
+                        pairs,
+                        max_states=octahedron_max_states,
+                    )
+                    if seeded.status is RetractionSearchStatus.FOUND:
+                        if seeded.retraction is None or seeded.inclusion is None:
+                            raise AssertionError("Missing seeded retraction witness")
+                        target_vertices = [v for pair in pairs for v in pair]
+                        target = graph.subgraph(target_vertices).copy()
+                        witness = (seeded.retraction, seeded.inclusion)
+                        if not verify_retraction_witness(graph, target, witness):
+                            raise AssertionError("Seeded O24 witness failed replay")
+                        certificate = Certificate(
+                            rule="octahedron_retraction_seeded",
+                            source=graph,
+                            target=target,
+                            target_status="proven_divergent",
+                            target_label="O_24",
+                            map=witness,
+                            iterate_index=i,
+                        )
+                        return (
+                            Verdict.DIVERGENT,
+                            "pared iterate 4 retracts onto seeded O_24 (snub)",
+                            certificate,
+                        )
+                    octahedron_limited |= (
+                        seeded.status is RetractionSearchStatus.LIMIT_REACHED
+                    )
 
         if is_clique_helly(graph):
             _logger.debug("Helly of index %s", i)
@@ -1419,6 +1471,7 @@ def _default_classifiers(
     octahedron_max_patterns: int = 5_000,
     octahedron_max_states: int = 100_000,
     octahedron_max_assignments: int = 500_000,
+    octahedron_retract_presets: tuple[str, ...] = (),
 ) -> list[Classifier]:
     """Check clockwork, then Helly/retractions/special octahedra per iterate.
 
@@ -1451,6 +1504,7 @@ def _default_classifiers(
             octahedron_max_patterns=octahedron_max_patterns,
             octahedron_max_states=octahedron_max_states,
             octahedron_max_assignments=octahedron_max_assignments,
+            octahedron_retract_presets=octahedron_retract_presets,
         ),
     ]
 
