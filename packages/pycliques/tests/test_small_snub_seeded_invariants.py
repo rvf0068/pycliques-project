@@ -28,9 +28,7 @@ def test_seeded_retraction_rejects_incomplete_found_result(
 ) -> None:
     seq = _SyntheticSnubSequence()
     pairs = tuple(nx.non_edges(seq.host))
-    monkeypatch.setattr(
-        "pycliques.small.snub_o24_pairs_for_iterates", lambda _: pairs
-    )
+    monkeypatch.setattr("pycliques.small.snub_o24_pairs_for_iterates", lambda _: pairs)
     projection = None if missing == "projection" else {v: v for v in seq.host}
     inclusion = None if missing == "inclusion" else {v: v for v in seq.host}
     monkeypatch.setattr(
@@ -54,9 +52,7 @@ def test_seeded_retraction_rejects_invalid_projection(
 ) -> None:
     seq = _SyntheticSnubSequence()
     pairs = tuple(nx.non_edges(seq.host))
-    monkeypatch.setattr(
-        "pycliques.small.snub_o24_pairs_for_iterates", lambda _: pairs
-    )
+    monkeypatch.setattr("pycliques.small.snub_o24_pairs_for_iterates", lambda _: pairs)
     projection = {v: 0 for v in seq.host}
     inclusion = {v: v for v in seq.host}
     monkeypatch.setattr(
