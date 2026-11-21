@@ -64,7 +64,7 @@ def snub_o24_matches_source(graph: nx.Graph) -> bool:
     return (
         graph.number_of_nodes() == 8
         and graph.number_of_edges() == 18
-        and nx.is_isomorphic(_labeled_f44(), graph)
+        and bool(nx.is_isomorphic(_labeled_f44(), graph))
     )
 
 
