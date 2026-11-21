@@ -51,11 +51,19 @@ octahedron has been found.
 
 ## Blind snub benchmark
 
-A reproducible regression test reconstructs \(K^4(F_{4,4})\) without
-using any saved witness. It has 1,076 vertices and 504,360 edges.
-The tested configuration (target_dimension=20, max_restarts=500,
-seed=24002) returns a complement-dominating induced \(O_{20}\)
-after 411 restarts in the canonical bitmask labeling.
+The regression test reconstructs \(K^4(F_{4,4})\) without using any
+saved witness. It has 1,076 vertices and 504,360 edges. With
+target_dimension=20, max_restarts=500, seed=24002, and
+require_dominating=False, it checks blind discovery and independently
+verifies an induced octahedron of dimension at least 20.
+
+Complement domination is a separate and harder heuristic objective.
+A local experiment produced a dominating \(O_{20}\) after 411 restarts,
+but that outcome did not reproduce in GitHub Actions with the same
+500-restart budget. Consequently the regression must not assert it
+without a robust reproducibility guarantee. Setting
+require_dominating=True still requests this stronger condition, and
+LIMIT_REACHED remains an inconclusive search result.
 
 ```bash
 uv run pytest packages/pycliques/tests/test_octahedral_compatibility_search.py -q
@@ -64,8 +72,8 @@ uv run pytest packages/pycliques/tests/test_octahedral_compatibility_search.py -
 The 20 antipodal pairs are found during the test; none are encoded in
 this algorithm. The historical original \(O_{20}\) was also found by
 compatible-nonedge search, but its exact discovery trace was not saved.
-Thus this test is a *new blind discovery*, not a replay of historical
-random choices.
+Thus this test is a *new blind induced-octahedron discovery*, not a replay of
+historical random choices; it does not certify complement domination or a retraction.
 
 ## Logical limitations
 
