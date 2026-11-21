@@ -29,9 +29,10 @@ def _check_pairs(
     antipodal_pairs: Sequence[tuple[Hashable, Hashable]],
 ) -> tuple[tuple[Hashable, Hashable], ...]:
     _check_graph(graph)
-    pairs = tuple(tuple(pair) for pair in antipodal_pairs)
-    if len(pairs) < 2 or any(len(pair) != 2 for pair in pairs):
+    raw_pairs = tuple(tuple(pair) for pair in antipodal_pairs)
+    if len(raw_pairs) < 2 or any(len(pair) != 2 for pair in raw_pairs):
         raise ValueError("Expected at least two antipodal pairs")
+    pairs = tuple((a, b) for a, b in raw_pairs)
     vertices = [v for pair in pairs for v in pair]
     if len(set(vertices)) != 2 * len(pairs) or any(v not in graph for v in vertices):
         raise ValueError("Octahedral endpoints must be distinct host vertices")
