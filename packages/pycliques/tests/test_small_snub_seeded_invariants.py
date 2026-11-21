@@ -31,12 +31,8 @@ def test_seeded_retraction_rejects_incomplete_found_result(
     monkeypatch.setattr(
         "pycliques.small.snub_o24_pairs_for_iterates", lambda _: pairs
     )
-    projection = {v: v for v in seq.host}
-    inclusion = {v: v for v in seq.host}
-    if missing == "projection":
-        projection = None
-    else:
-        inclusion = None
+    projection = None if missing == "projection" else {v: v for v in seq.host}
+    inclusion = None if missing == "inclusion" else {v: v for v in seq.host}
     monkeypatch.setattr(
         "pycliques.small.find_octahedral_retraction",
         lambda *_args, **_kwargs: BoundedRetractionResult(
