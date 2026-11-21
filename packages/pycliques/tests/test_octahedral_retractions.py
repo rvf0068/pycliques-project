@@ -148,9 +148,7 @@ def test_search_validates_missing_vertices_and_cross_edges() -> None:
     pairs = [(0, 1), (2, 3), (4, 5)]
     host = pycliques.octahedron(3)
     with pytest.raises(ValueError, match="belong to the host"):
-        pycliques.find_octahedral_retraction(
-            host, [(0, 1), (2, 3), (4, 8)]
-        )
+        pycliques.find_octahedral_retraction(host, [(0, 1), (2, 3), (4, 8)])
     host.remove_edge(0, 2)
     with pytest.raises(ValueError, match="completely joined"):
         pycliques.find_octahedral_retraction(host, pairs)
@@ -175,9 +173,7 @@ def test_initial_singleton_propagation_rejects_opposite_images() -> None:
     host.add_edges_from(("left", v) for v in (0, 2, 3, 4, 5))
     host.add_edges_from(("right", v) for v in (1, 2, 3, 4, 5))
     host.add_edge("left", "right")
-    result = pycliques.find_octahedral_retraction(
-        host, [(0, 1), (2, 3), (4, 5)]
-    )
+    result = pycliques.find_octahedral_retraction(host, [(0, 1), (2, 3), (4, 5)])
     assert result.status is pycliques.RetractionSearchStatus.EXHAUSTED
     assert result.states_explored == 1
     assert result.assignments_tried == 0
@@ -210,7 +206,8 @@ def test_rejected_propagation_counts_toward_budget(
         assert result.retraction is not None
         assert result.inclusion is not None
         assert pycliques.verify_retraction_witness(
-            host, host.subgraph(range(6)),
+            host,
+            host.subgraph(range(6)),
             (result.retraction, result.inclusion),
         )
 
