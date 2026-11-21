@@ -77,8 +77,7 @@ def test_amplification_greedily_extends_facets() -> None:
     all_facets = [facet for opposite_pair in amplified for facet in opposite_pair]
     assert all(
         not any(
-            u not in facet and all(graph.has_edge(u, v) for v in facet)
-            for u in graph
+            u not in facet and all(graph.has_edge(u, v) for v in facet) for u in graph
         )
         for facet in all_facets
     )
