@@ -364,6 +364,7 @@ __all__ = [
     "OctahedronSearchResult",
     "OctahedronSearchStatus",
     "find_induced_octahedron_amplified",
+    "find_induced_octahedron_compatibility",
     "verify_induced_octahedron",
     "BoundedRetractionResult",
     "RetractionSearchStatus",
