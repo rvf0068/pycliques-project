@@ -45,8 +45,7 @@ def _brute_max_dimension(graph, dominating):
             ):
                 continue
             if dominating and any(
-                all(v == u or graph.has_edge(v, u) for u in endpoints)
-                for v in graph
+                all(v == u or graph.has_edge(v, u) for u in endpoints) for v in graph
             ):
                 continue
             best = max(best, d)
@@ -152,9 +151,7 @@ def test_no_incumbent_is_inconclusive(monkeypatch, status, expected):
     assert result.antipodal_pairs is None
 
 
-@pytest.mark.parametrize(
-    "graph", [nx.DiGraph(), nx.MultiGraph(), nx.Graph([(0, 0)])]
-)
+@pytest.mark.parametrize("graph", [nx.DiGraph(), nx.MultiGraph(), nx.Graph([(0, 0)])])
 def test_invalid_graphs(graph):
     with pytest.raises(ValueError, match="simple undirected"):
         find_induced_octahedron_ilp(graph)
