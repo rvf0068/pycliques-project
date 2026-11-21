@@ -126,3 +126,101 @@ def test_snub_o24_retraction_is_rediscovered(snub_fourth_iterate: nx.Graph) -> N
         snub_fourth_iterate.subgraph([v for pair in pairs for v in pair]),
         (result.retraction, result.inclusion),
     )
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"max_states": 0},
+        {"max_states": True},
+        {"max_states": 1.5},
+        {"seed": 2.5},
+    ],
+)
+def test_search_rejects_invalid_limits_and_seed(options: dict) -> None:
+    with pytest.raises(ValueError):
+        pycliques.find_octahedral_retraction(
+            pycliques.octahedron(3), [(0, 1), (2, 3), (4, 5)], **options
+        )
+
+
+def test_search_validates_missing_vertices_and_cross_edges() -> None:
+    pairs = [(0, 1), (2, 3), (4, 5)]
+    host = pycliques.octahedron(3)
+    with pytest.raises(ValueError, match="belong to the host"):
+        pycliques.find_octahedral_retraction(
+            host, [(0, 1), (2, 3), (4, 8)]
+        )
+    host.remove_edge(0, 2)
+    with pytest.raises(ValueError, match="completely joined"):
+        pycliques.find_octahedral_retraction(host, pairs)
+
+
+def test_target_itself_needs_no_search_branches() -> None:
+    host = pycliques.octahedron(3)
+    result = pycliques.find_octahedral_retraction(
+        host, [(0, 1), (2, 3), (4, 5)], max_states=1
+    )
+    assert result.status is pycliques.RetractionSearchStatus.FOUND
+    assert result.states_explored == 1
+    assert result.assignments_tried == 0
+    assert result.retraction == {v: v for v in host}
+
+
+def test_initial_singleton_propagation_rejects_opposite_images() -> None:
+    host = pycliques.octahedron(3)
+    host.add_nodes_from(("left", "right"))
+    # The two added vertices are initially forced to antipodal images
+    # 0 and 1, but they are adjacent in the host.
+    host.add_edges_from(("left", v) for v in (0, 2, 3, 4, 5))
+    host.add_edges_from(("right", v) for v in (1, 2, 3, 4, 5))
+    host.add_edge("left", "right")
+    result = pycliques.find_octahedral_retraction(
+        host, [(0, 1), (2, 3), (4, 5)]
+    )
+    assert result.status is pycliques.RetractionSearchStatus.EXHAUSTED
+    assert result.states_explored == 1
+    assert result.assignments_tried == 0
+
+
+@pytest.mark.parametrize(
+    "budget,expected_status,attempted",
+    [
+        (1, pycliques.RetractionSearchStatus.LIMIT_REACHED, 0),
+        (2, pycliques.RetractionSearchStatus.LIMIT_REACHED, 1),
+        (3, pycliques.RetractionSearchStatus.LIMIT_REACHED, 2),
+        (4, pycliques.RetractionSearchStatus.FOUND, 3),
+    ],
+)
+def test_rejected_propagation_counts_toward_budget(
+    budget: int, expected_status: pycliques.RetractionSearchStatus, attempted: int
+) -> None:
+    # This 10-vertex graph provokes an immediately rejected search branch.
+    # Previously the rejection was omitted from states_explored, so the
+    # reported number of states could be smaller than attempted + 1.
+    host = nx.from_graph6_bytes(b"I]~qs|njw")
+    result = pycliques.find_octahedral_retraction(
+        host, [(0, 1), (2, 3), (4, 5)], max_states=budget
+    )
+    assert result.status is expected_status
+    assert result.assignments_tried == attempted
+    assert result.states_explored == attempted + 1
+    assert result.states_explored <= budget
+    if result.status is pycliques.RetractionSearchStatus.FOUND:
+        assert result.retraction is not None
+        assert result.inclusion is not None
+        assert pycliques.verify_retraction_witness(
+            host, host.subgraph(range(6)),
+            (result.retraction, result.inclusion),
+        )
+
+
+def test_solver_rejects_its_own_invalid_witness(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "pycliques.octahedral_retractions.verify_retraction_witness",
+        lambda *_: False,
+    )
+    with pytest.raises(AssertionError, match="invalid witness"):
+        pycliques.find_octahedral_retraction(
+            pycliques.octahedron(3), [(0, 1), (2, 3), (4, 5)]
+        )
