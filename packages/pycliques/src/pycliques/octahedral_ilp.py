@@ -65,10 +65,7 @@ def _valid_target(
                 return False
     if require_dominating:
         endpoints = set(chosen)
-        if any(
-            all(v == u or graph.has_edge(v, u) for u in endpoints)
-            for v in graph
-        ):
+        if any(all(v == u or graph.has_edge(v, u) for u in endpoints) for v in graph):
             return False
     return True
 
