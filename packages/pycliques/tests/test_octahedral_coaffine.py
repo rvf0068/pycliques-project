@@ -1,4 +1,5 @@
 """Regression checks for exact unseeded coaffine octahedral retraction CSP."""
+
 from __future__ import annotations
 
 import networkx as nx
@@ -16,7 +17,11 @@ def f45_pared_iterates() -> list[nx.Graph]:
         assert nxt is not None
         result.append(pycliques.completely_pared_graph(nxt))
     assert [(len(g), g.number_of_edges()) for g in result] == [
-        (9, 21), (14, 59), (23, 158), (46, 740), (202, 16289)
+        (9, 21),
+        (14, 59),
+        (23, 158),
+        (46, 740),
+        (202, 16289),
     ]
     return result
 
@@ -35,21 +40,17 @@ def test_f45_fourth_pared_iterate_retracts_to_unseeded_o9(
     assert result.inclusion is not None
     assert result.endomorphism is not None
     assert result.states_explored < 10_000
-    assert pycliques.verify_induced_octahedron(
-        host, result.antipodal_pairs
-    )
+    assert pycliques.verify_induced_octahedron(host, result.antipodal_pairs)
     target = host.subgraph(v for p in result.antipodal_pairs for v in p)
     assert pycliques.verify_retraction_witness(
         host, target, (result.retraction, result.inclusion)
     )
     assert all(
-        not host.has_edge(v, result.endomorphism[v])
-        and v != result.endomorphism[v]
+        not host.has_edge(v, result.endomorphism[v]) and v != result.endomorphism[v]
         for v in host
     )
     assert all(
-        result.retraction[v] ==
-        result.endomorphism[result.endomorphism[v]]
+        result.retraction[v] == result.endomorphism[result.endomorphism[v]]
         for v in host
     )
 
@@ -96,20 +97,21 @@ def test_bounded_resource_limit_never_means_no_retraction(
     assert result.dimension is None
 
 
-@pytest.mark.parametrize("kwargs", [
-    {"min_dimension": 2},
-    {"min_dimension": True},
-    {"max_states": 0},
-    {"max_states": True},
-    {"time_limit": -1},
-    {"time_limit": float("nan")},
-    {"time_limit": True},
-])
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"min_dimension": 2},
+        {"min_dimension": True},
+        {"max_states": 0},
+        {"max_states": True},
+        {"time_limit": -1},
+        {"time_limit": float("nan")},
+        {"time_limit": True},
+    ],
+)
 def test_invalid_arguments(kwargs: dict) -> None:
     with pytest.raises(ValueError):
-        pycliques.find_octahedral_retraction_coaffine(
-            nx.octahedral_graph(), **kwargs
-        )
+        pycliques.find_octahedral_retraction_coaffine(nx.octahedral_graph(), **kwargs)
 
 
 def test_input_graph_validation() -> None:
