@@ -14,9 +14,9 @@ from pycliques import (
     clique_graph,
     find_octahedral_retraction,
     octahedron,
+    RetractionSearchStatus,
     verify_retraction_witness,
 )
-from pycliques.retractions import RetractionSearchStatus
 
 
 DATA = Path(__file__).parent / "data" / "snub_o24_retraction.json.b85"
