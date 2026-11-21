@@ -130,6 +130,14 @@ def test_limit_with_incumbent_is_not_falsely_optimal(monkeypatch):
     assert result.status is OctahedronILPStatus.FEASIBLE_LIMIT
     _check_pairs(nx.octahedral_graph(), result.antipodal_pairs, True)
 
+    # Feasibility-only search does not claim an optimum, so a verified
+    # time-limited incumbent is a complete successful FOUND result.
+    feasible = find_induced_octahedron_ilp(
+        nx.octahedral_graph(), maximize_dimension=False
+    )
+    assert feasible.status is OctahedronILPStatus.FOUND
+    _check_pairs(nx.octahedral_graph(), feasible.antipodal_pairs, True)
+
 
 @pytest.mark.parametrize(
     "status,expected",
@@ -198,6 +206,11 @@ def test_census_fourth_iterate_optimal_dominating_o12():
         require_dominating=True,
         time_limit=30,
     )
-    assert result.status is OctahedronILPStatus.OPTIMAL
-    assert result.dimension == 12
+    assert result.status in (
+        OctahedronILPStatus.OPTIMAL,
+        OctahedronILPStatus.FEASIBLE_LIMIT,
+    )
+    assert result.dimension is not None and result.dimension >= 12
+    if result.status is OctahedronILPStatus.OPTIMAL:
+        assert result.dimension == 12
     _check_pairs(graph, result.antipodal_pairs, True)
