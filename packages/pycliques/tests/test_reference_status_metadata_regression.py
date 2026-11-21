@@ -20,7 +20,10 @@ def test_recheck_preserves_saved_certificate_when_rule_is_inconclusive() -> None
         rule="reference", target_status="conjectured_divergent", target_label="example"
     )
     entries = [(7, graph, saved)]
-    assert _recheck_indeterminate_file(entries, 12, classifier=lambda seq: None) == entries
+    assert (
+        _recheck_indeterminate_file(entries, 12, classifier=lambda seq: None)
+        == entries
+    )
 
 
 def test_recheck_discards_classified_graph() -> None:
