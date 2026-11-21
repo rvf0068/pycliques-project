@@ -187,9 +187,7 @@ def find_induced_octahedron_amplified(
         dimension, common = len(pairs), allowed.bit_count()
         if dimension > best_dimension:
             best_dimension, best_common = dimension, common
-        if dimension >= target_dimension and (
-            not require_dominating or common == 0
-        ):
+        if dimension >= target_dimension and (not require_dominating or common == 0):
             found = pairs if require_dominating else pairs[:target_dimension]
             labels = tuple((nodes[a], nodes[b]) for a, b in found)
             if verify_induced_octahedron(
