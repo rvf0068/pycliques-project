@@ -84,8 +84,7 @@ def snub_fourth_iterate() -> nx.Graph:
     graph.add_edges_from((i, i + 1) for i in range(3))
     graph.add_edges_from((i, i + 1) for i in range(4, 7))
     graph.add_edges_from(
-        (i, 4 + j) for i in range(4) for j in range(4)
-        if i in (0, 3) or j in (0, 3)
+        (i, 4 + j) for i in range(4) for j in range(4) if i in (0, 3) or j in (0, 3)
     )
     assert nx.is_isomorphic(graph, nx.from_graph6_bytes(b"GQyuzw"))
     expected = [(8, 18), (12, 46), (20, 136), (56, 1196), (1076, 504360)]
