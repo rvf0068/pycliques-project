@@ -50,9 +50,17 @@ def find_octahedral_retraction(
     count toward ``max_states``; wall-clock time is not bounded.
 
     This method does *not* find an induced octahedron automatically; the
-    embedding must already have been identified. Graph edges may collapse
+    embedding must already have been identified. The host must be an
+    undirected simple loopless NetworkX graph. Graph edges may collapse
     to a vertex, as in the standard clique-graph morphism convention.
     """
+    if (
+        not isinstance(graph, nx.Graph)
+        or graph.is_multigraph()
+        or graph.is_directed()
+        or nx.number_of_selfloops(graph)
+    ):
+        raise ValueError("Require an undirected simple loopless graph")
     if (
         not isinstance(max_states, int)
         or isinstance(max_states, bool)
