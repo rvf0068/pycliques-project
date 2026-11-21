@@ -63,6 +63,9 @@ Tools for studying the **clique graph operator** K(G). Given a graph G, the cliq
 - `find_induced_octahedron` / `augment_induced_octahedron` /
   `amplify_induced_octahedron` — general octahedral search, local augmentation,
   and exact next-iterate lifting ([mathematics and examples](docs/octahedral_amplification.md))
+- `find_induced_octahedron_amplified` — bounded, graph-independent search
+  for induced octahedra using nonlocal antipodal-pair repairs;
+  [guide](docs/general_octahedral_amplification.md)
 - `find_octahedral_retraction` — bounded, bitset-based search onto a specified
   induced octahedron; [snub O24 proof and replay](docs/snub_o24_retraction.md)
 - `classify_clique_behavior` — apply the fast standard convergence/divergence
