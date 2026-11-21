@@ -130,12 +130,6 @@ from .named import (
     snub_disphenoid,
     suspension_of_cycle,
 )
-from .octahedral_nonlocal_search import (
-    OctahedronSearchResult,
-    OctahedronSearchStatus,
-    find_induced_octahedron_amplified,
-    verify_induced_octahedron,
-)
 from .octahedral_boolean import (
     MaximalIntersectingFamilies,
     OctahedralBooleanModel,
@@ -143,6 +137,12 @@ from .octahedral_boolean import (
     build_octahedral_boolean_model,
     degree_histogram,
     enumerate_maximal_intersecting_families,
+)
+from .octahedral_nonlocal_search import (
+    OctahedronSearchResult,
+    OctahedronSearchStatus,
+    find_induced_octahedron_amplified,
+    verify_induced_octahedron,
 )
 from .octahedral_retractions import find_octahedral_retraction
 from .poset_homotopy import (
