@@ -2,9 +2,8 @@
 from __future__ import annotations
 
 import networkx as nx
-import pytest
-
 import pycliques
+import pytest
 from pycliques.retractions import RetractionSearchStatus
 
 
