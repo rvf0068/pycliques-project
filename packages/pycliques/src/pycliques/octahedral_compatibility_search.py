@@ -1,6 +1,6 @@
 """Blind induced-octahedron search using compatible nonedges.
 
-An induced O_d is a clique of d vertices in the auxiliary graph whose
+An induced O_d corresponds to a complete set in the auxiliary graph whose
 vertices are nonedges of G, with edges joining pairs of nonedges having
 four cross-edges in G. We avoid explicitly constructing that potentially
 huge auxiliary graph by intersecting closed-neighborhood bitmasks.
@@ -167,9 +167,7 @@ def find_induced_octahedron_compatibility(
     def accept(
         pairs: list[tuple[int, int]], common_count: int, trial: int
     ) -> OctahedronSearchResult | None:
-        if len(pairs) < target_dimension or (
-            require_dominating and common_count != 0
-        ):
+        if len(pairs) < target_dimension or (require_dominating and common_count != 0):
             return None
         labels = tuple((nodes[u], nodes[v]) for u, v in pairs)
         if not verify_induced_octahedron(
@@ -211,9 +209,7 @@ def find_induced_octahedron_compatibility(
                 return found
         if dimension >= max(3, target_dimension - 5):
             pool.append(pairs)
-            pool.sort(
-                key=lambda p: (len(p), -common(p).bit_count()), reverse=True
-            )
+            pool.sort(key=lambda p: (len(p), -common(p).bit_count()), reverse=True)
             del pool[60:]
 
     return OctahedronSearchResult(
