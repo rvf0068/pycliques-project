@@ -144,11 +144,11 @@ from .octahedral_boolean import (
     degree_histogram,
     enumerate_maximal_intersecting_families,
 )
-from .octahedral_compatibility_search import find_induced_octahedron_compatibility
 from .octahedral_coaffine import (
     CoaffineOctahedronResult,
     find_octahedral_retraction_coaffine,
 )
+from .octahedral_compatibility_search import find_induced_octahedron_compatibility
 from .octahedral_nonlocal_search import (
     OctahedronSearchResult,
     OctahedronSearchStatus,
