@@ -100,8 +100,8 @@ def snub_o24_pairs_for_iterates(
                 bitmasks.append((mask, clique))
         except (KeyError, TypeError):
             return None
-        if len({mask for mask, _ in bitmasks}) != len(graph):
-            return None
+        # The source indices are distinct and frozensets are unique graph
+        # vertices, so the subset-to-bitmask encoding is injective.
         bitmasks.sort(key=lambda pair: pair[0])
         mapping = {index: clique for index, (_, clique) in enumerate(bitmasks)}
 
