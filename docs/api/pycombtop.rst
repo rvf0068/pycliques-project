@@ -54,7 +54,7 @@ Example: verifying a collapse certificate
 ------------------------------------------
 
 This small graph has a relative elementary-collapse sequence from
-``X = Δ(K(G))`` to ``N(G)``. ``PROVED`` means that the sequence was replayed
+:math:`X = \Delta(K(G))` to :math:`N(G)`. ``PROVED`` means that the sequence was replayed
 successfully; ``INCONCLUSIVE`` means that the bounded search did not establish
 a collapse. A verified collapse certificate is stronger than a homotopy
 equivalence claim, while vanishing rational relative Betti numbers are only a
