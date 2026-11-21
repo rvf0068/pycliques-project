@@ -104,9 +104,7 @@ def find_induced_octahedron(
     full = (1 << len(nodes)) - 1
     found: tuple[tuple[Hashable, Hashable], ...] | None = None
 
-    def walk(
-        available: int, chosen: list[tuple[int, int]]
-    ) -> bool:
+    def walk(available: int, chosen: list[tuple[int, int]]) -> bool:
         nonlocal count, found
         if len(chosen) == dimension:
             if require_dominating and available:
@@ -227,9 +225,7 @@ def augment_induced_octahedron(
             rest = work[:omitted] + work[omitted + 1 :]
             candidate_mask = common(rest)
             for a in _bits(candidate_mask):
-                others = (
-                    candidate_mask & ~masks[a] & ~((1 << (a + 1)) - 1)
-                )
+                others = candidate_mask & ~masks[a] & ~((1 << (a + 1)) - 1)
                 for b in _bits(others):
                     if not charge():
                         return None
@@ -241,9 +237,7 @@ def augment_induced_octahedron(
                                 return None
                             grown = rest + [(a, b), (c, d)]
                             if not require_dominating or common(grown) == 0:
-                                answer = tuple(
-                                    (nodes[u], nodes[v]) for u, v in grown
-                                )
+                                answer = tuple((nodes[u], nodes[v]) for u, v in grown)
                                 _check_pairs(graph, answer)
                                 return answer
 
