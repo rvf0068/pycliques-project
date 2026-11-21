@@ -63,9 +63,7 @@ def test_one_for_two_augments_smaller_octahedron() -> None:
 
 def test_augmentation_can_be_non_dominating() -> None:
     graph = pycliques.octahedron(5)
-    grown = augment_induced_octahedron(
-        graph, _pairs(3), max_walk_steps=0
-    )
+    grown = augment_induced_octahedron(graph, _pairs(3), max_walk_steps=0)
     assert grown is not None
     assert len(grown) == 4
     assert not is_dominating_octahedron(graph, grown)
