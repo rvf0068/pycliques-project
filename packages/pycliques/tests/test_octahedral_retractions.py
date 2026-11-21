@@ -215,7 +215,9 @@ def test_rejected_propagation_counts_toward_budget(
         )
 
 
-def test_solver_rejects_its_own_invalid_witness(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_solver_rejects_its_own_invalid_witness(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(
         "pycliques.octahedral_retractions.verify_retraction_witness",
         lambda *_: False,
