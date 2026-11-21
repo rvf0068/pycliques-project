@@ -52,7 +52,11 @@ def find_octahedral_retraction(
     embedding must already have been identified. Graph edges may collapse
     to a vertex, as in the standard clique-graph morphism convention.
     """
-    if not isinstance(max_states, int) or isinstance(max_states, bool) or max_states < 1:
+    if (
+        not isinstance(max_states, int)
+        or isinstance(max_states, bool)
+        or max_states < 1
+    ):
         raise ValueError("max_states must be a positive integer")
     if not isinstance(seed, int):
         raise ValueError("seed must be an integer")
@@ -95,7 +99,9 @@ def find_octahedral_retraction(
     target = graph.subgraph(target_vertices)
     inclusion = {v: v for v in target_vertices}
     if any(mask == 0 for mask in domains):
-        return BoundedRetractionResult(RetractionSearchStatus.EXHAUSTED, None, None, 1, 0)
+        return BoundedRetractionResult(
+            RetractionSearchStatus.EXHAUSTED, None, None, 1, 0
+        )
 
     rng = random.Random(seed)
     trail: list[tuple[int, int]] = []
@@ -129,10 +135,15 @@ def find_octahedral_retraction(
 
     queue = [i for i, mask in enumerate(domains) if mask.bit_count() == 1]
     if not propagate(queue):
-        return BoundedRetractionResult(RetractionSearchStatus.EXHAUSTED, None, None, 1, 0)
+        return BoundedRetractionResult(
+            RetractionSearchStatus.EXHAUSTED, None, None, 1, 0
+        )
 
     def choose_frame() -> _SearchFrame | None:
-        size = min((domains[i].bit_count() for i in outside if domains[i].bit_count() > 1), default=0)
+        size = min(
+            (domains[i].bit_count() for i in outside if domains[i].bit_count() > 1),
+            default=0,
+        )
         if size == 0:
             return None
         candidates = [i for i in outside if domains[i].bit_count() == size]
@@ -154,7 +165,11 @@ def find_octahedral_retraction(
             index = candidates[0]
         choices = [p for p in range(len(target_vertices)) if (domains[index] >> p) & 1]
         counts = {
-            p: sum(bool(domains[j] & (1 << (p ^ 1))) for j in neighbors[index] if nodes[j] not in target_set)
+            p: sum(
+                bool(domains[j] & (1 << (p ^ 1)))
+                for j in neighbors[index]
+                if nodes[j] not in target_set
+            )
             for p in choices
         }
         choices.sort(key=lambda p: (counts[p], rng.random()))
@@ -207,7 +222,11 @@ def find_octahedral_retraction(
             return found()
         frames.append(child)
     return BoundedRetractionResult(
-        RetractionSearchStatus.LIMIT_REACHED if limited else RetractionSearchStatus.EXHAUSTED,
+        (
+            RetractionSearchStatus.LIMIT_REACHED
+            if limited
+            else RetractionSearchStatus.EXHAUSTED
+        ),
         None,
         None,
         states_explored,
