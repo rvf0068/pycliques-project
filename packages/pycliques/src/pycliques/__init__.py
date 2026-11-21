@@ -138,6 +138,7 @@ from .octahedral_boolean import (
     degree_histogram,
     enumerate_maximal_intersecting_families,
 )
+from .octahedral_retractions import find_octahedral_retraction
 from .poset_homotopy import (
     ClosedCliqueIntersections,
     DoubleBoundHClosureResult,
@@ -352,6 +353,7 @@ __all__ = [
     "SpecialOctahedronWitness",
     "bounded_retraction",
     "dict_to_tuple",
+    "find_octahedral_retraction",
     "find_special_octahedron_witness",
     "graph_from_gap_adjacency_list",
     "has_induced",
