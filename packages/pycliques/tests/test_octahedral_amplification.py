@@ -72,9 +72,7 @@ def test_limit_is_not_negative_certificate() -> None:
 )
 def test_invalid_search_parameters(options: dict) -> None:
     with pytest.raises(ValueError):
-        pycliques.find_induced_octahedron_amplified(
-            nx.octahedral_graph(), **options
-        )
+        pycliques.find_induced_octahedron_amplified(nx.octahedral_graph(), **options)
 
 
 def test_invalid_embedding_is_rejected() -> None:
