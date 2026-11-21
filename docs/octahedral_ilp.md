@@ -40,8 +40,8 @@ labels; each reported target is independently checked against the input.
 | Status | Meaning |
 | --- | --- |
 | `OPTIMAL` | HiGHS reports optimal dimension, and a target is verified |
-| `FOUND` | Feasibility-only solve produced a verified target |
-| `FEASIBLE_LIMIT` | A verified incumbent was found but optimality is **unknown** |
+| `FOUND` | Feasibility-only solve produced a verified target, even with a time limit |
+| `FEASIBLE_LIMIT` | Optimization stopped with a verified incumbent; maximum dimension is **unknown** |
 | `INFEASIBLE` | No induced target satisfying the requested constraints exists |
 | `LIMIT_REACHED` | No incumbent within the resource budget: **inconclusive** |
 | `SOLVER_ERROR` | Solver failed or produced an invalid candidate: **inconclusive** |
