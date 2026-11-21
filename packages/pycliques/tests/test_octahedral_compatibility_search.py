@@ -76,17 +76,13 @@ def test_invalid_parameters(options: dict) -> None:
 )
 def test_invalid_graphs(bad_graph: nx.Graph) -> None:
     with pytest.raises(ValueError, match="undirected loopless"):
-        pycliques.find_induced_octahedron_compatibility(
-            bad_graph, target_dimension=3
-        )
+        pycliques.find_induced_octahedron_compatibility(bad_graph, target_dimension=3)
 
 
 def _canonical_clique_graph(graph: nx.Graph) -> nx.Graph:
     result = pycliques.clique_graph(graph, bound=1200)
     assert result is not None
-    order = sorted(
-        result, key=lambda clique: sum(1 << int(v) for v in clique)
-    )
+    order = sorted(result, key=lambda clique: sum(1 << int(v) for v in clique))
     return nx.relabel_nodes(result, {clique: i for i, clique in enumerate(order)})
 
 
@@ -97,10 +93,7 @@ def test_snub_o20_discovered_without_stored_coordinates() -> None:
     graph.add_edges_from((i, i + 1) for i in range(3))
     graph.add_edges_from((i, i + 1) for i in range(4, 7))
     graph.add_edges_from(
-        (i, 4 + j)
-        for i in range(4)
-        for j in range(4)
-        if i in (0, 3) or j in (0, 3)
+        (i, 4 + j) for i in range(4) for j in range(4) if i in (0, 3) or j in (0, 3)
     )
     for _ in range(4):
         graph = _canonical_clique_graph(graph)
