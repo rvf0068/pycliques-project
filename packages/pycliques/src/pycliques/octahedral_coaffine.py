@@ -229,9 +229,9 @@ def find_octahedral_retraction_coaffine(
 
     def dfs(d: list[int]):
         nonlocal states, assignments
-        states += 1
-        if states > max_states:
+        if states >= max_states:
             return limit
+        states += 1
         check_time()
         undecided = [i for i in range(n) if d[i].bit_count() > 1]
         if not undecided:
