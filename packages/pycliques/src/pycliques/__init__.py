@@ -138,6 +138,12 @@ from .octahedral_boolean import (
     degree_histogram,
     enumerate_maximal_intersecting_families,
 )
+from .octahedral_amplification import (
+    OctahedronSearchResult,
+    OctahedronSearchStatus,
+    find_induced_octahedron_amplified,
+    verify_induced_octahedron,
+)
 from .octahedral_retractions import find_octahedral_retraction
 from .poset_homotopy import (
     ClosedCliqueIntersections,
@@ -348,6 +354,10 @@ __all__ = [
     "snub_disphenoid",
     "suspension_of_cycle",
     # retractions
+    "OctahedronSearchResult",
+    "OctahedronSearchStatus",
+    "find_induced_octahedron_amplified",
+    "verify_induced_octahedron",
     "BoundedRetractionResult",
     "RetractionSearchStatus",
     "SpecialOctahedronWitness",
