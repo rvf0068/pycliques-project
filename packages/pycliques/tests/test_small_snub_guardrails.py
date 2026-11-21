@@ -55,13 +55,14 @@ def test_seeded_rule_handles_missing_iterate() -> None:
         def __getitem__(self, index: int) -> nx.Graph | None:
             return source if index == 0 else None
 
-    assert _test_iterate_certificates(
+    result = _test_iterate_certificates(
         Missing(source),
         tries=0,
         retraction_depth=0,
         targets=(),
         octahedron_retract_presets=("snub_o24",),
-    ) is None
+    )
+    assert result is None
 
 
 def test_seeded_rule_handles_missing_embedding(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -72,13 +73,14 @@ def test_seeded_rule_handles_missing_embedding(monkeypatch: pytest.MonkeyPatch) 
         def __getitem__(self, index: int) -> nx.Graph:
             return source
 
-    assert _test_iterate_certificates(
+    result = _test_iterate_certificates(
         Present(source),
         tries=0,
         retraction_depth=0,
         targets=(),
         octahedron_retract_presets=("snub_o24",),
-    ) is None
+    )
+    assert result is None
 
 
 def test_seeded_rule_reports_resource_limit(monkeypatch: pytest.MonkeyPatch) -> None:
