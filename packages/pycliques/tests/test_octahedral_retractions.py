@@ -113,7 +113,9 @@ def test_snub_o24_certificate_regression(snub_fourth_iterate: nx.Graph) -> None:
 def test_snub_o24_retraction_is_rediscovered(snub_fourth_iterate: nx.Graph) -> None:
     """Optional research test: rediscover a map from the same O24 embedding."""
     pairs = _certificate()["target_pairs"]
-    result = pycliques.find_octahedral_retraction(snub_fourth_iterate, pairs, max_states=5_000)
+    result = pycliques.find_octahedral_retraction(
+        snub_fourth_iterate, pairs, max_states=5_000
+    )
     assert result.status == pycliques.RetractionSearchStatus.FOUND
     assert result.retraction is not None
     assert result.inclusion is not None
