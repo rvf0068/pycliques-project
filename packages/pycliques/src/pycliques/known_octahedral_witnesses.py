@@ -54,10 +54,7 @@ def _labeled_f44() -> nx.Graph:
     graph.add_edges_from((i, i + 1) for i in range(3))
     graph.add_edges_from((i, i + 1) for i in range(4, 7))
     graph.add_edges_from(
-        (i, 4 + j)
-        for i in range(4)
-        for j in range(4)
-        if i in (0, 3) or j in (0, 3)
+        (i, 4 + j) for i in range(4) for j in range(4) if i in (0, 3) or j in (0, 3)
     )
     return graph
 
