@@ -11,7 +11,6 @@ import networkx as nx
 import pycliques
 import pytest
 
-
 DATA = Path(__file__).parent / "data" / "snub_o24_retraction.json.b85"
 
 
