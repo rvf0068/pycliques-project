@@ -154,7 +154,6 @@ def test_search_validates_missing_vertices_and_cross_edges() -> None:
         pycliques.find_octahedral_retraction(host, pairs)
 
 
-
 @pytest.mark.parametrize("graph_class", [nx.DiGraph, nx.MultiGraph, nx.MultiDiGraph])
 def test_rejects_directed_and_multigraph_hosts(
     graph_class: type[nx.Graph],
@@ -162,18 +161,14 @@ def test_rejects_directed_and_multigraph_hosts(
     # Even reciprocal directed edges do not make a valid simple graph input.
     host = graph_class(pycliques.octahedron(3))
     with pytest.raises(ValueError, match="undirected simple loopless graph"):
-        pycliques.find_octahedral_retraction(
-            host, [(0, 1), (2, 3), (4, 5)]
-        )
+        pycliques.find_octahedral_retraction(host, [(0, 1), (2, 3), (4, 5)])
 
 
 def test_rejects_looped_host() -> None:
     host = pycliques.octahedron(3)
     host.add_edge(0, 0)
     with pytest.raises(ValueError, match="undirected simple loopless graph"):
-        pycliques.find_octahedral_retraction(
-            host, [(0, 1), (2, 3), (4, 5)]
-        )
+        pycliques.find_octahedral_retraction(host, [(0, 1), (2, 3), (4, 5)])
 
 
 def test_target_itself_needs_no_search_branches() -> None:
