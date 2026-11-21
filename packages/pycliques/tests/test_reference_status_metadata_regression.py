@@ -21,8 +21,7 @@ def test_recheck_preserves_saved_certificate_when_rule_is_inconclusive() -> None
     )
     entries = [(7, graph, saved)]
     assert (
-        _recheck_indeterminate_file(entries, 12, classifier=lambda seq: None)
-        == entries
+        _recheck_indeterminate_file(entries, 12, classifier=lambda seq: None) == entries
     )
 
 
