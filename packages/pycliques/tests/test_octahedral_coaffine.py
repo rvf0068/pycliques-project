@@ -91,6 +91,7 @@ def test_bounded_resource_limit_never_means_no_retraction(
         f45_pared_iterates[4], max_states=1
     )
     assert result.status is RetractionSearchStatus.LIMIT_REACHED
+    assert result.states_explored == 1
     assert result.retraction is None
     assert result.dimension is None
 
