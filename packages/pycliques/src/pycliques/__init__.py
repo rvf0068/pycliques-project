@@ -130,7 +130,6 @@ from .named import (
     snub_disphenoid,
     suspension_of_cycle,
 )
-from .octahedral_retractions import find_octahedral_retraction
 from .octahedral_boolean import (
     MaximalIntersectingFamilies,
     OctahedralBooleanModel,
@@ -139,6 +138,7 @@ from .octahedral_boolean import (
     degree_histogram,
     enumerate_maximal_intersecting_families,
 )
+from .octahedral_retractions import find_octahedral_retraction
 from .poset_homotopy import (
     ClosedCliqueIntersections,
     DoubleBoundHClosureResult,
