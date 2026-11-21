@@ -222,12 +222,12 @@ def find_induced_octahedron_ilp(
                 graph, pairs, require_dominating=require_dominating
             ):
                 status = (
-                    OctahedronILPStatus.FEASIBLE_LIMIT
-                    if result.status == 1
+                    OctahedronILPStatus.FOUND
+                    if not maximize_dimension
                     else (
-                        OctahedronILPStatus.OPTIMAL
-                        if maximize_dimension
-                        else OctahedronILPStatus.FOUND
+                        OctahedronILPStatus.FEASIBLE_LIMIT
+                        if result.status == 1
+                        else OctahedronILPStatus.OPTIMAL
                     )
                 )
                 return OctahedronILPResult(status, pairs, len(pairs), details)
