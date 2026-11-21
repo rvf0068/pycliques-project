@@ -8,6 +8,7 @@ from pycliques.known_octahedral_witnesses import (
     snub_o24_pairs_for_iterates,
 )
 from pycliques.small import (
+    CliqueSequence,
     Verdict,
     _test_iterate_certificates,
     classify_clique_behavior,
@@ -96,9 +97,7 @@ def test_transport_snub_target_through_nested_clique_labels() -> None:
     assert pairs is not None
     assert len(pairs) == 24
     vertices = [v for pair in pairs for v in pair]
-    assert nx.is_isomorphic(
-        iterates[-1].subgraph(vertices), pycliques.octahedron(24)
-    )
+    assert nx.is_isomorphic(iterates[-1].subgraph(vertices), pycliques.octahedron(24))
 
 
 def test_seeded_classifier_rule_returns_verified_map(
@@ -107,10 +106,7 @@ def test_seeded_classifier_rule_returns_verified_map(
     """Exercise the seeded classification rule without a huge graph in CI."""
     source = nx.from_graph6_bytes(b"GQyuzw")
     target = pycliques.octahedron(24)
-    pairs = [
-        (a, b)
-        for a, b in nx.non_edges(target)
-    ]
+    pairs = list(nx.non_edges(target))
     assert len(pairs) == 24
     host = target.copy()
     host.add_edge(48, 0)
@@ -123,8 +119,13 @@ def test_seeded_classifier_rule_returns_verified_map(
         lambda _iterates: tuple(pairs),
     )
     sequence = [source, nx.path_graph(1), nx.path_graph(1), nx.path_graph(1), host]
+
+    class StubSequence(CliqueSequence):
+        def __getitem__(self, index: int) -> nx.Graph:
+            return sequence[index]
+
     verdict = _test_iterate_certificates(
-        sequence,
+        StubSequence(source),
         tries=5,
         retraction_depth=0,
         targets=(),
@@ -138,7 +139,7 @@ def test_seeded_classifier_rule_returns_verified_map(
     assert certificate is not None
     assert certificate.rule == "octahedron_retraction_seeded"
     assert certificate.target is not None
-    assert certificate.map is not None
+    assert isinstance(certificate.map, tuple)
     assert pycliques.verify_retraction_witness(
         host, certificate.target, certificate.map
     )
