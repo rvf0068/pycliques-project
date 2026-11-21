@@ -130,6 +130,12 @@ from .named import (
     snub_disphenoid,
     suspension_of_cycle,
 )
+from .octahedral_amplification import (
+    amplify_induced_octahedron,
+    augment_induced_octahedron,
+    find_induced_octahedron,
+    is_dominating_octahedron,
+)
 from .octahedral_boolean import (
     MaximalIntersectingFamilies,
     OctahedralBooleanModel,
@@ -353,6 +359,10 @@ __all__ = [
     "SpecialOctahedronWitness",
     "bounded_retraction",
     "dict_to_tuple",
+    "amplify_induced_octahedron",
+    "augment_induced_octahedron",
+    "find_induced_octahedron",
+    "is_dominating_octahedron",
     "find_octahedral_retraction",
     "find_special_octahedron_witness",
     "graph_from_gap_adjacency_list",
