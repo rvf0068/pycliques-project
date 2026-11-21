@@ -10,10 +10,10 @@ from pathlib import Path
 import networkx as nx
 import pytest
 from pycliques import (
-    RetractionSearchStatus,
     clique_graph,
     find_octahedral_retraction,
     octahedron,
+    RetractionSearchStatus,
     verify_retraction_witness,
 )
 
