@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - "docs/**"
+      - "packages/**"
+      - "research/partition_lattice.py"
+      - "pyproject.toml"
+      - "uv.lock"
       - "Makefile"
       - ".github/workflows/docs-pdf.yml"
   workflow_dispatch:
