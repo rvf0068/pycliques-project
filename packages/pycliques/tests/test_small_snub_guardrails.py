@@ -66,9 +66,7 @@ def test_seeded_rule_handles_missing_iterate() -> None:
 
 def test_seeded_rule_handles_missing_embedding(monkeypatch: pytest.MonkeyPatch) -> None:
     source = _labeled_f44()
-    monkeypatch.setattr(
-        "pycliques.small.snub_o24_pairs_for_iterates", lambda _: None
-    )
+    monkeypatch.setattr("pycliques.small.snub_o24_pairs_for_iterates", lambda _: None)
 
     class Present(CliqueSequence):
         def __getitem__(self, index: int) -> nx.Graph:
@@ -87,9 +85,7 @@ def test_seeded_rule_reports_resource_limit(monkeypatch: pytest.MonkeyPatch) -> 
     source = _labeled_f44()
     target = nx.octahedral_graph()
     pairs = tuple(nx.non_edges(target))
-    monkeypatch.setattr(
-        "pycliques.small.snub_o24_pairs_for_iterates", lambda _: pairs
-    )
+    monkeypatch.setattr("pycliques.small.snub_o24_pairs_for_iterates", lambda _: pairs)
     monkeypatch.setattr(
         "pycliques.small.find_octahedral_retraction",
         lambda *_args, **_kwargs: BoundedRetractionResult(
