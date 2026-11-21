@@ -145,6 +145,10 @@ from .octahedral_boolean import (
     enumerate_maximal_intersecting_families,
 )
 from .octahedral_compatibility_search import find_induced_octahedron_compatibility
+from .octahedral_coaffine import (
+    CoaffineOctahedronResult,
+    find_octahedral_retraction_coaffine,
+)
 from .octahedral_nonlocal_search import (
     OctahedronSearchResult,
     OctahedronSearchStatus,
@@ -376,6 +380,8 @@ __all__ = [
     "find_induced_octahedron",
     "is_dominating_octahedron",
     "find_octahedral_retraction",
+    "CoaffineOctahedronResult",
+    "find_octahedral_retraction_coaffine",
     "find_special_octahedron_witness",
     "graph_from_gap_adjacency_list",
     "has_induced",
