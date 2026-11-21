@@ -141,12 +141,8 @@ def test_four_pairs_can_be_discovered_or_retained() -> None:
 )
 def test_invalid_graphs_are_rejected(bad_graph: nx.Graph) -> None:
     with pytest.raises(ValueError, match="simple undirected"):
-        pycliques.find_induced_octahedron_amplified(
-            bad_graph, target_dimension=3
-        )
+        pycliques.find_induced_octahedron_amplified(bad_graph, target_dimension=3)
 
 
 def test_missing_cross_edges_are_rejected() -> None:
-    assert not pycliques.verify_induced_octahedron(
-        nx.empty_graph(4), [(0, 1), (2, 3)]
-    )
+    assert not pycliques.verify_induced_octahedron(nx.empty_graph(4), [(0, 1), (2, 3)])
