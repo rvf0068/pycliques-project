@@ -321,7 +321,7 @@ def clear_reference_graphs() -> None:
 
 register_reference_graph(
     snub_disphenoid(),
-    status=ReferenceStatus.CONJECTURED,
+    status=ReferenceStatus.PROVEN,
     label="snub_disphenoid",
 )
 
@@ -1692,7 +1692,15 @@ def classify_clique_behavior(
     seq = CliqueSequence(pared_graph, bound=bound)
     conditional_result: ClassifierResult | None = None
 
-    reference_result = _classify_reference_graph(pared_graph)
+    # Opt-in research replay must execute the solver rather than stop at
+    # the independently proven snub reference classification.
+    seeded_snub_requested = (
+        "snub_o24" in octahedron_retract_presets
+        and snub_o24_matches_source(pared_graph)
+    )
+    reference_result = (
+        None if seeded_snub_requested else _classify_reference_graph(pared_graph)
+    )
     if reference_result is not None:
         verdict, reason, certificate = reference_result
         if verdict is Verdict.INDETERMINATE:
