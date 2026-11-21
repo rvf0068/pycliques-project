@@ -60,10 +60,10 @@ from pycliques.octahedral_retractions import find_octahedral_retraction
 from pycliques.retractions import (
     RetractionSearchStatus,
     SpecialOctahedronWitness,
-    verify_retraction_witness,
     find_special_octahedron_witness,
     retracts,
     special_octahedra_dimension,
+    verify_retraction_witness,
 )
 from pycliques.targeted_retractions import (
     TargetSearchStatus,
