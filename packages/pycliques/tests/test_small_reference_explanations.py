@@ -21,7 +21,7 @@ def _restore_builtins() -> None:
     clear_reference_graphs()
     register_reference_graph(
         snub_disphenoid(),
-        status=ReferenceStatus.CONJECTURED,
+        status=ReferenceStatus.PROVEN,
         label="snub_disphenoid",
     )
     register_reference_graph(
@@ -64,17 +64,16 @@ def test_named_proven_direct_reference():
     assert cert.target_label == "octahedral_graph"
 
 
-def test_named_conjectured_direct_reference():
+def test_snub_now_has_proven_direct_reference():
     result = _classify_reference_graph(snub_disphenoid())
 
     assert result is not None
     verdict, reason, cert = result
-    assert verdict is Verdict.INDETERMINATE
+    assert verdict is Verdict.DIVERGENT
     assert "'snub_disphenoid'" in reason
-    assert "conjectured" in reason
-    assert "proven" not in reason
+    assert "proven clique divergent" in reason
     assert cert is not None
-    assert cert.target_status == "conjectured_divergent"
+    assert cert.target_status == "proven_divergent"
     assert cert.target_label == "snub_disphenoid"
 
 
