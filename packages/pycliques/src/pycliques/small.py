@@ -1354,7 +1354,7 @@ def _test_iterate_certificates(
                         seeded_witness = (seeded.retraction, seeded.inclusion)
                         if not verify_retraction_witness(graph, target, seeded_witness):
                             raise AssertionError("Seeded O24 witness failed replay")
-                        certificate = Certificate(
+                        seeded_certificate = Certificate(
                             rule="octahedron_retraction_seeded",
                             source=graph,
                             target=target,
@@ -1366,7 +1366,7 @@ def _test_iterate_certificates(
                         return (
                             Verdict.DIVERGENT,
                             "pared iterate 4 retracts onto seeded O_24 (snub)",
-                            certificate,
+                            seeded_certificate,
                         )
                     octahedron_limited |= (
                         seeded.status is RetractionSearchStatus.LIMIT_REACHED
