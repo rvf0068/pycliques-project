@@ -19,8 +19,6 @@ jobs:
       - run: uv sync --frozen --python 3.11
       - name: Ruff import fix preview
         run: uv run ruff check --diff packages/pycliques/tests/test_targeted_retractions.py packages/pycombtop/tests/test_bounded_betti.py || true
-      - name: Ruff generic octahedral formatter preview
-        run: uv run ruff format --diff packages/pycliques/src/pycliques/octahedral_amplification.py packages/pycliques/tests/test_octahedral_amplification.py
       - name: Ruff formatter preview
         run: uv run ruff format --diff packages/pycliques/src/pycliques/targeted_retractions.py packages/pycombtop/src/pycombtop/bounded_betti.py packages/pycliques/tests/test_targeted_retractions.py packages/pycombtop/tests/test_bounded_betti.py
       - name: Targeted module line-coverage report
