@@ -1,0 +1,42 @@
+name: Optional octahedral MILP verification
+
+on:
+  pull_request:
+    paths:
+      - "packages/pycliques/src/pycliques/octahedral_ilp.py"
+      - "packages/pycliques/tests/test_octahedral_ilp.py"
+      - "docs/octahedral_ilp.md"
+      - ".github/workflows/octahedral-ilp.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scipy-milp:
+    name: Exact ILP and census regression (Python 3.11)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - name: Install Python and existing workspace
+        run: |
+          uv python install 3.11
+          uv sync --python 3.11
+      - name: Install optional SciPy/HiGHS dependency
+        run: uv pip install 'scipy>=1.11'
+      - name: Run fast and full census regression with SciPy enabled
+        run: |
+          uv run --no-sync pytest packages/pycliques/tests/test_octahedral_ilp.py \
+            -m 'not slow' --cov=pycliques.octahedral_ilp \
+            --cov-report=xml:coverage-octahedral-ilp.xml
+          uv run --no-sync pytest packages/pycliques/tests/test_octahedral_ilp.py \
+            -m slow -v
+      - name: Upload supplementary ILP coverage
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage-octahedral-ilp.xml
+          flags: pycliques-ilp
+          fail_ci_if_error: false
