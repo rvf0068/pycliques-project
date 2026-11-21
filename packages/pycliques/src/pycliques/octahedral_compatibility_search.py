@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import math
 import random
-from collections.abc import Hashable, Iterator
+from collections.abc import Iterator
 
 import networkx as nx
 
