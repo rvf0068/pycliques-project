@@ -1,0 +1,36 @@
+name: Documentation PDF build
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "Makefile"
+      - ".github/workflows/docs-pdf.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  latexpdf:
+    name: Build Sphinx PDF with pdfLaTeX
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - name: Install Python documentation dependencies
+        run: uv sync --group dev
+      - name: Install TeX Live tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq latexmk texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended xindy
+      - name: Build package PDF via the documented command
+        run: make pdf
+      - name: Upload compiled documentation
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pycliques-documentation-pdf
+          path: docs/_build/latex/pycliques.pdf
+          if-no-files-found: error
