@@ -454,7 +454,7 @@ def test_ref_dep_retraction_proven_certificate():
         clear_reference_graphs()
         register_reference_graph(
             snub_disphenoid(),
-            status=ReferenceStatus.CONJECTURED,
+            status=ReferenceStatus.PROVEN,
             label="snub_disphenoid",
         )
         register_reference_graph(
@@ -489,7 +489,7 @@ def test_ref_dep_retraction_conjectural_indeterminate():
         clear_reference_graphs()
         register_reference_graph(
             snub_disphenoid(),
-            status=ReferenceStatus.CONJECTURED,
+            status=ReferenceStatus.PROVEN,
             label="snub_disphenoid",
         )
         register_reference_graph(
@@ -538,10 +538,8 @@ def test_classify_local_bridge_divergent():
     assert certificate.edge == (0, "leaf")
 
 
-def test_classify_local_bridge_conjectured_divergent():
-    """Contracting a local bridge attached to snub disphenoid yields
-    INDETERMINATE with conjectured status.
-    """
+def test_classify_local_bridge_snub_proven_divergent():
+    """A local bridge attached to the proven divergent snub is divergent."""
     from pycliques import classify_local_bridge
 
     # Snub disphenoid + a leaf node attached by a bridge
@@ -551,12 +549,11 @@ def test_classify_local_bridge_conjectured_divergent():
     local_res = classify_local_bridge(g)
     assert local_res is not None
     verdict, reason, certificate = local_res
-    assert verdict is Verdict.INDETERMINATE
-    assert "conjectured" in reason
+    assert verdict is Verdict.DIVERGENT
     assert "Theorem 6.1" in reason
     assert certificate is not None
     assert certificate.rule == "local_bridge"
-    assert certificate.target_status == "conjectured_divergent"
+    assert certificate.target_status == "proven_divergent"
     assert certificate.target_label == "snub_disphenoid"
     assert certificate.edge == (0, "leaf")
 
@@ -592,10 +589,8 @@ def test_classify_non_triangle_edge_divergent():
     assert list(nx.common_neighbors(g, *certificate.edge)) == []
 
 
-def test_classify_non_triangle_edge_conjectured_divergent():
-    """Deleting a non-triangle edge that yields a conjectured divergent graph
-    returns INDETERMINATE with conjectured status.
-    """
+def test_classify_non_triangle_edge_snub_proven_divergent():
+    """A non-triangle edge deletion reaching the snub proves divergence."""
     from pycliques import classify_non_triangle_edge
 
     snub = snub_disphenoid()
@@ -610,12 +605,11 @@ def test_classify_non_triangle_edge_conjectured_divergent():
     res = classify_non_triangle_edge(g)
     assert res is not None
     verdict, reason, certificate = res
-    assert verdict is Verdict.INDETERMINATE
-    assert "conjectured" in reason
+    assert verdict is Verdict.DIVERGENT
     assert "Theorem 6.2" in reason
     assert certificate is not None
     assert certificate.rule == "non_triangle_edge"
-    assert certificate.target_status == "conjectured_divergent"
+    assert certificate.target_status == "proven_divergent"
     assert certificate.target_label == "snub_disphenoid"
     assert certificate.edge is not None
     assert list(nx.common_neighbors(g, *certificate.edge)) == []
@@ -726,10 +720,8 @@ def test_inverse_cutpoint_extension_rejects_invalid_split():
     assert not is_admissible_inverse_extension(extension)
 
 
-def test_classify_inverse_cutpoint_extension_conjectured_divergent():
-    """A split whose target is only conjectured divergent yields a
-    conditional INDETERMINATE result, never a proven DIVERGENT verdict.
-    """
+def test_classify_inverse_cutpoint_extension_snub_proven_divergent():
+    """A cutpoint extension of a proven divergent graph preserves the verdict."""
     from pycliques import classify_inverse_cutpoint_extension
     from pycliques.cutpoints import contract_local_bridge
 
@@ -744,16 +736,14 @@ def test_classify_inverse_cutpoint_extension_conjectured_divergent():
     res = classify_inverse_cutpoint_extension(h)
     assert res is not None
     verdict, reason, certificate = res
-    assert verdict is Verdict.INDETERMINATE
-    assert "conjectured" in reason
+    assert verdict is Verdict.DIVERGENT
     assert certificate is not None
     assert certificate.rule == "inverse_cutpoint_extension"
-    assert certificate.target_status == "conjectured_divergent"
+    assert certificate.target_status == "proven_divergent"
     assert certificate.target_label == "snub_disphenoid"
 
-    # The global classifier must not silently promote this to DIVERGENT.
     overall = classify_clique_behavior(h)
-    assert overall.verdict is not Verdict.DIVERGENT
+    assert overall.verdict is Verdict.DIVERGENT
 
 
 def test_classify_inverse_cutpoint_extension_respects_budget():
@@ -766,7 +756,7 @@ def test_classify_inverse_cutpoint_extension_respects_budget():
 
 
 def test_save_indeterminate_includes_certificate_metadata(tmp_path):
-    """Saved indeterminate rows include certificate metadata when available."""
+    """Saved rows record provenance, including a now-proven snub reference."""
     from pycliques.small import _save_indeterminate
 
     g = nx.disjoint_union(snub_disphenoid(), nx.cycle_graph(5))
@@ -782,7 +772,7 @@ def test_save_indeterminate_includes_certificate_metadata(tmp_path):
     saved = (tmp_path / "indeterminate_order_9.txt").read_text().splitlines()
     row = next(line for line in saved if line and not line.startswith("#"))
     assert "retracts" in row
-    assert "conjectured_divergent" in row
+    assert "proven_divergent" in row
     assert "snub_disphenoid" in row
 
 

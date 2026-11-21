@@ -51,12 +51,19 @@ from pycliques.cutpoints import (
 )
 from pycliques.dominated import completely_pared_graph, find_dominated_vertex
 from pycliques.helly import is_clique_helly
+from pycliques.known_octahedral_witnesses import (
+    snub_o24_matches_source,
+    snub_o24_pairs_for_iterates,
+)
 from pycliques.named import complement_of_cycle, snub_disphenoid, suspension_of_cycle
+from pycliques.octahedral_retractions import find_octahedral_retraction
 from pycliques.retractions import (
+    RetractionSearchStatus,
     SpecialOctahedronWitness,
     find_special_octahedron_witness,
     retracts,
     special_octahedra_dimension,
+    verify_retraction_witness,
 )
 from pycliques.targeted_retractions import (
     TargetSearchStatus,
@@ -314,7 +321,7 @@ def clear_reference_graphs() -> None:
 
 register_reference_graph(
     snub_disphenoid(),
-    status=ReferenceStatus.CONJECTURED,
+    status=ReferenceStatus.PROVEN,
     label="snub_disphenoid",
 )
 
@@ -1305,6 +1312,7 @@ def _test_iterate_certificates(
     octahedron_max_patterns: int = 5_000,
     octahedron_max_states: int = 100_000,
     octahedron_max_assignments: int = 500_000,
+    octahedron_retract_presets: tuple[str, ...] = (),
 ) -> ClassifierResult | None:
     """Inspect each pared iterate fully before constructing the next.
 
@@ -1315,8 +1323,55 @@ def _test_iterate_certificates(
     restricted to the first two pared iterates, regardless of `tries`.
     An octahedral retraction search is opt-in at explicitly selected
     iterate indices and dimensions, with independent replay and budgets.
+    A known target preset may construct its required iterate first.
     """
     octahedron_limited = False
+    snub_seeded = (
+        "snub_o24" in octahedron_retract_presets
+        and snub_o24_matches_source(seq[0])
+    )
+    # Try the supplied octahedral embedding before any general
+    # Helly/special-octahedron recognition. No projection
+    # is preloaded; the solver must discover a valid retraction.
+    if snub_seeded:
+        graph = seq[4]
+        if graph is not None:
+            prefix = [seq[j] for j in range(5)]
+            if all(step is not None for step in prefix):
+                pared_iterates = cast(list[nx.Graph], prefix)
+                pairs = snub_o24_pairs_for_iterates(pared_iterates)
+                if pairs is not None:
+                    seeded = find_octahedral_retraction(
+                        graph,
+                        pairs,
+                        max_states=octahedron_max_states,
+                    )
+                    if seeded.status is RetractionSearchStatus.FOUND:
+                        if seeded.retraction is None or seeded.inclusion is None:
+                            raise AssertionError("Missing seeded retraction witness")
+                        target_vertices = [v for pair in pairs for v in pair]
+                        target = graph.subgraph(target_vertices).copy()
+                        seeded_witness = (seeded.retraction, seeded.inclusion)
+                        if not verify_retraction_witness(graph, target, seeded_witness):
+                            raise AssertionError("Seeded O24 witness failed replay")
+                        seeded_certificate = Certificate(
+                            rule="octahedron_retraction_seeded",
+                            source=graph,
+                            target=target,
+                            target_status="proven_divergent",
+                            target_label="O_24",
+                            map=seeded_witness,
+                            iterate_index=4,
+                        )
+                        return (
+                            Verdict.DIVERGENT,
+                            "pared iterate 4 retracts onto seeded O_24 (snub)",
+                            seeded_certificate,
+                        )
+                    octahedron_limited |= (
+                        seeded.status is RetractionSearchStatus.LIMIT_REACHED
+                    )
+
     for i in range(tries):
         graph = seq[i]
         if graph is None:
@@ -1419,6 +1474,7 @@ def _default_classifiers(
     octahedron_max_patterns: int = 5_000,
     octahedron_max_states: int = 100_000,
     octahedron_max_assignments: int = 500_000,
+    octahedron_retract_presets: tuple[str, ...] = (),
 ) -> list[Classifier]:
     """Check clockwork, then Helly/retractions/special octahedra per iterate.
 
@@ -1451,6 +1507,7 @@ def _default_classifiers(
             octahedron_max_patterns=octahedron_max_patterns,
             octahedron_max_states=octahedron_max_states,
             octahedron_max_assignments=octahedron_max_assignments,
+            octahedron_retract_presets=octahedron_retract_presets,
         ),
     ]
 
@@ -1478,6 +1535,7 @@ def classify_clique_behavior(
     octahedron_max_patterns: int = 5_000,
     octahedron_max_states: int = 100_000,
     octahedron_max_assignments: int = 500_000,
+    octahedron_retract_presets: tuple[str, ...] = (),
 ) -> CliqueBehavior:
     """Classify the observed clique behavior of an undirected graph.
 
@@ -1555,6 +1613,15 @@ def classify_clique_behavior(
     octahedron_max_assignments : int, optional
         Positive bounds for each selected iterate's candidate and CSP search.
         Reaching a limit never establishes the absence of a retraction.
+    octahedron_retract_presets : tuple[str, ...], optional
+        Opt-in known-embedding search. Currently "snub_o24" is supported:
+        for a snub disphenoid (any vertex labeling), construct K^4(G),
+        transport the independently known induced O_24 embedding, and
+        search afresh for a retraction using the specialized bitset solver.
+        Requires tries >= 5 and bound >= 1076. This does not replay a saved
+        projection and does not discover the O_24 embedding from scratch.
+        The per-target budget is octahedron_max_states; the generic pattern
+        and assignment budgets do not apply to this seeded solver.
 
     .. rubric:: Returns
 
@@ -1616,12 +1683,27 @@ def classify_clique_behavior(
         octahedron_max_assignments,
     ) < 1:
         raise ValueError("octahedron search budgets must be positive")
+    if (
+        len(set(octahedron_retract_presets)) != len(octahedron_retract_presets)
+        or any(preset != "snub_o24" for preset in octahedron_retract_presets)
+    ):
+        raise ValueError("Unknown or duplicated octahedron retraction preset")
+    if "snub_o24" in octahedron_retract_presets and (tries < 5 or bound < 1076):
+        raise ValueError("snub_o24 requires tries >= 5 and bound >= 1076")
 
     pared_graph = completely_pared_graph(graph)
     seq = CliqueSequence(pared_graph, bound=bound)
     conditional_result: ClassifierResult | None = None
 
-    reference_result = _classify_reference_graph(pared_graph)
+    # Opt-in research replay must execute the solver rather than stop at
+    # the independently proven snub reference classification.
+    seeded_snub_requested = (
+        "snub_o24" in octahedron_retract_presets
+        and snub_o24_matches_source(pared_graph)
+    )
+    reference_result = (
+        None if seeded_snub_requested else _classify_reference_graph(pared_graph)
+    )
     if reference_result is not None:
         verdict, reason, certificate = reference_result
         if verdict is Verdict.INDETERMINATE:
@@ -1655,6 +1737,7 @@ def classify_clique_behavior(
         octahedron_max_patterns=octahedron_max_patterns,
         octahedron_max_states=octahedron_max_states,
         octahedron_max_assignments=octahedron_max_assignments,
+        octahedron_retract_presets=octahedron_retract_presets,
     ):
         result = classifier(seq)
         if result is not None:
@@ -1856,6 +1939,7 @@ def classify_clique_behavior_with_clockwork_pair_search(
     octahedron_max_patterns: int = 5_000,
     octahedron_max_states: int = 100_000,
     octahedron_max_assignments: int = 500_000,
+    octahedron_retract_presets: tuple[str, ...] = (),
     max_m: int = 3,
     max_n: int = 3,
     max_coaffinations: int = 20,
@@ -1910,6 +1994,7 @@ def classify_clique_behavior_with_clockwork_pair_search(
         octahedron_max_patterns=octahedron_max_patterns,
         octahedron_max_states=octahedron_max_states,
         octahedron_max_assignments=octahedron_max_assignments,
+        octahedron_retract_presets=octahedron_retract_presets,
     )
     if fast.verdict is not Verdict.INDETERMINATE:
         return fast

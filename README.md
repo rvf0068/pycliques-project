@@ -60,6 +60,9 @@ Tools for studying the **clique graph operator** K(G). Given a graph G, the cliq
 - `completely_pared_graph` / `find_dominated_vertex` — graph dismantling
 - `recognize_clockwork` / `is_clique_divergent_clockwork` — clockwork-graph recognition
 - `retracts` / `special_octahedra_dimension` — retraction tests
+- `find_induced_octahedron` / `augment_induced_octahedron` /
+  `amplify_induced_octahedron` — general octahedral search, local augmentation,
+  and exact next-iterate lifting ([mathematics and examples](docs/octahedral_amplification.md))
 - `find_induced_octahedron_amplified` — bounded, graph-independent search
   for induced octahedra using nonlocal antipodal-pair repairs;
   [guide](docs/general_octahedral_amplification.md)
@@ -67,6 +70,8 @@ Tools for studying the **clique graph operator** K(G). Given a graph G, the cliq
   induced octahedron; [snub O24 proof and replay](docs/snub_o24_retraction.md)
 - `classify_clique_behavior` — apply the fast standard convergence/divergence
   tests to one graph
+  (opt-in `octahedron_retract_presets=("snub_o24",)` reconstructs K^4(snub)
+  and rediscovers the certified O24 retraction; see the proof guide above)
 - `classify_clockwork_pair_map` — the separate, more expensive clockwork-pair
   (coaffination) search based on [LNP06, Theorems 2.6 and 3.1]
 - `classify_clique_behavior_with_clockwork_pair_search` — runs the fast pass, then
