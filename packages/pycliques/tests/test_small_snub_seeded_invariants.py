@@ -5,6 +5,8 @@ classifier also rejects a violated solver contract rather than claiming
 a mathematical proof from an invalid certificate.
 """
 
+from collections.abc import Hashable
+
 import networkx as nx
 import pytest
 from pycliques.known_octahedral_witnesses import _labeled_f44
@@ -53,7 +55,7 @@ def test_seeded_retraction_rejects_invalid_projection(
     seq = _SyntheticSnubSequence()
     pairs = tuple(nx.non_edges(seq.host))
     monkeypatch.setattr("pycliques.small.snub_o24_pairs_for_iterates", lambda _: pairs)
-    projection = {v: 0 for v in seq.host}
+    projection: dict[Hashable, Hashable] = {v: 0 for v in seq.host}
     inclusion = {v: v for v in seq.host}
     monkeypatch.setattr(
         "pycliques.small.find_octahedral_retraction",
