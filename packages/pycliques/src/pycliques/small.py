@@ -1351,8 +1351,8 @@ def _test_iterate_certificates(
                             raise AssertionError("Missing seeded retraction witness")
                         target_vertices = [v for pair in pairs for v in pair]
                         target = graph.subgraph(target_vertices).copy()
-                        witness = (seeded.retraction, seeded.inclusion)
-                        if not verify_retraction_witness(graph, target, witness):
+                        seeded_witness = (seeded.retraction, seeded.inclusion)
+                        if not verify_retraction_witness(graph, target, seeded_witness):
                             raise AssertionError("Seeded O24 witness failed replay")
                         certificate = Certificate(
                             rule="octahedron_retraction_seeded",
@@ -1360,7 +1360,7 @@ def _test_iterate_certificates(
                             target=target,
                             target_status="proven_divergent",
                             target_label="O_24",
-                            map=witness,
+                            map=seeded_witness,
                             iterate_index=4,
                         )
                         return (
