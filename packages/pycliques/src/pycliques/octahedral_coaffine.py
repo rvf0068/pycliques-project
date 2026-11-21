@@ -13,6 +13,7 @@ A bounded search gives no negative conclusion upon reaching a limit.
 
 Unlike coaffinations, these endomorphisms need NOT be automorphisms.
 """
+
 from __future__ import annotations
 
 import math
@@ -108,9 +109,7 @@ def find_octahedral_retraction_coaffine(
     n = len(nodes)
     positions = {v: i for i, v in enumerate(nodes)}
     neighbors = [tuple(positions[w] for w in graph[v]) for v in nodes]
-    closed = [
-        sum(1 << j for j in neighbors[i]) | (1 << i) for i in range(n)
-    ]
+    closed = [sum(1 << j for j in neighbors[i]) | (1 << i) for i in range(n)]
     full = (1 << n) - 1
     domains = [full & ~closed[i] for i in range(n)]
     start = time.monotonic()
@@ -126,8 +125,14 @@ def find_octahedral_retraction_coaffine(
         endomorphism: dict[Hashable, Hashable] | None = None,
     ) -> CoaffineOctahedronResult:
         return CoaffineOctahedronResult(
-            status, pairs, projection, inclusion, endomorphism,
-            states, revisions, assignments
+            status,
+            pairs,
+            projection,
+            inclusion,
+            endomorphism,
+            states,
+            revisions,
+            assignments,
         )
 
     if n < 2 * min_dimension or any(mask == 0 for mask in domains):
@@ -140,9 +145,7 @@ def find_octahedral_retraction_coaffine(
         if time_limit is not None and time.monotonic() - start > time_limit:
             raise _TimeLimit
 
-    def propagate(
-        d: list[int], pending: deque[tuple[int, int]]
-    ) -> bool:
+    def propagate(d: list[int], pending: deque[tuple[int, int]]) -> bool:
         """Revise directed arcs (i,j): image(i)~image(j) or equality."""
         nonlocal revisions
         processed = 0
@@ -172,18 +175,25 @@ def find_octahedral_retraction_coaffine(
 
     def positive(
         d: list[int],
-    ) -> tuple[
-        tuple[tuple[Hashable, Hashable], ...],
-        dict[Hashable, Hashable],
-        dict[Hashable, Hashable],
-        dict[Hashable, Hashable],
-    ] | None:
+    ) -> (
+        tuple[
+            tuple[tuple[Hashable, Hashable], ...],
+            dict[Hashable, Hashable],
+            dict[Hashable, Hashable],
+            dict[Hashable, Hashable],
+        ]
+        | None
+    ):
         f = [mask.bit_length() - 1 for mask in d]
-        if not all(i != f[i] and not graph.has_edge(nodes[i], nodes[f[i]])
-                   for i in range(n)):
+        if not all(
+            i != f[i] and not graph.has_edge(nodes[i], nodes[f[i]]) for i in range(n)
+        ):
             raise AssertionError("Coaffine CSP returned invalid endomorphism")
-        if not all(f[u] == f[v] or graph.has_edge(nodes[f[u]], nodes[f[v]])
-                   for u in range(n) for v in neighbors[u]):
+        if not all(
+            f[u] == f[v] or graph.has_edge(nodes[f[u]], nodes[f[v]])
+            for u in range(n)
+            for v in neighbors[u]
+        ):
             raise AssertionError("Coaffine CSP returned a non-morphism")
 
         r = [f[f[i]] for i in range(n)]
@@ -198,16 +208,15 @@ def find_octahedral_retraction_coaffine(
         while remaining:
             u = min(remaining)
             missing = [
-                v for v in image
-                if v != u and not graph.has_edge(nodes[u], nodes[v])
+                v for v in image if v != u and not graph.has_edge(nodes[u], nodes[v])
             ]
             if len(missing) != 1 or missing[0] not in remaining:
                 return None
             v = missing[0]
-            if sum(
-                w != v and not graph.has_edge(nodes[v], nodes[w])
-                for w in image
-            ) != 1:
+            if (
+                sum(w != v and not graph.has_edge(nodes[v], nodes[w]) for w in image)
+                != 1
+            ):
                 return None
             pairs.append((nodes[u], nodes[v]))
             remaining.difference_update((u, v))
@@ -219,9 +228,7 @@ def find_octahedral_retraction_coaffine(
         inclusion = {v: v for v in target}
         if not verify_induced_octahedron(graph, opposite):
             raise AssertionError("Coaffine CSP produced non-octahedral target")
-        if not verify_retraction_witness(
-            graph, target, (projection, inclusion)
-        ):
+        if not verify_retraction_witness(graph, target, (projection, inclusion)):
             raise AssertionError("Coaffine CSP produced invalid retraction")
         return opposite, projection, inclusion, endomorphism
 
@@ -236,10 +243,7 @@ def find_octahedral_retraction_coaffine(
         undecided = [i for i in range(n) if d[i].bit_count() > 1]
         if not undecided:
             return positive(d)
-        x = min(
-            undecided,
-            key=lambda i: (d[i].bit_count(), -len(neighbors[i]))
-        )
+        x = min(undecided, key=lambda i: (d[i].bit_count(), -len(neighbors[i])))
         choices = d[x]
         while choices:
             bit = choices & -choices
@@ -247,9 +251,7 @@ def find_octahedral_retraction_coaffine(
             assignments += 1
             candidate = d.copy()
             candidate[x] = bit
-            if propagate(
-                candidate, deque((i, x) for i in neighbors[x])
-            ):
+            if propagate(candidate, deque((i, x) for i in neighbors[x])):
                 result = dfs(candidate)
                 if result is limit or result is not None:
                     return result
