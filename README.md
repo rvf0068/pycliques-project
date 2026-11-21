@@ -60,6 +60,9 @@ Tools for studying the **clique graph operator** K(G). Given a graph G, the cliq
 - `completely_pared_graph` / `find_dominated_vertex` — graph dismantling
 - `recognize_clockwork` / `is_clique_divergent_clockwork` — clockwork-graph recognition
 - `retracts` / `special_octahedra_dimension` — retraction tests
+- `find_induced_octahedron_amplified` — bounded, graph-independent search
+  for induced octahedra using nonlocal antipodal-pair repairs;
+  [guide](docs/general_octahedral_amplification.md)
 - `find_octahedral_retraction` — bounded, bitset-based search onto a specified
   induced octahedron; [snub O24 proof and replay](docs/snub_o24_retraction.md)
 - `classify_clique_behavior` — apply the fast standard convergence/divergence
