@@ -454,7 +454,7 @@ def test_ref_dep_retraction_proven_certificate():
         clear_reference_graphs()
         register_reference_graph(
             snub_disphenoid(),
-            status=ReferenceStatus.CONJECTURED,
+            status=ReferenceStatus.PROVEN,
             label="snub_disphenoid",
         )
         register_reference_graph(
@@ -489,7 +489,7 @@ def test_ref_dep_retraction_conjectural_indeterminate():
         clear_reference_graphs()
         register_reference_graph(
             snub_disphenoid(),
-            status=ReferenceStatus.CONJECTURED,
+            status=ReferenceStatus.PROVEN,
             label="snub_disphenoid",
         )
         register_reference_graph(
@@ -538,10 +538,8 @@ def test_classify_local_bridge_divergent():
     assert certificate.edge == (0, "leaf")
 
 
-def test_classify_local_bridge_conjectured_divergent():
-    """Contracting a local bridge attached to snub disphenoid yields
-    INDETERMINATE with conjectured status.
-    """
+def test_classify_local_bridge_snub_proven_divergent():
+    """A local bridge attached to the proven divergent snub is divergent."""
     from pycliques import classify_local_bridge
 
     # Snub disphenoid + a leaf node attached by a bridge
@@ -551,12 +549,12 @@ def test_classify_local_bridge_conjectured_divergent():
     local_res = classify_local_bridge(g)
     assert local_res is not None
     verdict, reason, certificate = local_res
-    assert verdict is Verdict.INDETERMINATE
-    assert "conjectured" in reason
+    assert verdict is Verdict.DIVERGENT
+    assert "proven" in reason
     assert "Theorem 6.1" in reason
     assert certificate is not None
     assert certificate.rule == "local_bridge"
-    assert certificate.target_status == "conjectured_divergent"
+    assert certificate.target_status == "proven_divergent"
     assert certificate.target_label == "snub_disphenoid"
     assert certificate.edge == (0, "leaf")
 
