@@ -1323,27 +1323,19 @@ def _test_iterate_certificates(
     restricted to the first two pared iterates, regardless of `tries`.
     An octahedral retraction search is opt-in at explicitly selected
     iterate indices and dimensions, with independent replay and budgets.
+    A known target preset may construct its required iterate first.
     """
     octahedron_limited = False
     snub_seeded = (
         "snub_o24" in octahedron_retract_presets
         and snub_o24_matches_source(seq[0])
     )
-    for i in range(tries):
-        graph = seq[i]
-        if graph is None:
-            if octahedron_limited:
-                return (
-                    Verdict.INDETERMINATE,
-                    "optional octahedral retraction search reached its resource limits",
-                    None,
-                )
-            return None
-
-        # Try the supplied octahedral embedding before expensive
-        # general Helly/special-octahedron recognition. No projection
-        # is preloaded; the solver must discover a valid retraction.
-        if i == 4 and snub_seeded:
+    # Try the supplied octahedral embedding before any general
+    # Helly/special-octahedron recognition. No projection
+    # is preloaded; the solver must discover a valid retraction.
+    if snub_seeded:
+        graph = seq[4]
+        if graph is not None:
             prefix = [seq[j] for j in range(5)]
             if all(step is not None for step in prefix):
                 pared_iterates = cast(list[nx.Graph], prefix)
@@ -1369,7 +1361,7 @@ def _test_iterate_certificates(
                             target_status="proven_divergent",
                             target_label="O_24",
                             map=witness,
-                            iterate_index=i,
+                            iterate_index=4,
                         )
                         return (
                             Verdict.DIVERGENT,
@@ -1379,6 +1371,17 @@ def _test_iterate_certificates(
                     octahedron_limited |= (
                         seeded.status is RetractionSearchStatus.LIMIT_REACHED
                     )
+
+    for i in range(tries):
+        graph = seq[i]
+        if graph is None:
+            if octahedron_limited:
+                return (
+                    Verdict.INDETERMINATE,
+                    "optional octahedral retraction search reached its resource limits",
+                    None,
+                )
+            return None
 
         if is_clique_helly(graph):
             _logger.debug("Helly of index %s", i)
