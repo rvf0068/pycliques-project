@@ -130,7 +130,7 @@ from .named import (
     snub_disphenoid,
     suspension_of_cycle,
 )
-from .octahedral_amplification import (
+from .octahedral_nonlocal_search import (
     OctahedronSearchResult,
     OctahedronSearchStatus,
     find_induced_octahedron_amplified,
