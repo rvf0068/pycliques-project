@@ -16,7 +16,10 @@ DATA = Path(__file__).parent / "data" / "snub_o24_retraction.json.b85"
 
 def _certificate() -> dict:
     """Read the zlib/base85-encoded JSON without third-party dependencies."""
-    return json.loads(zlib.decompress(base64.b85decode(DATA.read_text().strip())))
+    data = json.loads(zlib.decompress(base64.b85decode(DATA.read_text().strip())))
+    if not isinstance(data, dict):
+        raise ValueError("snub retraction certificate must be a JSON object")
+    return data
 
 
 def _small_fixture() -> tuple[nx.Graph, list[tuple[int, int]]]:
