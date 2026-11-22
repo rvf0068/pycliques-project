@@ -7,6 +7,8 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import networkx as nx
+import pycliques.octahedral_coaffine as coaffine
+import pycliques.octahedral_coaffine_native as native
 import pytest
 from pycliques.octahedral_coaffine_native import (
     _cached_executable,
@@ -14,9 +16,6 @@ from pycliques.octahedral_coaffine_native import (
     find_coaffine_native_executable,
     run_coaffine_native,
 )
-
-import pycliques.octahedral_coaffine as coaffine
-import pycliques.octahedral_coaffine_native as native
 
 
 def _run_fake(
@@ -162,6 +161,7 @@ def test_configured_native_executable_validation(
 
     candidate = tmp_path / "candidate"
     candidate.write_bytes(b"dummy binary")
+    monkeypatch.setenv("PYCLIQUES_COAFFINE_NATIVE", str(candidate))
     with pytest.raises(RuntimeError, match="does not identify an executable"):
         find_coaffine_native_executable()
     candidate.chmod(0o755)
