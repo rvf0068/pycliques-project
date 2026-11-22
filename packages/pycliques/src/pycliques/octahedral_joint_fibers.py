@@ -4,6 +4,7 @@ No graph-specific pairs or retractions are stored. A returned partial map is
 verified against the supplied host and is not a complete retraction unless
 all vertices are covered and all required antipodal pairs have been chosen.
 """
+
 from __future__ import annotations
 
 import json
