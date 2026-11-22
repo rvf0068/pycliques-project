@@ -111,9 +111,7 @@ def test_native_protocol_accepts_valid_report(
 def test_native_protocol_handles_limit_and_no_time_bound(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    result = _run_fake(
-        monkeypatch, "RESULT LIMIT_REACHED 5 12 9", time_limit=None
-    )
+    result = _run_fake(monkeypatch, "RESULT LIMIT_REACHED 5 12 9", time_limit=None)
     assert result.status == "LIMIT_REACHED"
     assert result.projection is None
     assert result.states_explored == 5
@@ -217,9 +215,7 @@ def test_native_found_without_witness_is_rejected(
     monkeypatch.setattr(
         coaffine,
         "run_coaffine_native",
-        lambda *args, **kwargs: native.NativeCoaffineRawResult(
-            "FOUND", 1, 0, 0
-        ),
+        lambda *args, **kwargs: native.NativeCoaffineRawResult("FOUND", 1, 0, 0),
     )
     with pytest.raises(RuntimeError, match="missing a witness"):
         coaffine.find_octahedral_retraction_coaffine(
