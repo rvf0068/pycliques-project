@@ -4,6 +4,7 @@ Heuristic pair discovery is followed by logically exact completion and
 independent retraction verification. All unsuccessful bounded calls return
 LIMIT_REACHED, never a global nonexistence claim.
 """
+
 from __future__ import annotations
 
 import random
@@ -68,8 +69,9 @@ def _learn_conflicts(
                 core = smaller
         # Independently check each local deletion against the exact screen.
         assert impossible(core)
-        assert all(not impossible(core & ~(1 << i))
-                   for i in range(k) if core & (1 << i))
+        assert all(
+            not impossible(core & ~(1 << i)) for i in range(k) if core & (1 << i)
+        )
         found.add(core)
     return found
 
@@ -91,13 +93,11 @@ def _repair_candidates(
         if any(not (deleted & core) for core in cores):
             continue
         retained = all_pairs & ~deleted
-        partial = tuple(pair for i, pair in enumerate(pairs)
-                        if retained & (1 << i))
+        partial = tuple(pair for i, pair in enumerate(pairs) if retained & (1 << i))
         common = masks.common(partial)
         if common.bit_count() < 2 * remaining:
             continue
-        if any(not (masks.nonedge[v] & common)
-               for v in _bit_indices(common)):
+        if any(not (masks.nonedge[v] & common) for v in _bit_indices(common)):
             continue
         candidates.append((common.bit_count(), deleted, partial))
     candidates.sort(reverse=True)
@@ -137,8 +137,15 @@ def find_blind_octahedral_retraction(
     The seed fixes the random generator, **not** the graph's vertex order.
     Use explicit graph insertion order for archival reproductions.
     """
-    limits = (beam, samples, biclique_variants, core_rounds, max_repairs,
-              completion_states, retraction_states)
+    limits = (
+        beam,
+        samples,
+        biclique_variants,
+        core_rounds,
+        max_repairs,
+        completion_states,
+        retraction_states,
+    )
     if any(type(x) is not int or x < 1 for x in limits):
         raise ValueError("all search budgets must be positive integers")
     if type(target_dimension) is not int or target_dimension < 3:
@@ -149,8 +156,13 @@ def find_blind_octahedral_retraction(
         raise ValueError("seeds must be integers")
     m = _OctahedralMasks(graph)
     fiber = joint_beam_search(
-        graph, target_dimension, seed=seed, beam=beam, samples=samples,
-        biclique_variants=biclique_variants, verbose=False,
+        graph,
+        target_dimension,
+        seed=seed,
+        beam=beam,
+        samples=samples,
+        biclique_variants=biclique_variants,
+        verbose=False,
     )
     if fiber is None:
         return BlindOctahedralRetraction(
@@ -173,16 +185,16 @@ def find_blind_octahedral_retraction(
             OctahedralBlindStatus.LIMIT_REACHED, None, None, k, 0, 0, 0
         )
     conflicts = _learn_conflicts(m, indexed, rounds=core_rounds, seed=seed)
-    choices = _repair_candidates(
-        m, indexed, conflicts, target_dimension, delete_count
-    )
+    choices = _repair_candidates(m, indexed, conflicts, target_dimension, delete_count)
     examined = 0
     states = 0
     for _, _, remaining_pairs in choices[:max_repairs]:
         examined += 1
         initial = tuple((m.nodes[a], m.nodes[b]) for a, b in remaining_pairs)
         completion = complete_dominating_octahedron(
-            graph, initial, target_dimension=target_dimension,
+            graph,
+            initial,
+            target_dimension=target_dimension,
             max_states=completion_states,
         )
         states += completion.states_explored
@@ -198,12 +210,19 @@ def find_blind_octahedral_retraction(
                 graph, target, ret, k, len(conflicts), examined, states
             )
     return BlindOctahedralRetraction(
-        OctahedralBlindStatus.LIMIT_REACHED, None, None, k,
-        len(conflicts), examined, states
+        OctahedralBlindStatus.LIMIT_REACHED,
+        None,
+        None,
+        k,
+        len(conflicts),
+        examined,
+        states,
     )
 
 
-def _verified_result(graph, pairs, result, k, cores, repairs, states):
+def _verified_result(
+    graph, pairs, result, k, cores, repairs, states
+) -> BlindOctahedralRetraction:
     assert result.retraction is not None and result.inclusion is not None
     target = graph.subgraph([v for pair in pairs for v in pair])
     if not verify_retraction_witness(
@@ -211,6 +230,5 @@ def _verified_result(graph, pairs, result, k, cores, repairs, states):
     ):
         raise AssertionError("octahedral retraction failed independent verification")
     return BlindOctahedralRetraction(
-        OctahedralBlindStatus.FOUND, pairs, result.retraction,
-        k, cores, repairs, states
+        OctahedralBlindStatus.FOUND, pairs, result.retraction, k, cores, repairs, states
     )
