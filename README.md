@@ -68,6 +68,11 @@ Tools for studying the **clique graph operator** K(G). Given a graph G, the cliq
   [guide](docs/general_octahedral_amplification.md)
 - `find_octahedral_retraction` — bounded, bitset-based search onto a specified
   induced octahedron; [snub O24 proof and replay](docs/snub_o24_retraction.md)
+- `find_octahedral_retraction_coaffine` — unseeded complete-or-bounded
+  octahedral-retraction search; an **optional, explicitly compiled C++17
+  bitset backend** accelerates discovery while retaining a pure-Python
+  fallback and independently checking every positive native witness.
+  [Build instructions, verification, and McKay 253650 example](docs/coaffine_native.md)
 - `classify_clique_behavior` — apply the fast standard convergence/divergence
   tests to one graph
   (opt-in `octahedron_retract_presets=("snub_o24",)` reconstructs K^4(snub)
