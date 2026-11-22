@@ -142,9 +142,9 @@ def test_native_process_failure_and_timeout(
 
 
 def test_native_rejects_graphs_over_capacity() -> None:
-    with pytest.raises(ValueError, match="at most 512"):
+    with pytest.raises(ValueError, match="at most 2048"):
         run_coaffine_native(
-            nx.empty_graph(513),
+            nx.empty_graph(2049),
             min_dimension=3,
             max_states=10,
             time_limit=1,
