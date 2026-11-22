@@ -65,13 +65,13 @@ on each complete weak endomorphism.
 
 ### Exact support-change-driven acceleration
 
-For any nonempty domain \\(D \\subseteq V(X)\\), the image values
+For any nonempty domain \(D \subseteq V(X)\), the image values
 supported by adjacency or equality in the original graph are
 
-\\[
-\\operatorname{supp}_X(D)=\\bigcup_{t\\in D}N_X[t]
-=V(X)\\setminus\\bigcap_{t\\in D}N_{\\overline{X}}(t).
-\\]
+\[
+\operatorname{supp}_X(D)=\bigcup_{t\in D}N_X[t]
+=V(X)\setminus\bigcap_{t\in D}N_{\overline{X}}(t).
+\]
 
 The updated native engine computes the intersection of *open*
 complement neighborhoods and stops early if it becomes empty.
