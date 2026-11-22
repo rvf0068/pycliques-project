@@ -119,6 +119,8 @@ def closed_biclique(
 
 def check_partial_state(mask: Masks, state: State):
     """Costly, exact invariant check for tests and successful certificates."""
+    if len(state.pairs) != len(state.fibers):
+        raise ValueError("partial state must have equal numbers of pairs and fibers")
     anchored: set[int] = set()
     seen = 0
     for i, ((a, b), (A, B)) in enumerate(zip(state.pairs, state.fibers)):
@@ -192,6 +194,8 @@ def load_partial_state(path, mask: Masks) -> State:
         mask.g.number_of_edges(),
     ):
         raise ValueError("checkpoint source-graph dimensions differ")
+    if len(data["pairs"]) != len(data["fibers"]):
+        raise ValueError("checkpoint must have equal numbers of pairs and fibers")
     pairs = tuple(tuple(mask.index[v] for v in p) for p in data["pairs"])
     fibers = tuple(
         (sum(1 << mask.index[v] for v in A), sum(1 << mask.index[v] for v in B))
