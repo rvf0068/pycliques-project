@@ -38,9 +38,12 @@ def _source_file() -> Path:
 def _cached_executable(*, cache_dir: Path | None = None) -> Path:
     source = _source_file()
     tag = hashlib.sha256(source.read_bytes()).hexdigest()[:16]
-    root = cache_dir if cache_dir is not None else Path(
-        os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")
-    ) / "pycliques"
+    root = (
+        cache_dir
+        if cache_dir is not None
+        else Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache"))
+        / "pycliques"
+    )
     return Path(root) / f"coaffine-native-{tag}"
 
 
@@ -127,8 +130,11 @@ def run_coaffine_native(
         ]
         try:
             completed = subprocess.run(
-                command, text=True, capture_output=True,
-                timeout=timeout, check=False,
+                command,
+                text=True,
+                capture_output=True,
+                timeout=timeout,
+                check=False,
             )
         except subprocess.TimeoutExpired:
             return NativeCoaffineRawResult("LIMIT_REACHED", 0, 0, 0)
@@ -142,8 +148,10 @@ def run_coaffine_native(
     if not lines:
         raise RuntimeError("Native backend returned no output")
     header = lines[0].split()
-    if len(header) != 5 or header[0] != "RESULT" or header[1] not in (
-        "FOUND", "EXHAUSTED", "LIMIT_REACHED"
+    if (
+        len(header) != 5
+        or header[0] != "RESULT"
+        or header[1] not in ("FOUND", "EXHAUSTED", "LIMIT_REACHED")
     ):
         raise RuntimeError("Malformed native result header")
     try:
@@ -163,9 +171,12 @@ def run_coaffine_native(
     projection_line = lines[2].split()
     endomorphism_line = lines[3].split()
     if (
-        not pair_line or pair_line[0] != "PAIRS"
-        or not projection_line or projection_line[0] != "PROJECTION"
-        or not endomorphism_line or endomorphism_line[0] != "ENDOMORPHISM"
+        not pair_line
+        or pair_line[0] != "PAIRS"
+        or not projection_line
+        or projection_line[0] != "PROJECTION"
+        or not endomorphism_line
+        or endomorphism_line[0] != "ENDOMORPHISM"
     ):
         raise RuntimeError("Incorrect native witness field names")
     try:
