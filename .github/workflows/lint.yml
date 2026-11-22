@@ -26,6 +26,16 @@ jobs:
       - name: Install Dependencies
         run: uv sync
 
+      - name: Emit exact Ruff-formatted source (temporary diagnostic)
+        run: |
+          uv run ruff format packages/pycliques/src/pycliques/octahedral_blind.py packages/pycliques/src/pycliques/octahedral_blind_search.py packages/pycliques/src/pycliques/octahedral_joint_fibers.py packages/pycliques/tests/test_octahedral_blind.py packages/pycliques/tests/test_blind_snub_regression.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          for p in ("packages/pycliques/src/pycliques/octahedral_blind.py", "packages/pycliques/src/pycliques/octahedral_blind_search.py", "packages/pycliques/src/pycliques/octahedral_joint_fibers.py", "packages/pycliques/tests/test_octahedral_blind.py", "packages/pycliques/tests/test_blind_snub_regression.py"):
+              print("AUTOFORMAT_JSON:" + json.dumps({"path": p, "content": Path(p).read_text()}, ensure_ascii=True))
+          PY
+
       - name: Ruff check
         run: uv run ruff check packages/
 
