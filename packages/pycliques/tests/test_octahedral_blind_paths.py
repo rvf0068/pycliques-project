@@ -6,6 +6,7 @@ remains an optional slow regression test.
 
 import json
 import random
+from itertools import combinations
 
 import networkx as nx
 import pycliques.octahedral_blind as ob
@@ -380,7 +381,7 @@ def test_repair_candidate_heap_retains_exhaustive_ranking():
     masks = ob._OctahedralMasks(graph)
     pairs = masks.pairs(graph, base_pairs(6))
     expected = []
-    for discarded in __import__("itertools").combinations(range(6), 3):
+    for discarded in combinations(range(6), 3):
         deleted = sum(1 << i for i in discarded)
         partial = tuple(pair for i, pair in enumerate(pairs) if i not in discarded)
         common = masks.common(partial)
