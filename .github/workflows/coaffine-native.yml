@@ -23,8 +23,6 @@ jobs:
       - uses: astral-sh/setup-uv@v4
       - run: uv python install 3.11
       - run: uv sync
-      - name: Inspect Ruff formatting diff
-        run: uv run ruff format --diff packages/pycliques/src/pycliques/octahedral_coaffine.py packages/pycliques/src/pycliques/octahedral_coaffine_native.py packages/pycliques/tests/test_octahedral_coaffine_native.py || true
       - name: Verify portable wheel includes native source (no bundled binary)
         run: |
           uv build --package pycliques --wheel --out-dir /tmp/pycliques-wheel
