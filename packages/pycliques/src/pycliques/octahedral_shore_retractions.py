@@ -11,6 +11,7 @@ deletes a_i from domains of adjacent still-unassigned vertices.
 Every branch is mathematically complete for the fixed target, regardless
 of orientation. Auto-orientation changes performance, never correctness.
 """
+
 from __future__ import annotations
 
 import random
@@ -171,9 +172,7 @@ def find_octahedral_retraction_shores(
                 if not mask:
                     raise AssertionError("unassigned vertex without an a-shore image")
                 projection[x] = shore_a[(mask & -mask).bit_length() - 1]
-        if not verify_retraction_witness(
-            graph, target, (projection, inclusion)
-        ):
+        if not verify_retraction_witness(graph, target, (projection, inclusion)):
             raise AssertionError("two-shore propagation produced an invalid witness")
         return BoundedRetractionResult(
             RetractionSearchStatus.FOUND,
