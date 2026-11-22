@@ -24,8 +24,6 @@ jobs:
       - uses: astral-sh/setup-uv@v4
       - run: uv python install 3.11
       - run: uv sync
-      - name: Show Ruff formatting for new protocol tests
-        run: uv run ruff format --diff packages/pycliques/tests/test_octahedral_coaffine_native_protocol.py || true
       - name: Verify portable wheel includes native source (no bundled binary)
         run: |
           uv build --package pycliques --wheel --out-dir /tmp/pycliques-wheel
