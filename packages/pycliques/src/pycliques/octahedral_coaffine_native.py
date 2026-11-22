@@ -106,7 +106,9 @@ def run_coaffine_native(
     nodes = list(graph)
     n = len(nodes)
     if n > MAX_NATIVE_ORDER:
-        raise ValueError(f"native coaffine backend supports at most {MAX_NATIVE_ORDER} vertices")
+        raise ValueError(
+            f"native coaffine backend supports at most {MAX_NATIVE_ORDER} vertices"
+        )
     positions = {v: i for i, v in enumerate(nodes)}
     with tempfile.TemporaryDirectory() as tmp:
         graph_path = Path(tmp) / "graph.txt"
@@ -190,7 +192,9 @@ def run_coaffine_native(
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Build optional C++17 coaffine backend")
+    parser = argparse.ArgumentParser(
+        description="Build optional C++17 coaffine backend"
+    )
     parser.add_argument("--build", action="store_true")
     args = parser.parse_args()
     if not args.build:
