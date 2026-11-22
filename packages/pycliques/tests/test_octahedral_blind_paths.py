@@ -345,3 +345,57 @@ def test_weighted_repair_empty_invalid_and_budgeted_conflict():
     partial = ob.minimize_octahedral_conflict(graph, base_pairs(3), max_checks=1)
     assert partial is not None and not partial.deletion_minimal
     assert partial.checks == 1
+
+
+def test_repair_candidate_generation_is_bounded(monkeypatch):
+    """Avoid materializing all C(18, 9) deletion sets for a tiny budget."""
+    graph = octahedron(18)
+    masks = ob._OctahedralMasks(graph)
+    pairs = masks.pairs(graph, base_pairs(18))
+    original_common = masks.common
+    calls = 0
+
+    def counted_common(partial):
+        nonlocal calls
+        calls += 1
+        return original_common(partial)
+
+    monkeypatch.setattr(masks, "common", counted_common)
+    candidates = bs._repair_candidates(
+        masks,
+        pairs,
+        set(),
+        18,
+        9,
+        max_repairs=2,
+        max_candidate_checks=7,
+    )
+    assert calls == 7
+    assert len(candidates) == 2
+    assert candidates == sorted(candidates, reverse=True)
+
+
+def test_repair_candidate_heap_retains_exhaustive_ranking():
+    graph = octahedron(6)
+    masks = ob._OctahedralMasks(graph)
+    pairs = masks.pairs(graph, base_pairs(6))
+    expected = []
+    for discarded in __import__("itertools").combinations(range(6), 3):
+        deleted = sum(1 << i for i in discarded)
+        partial = tuple(pair for i, pair in enumerate(pairs) if i not in discarded)
+        common = masks.common(partial)
+        expected.append((common.bit_count(), deleted, partial))
+    expected.sort(reverse=True)
+    result = bs._repair_candidates(
+        masks,
+        pairs,
+        set(),
+        6,
+        3,
+        max_repairs=4,
+        max_candidate_checks=20,
+    )
+    assert result == expected[:4]
+    for kwargs in ({"max_repairs": 0}, {"max_candidate_checks": 0}):
+        with pytest.raises(ValueError, match="positive integers"):
+            bs._repair_candidates(masks, pairs, set(), 6, 3, **kwargs)
