@@ -8,8 +8,8 @@ import pytest
 from pycliques.octahedral_blind import (
     OctahedralBlindStatus,
     complete_dominating_octahedron,
-    minimum_octahedral_repair,
     minimize_octahedral_conflict,
+    minimum_octahedral_repair,
     screen_partial_octahedral_retraction,
 )
 from pycliques.octahedral_blind_search import find_blind_octahedral_retraction
