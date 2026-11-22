@@ -88,7 +88,7 @@ bool positive(const State& state) {
         projection[u] = f[f[u]];
         image.insert(projection[u]);
     }
-    if (image.size() < static_cast<std::size_t>(2 * min_dimension) || image.size() % 2) return false;
+    if (image.size() < static_cast<std::size_t>(2LL * min_dimension) || image.size() % 2) return false;
     for (const int u : image) {
         if (projection[u] != u) return false;
     }
@@ -200,7 +200,7 @@ int main(int argc, char** argv) {
             edges.emplace_back(u, v);
         }
         started = Clock::now();
-        if (n < 2 * min_dimension) {
+        if (static_cast<std::int64_t>(n) < 2LL * min_dimension) {
             print_result(false);
             return 0;
         }
