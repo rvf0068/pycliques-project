@@ -1,0 +1,33 @@
+name: Unseeded native coaffine O12 proof and portability checks
+
+on:
+  pull_request:
+    paths:
+      - "packages/pycliques/src/pycliques/_coaffine_native.cpp"
+      - "packages/pycliques/src/pycliques/octahedral_coaffine.py"
+      - "packages/pycliques/src/pycliques/octahedral_coaffine_native.py"
+      - "packages/pycliques/tests/test_octahedral_coaffine_native.py"
+      - ".github/workflows/coaffine-native.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    name: Native C++17 / Python 3.11 independent unseeded O12 reproduction
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv python install 3.11
+      - run: uv sync
+      - name: Test optional build, exact small-graph comparisons and false-positive guards
+        run: uv run pytest -q packages/pycliques/tests/test_octahedral_coaffine_native.py -m "not slow"
+      - name: Rediscover McKay 253650 P4 to O12 without a stored target
+        run: uv run pytest -q packages/pycliques/tests/test_octahedral_coaffine_native.py -m slow
+      - name: Test explicit build entry point
+        run: |
+          uv run python -m pycliques.octahedral_coaffine_native --build
+          uv run python -c "import pycliques as pc, networkx as nx; r=pc.find_octahedral_retraction_coaffine(nx.octahedral_graph()); assert r.dimension == 3"
