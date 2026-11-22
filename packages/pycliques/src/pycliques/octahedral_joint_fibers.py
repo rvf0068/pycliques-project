@@ -16,6 +16,17 @@ from pathlib import Path
 import networkx as nx
 
 
+def _validate_host_graph(graph: nx.Graph) -> None:
+    """Require the graph model assumed by octahedral fiber search."""
+    if (
+        not isinstance(graph, nx.Graph)
+        or graph.is_directed()
+        or graph.is_multigraph()
+        or nx.number_of_selfloops(graph)
+    ):
+        raise ValueError("require a simple undirected loopless NetworkX graph")
+
+
 def bit_indices(mask):
     while mask:
         z = mask & -mask
@@ -25,6 +36,7 @@ def bit_indices(mask):
 
 class Masks:
     def __init__(self, g):
+        _validate_host_graph(g)
         nodes = list(g)
         self.nodes = nodes
         self.index = {v: i for i, v in enumerate(nodes)}
@@ -427,6 +439,7 @@ def discover_partial_octahedral_fibers(
     Failure to reach the requested dimension is INCONCLUSIVE; its purpose is
     to supply compatible pairs for exact conflict-guided reconstruction.
     """
+    _validate_host_graph(graph)
     if type(target_dimension) is not int or target_dimension < 3:
         raise ValueError("target_dimension must be an integer >= 3")
     if any(type(x) is not int or x < 1 for x in (beam, samples, biclique_variants)):
