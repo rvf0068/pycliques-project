@@ -10,9 +10,11 @@ import random
 import networkx as nx
 import pytest
 
-from pycliques import octahedral_blind as ob
-from pycliques import octahedral_blind_search as bs
-from pycliques import octahedral_joint_fibers as jf
+from pycliques import (
+    octahedral_blind as ob,
+    octahedral_blind_search as bs,
+    octahedral_joint_fibers as jf,
+)
 
 
 def octahedron(d):
