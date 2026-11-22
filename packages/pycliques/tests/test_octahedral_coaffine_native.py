@@ -39,9 +39,7 @@ def test_native_octahedron_arbitrary_labels(
     native_binary: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _native(monkeypatch, native_binary)
-    graph = nx.relabel_nodes(
-        nx.octahedral_graph(), {i: ("v", i) for i in range(6)}
-    )
+    graph = nx.relabel_nodes(nx.octahedral_graph(), {i: ("v", i) for i in range(6)})
     for backend in ("native", "auto"):
         result = pycliques.find_octahedral_retraction_coaffine(
             graph, backend=backend, time_limit=5
@@ -54,9 +52,7 @@ def test_native_octahedron_arbitrary_labels(
             result.retraction[v] == result.endomorphism[result.endomorphism[v]]
             for v in graph
         )
-        assert pycliques.verify_induced_octahedron(
-            graph, result.antipodal_pairs
-        )
+        assert pycliques.verify_induced_octahedron(graph, result.antipodal_pairs)
 
 
 @pytest.mark.parametrize(
@@ -87,8 +83,10 @@ def test_native_min_dimension_restricts_oct(
 ) -> None:
     _native(monkeypatch, native_binary)
     result = pycliques.find_octahedral_retraction_coaffine(
-        nx.octahedral_graph(), backend="native",
-        min_dimension=4, time_limit=5,
+        nx.octahedral_graph(),
+        backend="native",
+        min_dimension=4,
+        time_limit=5,
     )
     assert result.status is RetractionSearchStatus.EXHAUSTED
 
@@ -105,7 +103,9 @@ def test_native_vs_reference_small_graph_atlas(
             graph, backend="python", max_states=10_000, time_limit=5
         )
         assert native.status is python.status, (
-            nx.to_graph6_bytes(graph, header=False), native, python
+            nx.to_graph6_bytes(graph, header=False),
+            native,
+            python,
         )
 
 
@@ -152,7 +152,10 @@ def test_reject_corrupt_native_witness(monkeypatch: pytest.MonkeyPatch) -> None:
         module, "find_coaffine_native_executable", lambda: Path("/tmp/fake")
     )
     fake = NativeCoaffineRawResult(
-        "FOUND", 1, 0, 0,
+        "FOUND",
+        1,
+        0,
+        0,
         ((0, 3), (1, 4), (2, 5)),
         (0, 0, 0, 0, 0, 0),
         (3, 4, 5, 0, 1, 2),
@@ -175,9 +178,7 @@ def test_native_rediscovers_mckay_253650_o12(
     for _ in range(4):
         k = pycliques.clique_graph(pared)
         assert k is not None
-        k = nx.relabel_nodes(
-            k, {vertex: i for i, vertex in enumerate(k)}, copy=True
-        )
+        k = nx.relabel_nodes(k, {vertex: i for i, vertex in enumerate(k)}, copy=True)
         pared = pycliques.completely_pared_graph(k)
     assert (len(pared), pared.number_of_edges()) == (259, 28890)
 
@@ -190,9 +191,7 @@ def test_native_rediscovers_mckay_253650_o12(
     assert result.retraction is not None
     assert result.antipodal_pairs is not None
     assert result.endomorphism is not None
-    target = pared.subgraph(
-        v for pair in result.antipodal_pairs for v in pair
-    )
+    target = pared.subgraph(v for pair in result.antipodal_pairs for v in pair)
     assert pycliques.verify_retraction_witness(
         pared, target, (result.retraction, result.inclusion)
     )
