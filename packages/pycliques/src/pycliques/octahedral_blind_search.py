@@ -19,7 +19,7 @@ from .octahedral_blind import (
     _screen_masks,
     complete_dominating_octahedron,
 )
-from .octahedral_joint_fibers import Masks, joint_beam_search
+from .octahedral_joint_fibers import joint_beam_search
 from .octahedral_nonlocal_search import verify_induced_octahedron
 from .octahedral_retractions import find_octahedral_retraction
 from .retractions import RetractionSearchStatus, verify_retraction_witness
