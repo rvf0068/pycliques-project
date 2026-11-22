@@ -43,10 +43,10 @@ result = pycliques.find_octahedral_retraction_coaffine(
 ```
 
 - `backend="auto"` (default) uses the native executable if present for
-  hosts of order at most 512; otherwise it uses the existing Python solver
+  hosts of order at most 2,048; otherwise it uses the existing Python solver
 - `backend="python"` forces the established pure-Python implementation
 - `backend="native"` requires an already built native executable and
-  supports at most 512 vertices
+  supports at most 2,048 vertices
 
 The environment variable `PYCLIQUES_COAFFINE_NATIVE` can specify an
 explicit executable path; otherwise the version-matched cached build is
@@ -58,10 +58,44 @@ under an automatically removed temporary directory.
 The C++ implementation propagates cached bitset neighborhood supports
 rather than revisiting each image individually. Each search state
 contains the current candidate domains and their support unions.
-Directed arc consistency removes image candidates inconsistent with
+Arc consistency removes image candidates inconsistent with
 neighboring domains. The solver branches exhaustively (until bounded)
 on a minimum-domain variable and verifies the second-iterate condition
 on each complete weak endomorphism.
+
+### Exact support-change-driven acceleration
+
+For any nonempty domain \(D \subseteq V(X)\), the image values
+supported by adjacency or equality in the original graph are
+
+\[
+\operatorname{supp}_X(D)=\bigcup_{t\in D}N_X[t]
+=V(X)\setminus\bigcap_{t\in D}N_{\overline{X}}(t).
+\]
+
+The updated native engine computes the intersection of *open*
+complement neighborhoods and stops early if it becomes empty.
+This is the exact same support union, with no approximation.
+
+On each domain reduction the engine recomputes the support mask.
+**Only a strict change of that support mask queues work for adjacent
+source vertices.** A domain shrink that leaves its support unchanged
+cannot affect an adjacent variable: the arc constraint sees only
+the support mask, not the individual candidate identities.
+The initial queue likewise includes only variables with nonfull
+support. This is an exact arc-consistency fixed point, not a
+heuristic pruning rule, and preserves the exhaustive search status
+and the existing independently verified positive witness protocol.
+
+The larger 2,048-vertex bitsets permit experimentation on
+fourth pared clique iterates beyond the former 512-vertex limit.
+Large dense host graphs can still be expensive; keep explicit
+state/time budgets and interpret LIMIT_REACHED as inconclusive.
+For regression coverage, the native test suite checks a
+513-vertex true-twin enlargement of O3 with a genuine O3
+retraction, a 2,048-vertex star with no possible coaffine image,
+and exact outcome agreement with the Python reference on
+small graphs.
 
 **Every native FOUND result is checked again in Python**, including
 coaffinity of the endomorphism, preservation of edges up to equality,
@@ -110,6 +144,6 @@ These are descriptive measurements, not a guaranteed runtime or a
 promise that every graph will be easy.
 
 The previous solver's result statuses and `CoaffineOctahedronResult`
-fields are retained. The native source has an explicit 512-vertex
+fields are retained. The native source has an explicit 2,048-vertex
 capacity; with `backend="auto"`, a larger graph goes through the
 unbounded Python implementation rather than generating a false negative.

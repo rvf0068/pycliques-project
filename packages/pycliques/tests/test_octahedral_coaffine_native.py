@@ -79,6 +79,46 @@ def test_native_exhaustive_negative_small_cases(
     assert native.retraction is None
 
 
+def test_native_genuine_retraction_beyond_original_512_limit(
+    native_binary: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An O3 with 507 true twins still retracts to O3 at 513 vertices."""
+    _native(monkeypatch, native_binary)
+    graph = nx.octahedral_graph()
+    antipode = next(v for v in graph if v != 0 and not graph.has_edge(0, v))
+    for v in range(6, 513):
+        graph.add_node(v)
+        graph.add_edges_from((v, w) for w in range(v) if w != antipode)
+    assert len(graph) == 513
+    result = pycliques.find_octahedral_retraction_coaffine(
+        graph, backend="native", max_states=1000, time_limit=10
+    )
+    assert result.status is RetractionSearchStatus.FOUND
+    assert result.dimension == 3
+    assert result.retraction is not None
+    assert result.antipodal_pairs is not None
+    assert result.inclusion is not None
+    target = graph.subgraph(v for pair in result.antipodal_pairs for v in pair)
+    assert pycliques.verify_induced_octahedron(graph, result.antipodal_pairs)
+    assert pycliques.verify_retraction_witness(
+        graph, target, (result.retraction, result.inclusion)
+    )
+
+
+def test_native_at_exact_2048_vertex_capacity(
+    native_binary: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A universal vertex forbids any coaffine map: genuine EXHAUSTED."""
+    _native(monkeypatch, native_binary)
+    graph = nx.star_graph(2047)
+    assert len(graph) == 2048
+    result = pycliques.find_octahedral_retraction_coaffine(
+        graph, backend="native", max_states=10, time_limit=5
+    )
+    assert result.status is RetractionSearchStatus.EXHAUSTED
+    assert result.states_explored == 0
+
+
 def test_native_min_dimension_restricts_oct(
     native_binary: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -137,12 +177,12 @@ def test_invalid_native_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
         module.find_octahedral_retraction_coaffine(
             nx.octahedral_graph(), backend="unknown"
         )
-    with pytest.raises(ValueError, match="at most 512"):
+    with pytest.raises(ValueError, match="at most 2048"):
         monkeypatch.setattr(
             module, "find_coaffine_native_executable", lambda: Path("/tmp/fake")
         )
         module.find_octahedral_retraction_coaffine(
-            nx.empty_graph(513), backend="native"
+            nx.empty_graph(2049), backend="native"
         )
 
 
