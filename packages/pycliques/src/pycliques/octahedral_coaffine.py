@@ -149,8 +149,13 @@ def find_octahedral_retraction_coaffine(
         status = RetractionSearchStatus[native.status]
         if status is not RetractionSearchStatus.FOUND:
             return CoaffineOctahedronResult(
-                status, None, None, None, None,
-                native.states_explored, native.arc_revisions,
+                status,
+                None,
+                None,
+                None,
+                None,
+                native.states_explored,
+                native.arc_revisions,
                 native.assignments_tried,
             )
 
@@ -171,10 +176,7 @@ def find_octahedral_retraction_coaffine(
             len(image) != 2 * len(pairs)
             or set(r.values()) != image
             or any(r[u] != f[f[u]] for u in graph)
-            or any(
-                f[u] == u or graph.has_edge(u, f[u])
-                for u in graph
-            )
+            or any(f[u] == u or graph.has_edge(u, f[u]) for u in graph)
             or any(
                 f[u] != f[v] and not graph.has_edge(f[u], f[v])
                 for u, v in graph.edges()
@@ -184,8 +186,13 @@ def find_octahedral_retraction_coaffine(
         ):
             raise RuntimeError("Native backend returned an invalid certificate")
         return CoaffineOctahedronResult(
-            status, pairs, r, inclusion, f,
-            native.states_explored, native.arc_revisions,
+            status,
+            pairs,
+            r,
+            inclusion,
+            f,
+            native.states_explored,
+            native.arc_revisions,
             native.assignments_tried,
         )
 
