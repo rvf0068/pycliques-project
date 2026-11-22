@@ -15,6 +15,7 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 MAX_NATIVE_ORDER = 512
 _ENV_NAME = "PYCLIQUES_COAFFINE_NATIVE"
@@ -180,7 +181,10 @@ def run_coaffine_native(
     ):
         raise RuntimeError("Incorrect native witness field names")
     try:
-        pairs = tuple(tuple(map(int, pair.split(","))) for pair in pair_line[1:])
+        pairs = cast(
+            tuple[tuple[int, int], ...],
+            tuple(tuple(map(int, pair.split(","))) for pair in pair_line[1:]),
+        )
         projection = tuple(map(int, projection_line[1:]))
         endomorphism = tuple(map(int, endomorphism_line[1:]))
     except ValueError as exc:
