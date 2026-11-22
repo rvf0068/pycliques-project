@@ -180,7 +180,7 @@ int main(int argc, char** argv) {
         }
         std::ifstream input(argv[1]);
         int m = 0;
-        if (!(input >> n >> m) || n < 1 || n > CAPACITY || m < 0 ||
+        if (!(input >> n >> m) || n < 0 || n > CAPACITY || m < 0 ||
             m > n * (n - 1) / 2) throw std::invalid_argument("invalid graph size");
         closed.assign(n, {});
         neighbors.assign(n, {});
