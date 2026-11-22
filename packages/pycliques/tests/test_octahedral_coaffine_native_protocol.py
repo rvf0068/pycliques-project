@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import runpy
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -221,3 +224,33 @@ def test_native_found_without_witness_is_rejected(
         coaffine.find_octahedral_retraction_coaffine(
             nx.octahedral_graph(), backend="native"
         )
+
+
+def test_native_cli_requires_explicit_build_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cover the command-line guard without needing a C++ compiler."""
+    entrypoint = str(Path(native.__file__))
+    monkeypatch.setattr(sys, "argv", ["octahedral_coaffine_native.py"])
+    with pytest.raises(SystemExit) as caught:
+        runpy.run_path(entrypoint, run_name="__main__")
+    assert caught.value.code == 2
+
+
+def test_native_cli_builds_real_binary(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Exercise the installed CLI exactly as a user invokes --build."""
+    if shutil.which("c++") is None:
+        pytest.skip("Optional C++17 compiler is not installed")
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+    monkeypatch.setattr(
+        sys, "argv", ["octahedral_coaffine_native.py", "--build"]
+    )
+    runpy.run_path(str(Path(native.__file__)), run_name="__main__")
+    built = Path(capsys.readouterr().out.strip())
+    assert built.is_file()
+    assert built.parent == tmp_path / "pycliques"
+    assert built.name.startswith("coaffine-native-")
