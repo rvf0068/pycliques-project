@@ -8,12 +8,10 @@ import json
 import random
 
 import networkx as nx
+import pycliques.octahedral_blind as ob
+import pycliques.octahedral_blind_search as bs
+import pycliques.octahedral_joint_fibers as jf
 import pytest
-from pycliques import (
-    octahedral_blind as ob,
-    octahedral_blind_search as bs,
-    octahedral_joint_fibers as jf,
-)
 
 
 def octahedron(d):
