@@ -96,7 +96,9 @@ def find_octahedral_retraction_shores(
             candidates = range(total)
         else:
             rng = random.Random(0)
-            samples = {0, total - 1}
+            samples = {0}
+            if max_orientation_samples > 1:
+                samples.add(total - 1)
             while len(samples) < max_orientation_samples and len(samples) < total:
                 samples.add(rng.getrandbits(d))
             candidates = sorted(samples)
