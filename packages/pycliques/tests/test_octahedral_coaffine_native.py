@@ -47,6 +47,7 @@ def test_native_octahedron_arbitrary_labels(
         assert result.status is RetractionSearchStatus.FOUND
         assert result.dimension == 3
         assert result.retraction == {v: v for v in graph}
+        assert result.antipodal_pairs is not None
         assert result.endomorphism is not None
         assert all(
             result.retraction[v] == result.endomorphism[result.endomorphism[v]]
@@ -216,6 +217,7 @@ def test_native_rediscovers_mckay_253650_o12(
     assert result.retraction is not None
     assert result.antipodal_pairs is not None
     assert result.endomorphism is not None
+    assert result.inclusion is not None
     target = pared.subgraph(v for pair in result.antipodal_pairs for v in pair)
     assert pycliques.verify_retraction_witness(
         pared, target, (result.retraction, result.inclusion)
