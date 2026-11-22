@@ -448,13 +448,18 @@ def test_unmatched_checkpoint_pairs_and_fibers_rejected(tmp_path) -> None:
     masks = jf.Masks(graph)
     common = masks.closed[0] & masks.closed[1] & masks.closed[2] & masks.closed[3]
     unmatched = jf.State(
-        ((0, 1), (2, 3)), (((1 << 0), (1 << 1)),), 0b11, common
+        ((0, 1), (2, 3)),
+        (((1 << 0), (1 << 1)),),
+        0b11,
+        common,
     )
     with pytest.raises(ValueError, match="equal numbers of pairs and fibers"):
         jf.check_partial_state(masks, unmatched)
 
     valid = jf.State(
-        ((0, 1),), (((1 << 0), (1 << 1)),), 0b11,
+        ((0, 1),),
+        (((1 << 0), (1 << 1)),),
+        0b11,
         masks.closed[0] & masks.closed[1],
     )
     path = tmp_path / "partial.json"
@@ -466,9 +471,7 @@ def test_unmatched_checkpoint_pairs_and_fibers_rejected(tmp_path) -> None:
     with pytest.raises(ValueError, match="equal numbers of pairs and fibers"):
         jf.load_partial_state(path, masks)
 
-    extra_fiber = dict(
-        original, fibers=[*original["fibers"], [[2], [3]]]
-    )
+    extra_fiber = dict(original, fibers=[*original["fibers"], [[2], [3]]])
     path.write_text(json.dumps(extra_fiber))
     with pytest.raises(ValueError, match="equal numbers of pairs and fibers"):
         jf.load_partial_state(path, masks)
