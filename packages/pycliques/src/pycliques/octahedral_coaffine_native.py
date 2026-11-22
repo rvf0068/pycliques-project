@@ -16,7 +16,6 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-
 MAX_NATIVE_ORDER = 512
 _ENV_NAME = "PYCLIQUES_COAFFINE_NATIVE"
 
