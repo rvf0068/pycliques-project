@@ -98,7 +98,9 @@ class _OctahedralMasks:
         return common
 
 
-def _screen_masks(m: _OctahedralMasks, pairs: Sequence[tuple[int, int]]) -> OctahedralScreen:
+def _screen_masks(
+    m: _OctahedralMasks, pairs: Sequence[tuple[int, int]]
+) -> OctahedralScreen:
     """2-SAT on vertices that cannot map to any future antipodal pair."""
     if not pairs:
         return OctahedralScreen(True, "NO_PAIRS", 0, 0, 0, 0)
@@ -374,11 +376,20 @@ def complete_dominating_octahedron(
                     continue
                 candidates.add(pair)
                 next_common = common & m.closed[a] & m.closed[b]
-                if next_common.bit_count() >= 2 * (r - 1):
-                    choices.append((next_common.bit_count(), pair, next_common))
+                if next_common.bit_count() < 2 * (r - 1):
+                    continue
+                residual_edges = sum(
+                    (m.nonedge[v] & next_common).bit_count()
+                    for v in _bits(next_common)
+                ) // 2
+                if residual_edges < r - 1:
+                    continue
+                choices.append((
+                    next_common.bit_count(), -residual_edges, pair, next_common
+                ))
         choices.sort()
         unknown = False
-        for _, pair, next_common in choices:
+        for _, _, pair, next_common in choices:
             result = solve(next_common, r - 1)
             if isinstance(result, tuple):
                 found = (pair, *result)
