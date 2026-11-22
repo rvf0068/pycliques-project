@@ -1,8 +1,10 @@
 """Exact screening, completion, hitting-set, arbitrary labels, and blind search."""
+
 import random
 
 import networkx as nx
 import pytest
+
 from pycliques.octahedral_blind import (
     OctahedralBlindStatus,
     complete_dominating_octahedron,
