@@ -141,3 +141,19 @@ def test_invalid_limit(bad):
         complete_dominating_octahedron(
             octahedron(3), [], target_dimension=3, max_states=bad
         )
+
+
+@pytest.mark.parametrize(
+    "bad_graph",
+    [
+        nx.DiGraph([(0, 1)]),
+        nx.MultiGraph([(0, 1), (0, 1)]),
+        nx.MultiDiGraph([(0, 1)]),
+        nx.Graph([(0, 0)]),
+    ],
+)
+def test_partial_fiber_discovery_rejects_unsupported_hosts(
+    bad_graph: nx.Graph,
+) -> None:
+    with pytest.raises(ValueError, match="simple undirected loopless"):
+        discover_partial_octahedral_fibers(bad_graph, 3)
