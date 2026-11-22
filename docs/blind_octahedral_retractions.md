@@ -31,6 +31,16 @@ The top-level heuristic returns `LIMIT_REACHED` for any failure; it **never
 proves nonexistence**. The graph's vertex iteration order is relevant to
 randomized reproducibility even with a fixed seed.
 
+For conflict-guided repair, `max_repairs` bounds how many best-ranked
+candidates are retained and passed to the completion solver, while
+`max_candidate_checks` (default 200,000) independently bounds how many
+deletion combinations are examined. Candidate generation is streamed and
+uses a bounded heap, rather than materializing all combinations. A budget
+cutoff is inconclusive and can miss a better repair; increasing the budget
+may change the chosen candidates. The default covers all
+`binom(22, 7) = 170544` deletions used in the original snub experiment.
+
+
 ## Exact tests and completion
 
 ```python
