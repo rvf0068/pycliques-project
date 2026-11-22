@@ -7,6 +7,7 @@ on:
       - "packages/pycliques/src/pycliques/octahedral_coaffine.py"
       - "packages/pycliques/src/pycliques/octahedral_coaffine_native.py"
       - "packages/pycliques/tests/test_octahedral_coaffine_native.py"
+      - "packages/pycliques/tests/test_octahedral_coaffine_native_protocol.py"
       - ".github/workflows/coaffine-native.yml"
   workflow_dispatch:
 
@@ -28,7 +29,11 @@ jobs:
           uv build --package pycliques --wheel --out-dir /tmp/pycliques-wheel
           uv run python -c "from pathlib import Path; import zipfile; wheels=list(Path('/tmp/pycliques-wheel').glob('*.whl')); assert len(wheels)==1; z=zipfile.ZipFile(wheels[0]); assert 'pycliques/_coaffine_native.cpp' in z.namelist(); assert 'pycliques/octahedral_coaffine_native.py' in z.namelist()"
       - name: Test optional build, exact small-graph comparisons and false-positive guards
-        run: uv run pytest -q packages/pycliques/tests/test_octahedral_coaffine_native.py -m "not slow"
+        run: |
+          uv run pytest -q packages/pycliques/tests/test_octahedral_coaffine_native.py packages/pycliques/tests/test_octahedral_coaffine_native_protocol.py -m "not slow"
+      - name: Measure accelerated wrapper coverage (diagnostic)
+        run: |
+          uv run pytest -q packages/pycliques/tests/test_octahedral_coaffine_native.py packages/pycliques/tests/test_octahedral_coaffine_native_protocol.py -m "not slow" --cov=pycliques.octahedral_coaffine_native --cov-report=term-missing
       - name: Rediscover McKay 253650 P4 to O12 without a stored target
         run: uv run pytest -q packages/pycliques/tests/test_octahedral_coaffine_native.py -m slow
       - name: Test explicit build entry point
