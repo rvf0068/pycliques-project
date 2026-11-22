@@ -148,6 +148,7 @@ from .octahedral_coaffine import (
     CoaffineOctahedronResult,
     find_octahedral_retraction_coaffine,
 )
+from .octahedral_coaffine_native import build_coaffine_native
 from .octahedral_compatibility_search import find_induced_octahedron_compatibility
 from .octahedral_nonlocal_search import (
     OctahedronSearchResult,
@@ -382,6 +383,7 @@ __all__ = [
     "find_octahedral_retraction",
     "CoaffineOctahedronResult",
     "find_octahedral_retraction_coaffine",
+    "build_coaffine_native",
     "find_special_octahedron_witness",
     "graph_from_gap_adjacency_list",
     "has_induced",
