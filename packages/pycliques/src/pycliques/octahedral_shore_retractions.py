@@ -93,6 +93,7 @@ def find_octahedral_retraction_shores(
             for pair in pairs
         ]
         total = 1 << d
+        candidates: Sequence[int]
         if total <= max_orientation_samples:
             candidates = range(total)
         else:
