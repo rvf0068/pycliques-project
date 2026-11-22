@@ -3,6 +3,7 @@
 The graph is arbitrary: neither snub coordinates nor saved witnesses occur here.
 A ``LIMIT_REACHED`` result is never evidence of nonexistence.
 """
+
 from __future__ import annotations
 
 from collections.abc import Hashable, Sequence
@@ -83,9 +84,12 @@ class _OctahedralMasks:
 
     def pairs(self, graph: nx.Graph, pairs: Sequence[tuple[Hashable, Hashable]]):
         try:
-            normalized = tuple(tuple(pair) for pair in pairs)
+            raw_pairs = tuple(tuple(pair) for pair in pairs)
         except TypeError as error:
             raise ValueError("pairs must contain two vertices each") from error
+        if any(len(pair) != 2 for pair in raw_pairs):
+            raise ValueError("antipodal pairs must have two endpoints")
+        normalized = tuple((pair[0], pair[1]) for pair in raw_pairs)
         if normalized and not verify_induced_octahedron(graph, normalized):
             raise ValueError("pairs must induce an octahedron")
         return tuple((self.index[a], self.index[b]) for a, b in normalized)
@@ -113,10 +117,11 @@ def _screen_masks(
         if complement_neighbors & common:
             continue  # A future target image has not been ruled out.
         if x in anchor_pos:
-            choices = (anchor_pos[x],)
+            choices: tuple[int, ...] = (anchor_pos[x],)
         else:
-            choices = tuple(i for i, a in enumerate(antipodes)
-                            if complement_neighbors & (1 << a))
+            choices = tuple(
+                i for i, a in enumerate(antipodes) if complement_neighbors & (1 << a)
+            )
         if not choices:
             return OctahedralScreen(False, "EMPTY_DOMAIN", len(domains) + 1, 0, 0, 0)
         domains[x] = choices
@@ -125,8 +130,8 @@ def _screen_masks(
     binary = tuple(x for x in domains if len(domains[x]) == 2)
     binary_positions = {x: i for i, x in enumerate(binary)}
     eligible = singleton | set(binary)
-    edges = [[] for _ in range(2 * len(binary))]
-    reverse = [[] for _ in edges]
+    edges: list[list[int]] = [[] for _ in range(2 * len(binary))]
+    reverse: list[list[int]] = [[] for _ in edges]
     clauses = 0
 
     def imply(u: int, v: int) -> None:
@@ -144,8 +149,12 @@ def _screen_masks(
                     clauses += 1
                     if x in singleton and y in singleton:
                         return OctahedralScreen(
-                            False, "FORCED_EDGE", len(domains), len(singleton),
-                            len(binary), clauses
+                            False,
+                            "FORCED_EDGE",
+                            len(domains),
+                            len(singleton),
+                            len(binary),
+                            clauses,
                         )
                     if x in singleton:
                         literal = 2 * binary_positions[y] + iy
@@ -184,19 +193,22 @@ def _screen_masks(
         if component[root] >= 0:
             continue
         component[root] = number
-        stack = [root]
-        while stack:
-            u = stack.pop()
+        component_stack = [root]
+        while component_stack:
+            u = component_stack.pop()
             for v in reverse[u]:
                 if component[v] < 0:
                     component[v] = number
-                    stack.append(v)
+                    component_stack.append(v)
         number += 1
-    possible = all(component[2 * i] != component[2 * i + 1]
-                   for i in range(len(binary)))
+    possible = all(component[2 * i] != component[2 * i + 1] for i in range(len(binary)))
     return OctahedralScreen(
-        possible, "NOT_DISPROVED" if possible else "2SAT_CONFLICT",
-        len(domains), len(singleton), len(binary), clauses
+        possible,
+        "NOT_DISPROVED" if possible else "2SAT_CONFLICT",
+        len(domains),
+        len(singleton),
+        len(binary),
+        clauses,
     )
 
 
@@ -246,7 +258,7 @@ def minimize_octahedral_conflict(
     i = 0
     finished = True
     while i < len(indexed):
-        smaller = indexed[:i] + indexed[i + 1:]
+        smaller = indexed[:i] + indexed[i + 1 :]
         report = check(smaller)
         if report is None:
             finished = False
@@ -282,8 +294,7 @@ def minimum_octahedral_repair(
     cores = tuple(sorted(set(conflicts)))
     if any(type(c) is not int or c <= 0 or c >= (1 << k) for c in cores):
         raise ValueError("conflicts must be nonempty subsets of pair indices")
-    cores = tuple(c for c in cores
-                  if not any(d != c and (d & c) == d for d in cores))
+    cores = tuple(c for c in cores if not any(d != c and (d & c) == d for d in cores))
     if not cores:
         return OctahedralHittingSet((), 0, 1)
     best = (sum(costs) + 1, 0)
@@ -304,13 +315,15 @@ def minimum_octahedral_repair(
         pivot = min(remaining, key=int.bit_count)
         for i in range(k):
             if pivot & (1 << i):
-                visit(deleted | (1 << i), cost + costs[i],
-                      tuple(c for c in remaining if not (c & (1 << i))))
+                visit(
+                    deleted | (1 << i),
+                    cost + costs[i],
+                    tuple(c for c in remaining if not (c & (1 << i))),
+                )
 
     visit(0, 0, cores)
     return OctahedralHittingSet(
-        tuple(i for i in range(k) if best[1] & (1 << i)),
-        best[0], explored
+        tuple(i for i in range(k) if best[1] & (1 << i)), best[0], explored
     )
 
 
@@ -377,15 +390,18 @@ def complete_dominating_octahedron(
                 next_common = common & m.closed[a] & m.closed[b]
                 if next_common.bit_count() < 2 * (r - 1):
                     continue
-                residual_edges = sum(
-                    (m.nonedge[v] & next_common).bit_count()
-                    for v in _bits(next_common)
-                ) // 2
+                residual_edges = (
+                    sum(
+                        (m.nonedge[v] & next_common).bit_count()
+                        for v in _bits(next_common)
+                    )
+                    // 2
+                )
                 if residual_edges < r - 1:
                     continue
-                choices.append((
-                    next_common.bit_count(), -residual_edges, pair, next_common
-                ))
+                choices.append(
+                    (next_common.bit_count(), -residual_edges, pair, next_common)
+                )
         choices.sort()
         unknown = False
         for _, _, pair, next_common in choices:
@@ -403,14 +419,15 @@ def complete_dominating_octahedron(
 
     remainder = solve(m.common(partial), remaining)
     if remainder is None:
-        return OctahedralCompletion(OctahedralBlindStatus.LIMIT_REACHED,
-                                     None, states, len(memo))
+        return OctahedralCompletion(
+            OctahedralBlindStatus.LIMIT_REACHED, None, states, len(memo)
+        )
     if remainder is False:
-        return OctahedralCompletion(OctahedralBlindStatus.EXHAUSTED,
-                                     None, states, len(memo))
+        return OctahedralCompletion(
+            OctahedralBlindStatus.EXHAUSTED, None, states, len(memo)
+        )
     pairs = partial + remainder
     labels = tuple((m.nodes[a], m.nodes[b]) for a, b in pairs)
     if not verify_induced_octahedron(graph, labels, require_dominating=True):
         raise AssertionError("completion failed independent verification")
-    return OctahedralCompletion(OctahedralBlindStatus.FOUND, labels,
-                                 states, len(memo))
+    return OctahedralCompletion(OctahedralBlindStatus.FOUND, labels, states, len(memo))
