@@ -402,15 +402,10 @@ def test_repair_candidate_heap_retains_exhaustive_ranking():
             bs._repair_candidates(masks, pairs, set(), 6, 3, **kwargs)
 
 
-@pytest.mark.parametrize("missing_anchor,expected_image", [(1, 0), (0, 1)])
-def test_antipode_domain_indexing_is_not_reversed(
-    missing_anchor: int, expected_image: int
-) -> None:
-    """A nonneighbor of the antipode permits the stated image, not its opposite.
 
-    Reversing the `antipodes` tuple in _screen_masks is necessary. An
-    (a_i, b_i)-ordered tuple would falsely reject this actual retraction.
-    """
+@pytest.mark.parametrize("missing_anchor,expected_image", [(1, 0), (0, 1)])
+def test_antipode_domain_indexing_is_not_reversed(missing_anchor, expected_image):
+    """A nonneighbor of the antipode permits this image, not its opposite."""
     graph = octahedron(3)
     graph.add_node(6)
     graph.add_edges_from((6, v) for v in range(6) if v != missing_anchor)
@@ -419,18 +414,16 @@ def test_antipode_domain_indexing_is_not_reversed(
     assert report.possible
     assert report.forced_vertices == 7
     assert report.singleton_domains == 7
-
     target = graph.subgraph(range(6))
     projection = {v: v for v in range(6)}
     projection[6] = expected_image
-    assert all(
-        projection[u] == projection[v]
-        or target.has_edge(projection[u], projection[v])
-        for u, v in graph.edges
-    )
+    for u, v in graph.edges:
+        assert projection[u] == projection[v] or target.has_edge(
+            projection[u], projection[v]
+        )
 
 
-def test_antipode_domain_detects_real_forced_edge() -> None:
+def test_antipode_domain_detects_real_forced_edge():
     """Oppositely forced outside vertices cannot be adjacent."""
     graph = octahedron(3)
     graph.add_nodes_from((6, 7))
@@ -442,35 +435,25 @@ def test_antipode_domain_detects_real_forced_edge() -> None:
     assert report.reason == "FORCED_EDGE"
 
 
-def test_unmatched_checkpoint_pairs_and_fibers_rejected(tmp_path) -> None:
+def test_unmatched_checkpoint_pairs_and_fibers_rejected(tmp_path):
     """Neither direct invariant checks nor file loading may silently zip."""
     graph = octahedron(4)
     masks = jf.Masks(graph)
+    pairs = ((0, 1), (2, 3))
+    fibers = (((1 << 0), (1 << 1)),)
     common = masks.closed[0] & masks.closed[1] & masks.closed[2] & masks.closed[3]
-    unmatched = jf.State(
-        ((0, 1), (2, 3)),
-        (((1 << 0), (1 << 1)),),
-        0b11,
-        common,
-    )
+    unmatched = jf.State(pairs, fibers, 0b11, common)
     with pytest.raises(ValueError, match="equal numbers of pairs and fibers"):
         jf.check_partial_state(masks, unmatched)
-
-    valid = jf.State(
-        ((0, 1),),
-        (((1 << 0), (1 << 1)),),
-        0b11,
-        masks.closed[0] & masks.closed[1],
-    )
+    valid_common = masks.closed[0] & masks.closed[1]
+    valid = jf.State(((0, 1),), fibers, 0b11, valid_common)
     path = tmp_path / "partial.json"
     jf.save_partial_state(path, masks, valid)
     original = json.loads(path.read_text())
-
     extra_pair = dict(original, pairs=[*original["pairs"], [2, 3]])
     path.write_text(json.dumps(extra_pair))
     with pytest.raises(ValueError, match="equal numbers of pairs and fibers"):
         jf.load_partial_state(path, masks)
-
     extra_fiber = dict(original, fibers=[*original["fibers"], [[2], [3]]])
     path.write_text(json.dumps(extra_fiber))
     with pytest.raises(ValueError, match="equal numbers of pairs and fibers"):
