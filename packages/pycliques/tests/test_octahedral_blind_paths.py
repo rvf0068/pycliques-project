@@ -9,7 +9,6 @@ import random
 
 import networkx as nx
 import pytest
-
 from pycliques import (
     octahedral_blind as ob,
     octahedral_blind_search as bs,
