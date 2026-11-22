@@ -136,6 +136,21 @@ from .octahedral_amplification import (
     find_induced_octahedron,
     is_dominating_octahedron,
 )
+from .octahedral_blind import (
+    OctahedralBlindStatus,
+    OctahedralCompletion,
+    OctahedralConflict,
+    OctahedralHittingSet,
+    OctahedralScreen,
+    complete_dominating_octahedron,
+    minimize_octahedral_conflict,
+    minimum_octahedral_repair,
+    screen_partial_octahedral_retraction,
+)
+from .octahedral_blind_search import (
+    BlindOctahedralRetraction,
+    find_blind_octahedral_retraction,
+)
 from .octahedral_boolean import (
     MaximalIntersectingFamilies,
     OctahedralBooleanModel,
@@ -150,6 +165,10 @@ from .octahedral_coaffine import (
 )
 from .octahedral_coaffine_native import build_coaffine_native
 from .octahedral_compatibility_search import find_induced_octahedron_compatibility
+from .octahedral_joint_fibers import (
+    PartialOctahedralFibers,
+    discover_partial_octahedral_fibers,
+)
 from .octahedral_nonlocal_search import (
     OctahedronSearchResult,
     OctahedronSearchStatus,
@@ -366,6 +385,19 @@ __all__ = [
     "snub_disphenoid",
     "suspension_of_cycle",
     # retractions
+    "OctahedralBlindStatus",
+    "OctahedralCompletion",
+    "OctahedralConflict",
+    "OctahedralHittingSet",
+    "OctahedralScreen",
+    "complete_dominating_octahedron",
+    "minimum_octahedral_repair",
+    "minimize_octahedral_conflict",
+    "screen_partial_octahedral_retraction",
+    "PartialOctahedralFibers",
+    "discover_partial_octahedral_fibers",
+    "BlindOctahedralRetraction",
+    "find_blind_octahedral_retraction",
     "OctahedronSearchResult",
     "OctahedronSearchStatus",
     "find_induced_octahedron_amplified",
