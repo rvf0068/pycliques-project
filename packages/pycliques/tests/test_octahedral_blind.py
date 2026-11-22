@@ -66,7 +66,9 @@ def test_partial_screen_forced_edge_and_conflict():
     conflict = minimize_octahedral_conflict(graph, pairs)
     assert conflict is not None
     assert conflict.deletion_minimal
-    assert not screen_partial_octahedral_retraction(graph, conflict.antipodal_pairs).possible
+    assert not screen_partial_octahedral_retraction(
+        graph, conflict.antipodal_pairs
+    ).possible
     for i in range(len(conflict.antipodal_pairs)):
         small = conflict.antipodal_pairs[:i] + conflict.antipodal_pairs[i+1:]
         assert screen_partial_octahedral_retraction(graph, small).possible
@@ -117,7 +119,9 @@ def test_partial_fiber_search_returns_verifiable_map():
     assert all(result.projection[x]==x for x in anchors)
     assert all(result.projection[u]==result.projection[v] or
                graph.has_edge(result.projection[u],result.projection[v])
-               for u,v in graph.edges if u in result.projection and v in result.projection)
+        for u, v in graph.edges
+        if u in result.projection and v in result.projection
+    )
 
 
 @pytest.mark.parametrize("bad",[0,True,-1])
