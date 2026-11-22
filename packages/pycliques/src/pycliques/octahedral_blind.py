@@ -108,8 +108,14 @@ def _screen_masks(
     if not pairs:
         return OctahedralScreen(True, "NO_PAIRS", 0, 0, 0, 0)
     common = m.common(pairs)
+    # Index i always denotes the IMAGE at target position i, ordered
+    # (a_0, b_0, a_1, b_1, ...). An outside vertex x may map to image v
+    # precisely when x is NONadjacent to the ANTIPODE of v: if x were
+    # adjacent to that fixed antipode, adjacency would not be preserved.
+    # Consequently these nonadjacency witnesses MUST be in reversed
+    # (b_i, a_i) order. Do not replace this by (a_i, b_i).
     antipodes = tuple(x for a, b in pairs for x in (b, a))
-    # Positions of anchor vertices in the target list (a_0,b_0,a_1,b_1,...).
+    # Fixed target vertices use their actual (a_i, b_i) image positions.
     anchor_pos = {v: i for i, v in enumerate(x for pair in pairs for x in pair)}
     domains: dict[int, tuple[int, ...]] = {}
     for x in range(len(m.nodes)):
