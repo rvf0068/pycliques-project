@@ -246,9 +246,7 @@ def test_native_cli_builds_real_binary(
     if shutil.which("c++") is None:
         pytest.skip("Optional C++17 compiler is not installed")
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
-    monkeypatch.setattr(
-        sys, "argv", ["octahedral_coaffine_native.py", "--build"]
-    )
+    monkeypatch.setattr(sys, "argv", ["octahedral_coaffine_native.py", "--build"])
     runpy.run_path(str(Path(native.__file__)), run_name="__main__")
     built = Path(capsys.readouterr().out.strip())
     assert built.is_file()
