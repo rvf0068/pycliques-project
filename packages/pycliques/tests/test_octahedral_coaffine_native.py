@@ -137,12 +137,12 @@ def test_invalid_native_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
         module.find_octahedral_retraction_coaffine(
             nx.octahedral_graph(), backend="unknown"
         )
-    with pytest.raises(ValueError, match="at most 512"):
+    with pytest.raises(ValueError, match="at most 2048"):
         monkeypatch.setattr(
             module, "find_coaffine_native_executable", lambda: Path("/tmp/fake")
         )
         module.find_octahedral_retraction_coaffine(
-            nx.empty_graph(513), backend="native"
+            nx.empty_graph(2049), backend="native"
         )
 
 
