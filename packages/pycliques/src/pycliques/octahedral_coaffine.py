@@ -89,7 +89,7 @@ def find_octahedral_retraction_coaffine(
     bitset engine if it has been explicitly compiled; otherwise it uses
     the established portable Python engine. backend='python' forces
     the reference implementation. backend='native' requires the compiled
-    executable and supports up to 512 vertices. Build it once with
+    executable and supports up to 2048 vertices. Build it once with
     'python -m pycliques.octahedral_coaffine_native --build'.
     This is optional; no compilation occurs during package installation or
     normal imports. Every positive native certificate is re-verified
