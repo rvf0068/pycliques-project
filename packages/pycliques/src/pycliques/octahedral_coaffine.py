@@ -24,6 +24,11 @@ from dataclasses import dataclass
 
 import networkx as nx
 
+from .octahedral_coaffine_native import (
+    MAX_NATIVE_ORDER,
+    find_coaffine_native_executable,
+    run_coaffine_native,
+)
 from .octahedral_nonlocal_search import verify_induced_octahedron
 from .retractions import RetractionSearchStatus, verify_retraction_witness
 
@@ -59,6 +64,7 @@ def find_octahedral_retraction_coaffine(
     min_dimension: int = 3,
     max_states: int = 20_000,
     time_limit: float | None = None,
+    backend: str = "auto",
 ) -> CoaffineOctahedronResult:
     """Search for a retraction onto any induced octahedron with no seed.
 
@@ -78,6 +84,16 @@ def find_octahedral_retraction_coaffine(
 
     Edge images may coincide, as in the standard clique-graph morphism
     convention. The input must be a finite simple undirected graph.
+
+    The default backend='auto' uses the version-matched C++17
+    bitset engine if it has been explicitly compiled; otherwise it uses
+    the established portable Python engine. backend='python' forces
+    the reference implementation. backend='native' requires the compiled
+    executable and supports up to 512 vertices. Build it once with
+    'python -m pycliques.octahedral_coaffine_native --build'.
+    This is optional; no compilation occurs during package installation or
+    normal imports. Every positive native certificate is re-verified
+    independently in Python. Resource limits are always inconclusive.
 
     >>> import networkx as nx
     >>> result = find_octahedral_retraction_coaffine(nx.octahedral_graph())
@@ -104,6 +120,74 @@ def find_octahedral_retraction_coaffine(
         or time_limit <= 0
     ):
         raise ValueError("time_limit must be finite and strictly positive")
+
+    if backend not in ("auto", "python", "native"):
+        raise ValueError("backend must be 'auto', 'python', or 'native'")
+
+    native_path = None
+    if backend != "python":
+        native_path = find_coaffine_native_executable()
+        if backend == "native" and native_path is None:
+            raise RuntimeError(
+                "Native backend is not built; run "
+                "'python -m pycliques.octahedral_coaffine_native --build'"
+            )
+        if backend == "native" and len(graph) > MAX_NATIVE_ORDER:
+            raise ValueError(
+                f"Native coaffine backend supports at most {MAX_NATIVE_ORDER} vertices"
+            )
+    if native_path is not None and len(graph) <= MAX_NATIVE_ORDER:
+        # The subprocess uses 0..n-1 positions and cannot interpret arbitrary
+        # NetworkX labels. Always map its result back and independently verify.
+        native = run_coaffine_native(
+            graph,
+            min_dimension=min_dimension,
+            max_states=max_states,
+            time_limit=time_limit,
+            executable=native_path,
+        )
+        status = RetractionSearchStatus[native.status]
+        if status is not RetractionSearchStatus.FOUND:
+            return CoaffineOctahedronResult(
+                status, None, None, None, None,
+                native.states_explored, native.arc_revisions,
+                native.assignments_tried,
+            )
+
+        if (
+            native.pairs is None
+            or native.projection is None
+            or native.endomorphism is None
+        ):
+            raise RuntimeError("Native FOUND result is missing a witness")
+        labels = list(graph)
+        pairs = tuple((labels[u], labels[v]) for u, v in native.pairs)
+        r = {labels[i]: labels[j] for i, j in enumerate(native.projection)}
+        f = {labels[i]: labels[j] for i, j in enumerate(native.endomorphism)}
+        image = {v for pair in pairs for v in pair}
+        target = graph.subgraph(image)
+        inclusion = {v: v for v in target}
+        if (
+            len(image) != 2 * len(pairs)
+            or set(r.values()) != image
+            or any(r[u] != f[f[u]] for u in graph)
+            or any(
+                f[u] == u or graph.has_edge(u, f[u])
+                for u in graph
+            )
+            or any(
+                f[u] != f[v] and not graph.has_edge(f[u], f[v])
+                for u, v in graph.edges()
+            )
+            or not verify_induced_octahedron(graph, pairs)
+            or not verify_retraction_witness(graph, target, (r, inclusion))
+        ):
+            raise RuntimeError("Native backend returned an invalid certificate")
+        return CoaffineOctahedronResult(
+            status, pairs, r, inclusion, f,
+            native.states_explored, native.arc_revisions,
+            native.assignments_tried,
+        )
 
     nodes = list(graph)
     n = len(nodes)
