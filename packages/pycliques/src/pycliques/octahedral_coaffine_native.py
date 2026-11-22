@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
-MAX_NATIVE_ORDER = 512
+MAX_NATIVE_ORDER = 2048
 _ENV_NAME = "PYCLIQUES_COAFFINE_NATIVE"
 
 
