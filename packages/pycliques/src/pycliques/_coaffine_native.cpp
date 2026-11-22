@@ -15,7 +15,7 @@
 #include <vector>
 
 namespace {
-constexpr int CAPACITY = 512;
+constexpr int CAPACITY = 2048;
 using Mask = std::bitset<CAPACITY>;
 using Clock = std::chrono::steady_clock;
 int n = 0, min_dimension = 3;
@@ -23,7 +23,9 @@ std::int64_t max_states = 20000, states = 0, revisions = 0, assignments = 0;
 double seconds_limit = 3600.0;
 Clock::time_point started;
 bool limited = false;
+Mask full_vertices;
 std::vector<Mask> closed;
+std::vector<Mask> complement_open;
 std::vector<std::vector<int>> neighbors;
 std::vector<std::pair<int, int>> edges;
 std::vector<std::pair<int, int>> answer_pairs;
@@ -33,12 +35,17 @@ bool timed_out() {
     return std::chrono::duration<double>(Clock::now() - started).count() >= seconds_limit;
 }
 
-Mask support(Mask domain) {
-    Mask result;
+// Exact De Morgan dual:
+// union_{v in D} N_X[v] = V(X) \ intersection_{v in D} N_{complement(X)}(v).
+// In dense hosts the intersection typically becomes empty after few vertices.
+Mask support(const Mask& domain) {
+    Mask excluded = full_vertices;
     for (int v = 0; v < n; ++v) {
-        if (domain.test(v)) result |= closed[v];
+        if (!domain.test(v)) continue;
+        excluded &= complement_open[v];
+        if (excluded.none()) return full_vertices;
     }
-    return result;
+    return full_vertices & ~excluded;
 }
 
 struct State {
@@ -46,23 +53,37 @@ struct State {
     std::vector<Mask> supports;
 };
 
-bool propagate(State& state, std::deque<std::pair<int, int>>& queue) {
-    std::uint64_t steps = 0;
+// Queue a vertex only when its support union changes. A reduction of its
+// domain with unchanged support cannot remove values from any neighboring
+// domain: the neighboring constraint reads only the support union.
+bool propagate(State& state, std::deque<int>& queue) {
+    std::vector<unsigned char> queued(n, 0);
+    for (const int u : queue) queued[u] = 1;
+    std::uint64_t visits = 0;
     while (!queue.empty()) {
-        if ((++steps % 4096) == 0 && timed_out()) {
-            limited = true;
-            return false;
-        }
-        const auto [u, v] = queue.front();
+        const int v = queue.front();
         queue.pop_front();
-        const Mask revised = state.domains[u] & state.supports[v];
-        if (revised == state.domains[u]) continue;
-        ++revisions;
-        if (revised.none()) return false;
-        state.domains[u] = revised;
-        state.supports[u] = support(revised);
-        for (const int w : neighbors[u]) {
-            if (w != v) queue.emplace_back(w, u);
+        queued[v] = 0;
+        const Mask& supported = state.supports[v];
+        if (supported == full_vertices) continue;
+        for (const int u : neighbors[v]) {
+            if ((++visits % 8192) == 0 && timed_out()) {
+                limited = true;
+                return false;
+            }
+            const Mask revised = state.domains[u] & supported;
+            if (revised == state.domains[u]) continue;
+            ++revisions;
+            if (revised.none()) return false;
+            state.domains[u] = revised;
+            const Mask next_support = support(revised);
+            if (next_support != state.supports[u]) {
+                state.supports[u] = next_support;
+                if (!queued[u]) {
+                    queued[u] = 1;
+                    queue.push_back(u);
+                }
+            }
         }
     }
     return true;
@@ -146,9 +167,11 @@ bool dfs(const State& state) {
         State next = state;
         next.domains[pivot].reset();
         next.domains[pivot].set(image);
-        next.supports[pivot] = closed[image];
-        std::deque<std::pair<int, int>> queue;
-        for (const int w : neighbors[pivot]) queue.emplace_back(w, pivot);
+        std::deque<int> queue;
+        if (next.supports[pivot] != closed[image]) {
+            next.supports[pivot] = closed[image];
+            queue.push_back(pivot);
+        }
         if (propagate(next, queue) && dfs(next)) return true;
         if (limited) return false;
     }
@@ -204,22 +227,23 @@ int main(int argc, char** argv) {
             print_result(false);
             return 0;
         }
-        Mask all;
-        for (int u = 0; u < n; ++u) all.set(u);
-        State initial;
+        for (int u = 0; u < n; ++u) full_vertices.set(u);
+        complement_open.reserve(n);
         for (int u = 0; u < n; ++u) {
-            const Mask domain = all & ~closed[u];
+            complement_open.push_back(full_vertices & ~closed[u]);
+        }
+        State initial;
+        std::deque<int> queue;
+        for (int u = 0; u < n; ++u) {
+            const Mask domain = complement_open[u];
             if (domain.none()) {
                 print_result(false);
                 return 0;
             }
             initial.domains.push_back(domain);
-            initial.supports.push_back(support(domain));
-        }
-        std::deque<std::pair<int, int>> queue;
-        for (const auto& [u, v] : edges) {
-            queue.emplace_back(u, v);
-            queue.emplace_back(v, u);
+            const Mask supported = support(domain);
+            initial.supports.push_back(supported);
+            if (supported != full_vertices) queue.push_back(u);
         }
         bool found = false;
         if (propagate(initial, queue)) found = dfs(initial);
