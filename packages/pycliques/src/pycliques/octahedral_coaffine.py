@@ -136,7 +136,16 @@ def find_octahedral_retraction_coaffine(
             raise ValueError(
                 f"Native coaffine backend supports at most {MAX_NATIVE_ORDER} vertices"
             )
-    if native_path is not None and len(graph) <= MAX_NATIVE_ORDER:
+        if backend == "native" and max_states > (1 << 63) - 1:
+            raise ValueError("Native max_states must fit in a signed 64-bit integer")
+        if backend == "native" and min_dimension > (1 << 31) - 1:
+            raise ValueError("Native min_dimension must fit in a signed 32-bit integer")
+    if (
+        native_path is not None
+        and len(graph) <= MAX_NATIVE_ORDER
+        and max_states <= (1 << 63) - 1
+        and min_dimension <= (1 << 31) - 1
+    ):
         # The subprocess uses 0..n-1 positions and cannot interpret arbitrary
         # NetworkX labels. Always map its result back and independently verify.
         native = run_coaffine_native(
