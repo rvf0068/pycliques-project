@@ -124,6 +124,7 @@ def find_blind_octahedral_retraction(
     max_repairs: int = 10,
     completion_states: int = 200_000,
     retraction_states: int = 200_000,
+    retraction_seed: int = 9883,
 ) -> BlindOctahedralRetraction:
     """Attempt a *fully blind* retraction onto an induced ``O_d``.
 
@@ -144,8 +145,8 @@ def find_blind_octahedral_retraction(
         raise ValueError("target_dimension must be an integer >= 3")
     if type(delete_count) is not int or delete_count < 0:
         raise ValueError("delete_count must be a nonnegative integer")
-    if type(seed) is not int:
-        raise ValueError("seed must be an integer")
+    if type(seed) is not int or type(retraction_seed) is not int:
+        raise ValueError("seeds must be integers")
     m = _OctahedralMasks(graph)
     fiber = joint_beam_search(
         graph, target_dimension, seed=seed, beam=beam, samples=samples,
@@ -163,7 +164,7 @@ def find_blind_octahedral_retraction(
         graph, labels, require_dominating=True
     ):
         ret = find_octahedral_retraction(
-            graph, labels, max_states=retraction_states, seed=seed
+            graph, labels, max_states=retraction_states, seed=retraction_seed
         )
         if ret.status is RetractionSearchStatus.FOUND:
             return _verified_result(graph, labels, ret, k, 0, 0, 0)
@@ -190,7 +191,7 @@ def find_blind_octahedral_retraction(
         target = completion.antipodal_pairs
         assert target is not None
         ret = find_octahedral_retraction(
-            graph, target, max_states=retraction_states, seed=seed
+            graph, target, max_states=retraction_states, seed=retraction_seed
         )
         if ret.status is RetractionSearchStatus.FOUND:
             return _verified_result(
