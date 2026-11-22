@@ -4,7 +4,6 @@ import json
 
 import networkx as nx
 import pytest
-
 from pycliques.octahedral_blind import screen_partial_octahedral_retraction
 from pycliques.octahedral_joint_fibers import (
     Masks,
