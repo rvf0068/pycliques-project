@@ -4,7 +4,6 @@ These are small, deterministic graph tests; the census-scale snub replay
 remains an optional slow regression test.
 """
 
-# fmt: off
 import json
 import random
 
@@ -31,15 +30,17 @@ def test_fiber_operations_checkpoint_and_relabeling(tmp_path):
     right = masks.index["v1"]
     pair = ((left, right),)
     common = masks.closed[left] & masks.closed[right]
-    state = jf.State(pair, (((1 << left), (1 << right)),),
-                     (1 << left) | (1 << right), common)
+    state = jf.State(
+        pair, (((1 << left), (1 << right)),), (1 << left) | (1 << right), common
+    )
     assert jf.check_partial_state(masks, state)
     assert state.mapped() == 2
     assert jf.projection(masks, state) == {"v0": "v0", "v1": "v1"}
     assert jf.count_nonedge_pairs(masks, common) == 3
     assert len(jf.sample_compatible_pairs(masks, common, random.Random(2), 12)) == 3
-    bicliques = jf.closed_biclique(masks, left, right, all_nodes,
-                                  random.Random(4), variants=4)
+    bicliques = jf.closed_biclique(
+        masks, left, right, all_nodes, random.Random(4), variants=4
+    )
     assert bicliques
     for a, b in bicliques:
         assert (a >> left) & 1 and (b >> right) & 1
@@ -81,13 +82,24 @@ def test_joint_search_reports_dead_ends_and_resumes_states():
     graph = octahedron(4)
     masks = jf.Masks(graph)
     empty = jf.State((), (), 0, masks.all)
-    partial = jf.State(((0, 1),), (((1 << 0), (1 << 1)),),
-                       (1 << 0) | (1 << 1), masks.closed[0] & masks.closed[1])
+    partial = jf.State(
+        ((0, 1),),
+        (((1 << 0), (1 << 1)),),
+        (1 << 0) | (1 << 1),
+        masks.closed[0] & masks.closed[1],
+    )
     with pytest.raises(ValueError, match="equal dimensions"):
         jf.joint_beam_search(graph, 4, initial_states=[empty, partial], verbose=False)
-    resumed = jf.joint_beam_search(graph, 4, initial_states=[partial],
-                                   seed=9, beam=5, samples=20, steps=2,
-                                   verbose=False)
+    resumed = jf.joint_beam_search(
+        graph,
+        4,
+        initial_states=[partial],
+        seed=9,
+        beam=5,
+        samples=20,
+        steps=2,
+        verbose=False,
+    )
     assert resumed is not None
     assert 1 <= len(resumed.pairs) <= 2
     assert jf.check_partial_state(masks, resumed)
@@ -99,8 +111,11 @@ def test_joint_search_completion_oracle_and_callback():
 
     def oracle(masks, state, remainder):
         used = {a // 2 for p in state.pairs for a in p}
-        completion = [(masks.nodes[2 * i], masks.nodes[2 * i + 1])
-                      for i in range(4) if i not in used]
+        completion = [
+            (masks.nodes[2 * i], masks.nodes[2 * i + 1])
+            for i in range(4)
+            if i not in used
+        ]
         assert len(completion) == remainder
         return completion
 
@@ -109,10 +124,18 @@ def test_joint_search_completion_oracle_and_callback():
         seen.append(len(state.pairs))
         return len(state.pairs) == 4
 
-    result = jf.joint_beam_search(graph, 4, seed=17, beam=5, samples=15,
-                                   completion_oracle=oracle, oracle_start=1,
-                                   oracle_per_depth=2, callback=callback,
-                                   verbose=False)
+    result = jf.joint_beam_search(
+        graph,
+        4,
+        seed=17,
+        beam=5,
+        samples=15,
+        completion_oracle=oracle,
+        oracle_start=1,
+        oracle_per_depth=2,
+        callback=callback,
+        verbose=False,
+    )
     assert result is not None and len(result.pairs) == 4
     assert 4 in seen
     assert jf.check_partial_state(jf.Masks(graph), result)
@@ -120,26 +143,44 @@ def test_joint_search_completion_oracle_and_callback():
 
 def test_joint_search_early_callback_and_empty_oracle():
     graph = octahedron(4)
-    first = jf.joint_beam_search(graph, 4, seed=22, beam=4, samples=12,
-                                  callback=lambda m, s: len(s.pairs) == 1,
-                                  verbose=False)
+    first = jf.joint_beam_search(
+        graph,
+        4,
+        seed=22,
+        beam=4,
+        samples=12,
+        callback=lambda m, s: len(s.pairs) == 1,
+        verbose=False,
+    )
     assert first is not None and len(first.pairs) == 1
-    second = jf.joint_beam_search(graph, 4, seed=22, beam=4, samples=12,
-                                   completion_oracle=lambda m, s, r: (),
-                                   oracle_start=1, steps=2, verbose=False)
+    second = jf.joint_beam_search(
+        graph,
+        4,
+        seed=22,
+        beam=4,
+        samples=12,
+        completion_oracle=lambda m, s, r: (),
+        oracle_start=1,
+        steps=2,
+        verbose=False,
+    )
     assert second is not None and len(second.pairs) >= 1
 
 
 def test_fiber_public_validation_and_inconclusive_graph():
     with pytest.raises(ValueError, match="target_dimension"):
         jf.discover_partial_octahedral_fibers(octahedron(3), 2)
-    for keyword, value in (("seed", True), ("beam", 0), ("samples", 0),
-                           ("biclique_variants", 0)):
+    for keyword, value in (
+        ("seed", True),
+        ("beam", 0),
+        ("samples", 0),
+        ("biclique_variants", 0),
+    ):
         with pytest.raises(ValueError):
-            jf.discover_partial_octahedral_fibers(octahedron(3), 3,
-                                                 **{keyword: value})
-    result = jf.discover_partial_octahedral_fibers(nx.complete_graph(8), 3,
-                                                  seed=19, beam=2, samples=4)
+            jf.discover_partial_octahedral_fibers(octahedron(3), 3, **{keyword: value})
+    result = jf.discover_partial_octahedral_fibers(
+        nx.complete_graph(8), 3, seed=19, beam=2, samples=4
+    )
     assert result.antipodal_pairs == () and result.projection == {}
     assert result.covered_vertices == 0
 
@@ -159,15 +200,21 @@ def test_learn_conflicts_and_conflict_guided_candidate_filter():
         assert not ob._screen_masks(masks, indexed).possible
         for i in range(3):
             if core & (1 << i):
-                smaller = tuple(p for j, p in enumerate(full)
-                                if (core & (1 << j)) and j != i)
+                smaller = tuple(
+                    p for j, p in enumerate(full) if (core & (1 << j)) and j != i
+                )
                 assert ob._screen_masks(masks, smaller).possible
     good_graph = octahedron(4)
     good = ob._OctahedralMasks(good_graph)
-    assert bs._learn_conflicts(good, good.pairs(good_graph, base_pairs(3)),
-                               rounds=3, seed=1) == set()
-    candidates = bs._repair_candidates(good, good.pairs(good_graph,
-                                          base_pairs(3)), {0b001}, 4, 1)
+    assert (
+        bs._learn_conflicts(
+            good, good.pairs(good_graph, base_pairs(3)), rounds=3, seed=1
+        )
+        == set()
+    )
+    candidates = bs._repair_candidates(
+        good, good.pairs(good_graph, base_pairs(3)), {0b001}, 4, 1
+    )
     assert candidates and all(deleted & 0b001 for _, deleted, _ in candidates)
     assert candidates == sorted(candidates, reverse=True)
 
@@ -196,12 +243,11 @@ def test_blind_coordinator_accepts_complete_fiber_retraction(monkeypatch):
     graph = octahedron(3)
     masks = jf.Masks(graph)
     pairs = tuple((2 * i, 2 * i + 1) for i in range(3))
-    state = jf.State(pairs, tuple(((1 << a), (1 << b)) for a, b in pairs),
-                     masks.all, 0)
+    state = jf.State(pairs, tuple(((1 << a), (1 << b)) for a, b in pairs), masks.all, 0)
     monkeypatch.setattr(bs, "joint_beam_search", lambda *a, **kw: state)
-    outcome = bs.find_blind_octahedral_retraction(graph, target_dimension=3,
-                                                  delete_count=0,
-                                                  retraction_states=500)
+    outcome = bs.find_blind_octahedral_retraction(
+        graph, target_dimension=3, delete_count=0, retraction_states=500
+    )
     assert outcome.status is ob.OctahedralBlindStatus.FOUND
     assert len(outcome.antipodal_pairs) == 3
     assert set(outcome.projection) == set(graph)
@@ -211,16 +257,26 @@ def test_blind_coordinator_repairs_partial_target(monkeypatch):
     graph = octahedron(4)
     masks = jf.Masks(graph)
     pairs = base_pairs(3)
-    state = jf.State(pairs, tuple(((1 << a), (1 << b)) for a, b in pairs),
-                     sum((1 << a) | (1 << b) for a, b in pairs),
-                     masks.closed[0] & masks.closed[1] &
-                     masks.closed[2] & masks.closed[3] &
-                     masks.closed[4] & masks.closed[5])
+    state = jf.State(
+        pairs,
+        tuple(((1 << a), (1 << b)) for a, b in pairs),
+        sum((1 << a) | (1 << b) for a, b in pairs),
+        masks.closed[0]
+        & masks.closed[1]
+        & masks.closed[2]
+        & masks.closed[3]
+        & masks.closed[4]
+        & masks.closed[5],
+    )
     monkeypatch.setattr(bs, "joint_beam_search", lambda *a, **kw: state)
-    outcome = bs.find_blind_octahedral_retraction(graph, target_dimension=4,
-                                                  delete_count=0,
-                                                  core_rounds=4, max_repairs=4,
-                                                  completion_states=1000)
+    outcome = bs.find_blind_octahedral_retraction(
+        graph,
+        target_dimension=4,
+        delete_count=0,
+        core_rounds=4,
+        max_repairs=4,
+        completion_states=1000,
+    )
     assert outcome.status is ob.OctahedralBlindStatus.FOUND
     assert outcome.partial_dimension == 3
     assert outcome.repairs_considered >= 1
@@ -231,18 +287,25 @@ def test_blind_coordinator_unfinished_and_oversized_deletion(monkeypatch):
     graph = octahedron(4)
     masks = jf.Masks(graph)
     pair = ((0, 1),)
-    state = jf.State(pair, (((1 << 0), (1 << 1)),), 3,
-                     masks.closed[0] & masks.closed[1])
+    state = jf.State(
+        pair, (((1 << 0), (1 << 1)),), 3, masks.closed[0] & masks.closed[1]
+    )
     monkeypatch.setattr(bs, "joint_beam_search", lambda *a, **kw: state)
-    limit = bs.find_blind_octahedral_retraction(graph, target_dimension=4,
-                                                delete_count=4)
+    limit = bs.find_blind_octahedral_retraction(
+        graph, target_dimension=4, delete_count=4
+    )
     assert limit.status is ob.OctahedralBlindStatus.LIMIT_REACHED
     assert limit.partial_dimension == 1
-    monkeypatch.setattr(bs, "complete_dominating_octahedron", lambda *a, **kw:
-                        ob.OctahedralCompletion(ob.OctahedralBlindStatus.EXHAUSTED,
-                                                 None, 3, 2))
-    result = bs.find_blind_octahedral_retraction(graph, target_dimension=4,
-                                                 delete_count=0, core_rounds=2)
+    monkeypatch.setattr(
+        bs,
+        "complete_dominating_octahedron",
+        lambda *a, **kw: ob.OctahedralCompletion(
+            ob.OctahedralBlindStatus.EXHAUSTED, None, 3, 2
+        ),
+    )
+    result = bs.find_blind_octahedral_retraction(
+        graph, target_dimension=4, delete_count=0, core_rounds=2
+    )
     assert result.status is ob.OctahedralBlindStatus.LIMIT_REACHED
     assert result.repairs_considered >= 1 and result.completion_states >= 3
 
@@ -254,8 +317,7 @@ def test_conflict_minimization_limits_and_completion_edge_cases():
     with pytest.raises(ValueError):
         ob.minimize_octahedral_conflict(graph, base_pairs(3), max_checks=0)
     with pytest.raises(ValueError, match="more initial pairs"):
-        ob.complete_dominating_octahedron(graph, base_pairs(3),
-                                         target_dimension=2)
+        ob.complete_dominating_octahedron(graph, base_pairs(3), target_dimension=2)
     for bad in (nx.DiGraph(), nx.MultiGraph(), nx.Graph([(0, 0)])):
         with pytest.raises(ValueError, match="loopless"):
             ob.screen_partial_octahedral_retraction(bad, [])
@@ -272,8 +334,7 @@ def test_weighted_repair_empty_invalid_and_budgeted_conflict():
         ob.minimum_octahedral_repair([], -1)
     with pytest.raises(ValueError, match="nonempty subsets"):
         ob.minimum_octahedral_repair([0], 2)
-    costs = ob.minimum_octahedral_repair([0b011, 0b110, 0b111], 3,
-                                         weights=[9, 2, 1])
+    costs = ob.minimum_octahedral_repair([0b011, 0b110, 0b111], 3, weights=[9, 2, 1])
     assert costs.cost == 2 and costs.deleted_indices == (1,)
 
     graph = octahedron(3)
@@ -284,25 +345,3 @@ def test_weighted_repair_empty_invalid_and_budgeted_conflict():
     partial = ob.minimize_octahedral_conflict(graph, base_pairs(3), max_checks=1)
     assert partial is not None and not partial.deletion_minimal
     assert partial.checks == 1
-
-
-def test_emit_ruff_formatted_source():
-    """Temporary transfer of the formatter output for CI integration."""
-    import base64
-    import subprocess
-    from pathlib import Path
-
-    path = Path(__file__)
-    source = path.read_text().split("\ndef test_emit_ruff_formatted_source():\n")[0]
-    source = source.replace("# fmt: off\n", "", 1)
-    completed = subprocess.run(
-        ["ruff", "format", "--stdin-filename", str(path), "-"],
-        input=source,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    encoded = base64.b64encode(completed.stdout.encode()).decode()
-    for offset in range(0, len(encoded), 2000):
-        print("RUTFMT:" + encoded[offset : offset + 2000])
-    raise AssertionError("Temporary formatter transfer")
