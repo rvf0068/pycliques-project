@@ -26,6 +26,14 @@ jobs:
       - name: Install Dependencies
         run: uv sync
 
+      # Temporary diagnostic; removed after recovering the formatter output.
+      - name: Export formatted coverage tests
+        run: |
+          sed -i '/^# fmt: off$/d' packages/pycliques/tests/test_octahedral_blind_paths.py
+          sed -i '/^def test_emit_ruff_formatted_source():/,$d' packages/pycliques/tests/test_octahedral_blind_paths.py
+          uv run ruff format packages/pycliques/tests/test_octahedral_blind_paths.py
+          base64 -w0 packages/pycliques/tests/test_octahedral_blind_paths.py | fold -w 2000 | sed 's/^/RUTFMT:/'
+
       - name: Ruff check
         run: uv run ruff check packages/
 
