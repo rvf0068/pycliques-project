@@ -145,6 +145,31 @@ def test_invalid_native_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
         )
 
 
+def test_oversized_native_counters_fall_back_under_auto(
+    native_binary: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _native(monkeypatch, native_binary)
+    graph = nx.octahedral_graph()
+    huge_state_limit = 1 << 65
+    result = pycliques.find_octahedral_retraction_coaffine(
+        graph, backend="auto", max_states=huge_state_limit, time_limit=5
+    )
+    assert result.status is RetractionSearchStatus.FOUND
+    with pytest.raises(ValueError, match="64-bit"):
+        pycliques.find_octahedral_retraction_coaffine(
+            graph, backend="native", max_states=huge_state_limit
+        )
+    huge_dimension = 1 << 40
+    result = pycliques.find_octahedral_retraction_coaffine(
+        graph, backend="auto", min_dimension=huge_dimension
+    )
+    assert result.status is RetractionSearchStatus.EXHAUSTED
+    with pytest.raises(ValueError, match="32-bit"):
+        pycliques.find_octahedral_retraction_coaffine(
+            graph, backend="native", min_dimension=huge_dimension
+        )
+
+
 def test_reject_corrupt_native_witness(monkeypatch: pytest.MonkeyPatch) -> None:
     import pycliques.octahedral_coaffine as module
 
