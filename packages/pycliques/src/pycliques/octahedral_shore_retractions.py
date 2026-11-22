@@ -106,7 +106,7 @@ def find_octahedral_retraction_shores(
         for trial in candidates:
             covered = 0
             for i in range(d):
-                covered |= coverage[i][(trial >> i) & 1]
+                covered |= coverage[i][((trial >> i) & 1) ^ 1]
             score = (m - covered.bit_count(), trial)
             if score < best:
                 best = score
@@ -114,8 +114,8 @@ def find_octahedral_retraction_shores(
                     break
         orientation = best[1]
 
-    shore_a = [pair[((orientation >> i) & 1) ^ 1] for i, pair in enumerate(pairs)]
-    shore_b = [pair[(orientation >> i) & 1] for i, pair in enumerate(pairs)]
+    shore_a = [pair[(orientation >> i) & 1] for i, pair in enumerate(pairs)]
+    shore_b = [pair[((orientation >> i) & 1) ^ 1] for i, pair in enumerate(pairs)]
     allowed_a: list[int] = []
     allowed_b: list[int] = []
     for x in outside:
