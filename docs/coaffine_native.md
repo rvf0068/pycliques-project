@@ -1,6 +1,6 @@
 # Accelerated unseeded octahedral retractions
 
-The public function \`find_octahedral_retraction_coaffine(G)\` searches for
+The public function `find_octahedral_retraction_coaffine(G)` searches for
 coaffine weak endomorphisms \(\phi:G\to G\). If the second iterate
 \(\phi^2\) fixes its image pointwise and that image induces an octahedral
 graph \(O_d\), the result contains a certified ordinary retraction onto
@@ -14,41 +14,41 @@ The original pure-Python algorithm remains available and requires no
 compiler. A faster bitset implementation is included as C++17 *source*,
 with a separate, explicit build command:
 
-\`\`\`bash
+```bash
 # From the pycliques-project monorepo root, after uv sync:
 uv run python -m pycliques.octahedral_coaffine_native --build
-\`\`\`
+```
 
 Or from Python/Jupyter:
 
-\`\`\`python
+```python
 from pycliques import build_coaffine_native
 print(build_coaffine_native())
-\`\`\`
+```
 
-The build requires a C++17 compiler (for example, \`g++\` on Ubuntu).
+The build requires a C++17 compiler (for example, `g++` on Ubuntu).
 It downloads nothing, stores the executable under the XDG cache
-(default \`~/.cache/pycliques/\`) and hashes the source to avoid stale
+(default `~/.cache/pycliques/`) and hashes the source to avoid stale
 binaries after an update. The wheel remains a pure-Python package.
 There is **no compile-on-import** and **no compile-on-install**.
 
 Choose the engine when calling the unchanged public function:
 
-\`\`\`python
+```python
 import pycliques
 
 result = pycliques.find_octahedral_retraction_coaffine(
     graph, backend="native", max_states=10000, time_limit=30
 )
-\`\`\`
+```
 
-- \`backend="auto"\` (default) uses the native executable if present for
+- `backend="auto"` (default) uses the native executable if present for
   hosts of order at most 512; otherwise it uses the existing Python solver
-- \`backend="python"\` forces the established pure-Python implementation
-- \`backend="native"\` requires an already built native executable and
+- `backend="python"` forces the established pure-Python implementation
+- `backend="native"` requires an already built native executable and
   supports at most 512 vertices
 
-The environment variable \`PYCLIQUES_COAFFINE_NATIVE\` can specify an
+The environment variable `PYCLIQUES_COAFFINE_NATIVE` can specify an
 explicit executable path; otherwise the version-matched cached build is
 used. Input graphs may have *arbitrary hashable NetworkX vertex labels*.
 The wrapper serializes temporary integer indices and maps the result
@@ -67,9 +67,9 @@ on each complete weak endomorphism.
 coaffinity of the endomorphism, preservation of edges up to equality,
 the equation \(\phi^2=r\), the induced octahedron, pointwise fixation of
 the image, and the ordinary graph retraction using
-\`verify_retraction_witness\`.
+`verify_retraction_witness`.
 
-Only \`EXHAUSTED\` is a negative theorem. \`LIMIT_REACHED\` means the
+Only `EXHAUSTED` is a negative theorem. `LIMIT_REACHED` means the
 state/time budget was exhausted or the subprocess deadline was hit;
 it never proves that an octahedral retraction is absent.
 
@@ -78,7 +78,7 @@ it never proves that an octahedral retraction is absent.
 Once the optional executable is built, the following Jupyter-Python
 code **does not include any target, antipodal pairs or archived map**:
 
-\`\`\`python
+```python
 import networkx as nx
 import pycliques as pc
 
@@ -101,15 +101,15 @@ assert pc.verify_retraction_witness(
     p, target, (result.retraction, result.inclusion)
 )
 print(f"P4 -> O_{result.dimension}")
-\`\`\`
+```
 
-In a local Linux test (C++17 compiled with \`-O3\`), a 259-vertex,
+In a local Linux test (C++17 compiled with `-O3`), a 259-vertex,
 28,890-edge McKay 253650 host produced an O12 witness in **1,362
 states** and approximately **1.2–1.6 seconds** of native CSP time.
 These are descriptive measurements, not a guaranteed runtime or a
 promise that every graph will be easy.
 
-The previous solver's result statuses and \`CoaffineOctahedronResult\`
+The previous solver's result statuses and `CoaffineOctahedronResult`
 fields are retained. The native source has an explicit 512-vertex
-capacity; with \`backend="auto"\`, a larger graph goes through the
+capacity; with `backend="auto"`, a larger graph goes through the
 unbounded Python implementation rather than generating a false negative.
