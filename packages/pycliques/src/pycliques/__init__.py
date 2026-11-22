@@ -414,6 +414,7 @@ __all__ = [
     "find_induced_octahedron",
     "is_dominating_octahedron",
     "find_octahedral_retraction",
+    "find_octahedral_retraction_shores",
     "CoaffineOctahedronResult",
     "find_octahedral_retraction_coaffine",
     "build_coaffine_native",
