@@ -3,6 +3,8 @@
 import json
 
 import networkx as nx
+import pytest
+
 from pycliques.octahedral_blind import screen_partial_octahedral_retraction
 from pycliques.octahedral_joint_fibers import (
     Masks,
@@ -11,7 +13,6 @@ from pycliques.octahedral_joint_fibers import (
     load_partial_state,
     save_partial_state,
 )
-import pytest
 
 
 def test_possible_image_requires_nonadjacency_to_its_antipode():
