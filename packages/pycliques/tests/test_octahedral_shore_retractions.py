@@ -1,4 +1,5 @@
 """Two-shore octahedral solver: complete exactness, budgets and witness checks."""
+
 from __future__ import annotations
 
 import random
@@ -149,9 +150,7 @@ def test_two_shore_invalid_configurations(options: dict) -> None:
 def test_two_shore_invalid_target_reuses_exact_induced_validation() -> None:
     graph = pycliques.octahedron(3)
     with pytest.raises(ValueError):
-        pycliques.find_octahedral_retraction_shores(
-            graph, [(0, 1), (2, 3), (4, 8)]
-        )
+        pycliques.find_octahedral_retraction_shores(graph, [(0, 1), (2, 3), (4, 8)])
     graph.remove_edge(0, 2)
     with pytest.raises(ValueError):
         pycliques.find_octahedral_retraction_shores(graph, PAIRS)
@@ -165,6 +164,4 @@ def test_two_shore_independent_positive_witness_check(
         lambda *_: False,
     )
     with pytest.raises(AssertionError, match="invalid witness"):
-        pycliques.find_octahedral_retraction_shores(
-            pycliques.octahedron(3), PAIRS
-        )
+        pycliques.find_octahedral_retraction_shores(pycliques.octahedron(3), PAIRS)
