@@ -7,10 +7,11 @@ LIMIT_REACHED, never a global nonexistence claim.
 
 from __future__ import annotations
 
+import heapq
 import random
 from collections.abc import Hashable
 from dataclasses import dataclass
-from itertools import combinations
+from itertools import combinations, islice
 
 import networkx as nx
 
@@ -82,13 +83,29 @@ def _repair_candidates(
     cores: set[int],
     target_dimension: int,
     delete_count: int,
+    *,
+    max_repairs: int = 10,
+    max_candidate_checks: int = 200_000,
 ):
-    """Keep only conflict-hitting repairs with feasible residual domination."""
+    """Return the best bounded sample of conflict-hitting repairs.
+
+    Inspect at most ``max_candidate_checks`` deletion sets in combination
+    order and keep at most ``max_repairs`` candidates in a min-heap.
+    If the enumeration budget cuts off early, the result is only a heuristic
+    shortlist and does not imply anything about unexamined combinations.
+    When the budget covers all combinations, ranking agrees with the full
+    descending sort used by the earlier implementation.
+    """
+    if any(
+        type(limit) is not int or limit < 1
+        for limit in (max_repairs, max_candidate_checks)
+    ):
+        raise ValueError("repair budgets must be positive integers")
     k = len(pairs)
     remaining = target_dimension - k + delete_count
     all_pairs = (1 << k) - 1
-    candidates = []
-    for removed in combinations(range(k), delete_count):
+    best: list[tuple[int, int, tuple[tuple[int, int], ...]]] = []
+    for removed in islice(combinations(range(k), delete_count), max_candidate_checks):
         deleted = sum(1 << i for i in removed)
         if any(not (deleted & core) for core in cores):
             continue
@@ -99,9 +116,12 @@ def _repair_candidates(
             continue
         if any(not (masks.nonedge[v] & common) for v in _bit_indices(common)):
             continue
-        candidates.append((common.bit_count(), deleted, partial))
-    candidates.sort(reverse=True)
-    return candidates
+        candidate = (common.bit_count(), deleted, partial)
+        if len(best) < max_repairs:
+            heapq.heappush(best, candidate)
+        elif candidate > best[0]:
+            heapq.heapreplace(best, candidate)
+    return sorted(best, reverse=True)
 
 
 def _bit_indices(mask: int):
@@ -122,6 +142,7 @@ def find_blind_octahedral_retraction(
     core_rounds: int = 1000,
     delete_count: int = 7,
     max_repairs: int = 10,
+    max_candidate_checks: int = 200_000,
     completion_states: int = 200_000,
     retraction_states: int = 200_000,
     retraction_seed: int = 9883,
@@ -134,6 +155,10 @@ def find_blind_octahedral_retraction(
     The final existing CSP solver checks the target and constructs a full
     certificate. No negative outcome of this heuristic proves nonexistence.
 
+    Repair generation inspects at most ``max_candidate_checks`` deletion
+    sets and retains at most ``max_repairs`` candidates; hitting the budget
+    never proves that other repairs are impossible.
+
     The seed fixes the random generator, **not** the graph's vertex order.
     Use explicit graph insertion order for archival reproductions.
     """
@@ -143,6 +168,7 @@ def find_blind_octahedral_retraction(
         biclique_variants,
         core_rounds,
         max_repairs,
+        max_candidate_checks,
         completion_states,
         retraction_states,
     )
@@ -185,10 +211,18 @@ def find_blind_octahedral_retraction(
             OctahedralBlindStatus.LIMIT_REACHED, None, None, k, 0, 0, 0
         )
     conflicts = _learn_conflicts(m, indexed, rounds=core_rounds, seed=seed)
-    choices = _repair_candidates(m, indexed, conflicts, target_dimension, delete_count)
+    choices = _repair_candidates(
+        m,
+        indexed,
+        conflicts,
+        target_dimension,
+        delete_count,
+        max_repairs=max_repairs,
+        max_candidate_checks=max_candidate_checks,
+    )
     examined = 0
     states = 0
-    for _, _, remaining_pairs in choices[:max_repairs]:
+    for _, _, remaining_pairs in choices:
         examined += 1
         initial = tuple((m.nodes[a], m.nodes[b]) for a, b in remaining_pairs)
         completion = complete_dominating_octahedron(
