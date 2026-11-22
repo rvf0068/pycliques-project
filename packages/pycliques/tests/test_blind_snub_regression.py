@@ -1,4 +1,5 @@
 """New snub O24 witness is kept separate from blind discovery."""
+
 from __future__ import annotations
 
 import json
@@ -18,9 +19,7 @@ def test_new_snub_certificate_is_independently_valid() -> None:
     data = json.loads(DATA.read_text())
     pairs = tuple(tuple(pair) for pair in data["target_pairs"])
     projection = dict(zip(data["vertex_order"], data["images"]))
-    assert pycliques.verify_induced_octahedron(
-        g, pairs, require_dominating=True
-    )
+    assert pycliques.verify_induced_octahedron(g, pairs, require_dominating=True)
     target = g.subgraph([v for pair in pairs for v in pair])
     assert pycliques.verify_retraction_witness(
         g, target, (projection, {v: v for pair in pairs for v in pair})
