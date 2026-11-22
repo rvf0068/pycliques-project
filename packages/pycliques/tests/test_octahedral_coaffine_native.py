@@ -79,7 +79,6 @@ def test_native_exhaustive_negative_small_cases(
     assert native.retraction is None
 
 
-
 def test_native_genuine_retraction_beyond_original_512_limit(
     native_binary: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
