@@ -1,5 +1,4 @@
 """Exact screening, completion, hitting-set, arbitrary labels, and blind search."""
-import itertools
 import random
 
 import networkx as nx
