@@ -143,8 +143,8 @@ from .octahedral_blind import (
     OctahedralHittingSet,
     OctahedralScreen,
     complete_dominating_octahedron,
-    minimum_octahedral_repair,
     minimize_octahedral_conflict,
+    minimum_octahedral_repair,
     screen_partial_octahedral_retraction,
 )
 from .octahedral_blind_search import (
