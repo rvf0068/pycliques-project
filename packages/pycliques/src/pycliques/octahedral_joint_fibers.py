@@ -30,7 +30,8 @@ class Masks:
         self.all=(1<<len(nodes))-1
         self.closed=[1<<i for i in range(len(nodes))]
         for a,b in g.edges:
-            i=self.index[a];j=self.index[b]
+            i=self.index[a]
+            j=self.index[b]
             self.closed[i]|=1<<j
             self.closed[j]|=1<<i
         self.nonedge=[self.all & ~v for v in self.closed]
@@ -59,17 +60,22 @@ def closed_biclique(mask: Masks, a:int, b:int, remaining:int,
     H=mask.nonedge
     def closure(A):
         B=remaining
-        for v in bit_indices(A): B &= H[v]
-        if not ((B>>b)&1):return None
+        for v in bit_indices(A):
+            B &= H[v]
+        if not ((B>>b)&1):
+            return None
         new_A=remaining
-        for v in bit_indices(B):new_A &= H[v]
-        if not ((new_A>>a)&1):return None
+        for v in bit_indices(B):
+            new_A &= H[v]
+        if not ((new_A>>a)&1):
+            return None
         # Fixed point follows from the two antitone Galois maps.
         return new_A,B
     results=[]
     def add(A):
         v=closure(A)
-        if v and v not in results:results.append(v)
+        if v and v not in results:
+            results.append(v)
     add(1<<a)
     # Dual star: one singleton B, all possible A.
     A=H[b]&remaining
@@ -85,7 +91,8 @@ def closed_biclique(mask: Masks, a:int, b:int, remaining:int,
     for z in extra[:variants]:
         B=(1<<b)|(1<<z)
         A=remaining
-        for w in bit_indices(B):A &= H[w]
+        for w in bit_indices(B):
+            A &= H[w]
         add(A)
     # The largest bicliques (by covered vertices) are preferred locally.
     return sorted(results,key=lambda p:(p[0]|p[1]).bit_count(),reverse=True)
@@ -93,7 +100,8 @@ def closed_biclique(mask: Masks, a:int, b:int, remaining:int,
 
 def check_partial_state(mask: Masks, state: State):
     """Costly, exact invariant check for tests and successful certificates."""
-    anchored=set();seen=0
+    anchored=set()
+    seen=0
     for i,((a,b),(A,B)) in enumerate(zip(state.pairs,state.fibers)):
         assert a!=b and (mask.nonedge[a]>>b)&1
         assert A & (1<<a) and B & (1<<b)
@@ -106,7 +114,8 @@ def check_partial_state(mask: Masks, state: State):
         anchored.update((a,b))
     assert seen==state.covered
     common=mask.all
-    for a,b in state.pairs:common&=mask.closed[a]&mask.closed[b]
+    for a,b in state.pairs:
+        common&=mask.closed[a]&mask.closed[b]
     assert common==state.common
     return True
 
@@ -123,9 +132,11 @@ def retain_fibers(mask: Masks, state: State, keep_indexes):
     pairs=tuple(state.pairs[i] for i in indices)
     fibers=tuple(state.fibers[i] for i in indices)
     covered=0
-    for A,B in fibers:covered|=A|B
+    for A,B in fibers:
+        covered|=A|B
     common=mask.all
-    for a,b in pairs:common&=mask.closed[a]&mask.closed[b]
+    for a,b in pairs:
+        common&=mask.closed[a]&mask.closed[b]
     return State(pairs,fibers,covered,common)
 
 
@@ -158,9 +169,11 @@ def load_partial_state(path, mask: Masks) -> State:
                   sum(1<<mask.index[v] for v in B))
                  for A,B in data['fibers'])
     covered=0
-    for A,B in fibers:covered|=A|B
+    for A,B in fibers:
+        covered|=A|B
     common=mask.all
-    for a,b in pairs:common&=mask.closed[a]&mask.closed[b]
+    for a,b in pairs:
+        common&=mask.closed[a]&mask.closed[b]
     state=State(pairs,fibers,covered,common)
     check_partial_state(mask,state)
     if data.get('mapped_vertices') != state.mapped():
@@ -172,26 +185,33 @@ def projection(mask: Masks, state: State):
     """Return the partial projection in the original vertex labels."""
     r={}
     for (a,b),(A,B) in zip(state.pairs,state.fibers):
-        for x in bit_indices(A):r[mask.nodes[x]]=mask.nodes[a]
-        for x in bit_indices(B):r[mask.nodes[x]]=mask.nodes[b]
+        for x in bit_indices(A):
+            r[mask.nodes[x]]=mask.nodes[a]
+        for x in bit_indices(B):
+            r[mask.nodes[x]]=mask.nodes[b]
     return r
 
 
 def sample_compatible_pairs(mask, available, rng, samples):
     H=mask.nonedge
     vertices=list(bit_indices(available))
-    if not vertices:return []
-    seen=set();result=[]
+    if not vertices:
+        return []
+    seen=set()
+    result=[]
     for _ in range(samples*6):
-        if len(result)>=samples:break
+        if len(result)>=samples:
+            break
         a=rng.choice(vertices)
         choices=available&H[a]
-        if not choices:continue
+        if not choices:
+            continue
         cc=list(bit_indices(choices))
         b=rng.choice(cc)
         pair=tuple(sorted((a,b)))
         if pair not in seen:
-            result.append(pair);seen.add(pair)
+            result.append(pair)
+            seen.add(pair)
     return result
 
 
@@ -200,11 +220,13 @@ def count_nonedge_pairs(mask, C):
 
 
 def ranking(state:State,target:int,n:int,mask: Masks):
-    k=len(state.pairs);rem=target-k
+    k=len(state.pairs)
+    rem=target-k
     C=state.common
     e=count_nonedge_pairs(mask,C)
     # Need at least one nonedge for every remaining antipodal pair.
-    if e<rem:return (-10**9,0,0)
+    if e<rem:
+        return (-10**9,0,0)
     c=C.bit_count()
     # A future O_rem requires an induced matching in complement(G)[C].
     # Nonedges in C are necessary raw material for it.
@@ -226,7 +248,8 @@ def joint_beam_search(g: nx.Graph, dimension:int, *, seed=24002,
     supplied. Failure is inconclusive, even if no state survives.
     """
     assert dimension>=3
-    mask=Masks(g);rng=random.Random(seed)
+    mask=Masks(g)
+    rng=random.Random(seed)
     states=(list(initial_states) if initial_states is not None
             else [State((),(),0,mask.all)])
     if not states:
@@ -236,41 +259,53 @@ def joint_beam_search(g: nx.Graph, dimension:int, *, seed=24002,
         raise ValueError('initial states must have equal dimensions')
     for state in states:
         check_partial_state(mask,state)
-    seen=set();start=time.monotonic()
+    seen=set()
+    start=time.monotonic()
     for k in range(start_depth,dimension):
         next_states=[]
         for state in states:
             free=state.common & ~state.covered
-            if free.bit_count() < 2*(dimension-k):continue
-            if count_nonedge_pairs(mask,free) < dimension-k:continue
+            if free.bit_count() < 2*(dimension-k):
+                continue
+            if count_nonedge_pairs(mask,free) < dimension-k:
+                continue
             pairs=sample_compatible_pairs(mask,free,rng,samples)
             for a,b in pairs:
                 C=state.common & mask.closed[a] & mask.closed[b]
-                if (C&~state.covered).bit_count() < 2*(dimension-k-1):continue
-                if count_nonedge_pairs(mask,C) < dimension-k-1:continue
+                if (C&~state.covered).bit_count() < 2*(dimension-k-1):
+                    continue
+                if count_nonedge_pairs(mask,C) < dimension-k-1:
+                    continue
                 available=mask.all & ~state.covered
                 for A,B in closed_biclique(mask,a,b,available,rng,biclique_variants):
-                    if not ((A>>a)&1 and (B>>b)&1):continue
+                    if not ((A>>a)&1 and (B>>b)&1):
+                        continue
                     candidate=State(state.pairs+((a,b),),
                                     state.fibers+((A,B),),
                                     state.covered|A|B,C)
                     key=(candidate.pairs,candidate.covered)
-                    if key in seen:continue
+                    if key in seen:
+                        continue
                     seen.add(key)
                     next_states.append(candidate)
         if not next_states:
-            if verbose:print(f'No feasible joint states at dimension {k+1}',flush=True)
+            if verbose:
+                print(f'No feasible joint states at dimension {k+1}',flush=True)
             break
         next_states.sort(key=lambda z:ranking(z,dimension,mask.n,mask),reverse=True)
         # Maintain some beam diversity: multiple different anchors/fibers.
-        states=[];seen_anchor_sets=[]
+        states=[]
+        seen_anchor_sets=[]
         for candidate in next_states:
             anchor_set=frozenset(u for pair in candidate.pairs for u in pair)
             if any(len(anchor_set&old)>=2*k+1 for old in seen_anchor_sets):
                 continue
-            states.append(candidate);seen_anchor_sets.append(anchor_set)
-            if len(states)>=beam:break
-        if not states:states=next_states[:beam]
+            states.append(candidate)
+            seen_anchor_sets.append(anchor_set)
+            if len(states)>=beam:
+                break
+        if not states:
+            states=next_states[:beam]
         best=states[0]
         if verbose:
             print(f'depth={k+1:2d} beam={len(states):2d} '
@@ -279,20 +314,24 @@ def joint_beam_search(g: nx.Graph, dimension:int, *, seed=24002,
                   f'elapsed={time.monotonic()-start:.1f}s',flush=True)
         if callback is not None:
             for candidate in states:
-                if callback(mask,candidate):return candidate
+                if callback(mask,candidate):
+                    return candidate
         if (completion_oracle is not None and k+1 >= oracle_start
                 and k+1 < dimension):
             for j,candidate in enumerate(states[:oracle_per_depth]):
                 remainder=dimension-len(candidate.pairs)
-                if remainder<2:continue
+                if remainder<2:
+                    continue
                 completion=completion_oracle(mask,candidate,remainder)
-                if not completion:continue
+                if not completion:
+                    continue
                 # Append the *found*, graph-independent octahedral completion.
                 # Each added fiber is chosen greedily, as an induced biclique
                 # in complement(G), and never uses a saved snub certificate.
                 extended=candidate
                 for aa,bb in completion[:remainder]:
-                    aa=mask.index[aa];bb=mask.index[bb]
+                    aa=mask.index[aa]
+                    bb=mask.index[bb]
                     if not ((extended.common>>aa)&1 and (extended.common>>bb)&1):
                         raise AssertionError('completion not cross-compatible')
                     free=mask.all & ~extended.covered
@@ -308,7 +347,8 @@ def joint_beam_search(g: nx.Graph, dimension:int, *, seed=24002,
                           f'{extended.mapped()}/{mask.n} vertices mapped',flush=True)
                 if callback is not None and callback(mask,extended):
                     return extended
-        if steps is not None and k+1>=steps:break
+        if steps is not None and k+1>=steps:
+            break
     return states[0] if states else None
 
 
