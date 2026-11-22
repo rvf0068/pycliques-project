@@ -176,6 +176,7 @@ from .octahedral_nonlocal_search import (
     verify_induced_octahedron,
 )
 from .octahedral_retractions import find_octahedral_retraction
+from .octahedral_shore_retractions import find_octahedral_retraction_shores
 from .poset_homotopy import (
     ClosedCliqueIntersections,
     DoubleBoundHClosureResult,
@@ -413,6 +414,7 @@ __all__ = [
     "find_induced_octahedron",
     "is_dominating_octahedron",
     "find_octahedral_retraction",
+    "find_octahedral_retraction_shores",
     "CoaffineOctahedronResult",
     "find_octahedral_retraction_coaffine",
     "build_coaffine_native",

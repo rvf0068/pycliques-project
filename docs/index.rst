@@ -19,4 +19,5 @@ mean any complete set.
    research/partition_lattice
    research/helly_cover
    research/triangular_cover_divergence
+   research/octahedral_two_shore
    references
