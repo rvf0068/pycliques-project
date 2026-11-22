@@ -15,6 +15,7 @@ from pathlib import Path
 
 import networkx as nx
 
+
 def bit_indices(mask):
     while mask:
         z=mask & -mask
