@@ -70,7 +70,7 @@ def find_octahedral_retraction_shores(
     if orientation is not None and (
         type(orientation) is not int or not (0 <= orientation < (1 << d))
     ):
-        raise ValueError("orientation must be a bitmask selecting one endpoint per pair")
+        raise ValueError("orientation must be a pair-endpoint bitmask")
 
     targets = [v for pair in pairs for v in pair]
     target_set = set(targets)
