@@ -8,7 +8,6 @@ from __future__ import annotations
 from collections.abc import Hashable, Sequence
 from dataclasses import dataclass
 from enum import Enum
-from itertools import combinations
 
 import networkx as nx
 
