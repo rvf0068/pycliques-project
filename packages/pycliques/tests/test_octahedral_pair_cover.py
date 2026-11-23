@@ -24,9 +24,7 @@ def _independent_completion_oracle(nonedge, common: int, missing: int) -> bool:
         for b in _vertices(nonedge[a] & common):
             if b > a:
                 next_common = common & ~(nonedge[a] | nonedge[b])
-                if _independent_completion_oracle(
-                    nonedge, next_common, missing - 1
-                ):
+                if _independent_completion_oracle(nonedge, next_common, missing - 1):
                     return True
     return False
 
