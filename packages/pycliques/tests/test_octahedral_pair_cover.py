@@ -8,6 +8,7 @@ import random
 import networkx as nx
 from pycliques import octahedral_blind, octahedral_pair_cover
 
+
 def _vertices(mask: int):
     while mask:
         bit = mask & -mask
@@ -76,7 +77,9 @@ def test_positive_oct4_prefix_survives():
     masks = octahedral_blind._OctahedralMasks(graph)
     for count in range(1, 4):
         common = masks.common(tuple((2 * i, 2 * i + 1) for i in range(count)))
-        assert not octahedral_pair_cover.pair_cover_obstructs(masks.nonedge, common, 4 - count)
+        assert not octahedral_pair_cover.pair_cover_obstructs(
+            masks.nonedge, common, 4 - count
+        )
 
 
 def test_random_small_cover_rejections_against_exhaustive_oracle():
@@ -96,7 +99,9 @@ def test_random_small_cover_rejections_against_exhaustive_oracle():
                 continue
             common = masks.common(((u, v),))
             for missing in (1, 2):
-                if octahedral_pair_cover.pair_cover_obstructs(masks.nonedge, common, missing):
+                if octahedral_pair_cover.pair_cover_obstructs(
+                    masks.nonedge, common, missing
+                ):
                     rejected += 1
                     assert not _independent_completion_oracle(
                         masks.nonedge, common, missing
