@@ -55,6 +55,22 @@ completion = pycliques.complete_dominating_octahedron(
 # answer for extensions retaining P; LIMIT_REACHED is inconclusive.
 ```
 
+During `complete_dominating_octahedron`, an additional **exact edge-pair
+covering screen** discards branches that cannot be completed. If `T` is the
+set still uncovered in the complement `H` and `r` antipodal pairs remain,
+then any completion must satisfy, for every nonnegative integer weighting,
+
+\[
+\sum_{v\in T}w_v \leq r\max_{ab\in E(H[T])}
+\sum_{v\in T\cap(N_H(a)\cup N_H(b))}w_v.
+\]
+
+The implementation uses unit weights and two inexpensive degree-based
+integer weightings, restricted to small remaining subproblems to control
+search overhead. A strict violation is a proof that **no extension retaining
+the supplied partial pairs** is possible. This is a pruning optimization,
+not a claim that a resource-bounded global retraction search is complete.
+
 The forced-subgraph screen solves a 2-SAT *necessary* condition among vertices
 that cannot map to future antipodal pairs. It is not a sufficient condition
 for a retraction. If the screen rejects a partial target, you can call
