@@ -27,7 +27,7 @@ jobs:
         run: uv sync
 
       - name: Ruff check
-        run: uv run ruff check packages/
+        run: uv run ruff check packages/ || (uv run ruff check --diff packages/pycliques/tests/test_octahedral_pair_cover.py; exit 1)
 
       - name: Ruff format check
         run: uv run ruff format --check packages/
