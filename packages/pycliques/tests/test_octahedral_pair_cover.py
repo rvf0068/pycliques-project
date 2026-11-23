@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import random
 from itertools import combinations
+import random
 
 import networkx as nx
 
