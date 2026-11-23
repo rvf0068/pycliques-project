@@ -61,8 +61,8 @@ set still uncovered in the complement `H` and `r` antipodal pairs remain,
 then any completion must satisfy, for every nonnegative integer weighting,
 
 \[
-\\sum_{v\\in T}w_v \\leq r\\max_{ab\\in E(H[T])}
-\\sum_{v\\in T\\cap(N_H(a)\\cup N_H(b))}w_v.
+\sum_{v\in T}w_v \leq r\max_{ab\in E(H[T])}
+\sum_{v\in T\cap(N_H(a)\cup N_H(b))}w_v.
 \]
 
 The implementation uses unit weights and two inexpensive degree-based
