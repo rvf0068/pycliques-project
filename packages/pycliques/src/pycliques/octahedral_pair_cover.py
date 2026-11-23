@@ -23,9 +23,7 @@ def _bits(mask: int):
         mask -= bit
 
 
-def pair_cover_obstructs(
-    nonedge: Sequence[int], common: int, remaining: int
-) -> bool:
+def pair_cover_obstructs(nonedge: Sequence[int], common: int, remaining: int) -> bool:
     """Return True only when no dominating octahedral completion is possible.
 
     Bound computational overhead: apply the screen only when 1-4 pairs
@@ -65,13 +63,9 @@ def pair_cover_obstructs(
     # Integer-only fractional-cover dual witnesses. These weights
     # emphasize vertices with few potential complement-neighbors.
     for power in (1, 2):
-        weights = {
-            v: max(1, (2000 // degrees[v]) ** power) for v in vertices
-        }
+        weights = {v: max(1, (2000 // degrees[v]) ** power) for v in vertices}
         total = sum(weights.values())
-        maximum = max(
-            sum(weights[v] for v in _bits(mask)) for mask in covers
-        )
+        maximum = max(sum(weights[v] for v in _bits(mask)) for mask in covers)
         if total > remaining * maximum:
             return True
     return False
