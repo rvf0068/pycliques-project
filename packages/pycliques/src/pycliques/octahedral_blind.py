@@ -13,6 +13,7 @@ from enum import Enum
 import networkx as nx
 
 from .octahedral_nonlocal_search import verify_induced_octahedron
+from .octahedral_pair_cover import pair_cover_obstructs
 
 
 def _bits(mask: int):
@@ -383,6 +384,9 @@ def complete_dominating_octahedron(
                 min_degree = degree
                 pivot_neighborhood = n
         if min_degree == 0 or number_of_nonedges // 2 < r:
+            memo[key] = False
+            return False
+        if pair_cover_obstructs(m.nonedge, common, r):
             memo[key] = False
             return False
         candidates = set()
