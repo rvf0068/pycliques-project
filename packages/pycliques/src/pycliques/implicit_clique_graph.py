@@ -165,14 +165,49 @@ class ImplicitCliqueGraph:
             candidates &= self._closed(witness, active)
         return None
 
+    def _meeting_family_mask(self, family: int, active: int) -> int:
+        """Return active cliques intersecting at least one clique in family."""
+        result = 0
+        for row in self._incidence:
+            if row & family:
+                result |= row
+        return result & active
+
+    def nonadjacent_with_common_neighbor_mask(self, q: int) -> int:
+        """Return nonneighbors of q with a nonempty common neighborhood.
+
+        This is exactly the set of vertices at distance two from q, computed
+        from incidence masks without constructing edges.
+        """
+        self._check_vertex(q)
+        closed = self._closed(q, self.active_mask)
+        return self._meeting_family_mask(closed, self.active_mask) & ~closed
+
+    def universal_common_neighborhood_partners_mask(
+        self, q: int, p: int
+    ) -> int:
+        """Find all nonneighbors r of q for which p is a universal witness.
+
+        The witness p must belong to the common open neighborhood of q and r
+        and be universal in its induced subgraph. If p is not adjacent to q,
+        including when p equals q, return the empty mask.
+        """
+        self._check_vertex(q)
+        self._check_vertex(p)
+        if not self.has_edge(q, p):
+            return 0
+        active = self.active_mask
+        nq = self._closed(q, active)
+        np = self._closed(p, active)
+        bad = nq & ~np
+        forbidden = self._meeting_family_mask(bad, active)
+        return np & ~nq & ~forbidden
+
     def _dominated(self, vertex: int, active: int) -> int:
         # D(q) is the union of all active cliques disjoint from q.
         # A candidate p is dominated exactly when p misses D(q).
         disjoint = active & ~self._closed(vertex, active)
-        forbidden = 0
-        for row in self._incidence:
-            if row & disjoint:
-                forbidden |= row
+        forbidden = self._meeting_family_mask(disjoint, active)
         return active & ~forbidden & ~(1 << vertex)
 
     def dominated_vertices_mask(self, vertex: int) -> int:
