@@ -36,3 +36,23 @@ def test_orbit_accounting():
     assert result.proved
     assert result.completed_orbits == 1
     assert result.covered_maximal_completes == 4
+
+
+def test_vertex_strategy_without_maximal_enumeration(monkeypatch):
+    graph = nx.from_graph6_bytes(b"Iy~s~V]ng")
+    index = ClosedNecktieIndex(nx.find_cliques(graph), lazy=True)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("maximal completes must not be enumerated")
+
+    monkeypatch.setattr(index, "maximal_complete_orbits", forbidden)
+    result = check_closed_trace_contractibility(index, strategy="vertex")
+    assert result.proved
+    assert result.completed_orbits == len(index.family)
+    assert result.covered_maximal_completes == 0
+    assert result.strategy == "vertex"
+    limited = check_closed_trace_contractibility(index, strategy="vertex", max_nodes=0)
+    assert not limited.proved
+    assert limited.visited == 0
+    with pytest.raises(ValueError):
+        check_closed_trace_contractibility(index, strategy="invalid")
