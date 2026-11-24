@@ -23,7 +23,7 @@ class UniformStrongCollapseCertificate:
 
 @dataclass(frozen=True)
 class UniformStrongCollapseReduction:
-    """Verified-capable prefix, with a complete certificate if a cone was found."""
+    """Uniform collapse prefix and optional certificate of a cone endpoint."""
 
     moves: tuple[Move, ...]
     certificate: UniformStrongCollapseCertificate | None

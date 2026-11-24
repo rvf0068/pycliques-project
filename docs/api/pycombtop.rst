@@ -98,6 +98,16 @@ or a relative-face budget exit is inconclusive.
 Uniform strong collapses
 ------------------------
 
+A failed uniform-collapse search can still yield useful dominated-vertex
+deletions. ``uniform_strong_collapse_reduction`` retains these moves
+and an optional full cone certificate; ``verify_uniform_strong_collapse_prefix``
+independently replays the moves without requiring a cone. If a prefix is
+valid on an interval [M,E], it is valid on any nested interval: every
+intermediate family of the latter was also in the former. In an individual
+family, skip deletions whose removed vertex is absent. Restricting the
+nested interval to the surviving vertices allows the search to resume
+there. A partial prefix alone never proves contractibility.
+
 .. automodule:: pycombtop.strong_collapses
    :members:
    :undoc-members:
@@ -120,6 +130,13 @@ anchor; these are validated by the index. The checker counts good
 intermediate nodes toward its limit but need not test their
 contractibility, since they have a common vertex. Bad nodes and
 pruned intervals still require independently replayed certificates.
+
+With ``inherit_prefixes=True``, reuse independently verified partial
+collapse prefixes on nested intervals. The search checks both lower and
+upper containment before reusing a projection, and resets its history
+between orbit searches. Each successful suffix is independently replayed
+on the projected family. The result records the number of inherited
+checks. The default remains the original non-inheriting strategy.
 
 .. automodule:: pycombtop.closed_trace_contractibility
    :members:
