@@ -288,3 +288,52 @@ def test_adaptive_symmetry_cover_and_pruning():
         list(index.bad_closed_containing(0, stabilizer_generators=[moving]))
     with pytest.raises(ValueError):
         list(index.bad_closed_containing(-1))
+
+
+def test_cached_constrained_closure_against_atlas_oracle():
+    for base in nx.graph_atlas_g():
+        if len(base) > 6:
+            break
+        family = list(map(frozenset, nx.find_cliques(base)))
+        implicit = ImplicitCliqueGraph.from_family(family)
+        index = ClosedNecktieIndex.from_implicit(
+            implicit, cache_size=0, cache_witnesses=True
+        )
+        graph = nx.Graph()
+        graph.add_nodes_from(range(len(family)))
+        graph.add_edges_from(
+            (i, j) for i, j in combinations(graph, 2) if family[i] & family[j]
+        )
+        maximal = [set(q) for q in nx.find_cliques(graph)]
+        for complete in nx.enumerate_all_cliques(graph):
+            mask = sum(1 << i for i in complete)
+            containing = [q for q in maximal if set(complete) <= q]
+            closed = sum(1 << i for i in set.intersection(*containing))
+            assert index.close(mask) == closed
+            assert index.close_if_within(mask, mask) == (
+                closed if mask == closed else None
+            )
+            assert index.close_if_within(mask, closed) == closed
+            for i in graph:
+                allowed = index.full & ~(1 << i)
+                expected = None if closed & (1 << i) else closed
+                assert index.close_if_within(mask, allowed) == expected
+        for anchor in graph:
+            want = {m for m in index.closed_containing(anchor) if index.is_bad(m)}
+            assert set(index.bad_closed_containing(anchor)) == want
+
+
+def test_projection_and_constrained_closure_validation():
+    index = ClosedNecktieIndex(
+        [{0, 1}, {1, 2}, {3}], lazy=True, cache_witnesses=True
+    )
+    assert index.projected_members(7, [1, 100]) == (frozenset({1}),) * 2
+    assert not index.projected_members(7, [])
+    assert index.projected_members(7, [0, 3]) == (frozenset({0}), frozenset({3}))
+    with pytest.raises(ValueError):
+        index.projected_members(0, [1])
+    with pytest.raises(ValueError):
+        index.close_if_within(1, 8)
+    with pytest.raises(ValueError):
+        index.close_if_within(5, 7)
+    assert index.close_if_within(1, 0) is None
