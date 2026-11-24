@@ -23,8 +23,7 @@ def test_general_coaffine_matches_brute_force() -> None:
             break
         nodes = list(graph)
         domains = [
-            [w for w in nodes if w != v and not graph.has_edge(v, w)]
-            for v in nodes
+            [w for w in nodes if w != v and not graph.has_edge(v, w)] for v in nodes
         ]
         expected = any(
             all(
@@ -151,9 +150,12 @@ def test_stiff_search_connected_positive_and_limits() -> None:
         search_proper_stiff_retraction(graph, max_target_order=3).status
         is RetractionSearchStatus.EXHAUSTED
     )
-    assert search_proper_stiff_retraction(
-        graph, min_target_order=4, max_target_order=4
-    ).status is RetractionSearchStatus.FOUND
+    assert (
+        search_proper_stiff_retraction(
+            graph, min_target_order=4, max_target_order=4
+        ).status
+        is RetractionSearchStatus.FOUND
+    )
 
 
 @pytest.mark.parametrize(
