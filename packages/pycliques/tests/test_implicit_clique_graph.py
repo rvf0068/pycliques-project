@@ -140,3 +140,50 @@ def test_supplied_family_preserves_ids() -> None:
     for invalid in invalid_families:
         with pytest.raises(ValueError):
             ImplicitCliqueGraph.from_family(invalid)
+
+
+def test_implicit_common_neighborhoods_and_universal_vertices() -> None:
+    for graph in nx.graph_atlas_g():
+        if len(graph) > 5:
+            break
+        implicit = ImplicitCliqueGraph.from_graph(graph)
+        assert implicit is not None
+        for host in (implicit, implicit.pare().core):
+            explicit = host.to_networkx()
+            assert explicit is not None
+            for u in host:
+                for v in host:
+                    common = set(explicit[u]) & set(explicit[v])
+                    mask = sum(1 << w for w in common)
+                    assert host.common_neighborhood_mask(u, v) == mask
+                    expected = {w for w in common if common - {w} <= set(explicit[w])}
+                    found = host.universal_vertex(mask)
+                    if expected:
+                        assert found in expected
+                    else:
+                        assert found is None
+            universal = host.universal_vertex()
+            expected_all = {v for v in explicit if explicit.degree(v) == len(host) - 1}
+            if expected_all:
+                assert universal in expected_all
+            else:
+                assert universal is None
+
+
+def test_implicit_universal_vertex_subset_validation() -> None:
+    graph = ImplicitCliqueGraph.from_family([{0, 1}, {1, 2}, {2, 3}])
+    assert graph.universal_vertex() == 1
+    assert graph.universal_vertex(0) is None
+    assert graph.universal_vertex(1) == 0
+    assert graph.universal_vertex(5) is None
+    assert graph.common_neighborhood_mask(0, 2) == 2
+    core = graph.pare().core
+    assert len(core) == 1
+    removed = graph.active_mask & ~core.active_mask
+    for invalid in (-1, True, 8, removed):
+        with pytest.raises(ValueError):
+            core.universal_vertex(invalid)
+    with pytest.raises(KeyError):
+        graph.common_neighborhood_mask(-1, 0)
+    with pytest.raises(KeyError):
+        graph.common_neighborhood_mask(0, 3)

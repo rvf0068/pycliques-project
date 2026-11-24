@@ -134,6 +134,37 @@ class ImplicitCliqueGraph:
         self._check_vertex(vertex)
         return self._closed(vertex, self.active_mask)
 
+    def common_neighborhood_mask(self, u: int, v: int) -> int:
+        """Return the common open neighborhood of two active vertices."""
+        self._check_vertex(u)
+        self._check_vertex(v)
+        return (
+            self._closed(u, self.active_mask)
+            & self._closed(v, self.active_mask)
+            & ~((1 << u) | (1 << v))
+        )
+
+    def universal_vertex(self, subset: int | None = None) -> int | None:
+        """Find a universal vertex without materializing the induced subgraph.
+
+        The subset is a mask of active clique IDs, defaulting to all active
+        vertices. Return None exactly when no universal vertex exists,
+        including the empty induced subgraph. Every rejected candidate has
+        a witness in the subset that is not adjacent to it.
+        """
+        active = self.active_mask if subset is None else subset
+        if type(active) is not int or active < 0 or active & ~self.active_mask:
+            raise ValueError("subset must be a mask of active clique IDs")
+        candidates = active
+        while candidates:
+            candidate = (candidates & -candidates).bit_length() - 1
+            missing = active & ~self._closed(candidate, active)
+            if not missing:
+                return candidate
+            witness = (missing & -missing).bit_length() - 1
+            candidates &= self._closed(witness, active)
+        return None
+
     def _dominated(self, vertex: int, active: int) -> int:
         # D(q) is the union of all active cliques disjoint from q.
         # A candidate p is dominated exactly when p misses D(q).
