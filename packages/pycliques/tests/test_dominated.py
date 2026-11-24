@@ -141,3 +141,34 @@ def test_pared_graph_removes_strictly_dominated_twin_class():
         assert set(pared_graph(graph)) == {2}
         assert pared_index(graph) == 1
         assert len(graph) == 4
+
+
+def test_simultaneous_paring_matches_definition_on_graph_atlas():
+    """Check maximal classes and legal folds, independent of neighbor order."""
+    for graph in nx.graph_atlas_g():
+        neighborhoods = {v: set(graph[v]) | {v} for v in graph}
+        maximal = {
+            frozenset(n)
+            for n in neighborhoods.values()
+            if not any(n < other for other in neighborhoods.values())
+        }
+        for vertices in (list(graph), list(reversed(list(graph)))):
+            host = nx.Graph()
+            host.add_nodes_from(vertices)
+            host.add_edges_from(graph.edges())
+            pared = pared_graph(host)
+            assert len(pared) == len(maximal)
+            assert {frozenset(neighborhoods[v]) for v in pared} == maximal
+            current = host.copy()
+            for v in host:
+                if v in pared:
+                    continue
+                dominator = next(
+                    w for w in pared if neighborhoods[v] <= neighborhoods[w]
+                )
+                assert dominates(current, dominator, v)
+                current.remove_node(v)
+            assert set(current) == set(pared)
+            assert nx.is_isomorphic(
+                completely_pared_graph(host), completely_pared_graph(pared)
+            )
