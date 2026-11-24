@@ -93,10 +93,7 @@ def test_proper_stiff_search_matches_brute_force() -> None:
             for target in combinations(graph, order):
                 closed = {v: set(graph[v]).intersection(target) | {v} for v in target}
                 if any(
-                    closed[u] <= closed[v]
-                    for u in target
-                    for v in target
-                    if u != v
+                    closed[u] <= closed[v] for u in target for v in target if u != v
                 ):
                     continue
                 outside = [v for v in graph if v not in target]
@@ -150,9 +147,10 @@ def test_stiff_search_connected_positive_and_limits() -> None:
     ):
         limited = search_proper_stiff_retraction(graph, **budgets)
         assert limited.status is RetractionSearchStatus.LIMIT_REACHED
-    assert search_proper_stiff_retraction(
-        graph, max_target_order=3
-    ).status is RetractionSearchStatus.EXHAUSTED
+    assert (
+        search_proper_stiff_retraction(graph, max_target_order=3).status
+        is RetractionSearchStatus.EXHAUSTED
+    )
     assert search_proper_stiff_retraction(
         graph, min_target_order=4, max_target_order=4
     ).status is RetractionSearchStatus.FOUND
