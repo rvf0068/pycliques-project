@@ -136,6 +136,7 @@ def test_supplied_family_preserves_ids() -> None:
         for v in implicit.base_vertices
     )
     assert not ImplicitCliqueGraph.from_family([])
-    for invalid in ([[]], [[1], [1, 1]]):
+    invalid_families: list[list[list[int]]] = [[[]], [[1], [1, 1]]]
+    for invalid in invalid_families:
         with pytest.raises(ValueError):
             ImplicitCliqueGraph.from_family(invalid)
