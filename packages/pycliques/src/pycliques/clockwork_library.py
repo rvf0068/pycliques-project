@@ -97,8 +97,18 @@ def generate_divergent_clockwork_library(
         or max_templates < 1
     ):
         raise ValueError("max_templates must be a positive integer")
-    if fallback_max_order < 0 or fallback_max_candidates < 1:
-        raise ValueError("invalid recognition limits")
+    if (
+        not isinstance(fallback_max_order, int)
+        or isinstance(fallback_max_order, bool)
+        or fallback_max_order < 0
+    ):
+        raise ValueError("fallback_max_order must be a nonnegative integer")
+    if (
+        not isinstance(fallback_max_candidates, int)
+        or isinstance(fallback_max_candidates, bool)
+        or fallback_max_candidates < 1
+    ):
+        raise ValueError("fallback_max_candidates must be a positive integer")
 
     sizes_list: list[tuple[int, ...]] = []
     expected = 0

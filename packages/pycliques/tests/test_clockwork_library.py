@@ -68,10 +68,21 @@ def test_invalid_or_oversized_family(sizes, crown, limit):
 
 @pytest.mark.parametrize(
     "kwargs",
-    [{"fallback_max_order": -1}, {"fallback_max_candidates": 0}],
+    [
+        {"fallback_max_order": -1},
+        {"fallback_max_order": 1.5},
+        {"fallback_max_order": True},
+        {"fallback_max_order": "9"},
+        {"fallback_max_order": None},
+        {"fallback_max_candidates": 0},
+        {"fallback_max_candidates": 1.5},
+        {"fallback_max_candidates": True},
+        {"fallback_max_candidates": "10"},
+        {"fallback_max_candidates": None},
+    ],
 )
 def test_invalid_recognition_limits(kwargs):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match=next(iter(kwargs))):
         generate_divergent_clockwork_library(**kwargs)
 
 
