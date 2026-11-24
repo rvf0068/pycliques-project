@@ -101,9 +101,9 @@ also provides an exact bound: if more pairs are compulsory than the
 requested remaining target dimension, no such completion exists.
 
 This is a *vertex*-dominating induced-matching condition in \(H\).
-It must not be confused with the more restrictive literature definition
-of a dominating induced matching (also called efficient edge domination),
-which requires domination of edges rather than vertices.
+It must not be confused with the literature definition of a dominating
+induced matching (also called efficient edge domination), which requires
+edge domination, not vertex domination. The two conditions differ in general.
 
 The forced-subgraph screen solves a 2-SAT *necessary* condition among vertices
 that cannot map to future antipodal pairs. It is not a sufficient condition
