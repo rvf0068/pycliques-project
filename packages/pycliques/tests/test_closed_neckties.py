@@ -166,3 +166,50 @@ def test_shared_implicit_index_and_anchored_pruning():
         ClosedNecktieIndex.from_implicit(pared)
     with pytest.raises(ValueError):
         ClosedNecktieIndex(family, lazy=True, cache_size=-1)
+
+
+def test_anchored_pruning_covers_all_small_graph_traces():
+    # Use literal intersections of maximal completes as the independent
+    # oracle; do not call the implementation's closure to build expectations.
+    for base in nx.graph_atlas_g():
+        if len(base) > 5:
+            break
+        family = list(map(frozenset, nx.find_cliques(base)))
+        graph = nx.Graph()
+        graph.add_nodes_from(range(len(family)))
+        graph.add_edges_from(
+            (i, j) for i, j in combinations(graph, 2) if family[i] & family[j]
+        )
+        maximal = [set(q) for q in nx.find_cliques(graph)]
+        expected = set()
+        for complete in nx.enumerate_all_cliques(graph):
+            containing = [q for q in maximal if set(complete) <= q]
+            closed = set.intersection(*containing)
+            expected.add(sum(1 << i for i in closed))
+        for cache_size in (0, 2):
+            index = ClosedNecktieIndex(family, lazy=True, cache_size=cache_size)
+            for anchor in graph:
+                want = {m for m in expected if m & (1 << anchor)}
+                got = list(index.closed_containing(anchor))
+                assert set(got) == want
+                assert len(got) == len(want)
+                intervals = []
+
+                def prune(m, e):
+                    assert m & e == m
+                    assert m in want
+                    if m.bit_count() >= 2 and m.bit_count() % 2 == 0:
+                        intervals.append((m, e))
+                        return True
+                    return False
+
+                remaining = set(index.closed_containing(anchor, prune=prune))
+                assert remaining <= want
+                for m in want - remaining:
+                    assert any(a & m == a and m & b == m for a, b in intervals)
+
+
+def test_implicit_index_rejects_negative_cache():
+    graph = ImplicitCliqueGraph.from_family([{0}])
+    with pytest.raises(ValueError):
+        ClosedNecktieIndex.from_implicit(graph, cache_size=-1)

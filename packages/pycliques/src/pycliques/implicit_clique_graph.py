@@ -56,9 +56,7 @@ class ImplicitCliqueGraph:
         return cls._from_masks(labels, masks)
 
     @classmethod
-    def from_family(
-        cls, family: Iterable[Iterable[Hashable]]
-    ) -> ImplicitCliqueGraph:
+    def from_family(cls, family: Iterable[Iterable[Hashable]]) -> ImplicitCliqueGraph:
         """Build the intersection graph of a supplied nonempty-set family.
 
         Member IDs follow input order, with base labels in first-seen order.
