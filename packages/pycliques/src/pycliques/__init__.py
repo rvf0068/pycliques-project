@@ -63,6 +63,12 @@ from .coaffine_endomorphisms import (
     find_coaffine_endomorphism,
     verify_coaffine_endomorphism,
 )
+from .complete_transversals import (
+    CompleteTransversalResult,
+    find_complete_transversal,
+    find_split_cover_counterexample,
+    verify_complete_transversal,
+)
 from .cutpoints import (
     InverseCutpointExtension,
     contract_local_bridge,
@@ -146,10 +152,14 @@ from .named import (
     suspension_of_cycle,
 )
 from .octahedral_amplification import (
+    OctahedralAmplification,
+    amplified_common_neighbor,
     amplify_induced_octahedron,
     augment_induced_octahedron,
+    certify_octahedral_amplification,
     find_induced_octahedron,
     is_dominating_octahedron,
+    verify_octahedral_amplification,
 )
 from .octahedral_blind import (
     OctahedralBlindStatus,
@@ -437,6 +447,14 @@ __all__ = [
     "bounded_retraction",
     "dict_to_tuple",
     "amplify_induced_octahedron",
+    "OctahedralAmplification",
+    "amplified_common_neighbor",
+    "certify_octahedral_amplification",
+    "verify_octahedral_amplification",
+    "CompleteTransversalResult",
+    "find_complete_transversal",
+    "find_split_cover_counterexample",
+    "verify_complete_transversal",
     "augment_induced_octahedron",
     "find_induced_octahedron",
     "is_dominating_octahedron",

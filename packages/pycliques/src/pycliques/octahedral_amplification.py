@@ -10,8 +10,11 @@ from __future__ import annotations
 
 import random
 from collections.abc import Hashable, Sequence
+from dataclasses import dataclass
 
 import networkx as nx
+
+from .complete_transversals import CompleteTransversalResult, find_complete_transversal
 
 
 def _check_graph(graph: nx.Graph) -> None:
@@ -134,48 +137,170 @@ def find_induced_octahedron(
     return found
 
 
+@dataclass(frozen=True)
+class OctahedralAmplification:
+    """Implicit induced octahedron in the clique graph.
+
+    Index s encodes the seed transversal by its binary digits.
+    Its opposite has index len(extensions)-1-s. The common
+    neighborhoods are unions of all maximal extensions of each
+    transversal, not necessarily complete themselves.
+    """
+
+    original_pairs: tuple[tuple[Hashable, Hashable], ...]
+    extensions: tuple[frozenset[Hashable], ...]
+    common_neighborhoods: tuple[frozenset[Hashable], ...]
+
+    @property
+    def dimension(self) -> int:
+        return len(self.extensions) // 2
+
+    @property
+    def antipodal_pairs(
+        self,
+    ) -> tuple[tuple[frozenset[Hashable], frozenset[Hashable]], ...]:
+        return tuple(
+            (q, self.extensions[-1 - i])
+            for i, q in enumerate(self.extensions[: self.dimension])
+        )
+
+
+def _transversal_mask(pairs: list[tuple[int, int]], index: int) -> int:
+    return sum(1 << pair[(index >> i) & 1] for i, pair in enumerate(pairs))
+
+
+def _common_mask(closed: list[int], vertices: int) -> int:
+    common = (1 << len(closed)) - 1
+    for v in _bits(vertices):
+        common &= closed[v]
+    return common
+
+
+def certify_octahedral_amplification(
+    graph: nx.Graph,
+    antipodal_pairs: Sequence[tuple[Hashable, Hashable]],
+    *,
+    max_facets: int = 65_536,
+) -> OctahedralAmplification:
+    """Construct maximal extensions and their exact common neighborhoods.
+
+    The seed must have no common closed neighbor. Opposite seed
+    transversals have disjoint common closed neighborhoods; nonopposite
+    transversals intersect. Hence their distinct maximal extensions
+    induce an octahedron of dimension 2**(d-1) in K(G).
+
+    Neither the rest of K(G) nor its edges are constructed. The bound
+    and invalid inputs raise ValueError, just as in the original
+    amplify_induced_octahedron API.
+    """
+    pairs = _check_pairs(graph, antipodal_pairs)
+    if type(max_facets) is not int or max_facets < 1:
+        raise ValueError("max_facets must be a positive integer")
+    if len(pairs) >= max_facets.bit_length():
+        raise ValueError("Octahedral facet count exceeds max_facets")
+    nodes, positions, closed = _closed_masks(graph)
+    indexed = [(positions[a], positions[b]) for a, b in pairs]
+    endpoints = sum(1 << v for pair in indexed for v in pair)
+    if _common_mask(closed, endpoints):
+        raise ValueError("A vertex is adjacent to all octahedral vertices")
+
+    extensions: list[frozenset[Hashable]] = []
+    neighborhoods: list[frozenset[Hashable]] = []
+    for i in range(1 << len(pairs)):
+        chosen = _transversal_mask(indexed, i)
+        common = _common_mask(closed, chosen)
+        neighborhoods.append(frozenset(nodes[v] for v in _bits(common)))
+        available = common & ~chosen
+        while available:
+            bit = available & -available
+            chosen |= bit
+            available &= closed[bit.bit_length() - 1] & ~bit
+        extensions.append(frozenset(nodes[v] for v in _bits(chosen)))
+    return OctahedralAmplification(pairs, tuple(extensions), tuple(neighborhoods))
+
+
+def verify_octahedral_amplification(
+    graph: nx.Graph, certificate: OctahedralAmplification
+) -> bool:
+    """Replay the seed, extensions and opposite disjointness.
+
+    All other intersections follow from the seed transversals. No
+    quadratic comparison of the amplified vertices is required.
+    """
+    try:
+        pairs = _check_pairs(graph, certificate.original_pairs)
+        nodes, positions, closed = _closed_masks(graph)
+        indexed = [(positions[a], positions[b]) for a, b in pairs]
+        endpoints = sum(1 << v for pair in indexed for v in pair)
+        if _common_mask(closed, endpoints):
+            return False
+        extensions = certificate.extensions
+        size = len(extensions)
+        if (
+            size != 1 << len(pairs)
+            or len(certificate.common_neighborhoods) != size
+            or len(set(extensions)) != size
+        ):
+            return False
+        for i, (q, common) in enumerate(
+            zip(extensions, certificate.common_neighborhoods, strict=True)
+        ):
+            if not q <= common or not common <= positions.keys():
+                return False
+            chosen = _transversal_mask(indexed, i)
+            mask = sum(1 << positions[v] for v in q)
+            common_mask = sum(1 << positions[v] for v in common)
+            if (
+                chosen & mask != chosen
+                or common_mask != _common_mask(closed, chosen)
+                or mask != _common_mask(closed, mask)
+                or common & certificate.common_neighborhoods[size - 1 - i]
+            ):
+                return False
+        return True
+    except (TypeError, ValueError, KeyError, AttributeError):
+        return False
+
+
+def amplified_common_neighbor(
+    graph: nx.Graph,
+    certificate: OctahedralAmplification,
+    *,
+    all_extensions: bool = False,
+    max_states: int = 1_000_000,
+) -> CompleteTransversalResult:
+    """Check for a common neighbor without constructing K(G).
+
+    A complete set meeting every selected extension extends to a clique
+    meeting all of them. EXHAUSTED proves no common neighbor exists.
+    With all_extensions=True, use the union of all possible extensions
+    of each seed transversal instead. EXHAUSTED then proves the result
+    for every choice of maximal extensions; FOUND in that stronger test
+    need not be a common neighbor of the selected family.
+    """
+    if not verify_octahedral_amplification(graph, certificate):
+        raise ValueError("invalid amplification certificate")
+    family = (
+        certificate.common_neighborhoods if all_extensions else certificate.extensions
+    )
+    return find_complete_transversal(graph, family, max_states=max_states)
+
+
 def amplify_induced_octahedron(
     graph: nx.Graph,
     antipodal_pairs: Sequence[tuple[Hashable, Hashable]],
     *,
     max_facets: int = 1024,
 ) -> tuple[tuple[frozenset[Hashable], frozenset[Hashable]], ...]:
-    """Realize O_(2^(d-1)) in K(G) from a complement-dominating O_d in G.
+    """Realize O_(2^(d-1)) in K(G) from a complement-dominating O_d.
 
-    Vertices of K(G) are maximal completes of G, returned as frozensets.
-    Opposite pairs of extended facets become the antipodal pairs of
-    the lifted induced octahedron. Does not construct the full K(G).
-
-    Raises ValueError if the target is invalid, has an external common
-    neighbor, or its 2^d facets exceed max_facets. This is a one-step
-    construction, not a claim of automatic infinite amplification.
+    Backward-compatible wrapper returning only the antipodal pairs.
+    Does not construct K(G) or claim indefinite amplification.
+    Raises ValueError on invalid inputs or exceeding max_facets.
     """
-    pairs = _check_pairs(graph, antipodal_pairs)
-    if type(max_facets) is not int or max_facets < 1:
-        raise ValueError("max_facets must be a positive integer")
-    d = len(pairs)
-    if 1 << d > max_facets:
-        raise ValueError("Octahedral facet count exceeds max_facets")
-    if not is_dominating_octahedron(graph, pairs):
-        raise ValueError("A vertex is adjacent to all octahedral vertices")
-
-    facets: list[frozenset[Hashable]] = []
-    for mask in range(1 << d):
-        complete: set[Hashable] = {
-            pair[(mask >> i) & 1] for i, pair in enumerate(pairs)
-        }
-        for candidate in graph:
-            if candidate not in complete and all(
-                graph.has_edge(candidate, v) for v in complete
-            ):
-                complete.add(candidate)
-        facets.append(frozenset(complete))
-    full = (1 << d) - 1
-    return tuple(
-        (facets[mask], facets[mask ^ full])
-        for mask in range(1 << d)
-        if mask < (mask ^ full)
-    )
+    return certify_octahedral_amplification(
+        graph, antipodal_pairs, max_facets=max_facets
+    ).antipodal_pairs
 
 
 def augment_induced_octahedron(
