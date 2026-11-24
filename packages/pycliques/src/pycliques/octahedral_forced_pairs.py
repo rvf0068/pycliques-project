@@ -53,9 +53,7 @@ def screen_forced_pairs(nonedge: Sequence[int], common: int) -> ForcedPairScreen
         for x in _bits(common):
             neighbors = nonedge[x] & common
             if not neighbors:
-                return ForcedPairScreen(
-                    False, "ISOLATED", tuple(pairs), rounds, (x,)
-                )
+                return ForcedPairScreen(False, "ISOLATED", tuple(pairs), rounds, (x,))
             if neighbors.bit_count() == 1:
                 u = neighbors.bit_length() - 1
                 origins.setdefault(u, x)
