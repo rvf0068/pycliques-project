@@ -119,6 +119,11 @@ class Theorem:
         "attaching maps are nullhomotopic by pi_d(wedge S^d)=Z^r "
         "[Dong2003, Forman1998, Hatcher]."
     )
+    SYMBOLIC_INTEGRAL_MORSE_ZERO_DEGREE_CIRCLE = (
+        "The augmented Morse matching gives one vertex, one loop, and "
+        "only 2-cells otherwise. Their exact integral attaching degrees "
+        "are zero, so all maps into the circle are nullhomotopic."
+    )
     SYMBOLIC_INTEGRAL_MORSE_ONE_CIRCLE = (
         "An acyclic augmented Dong matching gives an integral Morse CW "
         "model with c0+1 vertices, c0+1 edges, and critical cells only "
@@ -165,7 +170,9 @@ class Theorem:
         "core. With one critical vertex and critical cells only in "
         "consecutive dimensions m,m+1 (m>=2), the maximal top Betti "
         "number forces zero cellular boundary. Hurewicz for a wedge of "
-        "m-spheres makes the attaching maps nullhomotopic "
+        "m-spheres makes the attaching maps nullhomotopic. With one "
+        "critical 1-cell, the same zero boundary proves zero-degree "
+        "attachments into the single circle "
         "[Hatcher, Algebraic Topology, Section 4.2]."
     )
     RECURSIVE_VERTEX_STAR = (
@@ -177,7 +184,9 @@ class Theorem:
         "Replayed free pairs and critical facets give a Morse CW model. "
         "One critical vertex and one positive dimension give a wedge directly. "
         "For two consecutive dimensions d,d+1 with d>=2, the verified integral "
-        "Morse boundary vanishes, so Hurewicz makes every attachment null."
+        "Morse boundary vanishes, so Hurewicz makes every attachment null. "
+        "With exactly one critical 1-cell and only 2-cells otherwise, "
+        "zero attaching degrees likewise make the attachments null."
     )
     BIPARTITE_SHORE = (
         "The simplex on one side of the bipartite complement and the other "
@@ -759,7 +768,9 @@ def _try_symbolic_dong(graph: nx.Graph) -> HomotopyVerdict | None:
     if integral.wedge_spheres is not None:
         c0 = integral.critical.get(0, 0)
         c1 = integral.critical.get(1, 0)
-        if c0 == c1 == 1:
+        if integral.wedge_spheres.get(1, 0) == 1 and c0 == 0 and c1 == 1:
+            reason = Theorem.SYMBOLIC_INTEGRAL_MORSE_ZERO_DEGREE_CIRCLE
+        elif c0 == c1 == 1:
             reason = Theorem.SYMBOLIC_INTEGRAL_MORSE_01_CANCELLATION
         elif c1 == c0 + 1 and integral.critical.get(2, 0) > 0:
             reason = Theorem.SYMBOLIC_INTEGRAL_MORSE_ONE_CIRCLE
