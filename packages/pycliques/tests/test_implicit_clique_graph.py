@@ -187,3 +187,48 @@ def test_implicit_universal_vertex_subset_validation() -> None:
         graph.common_neighborhood_mask(-1, 0)
     with pytest.raises(KeyError):
         graph.common_neighborhood_mask(0, 3)
+
+
+def test_batched_common_neighborhood_witnesses_match_explicit() -> None:
+    for graph in nx.graph_atlas_g():
+        if len(graph) > 5:
+            break
+        implicit = ImplicitCliqueGraph.from_graph(graph)
+        assert implicit is not None
+        for host in (implicit, implicit.pare().core):
+            explicit = host.to_networkx()
+            assert explicit is not None
+            for q in host:
+                common_by_partner = {
+                    r: set(explicit[q]) & set(explicit[r])
+                    for r in host
+                    if r != q and not explicit.has_edge(q, r)
+                }
+                assert host.nonadjacent_with_common_neighbor_mask(q) == sum(
+                    1 << r for r, common in common_by_partner.items() if common
+                )
+                for p in host:
+                    expected = sum(
+                        1 << r
+                        for r, common in common_by_partner.items()
+                        if p in common and common - {p} <= set(explicit[p])
+                    )
+                    assert (
+                        host.universal_common_neighborhood_partners_mask(q, p)
+                        == expected
+                    )
+
+
+def test_batched_common_neighborhood_witnesses_on_arbitrary_family() -> None:
+    host = ImplicitCliqueGraph.from_family(
+        [{0, 1}, {1, 2}, {2, 3}, {0, 3}, {1, 3}, {4}]
+    )
+    assert host.nonadjacent_with_common_neighbor_mask(0) == 1 << 2
+    assert host.universal_common_neighborhood_partners_mask(0, 4) == 1 << 2
+    assert host.universal_common_neighborhood_partners_mask(0, 0) == 0
+    assert host.universal_common_neighborhood_partners_mask(0, 2) == 0
+    assert host.universal_common_neighborhood_partners_mask(0, 1) == 0
+    with pytest.raises(KeyError):
+        host.nonadjacent_with_common_neighbor_mask(-1)
+    with pytest.raises(KeyError):
+        host.universal_common_neighborhood_partners_mask(0, 6)
