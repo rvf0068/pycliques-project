@@ -104,7 +104,8 @@ def test_proper_stiff_search_matches_brute_force() -> None:
                     mapping = dict(zip(outside, values, strict=True))
                     mapping.update({v: v for v in target})
                     if all(
-                        mapping[u] == mapping[v] or graph.has_edge(mapping[u], mapping[v])
+                        mapping[u] == mapping[v]
+                        or graph.has_edge(mapping[u], mapping[v])
                         for u, v in graph.edges()
                     ):
                         expected = True
