@@ -145,7 +145,7 @@ class ImplicitCliqueGraph:
         )
 
     def universal_vertex(self, subset: int | None = None) -> int | None:
-        """Find a universal vertex of an induced subgraph without edges.
+        """Find a universal vertex without materializing the induced subgraph.
 
         The subset is a mask of active clique IDs, defaulting to all active
         vertices. Return None exactly when no universal vertex exists,
