@@ -12,6 +12,7 @@ from enum import Enum
 
 import networkx as nx
 
+from .octahedral_forced_pairs import screen_forced_pairs
 from .octahedral_nonlocal_search import verify_induced_octahedron
 from .octahedral_pair_cover import pair_cover_obstructs
 
@@ -209,6 +210,19 @@ def _screen_masks(
                     component_stack.append(v)
         number += 1
     possible = all(component[2 * i] != component[2 * i + 1] for i in range(len(binary)))
+    # Additional, extension-safe inference on the still-undominated part of
+    # the complement. Restrict to small residual graphs to bound overhead.
+    if possible and common.bit_count() <= 512:
+        forced = screen_forced_pairs(m.nonedge, common)
+        if not forced.possible:
+            return OctahedralScreen(
+                False,
+                "FORCED_PAIR_" + forced.reason,
+                len(domains),
+                len(singleton),
+                len(binary),
+                clauses,
+            )
     return OctahedralScreen(
         possible,
         "NOT_DISPROVED" if possible else "2SAT_CONFLICT",
@@ -386,6 +400,27 @@ def complete_dominating_octahedron(
         if min_degree == 0 or number_of_nonedges // 2 < r:
             memo[key] = False
             return False
+        # Forced antipodal pairs are present in EVERY completion. Recurse
+        # on their residual common-neighborhood rather than branching over
+        # choices that would discard a compelled pair.
+        if common.bit_count() <= 512:
+            forced = screen_forced_pairs(m.nonedge, common)
+            required = forced.forced_pairs
+            if not forced.possible or len(required) > r:
+                memo[key] = False
+                return False
+            if required:
+                reduced = common
+                for a, b in required:
+                    reduced &= m.closed[a] & m.closed[b]
+                remainder = solve(reduced, r - len(required))
+                if isinstance(remainder, tuple):
+                    found = required + remainder
+                    memo[key] = found
+                    return found
+                if remainder is False:
+                    memo[key] = False
+                return remainder
         if pair_cover_obstructs(m.nonedge, common, r):
             memo[key] = False
             return False

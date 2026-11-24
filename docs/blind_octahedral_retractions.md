@@ -71,6 +71,40 @@ search overhead. A strict violation is a proof that **no extension retaining
 the supplied partial pairs** is possible. This is a pruning optimization,
 not a claim that a resource-bounded global retraction search is complete.
 
+## Iterative forced-antipodal-pair pruning
+
+Let \(X\) be the host, \(H=\overline{X}\), and \(P\) a partial collection
+of antipodal pairs. Write \(T\) for vertices with no \(H\)-neighbor among
+the endpoints of \(P\). Every further antipodal pair belongs to \(H[T]\),
+and the new endpoints must collectively dominate **every vertex of \(T\)**
+by open \(H\)-neighborhoods.
+
+If \(x\in T\) has exactly one neighbor \(u\) in \(H[T]\), then every
+completion must select \(u\) as an endpoint. Let \(F\) contain all
+such compulsory endpoints. Since the target pairs induce a matching in
+\(H\), **\(H[F]\) must have maximum degree at most one**. Every edge
+\(uv\in E(H[F])\) must itself be an antipodal pair. Selecting all these
+forced pairs and replacing \(T\) by
+\(T\setminus(N_H(u)\cup N_H(v))\) preserves every possible completion.
+Repeat until no more pairs are forced. An isolated undominated vertex,
+or a vertex of degree at least two in \(H[F]\), proves that no completion
+retaining \(P\) can exist.
+
+The routine `pycliques.octahedral_forced_pairs.screen_forced_pairs`
+implements this exact necessary test using complement bitmasks.
+`screen_partial_octahedral_retraction` applies it **after** its
+extension-safe frozen-domain 2-SAT test; the completion solver uses
+forced pairs as compulsory recursive steps. For predictable costs,
+the screen is applied only when at most 512 residual vertices remain.
+A positive result remains inconclusive. The number of remaining pairs
+also provides an exact bound: if more pairs are compulsory than the
+requested remaining target dimension, no such completion exists.
+
+This is a *vertex*-dominating induced-matching condition in \(H\).
+It must not be confused with the literature definition of a dominating
+induced matching (also called efficient edge domination), which requires
+edge domination, not vertex domination. The two conditions differ in general.
+
 The forced-subgraph screen solves a 2-SAT *necessary* condition among vertices
 that cannot map to future antipodal pairs. It is not a sufficient condition
 for a retraction. If the screen rejects a partial target, you can call
