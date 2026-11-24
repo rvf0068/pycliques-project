@@ -27,15 +27,11 @@ def test_implicit_matches_explicit_on_small_graphs() -> None:
         materialized = implicit.to_networkx()
         assert materialized is not None
         labels = {v: implicit.clique(v) for v in implicit}
-        assert nx.utils.graphs_equal(
-            nx.relabel_nodes(materialized, labels), explicit
-        )
+        assert nx.utils.graphs_equal(nx.relabel_nodes(materialized, labels), explicit)
         assert implicit.number_of_edges() == explicit.number_of_edges()
         for v in implicit:
             expected = set(materialized[v]) | {v}
-            assert implicit.closed_neighborhood_mask(v) == sum(
-                1 << w for w in expected
-            )
+            assert implicit.closed_neighborhood_mask(v) == sum(1 << w for w in expected)
             assert implicit.dominated_vertices_mask(v) == sum(
                 1 << w
                 for w in materialized
