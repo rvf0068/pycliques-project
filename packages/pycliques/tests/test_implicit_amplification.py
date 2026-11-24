@@ -1,6 +1,7 @@
 """Replay amplification and distinguish finite growth from divergence."""
 
 from dataclasses import replace
+from itertools import product
 
 import networkx as nx
 import pytest
@@ -10,6 +11,7 @@ from pycliques import (
     amplified_common_neighbor,
     certify_octahedral_amplification,
     completely_pared_graph,
+    find_complete_transversal,
     octahedron,
     verify_octahedral_amplification,
 )
@@ -70,6 +72,37 @@ def test_two_successful_amplifications_do_not_guarantee_continuation() -> None:
     assert result.status is RetractionSearchStatus.FOUND
     assert result.transversal is not None
     assert all(result.transversal & q for q in second.extensions)
+
+
+def test_every_extension_choice_of_counterexample_is_obstructed() -> None:
+    graph = nx.from_graph6_bytes(b"J]~vJZZn}~?")
+    first = certify_octahedral_amplification(graph, PAIRS)
+    host, labels = _intersection_graph(graph)
+    second_cliques = [frozenset(q) for q in nx.find_cliques(host)]
+    choices = [
+        [
+            q
+            for q in labels
+            if all(pair[(i >> j) & 1] in q for j, pair in enumerate(PAIRS))
+        ]
+        for i in range(8)
+    ]
+    count = 0
+    for extensions in product(*choices):
+        count += 1
+        cert = replace(first, extensions=extensions)
+        assert verify_octahedral_amplification(graph, cert)
+        pairs = [(labels[a], labels[b]) for a, b in cert.antipodal_pairs]
+        forced = []
+        for i in range(16):
+            seed = {pair[(i >> j) & 1] for j, pair in enumerate(pairs)}
+            possible = [q for q in second_cliques if seed <= q]
+            forced.append(frozenset.intersection(*possible))
+        # A complete set meets the intersection of all possible
+        # extensions of each second-stage transversal.
+        result = find_complete_transversal(host, forced)
+        assert result.status is RetractionSearchStatus.FOUND
+    assert count == 8
 
 
 @pytest.mark.slow
