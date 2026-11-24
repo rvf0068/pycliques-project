@@ -292,6 +292,16 @@ families, possibly with repetitions. The same interval-pruning callback
 is supported. Using only supplied generators that preserve the state
 is conservative; it does not claim to compute the full stabilizer.
 
+The optional ``cache_witnesses=True`` stores a single nonneighbor ID per
+member. A cached nonedge is reused only when both endpoints belong to the
+original common neighborhood. This uses linear additional storage.
+``close_if_within(mask, allowed)`` tests forbidden candidates first and
+returns either the full global closure or ``None`` on proven rejection;
+it never returns a partial closure. The ordered and adaptive traversals
+use this exact rejection rule. ``projected_members(mask, vertices)`` reads
+projected sets directly from the incidence stars, without decoding full
+members, omitting empty projections.
+
 .. automodule:: pycliques.closed_neckties
    :members:
    :show-inheritance:

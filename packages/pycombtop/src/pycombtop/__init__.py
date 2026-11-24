@@ -131,8 +131,11 @@ from .simplex import (
 )
 from .strong_collapses import (
     UniformStrongCollapseCertificate,
+    UniformStrongCollapseReduction,
     uniform_strong_collapse_certificate,
+    uniform_strong_collapse_reduction,
     verify_uniform_strong_collapse_certificate,
+    verify_uniform_strong_collapse_prefix,
 )
 from .symbolic_dong import SymbolicDongCertificate, symbolic_dong_certificate
 from .symbolic_integral_morse import (
@@ -255,8 +258,11 @@ __all__ = [
     "ClosedTraceResult",
     "check_closed_trace_contractibility",
     "UniformStrongCollapseCertificate",
+    "UniformStrongCollapseReduction",
     "uniform_strong_collapse_certificate",
+    "uniform_strong_collapse_reduction",
     "verify_uniform_strong_collapse_certificate",
+    "verify_uniform_strong_collapse_prefix",
     "indexed_relative_collapse",
     "verify_indexed_relative_collapse",
     "verify_relative_collapse",

@@ -1,13 +1,14 @@
 """Verify the local contractibility hypothesis of LPV08, Theorem 5.7."""
 
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Hashable, Iterable, Iterator
 from dataclasses import dataclass
 
 from pycliques.closed_neckties import ClosedNecktieIndex
 
 from .strong_collapses import (
-    uniform_strong_collapse_certificate,
+    uniform_strong_collapse_reduction,
     verify_uniform_strong_collapse_certificate,
+    verify_uniform_strong_collapse_prefix,
 )
 
 
@@ -23,6 +24,7 @@ class ClosedTraceResult:
     individual_certificates: int
     unresolved: int | None = None
     strategy: str = "maximal"
+    inherited_checks: int = 0
 
 
 class _NodeLimit(Exception):
@@ -36,6 +38,7 @@ def check_closed_trace_contractibility(
     max_nodes: int | None = None,
     strategy: str = "maximal",
     anchor_stabilizers: Callable[[int], Iterable[Iterable[int]]] | None = None,
+    inherit_prefixes: bool = False,
 ) -> ClosedTraceResult:
     """Check all nonempty closed completes using uniform strong collapses.
 
@@ -52,6 +55,9 @@ def check_closed_trace_contractibility(
     and accepts a callback supplying validated anchor-stabilizer generators.
     Its node budget also counts good intermediate nodes; these need no
     individual contractibility certificate.
+    With inherit_prefixes, independently replay partial uniform collapses
+    and reuse their surviving vertices on nested intervals. A prefix alone
+    never certifies contractibility.
     """
     if max_nodes is not None and max_nodes < 0:
         raise ValueError("max_nodes must be nonnegative or None")
@@ -59,7 +65,8 @@ def check_closed_trace_contractibility(
         raise ValueError("unknown closed-trace search strategy")
     if anchor_stabilizers is not None and strategy != "bad_vertex":
         raise ValueError("anchor stabilizers require bad_vertex strategy")
-    visited = completed = covered = pruned = individual = 0
+    visited = completed = covered = pruned = individual = inherited = 0
+    history: list[tuple[int, int, frozenset[Hashable]]] = []
 
     def result(proved: bool, unresolved: int | None = None) -> ClosedTraceResult:
         return ClosedTraceResult(
@@ -71,17 +78,41 @@ def check_closed_trace_contractibility(
             individual,
             unresolved,
             strategy,
+            inherited,
         )
 
-    def certify(m: int, e: int) -> bool:
-        fixed = index.members(m)
-        possible = index.members(e)
-        cert = uniform_strong_collapse_certificate(fixed, possible)
-        if cert is None:
-            return False
-        if not verify_uniform_strong_collapse_certificate(fixed, possible, cert):
-            raise RuntimeError("uniform strong-collapse certificate failed replay")
-        return True
+    def certify(m: int, e: int, *, remember: bool = False) -> bool:
+        nonlocal inherited
+        # Preorder traversal: discard cached prefixes until the current
+        # interval is contained in the last certified prefix interval.
+        while history:
+            lower, upper, vertices = history[-1]
+            if lower & m == lower and e & upper == e:
+                break
+            history.pop()
+        if history:
+            inherited += 1
+            vertices = history[-1][2]
+            fixed = index.projected_members(m, vertices)
+            possible = index.projected_members(e, vertices)
+        else:
+            fixed = index.members(m)
+            possible = index.members(e)
+        reduction = uniform_strong_collapse_reduction(fixed, possible)
+        cert = reduction.certificate
+        if cert is not None:
+            if not verify_uniform_strong_collapse_certificate(fixed, possible, cert):
+                raise RuntimeError("uniform strong-collapse certificate failed replay")
+            return True
+        if inherit_prefixes and remember and reduction.moves:
+            if not verify_uniform_strong_collapse_prefix(
+                fixed, possible, reduction.moves
+            ):
+                raise RuntimeError("uniform strong-collapse prefix failed replay")
+            removed = {v for v, _ in reduction.moves}
+            surviving = frozenset().union(*possible) - removed
+            history.append((m, e, surviving))
+        return False
 
     def prune(m: int, e: int) -> bool:
         nonlocal visited, pruned
@@ -90,7 +121,7 @@ def check_closed_trace_contractibility(
         visited += 1
         if strategy == "bad_vertex" and not index.is_bad(m):
             return False
-        if certify(m, e):
+        if certify(m, e, remember=True):
             pruned += 1
             return True
         return False
@@ -116,6 +147,7 @@ def check_closed_trace_contractibility(
 
     try:
         for search, size in searches():
+            history.clear()
             for closed in search:
                 # A common vertex already supplies a cone point.
                 if index.is_bad(closed):

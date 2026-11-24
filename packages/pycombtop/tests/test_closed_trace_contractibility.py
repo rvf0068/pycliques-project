@@ -80,3 +80,25 @@ def test_bad_vertex_strategy():
     assert not result.proved and result.unresolved == 7
     with pytest.raises(ValueError):
         check_closed_trace_contractibility(index, anchor_stabilizers=lambda _: [])
+
+
+def test_inherited_prefix_cannot_prove_noncontractible_cycle():
+    # The leaf 3 is uniformly dominated, but the remaining cycle is not.
+    index = ClosedNecktieIndex([{0, 1, 3}, {1, 2}, {0, 2}])
+    result = check_closed_trace_contractibility(
+        index, strategy="bad_vertex", inherit_prefixes=True
+    )
+    assert not result.proved
+    assert result.unresolved == 7
+    assert result.inherited_checks > 0
+
+
+def test_inherited_prefix_on_center_failure_example():
+    graph = nx.from_graph6_bytes(b"Iy~s~V]ng")
+    index = ClosedNecktieIndex(nx.find_cliques(graph), lazy=True, cache_witnesses=True)
+    for strategy in ("maximal", "vertex", "bad_vertex"):
+        result = check_closed_trace_contractibility(
+            index, strategy=strategy, inherit_prefixes=True
+        )
+        assert result.proved
+        assert result.unresolved is None

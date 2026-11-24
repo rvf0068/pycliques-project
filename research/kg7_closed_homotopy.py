@@ -104,6 +104,8 @@ def main():
         "--strategy", choices=["maximal", "vertex", "bad_vertex"], default="maximal"
     )
     parser.add_argument("--stabilizers", action="store_true")
+    parser.add_argument("--cache-witnesses", action="store_true")
+    parser.add_argument("--inherit-prefixes", action="store_true")
     args = parser.parse_args()
     if args.max_checks < 0:
         parser.error("--max-checks must be nonnegative")
@@ -114,7 +116,9 @@ def main():
     if args.stabilizers and not (args.uniform and args.strategy == "bad_vertex"):
         parser.error("--stabilizers requires --uniform --strategy bad_vertex")
     family, generators = family_and_generators(args.iterate)
-    index = ClosedNecktieIndex(family, lazy=args.lazy)
+    index = ClosedNecktieIndex(
+        family, lazy=args.lazy, cache_witnesses=args.cache_witnesses
+    )
     if args.uniform:
         provider = anchor_stabilizer_provider(generators) if args.stabilizers else None
         result = check_closed_trace_contractibility(
@@ -123,6 +127,7 @@ def main():
             max_nodes=args.max_checks,
             strategy=args.strategy,
             anchor_stabilizers=provider,
+            inherit_prefixes=args.inherit_prefixes,
         )
         print(result, flush=True)
         if result.proved:
