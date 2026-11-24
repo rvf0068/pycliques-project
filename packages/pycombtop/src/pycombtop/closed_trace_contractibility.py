@@ -101,9 +101,12 @@ def check_closed_trace_contractibility(
                 stabilizers: Iterable[Iterable[int]] = ()
                 if anchor_stabilizers is not None:
                     stabilizers = anchor_stabilizers(anchor)
-                yield index.bad_closed_containing(
-                    anchor, stabilizer_generators=stabilizers, prune=prune
-                ), 0
+                yield (
+                    index.bad_closed_containing(
+                        anchor, stabilizer_generators=stabilizers, prune=prune
+                    ),
+                    0,
+                )
         elif strategy == "vertex":
             for anchor in index.vertex_orbit_representatives(generators):
                 yield index.closed_containing(anchor, prune=prune), 0
