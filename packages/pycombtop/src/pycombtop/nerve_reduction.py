@@ -83,12 +83,8 @@ def verify_nerve_reduction(
             return False
 
         def maximal(family: set[frozenset[int]]) -> list[frozenset[int]]:
-            return sorted(
-                (
-                    f for f in family if f and not any(f < other for other in family)
-                ),
-                key=lambda f: (-len(f), sum(1 << v for v in f)),
-            )
+            keep = [f for f in family if f and not any(f < g for g in family)]
+            return sorted(keep, key=lambda f: (-len(f), sum(1 << v for v in f)))
 
         current = maximal({frozenset(_indices(m)) for m in masks})
         counts = [len(current)]
