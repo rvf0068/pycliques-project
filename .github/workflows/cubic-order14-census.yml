@@ -1,10 +1,5 @@
 name: Cubic order-14 research census
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - 'research/cubic_order14_pass2.py'
-      - '.github/workflows/cubic-order14-census.yml'
   workflow_dispatch:
 permissions:
   contents: read
