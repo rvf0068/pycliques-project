@@ -4,7 +4,8 @@ A verified ordering removes a maximal critical face, or a free face and
 its unique codimension-one coface. This certifies an acyclic matching.
 With one critical vertex and remaining cells in dimensions d,d+1 (d>=2),
 zero boundary in the integral Morse complex implies all attachments are
-null by Hurewicz. See Forman, A User's Guide to Discrete Morse Theory,
+null by Hurewicz. The same holds for d=1 if there is exactly one
+critical 1-cell: every loop in the resulting circle is classified by degree. See Forman, A User's Guide to Discrete Morse Theory,
 Sections 2 and 7, and Hatcher, Algebraic Topology, Theorem 4.32.
 """
 
@@ -143,7 +144,7 @@ def _replay(
         return dict(critical)
     if (
         len(dims) == 2
-        and dims[0] >= 2
+        and (dims[0] >= 2 or (dims[0] == 1 and critical[1] == 1))
         and dims[1] == dims[0] + 1
         and _zero_boundary(steps, dims[0])
     ):
