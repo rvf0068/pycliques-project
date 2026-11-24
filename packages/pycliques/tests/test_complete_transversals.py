@@ -17,9 +17,7 @@ def test_complete_transversal_matches_small_oracle() -> None:
         if len(graph) > 4:
             break
         subsets = [
-            frozenset(s)
-            for k in range(len(graph) + 1)
-            for s in combinations(graph, k)
+            frozenset(s) for k in range(len(graph) + 1) for s in combinations(graph, k)
         ]
         cliques = [set(q) for q in nx.find_cliques(graph)]
         for a in subsets:
