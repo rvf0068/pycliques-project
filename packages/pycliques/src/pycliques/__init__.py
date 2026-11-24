@@ -58,6 +58,11 @@ from .coaffinations import (
     coaffine_monomorphism,
     is_coaffine_map,
 )
+from .coaffine_endomorphisms import (
+    CoaffineEndomorphismResult,
+    find_coaffine_endomorphism,
+    verify_coaffine_endomorphism,
+)
 from .cutpoints import (
     InverseCutpointExtension,
     contract_local_bridge,
@@ -125,6 +130,11 @@ from .homotopy_research import (
     MissingFaceCertificate,
     homotopy_structure_certificates,
     verify_homotopy_structure_certificates,
+)
+from .implicit_clique_graph import (
+    ImplicitCliqueGraph,
+    ImplicitParingResult,
+    verify_implicit_paring,
 )
 from .named import (
     collapse_obstruction_fixture,
@@ -238,6 +248,7 @@ from .small import (
     test_eventually_helly,
     verify_clockwork_pair_map_certificate,
 )
+from .stiff_retractions import StiffRetractionResult, search_proper_stiff_retraction
 from .surfaces import (
     is_closed_surface,
     is_cycle,
@@ -255,6 +266,14 @@ from .targeted_retractions import (
 
 __all__ = [
     "__version__",
+    "CoaffineEndomorphismResult",
+    "find_coaffine_endomorphism",
+    "verify_coaffine_endomorphism",
+    "ImplicitCliqueGraph",
+    "ImplicitParingResult",
+    "verify_implicit_paring",
+    "StiffRetractionResult",
+    "search_proper_stiff_retraction",
     # cliques
     "Clique",
     "Complete",

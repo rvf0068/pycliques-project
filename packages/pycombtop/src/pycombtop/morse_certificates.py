@@ -12,6 +12,8 @@ Accepted exact wedge criteria:
   m >= 2, with top rational Betti number equal to the number of critical
   (m+1)-cells. This makes the cellular boundary zero and, by Hurewicz
   for a wedge of m-spheres, all attaching maps null-homotopic.
+* the same top Betti criterion with one critical 1-cell and critical
+  2-cells: loops in the single circle are classified by degree.
 
 Refs: Forman, Adv. Math. 134 (1998), 90--145; Hatcher,
 Algebraic Topology, Sections 0 and 4.2 (CW complexes and Hurewicz).
@@ -241,7 +243,7 @@ def facet_morse_certificate(
             or len(positive) == 1
             or (
                 len(positive) == 2
-                and positive[0] >= 2
+                and (positive[0] >= 2 or (positive[0] == 1 and critical[1] == 1))
                 and positive[1] == positive[0] + 1
             )
         )
