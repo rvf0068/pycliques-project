@@ -36,7 +36,8 @@ def test_against_explicit_completes(family):
         assert index.centers(mask) == sum(
             1 << i for i in h if is_center(family[i], [family[j] for j in complete])
         )
-        assert index.is_bad(mask) == (not set.intersection(*(set(family[j]) for j in complete)))
+        intersection = set.intersection(*(set(family[j]) for j in complete))
+        assert index.is_bad(mask) == (not intersection)
     for anchor in graph:
         got = list(index.closed_containing(anchor))
         assert len(got) == len(set(got))

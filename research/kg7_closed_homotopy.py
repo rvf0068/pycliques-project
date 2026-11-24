@@ -65,7 +65,12 @@ def main():
     centers = check_closed_centers(
         index, generators=generators, max_checks=args.max_checks
     )
-    print("center test:", centers, flush=True)
+    print("Center criterion:", centers, flush=True)
+    if centers.holds is False:
+        print(
+            "Center criterion fails; Theorem 5.7 contractibility test is independent.",
+            flush=True,
+        )
     if centers.witness is not None:
         print(
             "center witness indices:",
@@ -95,8 +100,12 @@ def main():
         if checked % 10_000 == 0:
             print("checked", checked, "bad", bad, "unknown", unknown, flush=True)
     print("checked", checked, "bad", bad, "unknown", unknown, flush=True)
+    # LPV08 Theorem 5.7 requires contractibility of Delta(h(A)), not
+    # a center. Good closed completes have a common vertex and hence a
+    # simplex nerve; all bad closed completes must have passed the reduction above.
+    # A failed center test does not refute this weaker sufficient condition.
     if exhaustive and not unknown:
-        print("PROVED: LPV08 Theorem 5.7 sufficient hypothesis")
+        print("PROVED: LPV08 Theorem 5.7 contractibility hypothesis")
     else:
         print("INCONCLUSIVE: incomplete enumeration or unresolved local complex")
 
