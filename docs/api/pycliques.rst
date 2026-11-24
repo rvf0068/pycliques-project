@@ -258,6 +258,22 @@ patterns also give exact center tests. Use incidence-preserving permutation
 generators to reduce the enumeration to vertex-orbit representatives. A
 failed center condition does not establish a failed homotopy equivalence.
 
+For large clique families, use ``ClosedNecktieIndex(family, lazy=True)``
+or construct an ``ImplicitCliqueGraph.from_family(family)`` and pass it to
+``ClosedNecktieIndex.from_implicit(graph)``. The latter shares incidence
+masks and preserves member IDs; the input graph must be unpared. The lazy
+index stores only a bounded cache of neighborhoods, rather than a dense
+neighborhood matrix. Family members are decoded on demand.
+
+The closure computation eliminates a candidate and all its nonneighbors
+in the original common neighborhood when a nonneighbor is found. Neither
+can be universal there. This works independently of the storage mode.
+
+The ``closed_containing`` and ``closed_representatives`` methods accept
+the same interval-pruning callback as ``closed_within``. When starting from
+a vertex, the upper family may not itself be a complete. A uniform
+strong-collapse certificate remains valid for such an interval.
+
 .. automodule:: pycliques.closed_neckties
    :members:
    :show-inheritance:

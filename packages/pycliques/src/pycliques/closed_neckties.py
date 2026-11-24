@@ -313,7 +313,13 @@ class ClosedNecktieIndex:
 
     def _maximal_completes(self, anchor: int | None = None) -> Iterator[int]:
         """Pivoted Bron-Kerbosch on the existing neighborhood bitsets."""
+        eager: tuple[int, ...] | None = None
+        if isinstance(self.adjacency, tuple):
+            eager = tuple(a & ~(1 << i) for i, a in enumerate(self.adjacency))
+
         def neighbors(i: int) -> int:
+            if eager is not None:
+                return eager[i]
             return self.adjacency[i] & ~(1 << i)
 
         if anchor is None:
