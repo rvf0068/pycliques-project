@@ -169,9 +169,7 @@ def test_no_forced_pair_fallback_finds_and_exhausts() -> None:
         (6, OctahedralBlindStatus.FOUND),
         (7, OctahedralBlindStatus.FOUND),
     ):
-        complement = nx.disjoint_union(
-            nx.complete_graph(2), nx.cycle_graph(length)
-        )
+        complement = nx.disjoint_union(nx.complete_graph(2), nx.cycle_graph(length))
         graph = nx.complement(complement)
         common = ((1 << len(graph)) - 1) & ~3
         screen = screen_forced_pairs(_nonedge(graph), common)
@@ -187,9 +185,7 @@ def test_no_forced_pair_fallback_finds_and_exhausts() -> None:
 
     # A target dimension too large for C6 is excluded by the ordinary
     # exact search, rather than by the forced-pair screen.
-    complement = nx.disjoint_union(
-        nx.complete_graph(2), nx.cycle_graph(6)
-    )
+    complement = nx.disjoint_union(nx.complete_graph(2), nx.cycle_graph(6))
     graph = nx.complement(complement)
     overlarge = complete_dominating_octahedron(
         graph, [(0, 1)], target_dimension=4, max_states=10000
