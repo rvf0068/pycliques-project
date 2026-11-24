@@ -16,10 +16,7 @@ from pycliques.octahedral_forced_pairs import screen_forced_pairs
 
 def _nonedge(graph: nx.Graph) -> tuple[int, ...]:
     full = (1 << len(graph)) - 1
-    return tuple(
-        full & ~(1 << x) & ~sum(1 << y for y in graph[x])
-        for x in graph
-    )
+    return tuple(full & ~(1 << x) & ~sum(1 << y for y in graph[x]) for x in graph)
 
 
 def _oracle(nonedge: tuple[int, ...], common: int, cache: dict[int, bool]) -> bool:
@@ -29,11 +26,7 @@ def _oracle(nonedge: tuple[int, ...], common: int, cache: dict[int, bool]) -> bo
     if common in cache:
         return cache[common]
     vertices = [x for x in range(len(nonedge)) if common & (1 << x)]
-    edges = [
-        (u, v)
-        for u, v in combinations(vertices, 2)
-        if nonedge[u] & (1 << v)
-    ]
+    edges = [(u, v) for u, v in combinations(vertices, 2) if nonedge[u] & (1 << v)]
     options = {
         x: [(u, v) for u, v in edges if nonedge[x] & ((1 << u) | (1 << v))]
         for x in vertices
@@ -56,9 +49,7 @@ def test_randomized_against_independent_exact_oracle() -> None:
         graph = nx.Graph()
         graph.add_nodes_from(range(n))
         graph.add_edges_from(
-            (u, v)
-            for u, v in combinations(range(n), 2)
-            if rng.random() < probability
+            (u, v) for u, v in combinations(range(n), 2) if rng.random() < probability
         )
         nonedge = _nonedge(graph)
         common = rng.randrange(1, 1 << n)
@@ -75,9 +66,7 @@ def test_planted_retractions_survive_all_prefixes() -> None:
         d = rng.randint(3, 6)
         n = 2 * d + rng.randint(0, 6)
         graph = nx.complete_graph(n)
-        images = list(range(2 * d)) + [
-            rng.randrange(2 * d) for _ in range(n - 2 * d)
-        ]
+        images = list(range(2 * d)) + [rng.randrange(2 * d) for _ in range(n - 2 * d)]
         for u, v in combinations(range(n), 2):
             if images[u] == (images[v] ^ 1) or (
                 (u >= 2 * d or v >= 2 * d) and rng.random() < 0.3
@@ -116,9 +105,7 @@ def test_partial_target_integration_and_positive_completion() -> None:
     graph = nx.Graph()
     graph.add_nodes_from(range(11))
     graph.add_edges_from((u + 2, v + 2) for u, v in base.edges())
-    graph.add_edges_from(
-        (a, x) for a in (0, 1) for x in range(2, 11)
-    )
+    graph.add_edges_from((a, x) for a in (0, 1) for x in range(2, 11))
     screen = screen_partial_octahedral_retraction(graph, [(0, 1)])
     assert not screen.possible
     assert screen.reason == "FORCED_PAIR_ISOLATED"
