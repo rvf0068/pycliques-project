@@ -96,12 +96,11 @@ def verify_nerve_reduction(
             old_count = len(current)
             for _ in range(2):
                 vertices = set().union(*current)
-                current = maximal(
-                    {
-                        frozenset(i for i, f in enumerate(current) if v in f)
-                        for v in vertices
-                    }
-                )
+                incidence = {
+                    frozenset(i for i, f in enumerate(current) if v in f)
+                    for v in vertices
+                }
+                current = maximal(incidence)
                 counts.append(len(current))
                 if len(current) <= 1:
                     break

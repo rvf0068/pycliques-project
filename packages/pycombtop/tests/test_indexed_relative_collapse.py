@@ -18,12 +18,9 @@ def test_relative_collapse_and_independent_replay():
     assert verify_indexed_relative_collapse(source, target, result.pairs)
     assert verify_relative_collapse(source, target, result.pairs)
     assert not verify_indexed_relative_collapse(source, target, result.pairs[:-1])
-    assert not verify_indexed_relative_collapse(
-        source, target, [(Simplex({0}), Simplex({0, 1}))]
-    )
-    assert not verify_indexed_relative_collapse(
-        source, target, [(Simplex({9}), Simplex({0, 9}))]
-    )
+    for v in (0, 9):
+        invalid_pairs = [(Simplex({v}), Simplex({0, 1} if v == 0 else {0, 9}))]
+        assert not verify_indexed_relative_collapse(source, target, invalid_pairs)
     assert not verify_indexed_relative_collapse(source, target, [(Simplex({0}),)])
 
 
@@ -35,9 +32,8 @@ def test_large_preserved_simplex_is_not_expanded():
     assert len(result.pairs) == 3
     limited = indexed_relative_collapse(source, target, max_bad_faces=5)
     assert limited.status is CollapseStatus.INCONCLUSIVE
-    assert not verify_indexed_relative_collapse(
-        source, target, result.pairs, max_bad_faces=5
-    )
+    pairs = result.pairs
+    assert not verify_indexed_relative_collapse(source, target, pairs, max_bad_faces=5)
     identical = indexed_relative_collapse(target, target, max_bad_faces=0)
     assert identical.status is CollapseStatus.PROVED
 
@@ -48,13 +44,11 @@ def test_dead_end_and_bad_target():
     result = indexed_relative_collapse(source, target)
     assert result.status is CollapseStatus.INCONCLUSIVE
     with pytest.raises(ValueError):
-        indexed_relative_collapse(
-            source, SimplicialComplex(range(3), facet_set=[{0, 1, 2}])
-        )
+        invalid = SimplicialComplex(range(3), facet_set=[{0, 1, 2}])
+        indexed_relative_collapse(source, invalid)
     with pytest.raises(ValueError):
-        indexed_relative_collapse(
-            source, SimplicialComplex(range(4), facet_set=[{3}])
-        )
+        invalid = SimplicialComplex(range(4), facet_set=[{3}])
+        indexed_relative_collapse(source, invalid)
     with pytest.raises(ValueError):
         indexed_relative_collapse(source, target, max_bad_faces=-1)
     with pytest.raises(ValueError):
