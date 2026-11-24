@@ -27,9 +27,10 @@ def test_certified_amplification_and_tampering() -> None:
     assert verify_octahedral_amplification(host, cert)
     assert cert.extensions == cert.common_neighborhoods
     for all_extensions in (False, True):
-        assert amplified_common_neighbor(
-            host, cert, all_extensions=all_extensions
-        ).status is RetractionSearchStatus.EXHAUSTED
+        assert (
+            amplified_common_neighbor(host, cert, all_extensions=all_extensions).status
+            is RetractionSearchStatus.EXHAUSTED
+        )
     assert not verify_octahedral_amplification(
         host, replace(cert, extensions=cert.extensions[:-1])
     )
@@ -59,9 +60,10 @@ def test_two_successful_amplifications_do_not_guarantee_continuation() -> None:
     graph = nx.from_graph6_bytes(b"J]~vJZZn}~?")
     first = certify_octahedral_amplification(graph, PAIRS)
     assert verify_octahedral_amplification(graph, first)
-    assert amplified_common_neighbor(
-        graph, first, all_extensions=True
-    ).status is RetractionSearchStatus.EXHAUSTED
+    assert (
+        amplified_common_neighbor(graph, first, all_extensions=True).status
+        is RetractionSearchStatus.EXHAUSTED
+    )
     host, labels = _intersection_graph(graph)
     assert len(host) == 21
     pairs = [(labels[a], labels[b]) for a, b in first.antipodal_pairs]
@@ -108,9 +110,7 @@ def test_every_extension_choice_of_counterexample_is_obstructed() -> None:
 @pytest.mark.slow
 def test_cubic_65_two_amplifications_without_constructing_k4() -> None:
     # Reproduce the stable mask ordering of the research certificate.
-    graph = completely_pared_graph(
-        nx.complement(nx.from_graph6_bytes(b"KsX_o_C?_B_M"))
-    )
+    graph = completely_pared_graph(nx.complement(nx.from_graph6_bytes(b"KsX_o_C?_B_M")))
     graph = nx.convert_node_labels_to_integers(graph, ordering="sorted")
     for order in (13, 24, 140):
         host, _ = _intersection_graph(graph)
