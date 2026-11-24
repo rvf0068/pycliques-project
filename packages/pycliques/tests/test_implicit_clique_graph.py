@@ -106,9 +106,7 @@ def test_invalid_paring_certificates() -> None:
 
 @pytest.mark.slow
 def test_cubic_77_large_implicit_iterate() -> None:
-    graph = completely_pared_graph(
-        nx.complement(nx.from_graph6_bytes(b"KsX@?oS@_D?J"))
-    )
+    graph = completely_pared_graph(nx.complement(nx.from_graph6_bytes(b"KsX@?oS@_D?J")))
     for order in (19, 64):
         nxt = clique_graph(graph)
         assert nxt is not None
