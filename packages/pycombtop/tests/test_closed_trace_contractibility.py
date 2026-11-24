@@ -56,3 +56,27 @@ def test_vertex_strategy_without_maximal_enumeration(monkeypatch):
     assert limited.visited == 0
     with pytest.raises(ValueError):
         check_closed_trace_contractibility(index, strategy="invalid")
+
+
+def test_bad_vertex_strategy():
+    graph = nx.from_graph6_bytes(b"Iy~s~V]ng")
+    index = ClosedNecktieIndex(nx.find_cliques(graph), lazy=True)
+    result = check_closed_trace_contractibility(index, strategy="bad_vertex")
+    assert result.proved
+    assert result.completed_orbits == len(index.family)
+    limited = check_closed_trace_contractibility(
+        index,
+        strategy="bad_vertex",
+        max_nodes=0,
+    )
+    assert not limited.proved and limited.visited == 0
+    cycle = ClosedNecktieIndex([{0, 1}, {1, 2}, {2, 0}])
+    result = check_closed_trace_contractibility(
+        cycle,
+        strategy="bad_vertex",
+        generators=[(1, 2, 0)],
+        anchor_stabilizers=lambda _: [(0, 2, 1)],
+    )
+    assert not result.proved and result.unresolved == 7
+    with pytest.raises(ValueError):
+        check_closed_trace_contractibility(index, anchor_stabilizers=lambda _: [])

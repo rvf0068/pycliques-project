@@ -274,6 +274,24 @@ the same interval-pruning callback as ``closed_within``. When starting from
 a vertex, the upper family may not itself be a complete. A uniform
 strong-collapse certificate remains valid for such an interval.
 
+For applications that only require bad closed completes, use
+``bad_closed_containing(anchor)``. A good closed family has a common
+vertex, and any bad extension must include a member that misses it.
+The method branches only over such members, retaining all other
+candidates for later extensions. This covers every bad closed family
+exactly once without symmetry.
+
+Optional incidence-preserving ``stabilizer_generators`` must fix the
+anchor. At each node the method retains a subgroup preserving both
+the closed lower family and its permitted upper family. It chooses
+an orbit of common incidence stars and branches on orbit
+representatives of the members outside their intersection. It
+excludes all earlier members of the chosen branch domain, not all
+earlier indices. The resulting search covers every orbit of bad closed
+families, possibly with repetitions. The same interval-pruning callback
+is supported. Using only supplied generators that preserve the state
+is conservative; it does not claim to compute the full stabilizer.
+
 .. automodule:: pycliques.closed_neckties
    :members:
    :show-inheritance:

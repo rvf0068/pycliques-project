@@ -347,3 +347,25 @@ def test_fourth_iterate_driver_requires_lazy_vertex_strategy(monkeypatch, capsys
     driver.main()
     assert calls == [3]
     assert "INCONCLUSIVE:" in capsys.readouterr().out
+
+
+def test_compact_anchor_stabilizer_provider():
+    from research.kg7_closed_homotopy import anchor_stabilizer_provider
+
+    generators = []
+    for k in range(6):
+        p = list(range(7))
+        p[k], p[k + 1] = p[k + 1], p[k]
+        generators.append(p)
+    stabilizers = anchor_stabilizer_provider(generators)(0)
+    assert all(p[0] == 0 for p in stabilizers)
+    identity = tuple(range(7))
+    reached = {identity}
+    queue = [identity]
+    for q in queue:
+        for p in stabilizers:
+            moved = tuple(p[v] for v in q)
+            if moved not in reached:
+                reached.add(moved)
+                queue.append(moved)
+    assert len(reached) == 720

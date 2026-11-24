@@ -113,6 +113,14 @@ particularly useful for lazy indices of very large clique graphs. It may
 still require many search nodes; a limit or unresolved trace is
 inconclusive, not a counterexample to homotopy equivalence.
 
+The optional ``strategy="bad_vertex"`` branches adaptively using
+common incidence stars. A callback ``anchor_stabilizers(anchor)``
+can supply incidence-preserving member permutations fixing each
+anchor; these are validated by the index. The checker counts good
+intermediate nodes toward its limit but need not test their
+contractibility, since they have a common vertex. Bad nodes and
+pruned intervals still require independently replayed certificates.
+
 .. automodule:: pycombtop.closed_trace_contractibility
    :members:
    :undoc-members:
