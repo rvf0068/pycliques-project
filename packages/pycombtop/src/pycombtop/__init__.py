@@ -4,6 +4,10 @@ pycombtop: Combinatorial topology and simplicial complexes.
 
 # Use relative imports to pull from your complex.py module
 # fundamental_group
+from .closed_trace_contractibility import (
+    ClosedTraceResult,
+    check_closed_trace_contractibility,
+)
 from .covering_divergence import (
     TriangularCoverDivergenceCertificate,
     verify_triangular_cover_divergence_certificate,
@@ -248,6 +252,8 @@ __all__ = [
     "CollapseResult",
     "CollapseStatus",
     "relative_collapse",
+    "ClosedTraceResult",
+    "check_closed_trace_contractibility",
     "UniformStrongCollapseCertificate",
     "uniform_strong_collapse_certificate",
     "verify_uniform_strong_collapse_certificate",
