@@ -25,7 +25,7 @@ from enum import Enum, auto
 
 import networkx as nx
 
-from .dominated import find_dominated_vertex
+from .dominated import completely_pared_graph
 
 
 class ClockworkRecognitionStatus(Enum):
@@ -1295,12 +1295,7 @@ def remove_dominated_vertices(G: nx.Graph) -> nx.Graph:
     >>> sorted(H.nodes())
     [0, 1, 2, 3, 4]
     """
-    H = G.copy()
-    while True:
-        u = find_dominated_vertex(H)
-        if u is None:
-            return H
-        H.remove_node(u)
+    return completely_pared_graph(G)
 
 
 # -------------------------------------------------------------------
