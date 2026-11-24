@@ -1258,3 +1258,119 @@ def test_small_main_range_update_preserves_unresolved_certificate(
 
     row = _saved_indeterminate_rows(tmp_path / "indeterminate_order_6.txt")[0]
     assert "retracts conjectured_divergent same-core" in row
+
+
+def test_sequence_lazy_family_and_edge_bound():
+    seq = CliqueSequence(nx.cycle_graph(4), relabel=True, max_edges=0)
+    family = seq.clique_family(1)
+    assert family is not None and len(family) == 4
+    assert seq.graph_count == 1 and not seq.exhausted
+    assert seq.raw_label_map(1) == dict(enumerate(family))
+    assert seq.raw_iterate(1) is None
+    assert seq.exhausted and seq[1] is None
+    assert seq.clique_family(1) is family
+    assert seq.label_map(1) is None and seq.paring_certificate(1) is None
+    assert seq.clique_family(2) is None
+
+
+def test_sequence_initial_paring_and_provenance():
+    from pycliques import dominates
+
+    graph = nx.path_graph(5)
+    seq = CliqueSequence(graph, relabel=True, pare_initial=True)
+    raw = seq.raw_iterate(0)
+    assert raw is not None and len(raw) == 5
+    assert seq.raw_label_map(0) == dict(enumerate(range(5)))
+    moves = seq.paring_certificate(0)
+    assert moves is not None and len(moves) == 4
+    current = raw.copy()
+    for v, w in moves:
+        assert v != w and v in current and w in current
+        assert dominates(current, w, v)
+        current.remove_node(v)
+    assert seq[0] is not None and len(seq[0]) == 1
+    assert seq.label_map(0) == {0: next(iter(current))}
+    assert len(graph) == 5
+    assert seq[1] is not None and len(seq[1]) == 1
+    assert seq.paring_certificate(1) == ()
+
+
+def test_sequence_relabels_survivors_and_records_raw_deletions():
+    from pycliques import dominates
+
+    seq = CliqueSequence(nx.path_graph(4), relabel=True)
+    family = seq.clique_family(1)
+    assert family is not None and len(family) == 3
+    assert seq[1] is not None and list(seq[1]) == [0]
+    raw = seq.raw_iterate(1)
+    assert raw is not None and len(raw) == 3
+    moves = seq.paring_certificate(1)
+    assert moves is not None and len(moves) == 2
+    current = raw.copy()
+    for v, w in moves:
+        assert v != w and dominates(current, w, v)
+        current.remove_node(v)
+    raw_label = next(iter(current))
+    assert seq.label_map(1) == {0: family[raw_label]}
+    assert seq.raw_label_map(1) == dict(enumerate(family))
+    assert seq.raw_iterate(1) is raw
+
+
+def test_sequence_stable_labeled_inputs_and_unpared_mode():
+    first = nx.path_graph(5)
+    second = nx.Graph()
+    second.add_nodes_from(reversed(list(first)))
+    second.add_edges_from((v, u) for u, v in reversed(list(first.edges)))
+    for pare in (False, True):
+        a = CliqueSequence(first, relabel=True, pare=pare)
+        b = CliqueSequence(second, relabel=True, pare=pare)
+        for n in range(3):
+            assert a[n] is not None and b[n] is not None
+            assert list(a[n]) == list(b[n])
+            assert all(list(a[n][v]) == list(b[n][v]) for v in a[n])
+            assert {frozenset(e) for e in a[n].edges} == {
+                frozenset(e) for e in b[n].edges
+            }
+            assert a.label_map(n) == b.label_map(n)
+            assert a.paring_certificate(n) == b.paring_certificate(n)
+            if n:
+                assert a.clique_family(n) == b.clique_family(n)
+    exact = CliqueSequence(first, pare=False)
+    assert exact[1] is not None and len(exact[1]) == 4
+    assert exact[1] is exact.raw_iterate(1)
+    assert exact.paring_certificate(1) == ()
+    assert exact.label_map(1) == {q: q for q in exact[1]}
+
+
+def test_sequence_validation_and_clique_budget():
+    seq = CliqueSequence(nx.cycle_graph(4), bound=3)
+    assert seq.clique_family(1) is None
+    assert seq.exhausted and seq[1] is None
+    assert seq.raw_label_map(1) is None
+    assert seq.graph_count == 1
+    with pytest.raises(IndexError):
+        seq[-1]
+    with pytest.raises(IndexError):
+        seq.raw_iterate(-1)
+    with pytest.raises(IndexError):
+        seq.raw_label_map(-1)
+    with pytest.raises(IndexError):
+        seq.clique_family(0)
+    with pytest.raises(ValueError):
+        CliqueSequence(nx.Graph(), bound=-1)
+    with pytest.raises(ValueError):
+        CliqueSequence(nx.Graph(), max_edges=-1)
+    with pytest.raises(ValueError):
+        CliqueSequence(nx.Graph(), pare=False, pare_initial=True)
+    with pytest.raises(ValueError):
+        CliqueSequence(nx.Graph(), vertex_key=lambda v: (v,))
+    with pytest.raises(ValueError):
+        CliqueSequence(nx.path_graph(2), relabel=True, vertex_key=lambda v: ())
+    with pytest.raises(ValueError):
+        CliqueSequence(nx.Graph([(1.5, 2.5)]), relabel=True)
+    custom = CliqueSequence(
+        nx.Graph([(1.5, 2.5)]), relabel=True, vertex_key=lambda v: (v,)
+    )
+    assert custom.raw_label_map(0) == {0: 1.5, 1: 2.5}
+    mixed = nx.Graph([(1, "a"), (b"b", ("c", 2)), (frozenset({1}), 1)])
+    assert CliqueSequence(mixed, relabel=True)[0].order() == 5

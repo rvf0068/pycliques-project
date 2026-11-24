@@ -219,3 +219,60 @@ failed center condition does not establish a failed homotopy equivalence.
    :members:
    :show-inheritance:
    :member-order: bysource
+
+CliqueSequence: pared iterates and reproducible labels
+-----------------------------------------------------
+
+Use ``CliqueSequence(G, bound=10000, pare=True, relabel=True,
+pare_initial=True)`` to construct completely pared iterates from an
+arbitrary starting graph. The default still assumes the supplied graph
+is already pared and retains its labels. For exact (unpared) iterates
+use ``pare=False``. Deterministic integer relabeling is not isomorphism
+canonization.
+
+For positive level n, ``seq.clique_family(n)`` returns all maximal cliques
+of the preceding output, even those subsequently removed by paring.
+It does not construct the edges of level n. ``seq.raw_iterate(n)``
+constructs the graph before paring. ``seq.raw_label_map(n)`` and
+``seq.label_map(n)`` map raw and surviving labels, respectively, to cliques
+of the preceding output (to the original input labels at level zero).
+``seq.paring_certificate(n)`` records ordered deletions in raw labels.
+A successful replay verifies domination in the current induced subgraph
+at each deletion; compacting surviving integer labels is a separate
+isomorphism.
+
+The order and edge bounds are applied to the raw graph, not the pared
+output. A clique family can remain available even when the edge bound
+prevents materializing that level. Treat cached graphs as read-only.
+
+For homotopy investigations, write P_0 for the completely pared starting
+graph and P_{n+1} for the completely pared clique graph of P_n. Dominated
+vertex deletion preserves homotopy type and induces a dismantling
+reduction on clique graphs, so each P_n has the homotopy type of the
+corresponding unpared iterate. Neckties and other incidence-level
+properties of the actual iterates need not be preserved. A certificate
+for a particular nerve comparison should therefore use the raw graph
+and the clique family with the same labels.
+
+.. code-block:: python
+
+   import networkx as nx
+   from pycliques import CliqueSequence, dominates
+
+   seq = CliqueSequence(nx.path_graph(5), relabel=True, pare_initial=True)
+   raw = seq.raw_iterate(0).copy()
+   for v, w in seq.paring_certificate(0):
+       assert v != w and dominates(raw, w, v)
+       raw.remove_node(v)
+   assert nx.is_isomorphic(raw, seq[0])
+   assert seq[0].order() == 1
+
+For completeness, the dismantling reduction is local: if v is dominated
+by w in G, each maximal clique q containing v also contains w. If q
+without v is not maximal in G without v, extend it to a maximal clique
+p of G without v. Then p is also maximal in G, does not contain v, and
+dominates q as a vertex of K(G), since every clique meeting q also meets
+q without v. Delete all such q. The surviving cliques correspond
+bijectively to the maximal cliques of G without v by removing v, and
+their intersection relation is unchanged. Iterating proves the claim
+for complete paring and all subsequent iterates.
