@@ -324,9 +324,7 @@ def test_cached_constrained_closure_against_atlas_oracle():
 
 
 def test_projection_and_constrained_closure_validation():
-    index = ClosedNecktieIndex(
-        [{0, 1}, {1, 2}, {3}], lazy=True, cache_witnesses=True
-    )
+    index = ClosedNecktieIndex([{0, 1}, {1, 2}, {3}], lazy=True, cache_witnesses=True)
     assert index.projected_members(7, [1, 100]) == (frozenset({1}),) * 2
     assert not index.projected_members(7, [])
     assert index.projected_members(7, [0, 3]) == (frozenset({0}), frozenset({3}))
