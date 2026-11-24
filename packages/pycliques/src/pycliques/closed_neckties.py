@@ -24,6 +24,56 @@ def _indices(mask: int) -> Iterator[int]:
         mask ^= bit
 
 
+_Permutations = tuple[tuple[int, ...], ...]
+_BadState = tuple[int, int, int, _Permutations]
+
+
+def _image_mask(mask: int, perm: tuple[int, ...]) -> int:
+    """Permute a mask without summing thousands of large integers."""
+    data = mask.to_bytes((mask.bit_length() + 7) // 8, "little")
+    result = bytearray((len(perm) + 7) // 8)
+    for offset, byte in enumerate(data):
+        while byte:
+            bit = byte & -byte
+            j = perm[8 * offset + bit.bit_length() - 1]
+            result[j // 8] |= 1 << (j % 8)
+            byte ^= bit
+    return int.from_bytes(result, "little")
+
+
+def _mask_orbit(mask: int, perms: _Permutations) -> set[int]:
+    seen = {mask}
+    queue = [mask]
+    for current in queue:
+        for p in perms:
+            moved = _image_mask(current, p)
+            if moved not in seen:
+                seen.add(moved)
+                queue.append(moved)
+    return seen
+
+
+def _candidate_representatives(mask: int, perms: _Permutations) -> int:
+    """Minimum member of each orbit in an invariant candidate set."""
+    if not perms:
+        return mask
+    remaining = set(_indices(mask))
+    representatives = 0
+    for v in sorted(remaining):
+        if v not in remaining:
+            continue
+        representatives |= 1 << v
+        remaining.remove(v)
+        queue = [v]
+        for w in queue:
+            for p in perms:
+                moved = p[w]
+                if moved in remaining:
+                    remaining.remove(moved)
+                    queue.append(moved)
+    return representatives
+
+
 _T = TypeVar("_T")
 
 
@@ -259,6 +309,114 @@ class ClosedNecktieIndex:
         root = self._close_common(self.full, maximal)
         yield from self._closed_subsets(root, maximal, prune)
 
+def _bad_branch_plan(
+        self, current: int, upper: int, perms: _Permutations
+    ) -> tuple[int, int, _Permutations, bool]:
+        """Choose an invariant branching domain hitting every bad extension."""
+        active = tuple(
+            p
+            for p in perms
+            if _image_mask(current, p) == current and _image_mask(upper, p) == upper
+        )
+        candidates = upper & ~current
+        reps = _candidate_representatives(candidates, active)
+        common_stars = {
+            star & upper for star in self.stars.values() if star & current == current
+        }
+        if not common_stars:
+            return candidates, reps, active, True
+        if not active:
+            largest = max(common_stars, key=lambda s: (s.bit_count(), s))
+            domain = upper & ~largest
+            return domain, domain, active, False
+
+        # Every bad extension misses each common vertex somewhere. Taking
+        # an orbit of projected stars gives an invariant branch domain.
+        best = (reps.bit_count() + 1, candidates.bit_count() + 1, candidates)
+        while common_stars:
+            orbit = _mask_orbit(min(common_stars), active)
+            common_stars.difference_update(orbit)
+            joint = upper
+            for star in orbit:
+                joint &= star
+            domain = upper & ~joint
+            score = ((domain & reps).bit_count(), domain.bit_count(), domain)
+            best = min(best, score)
+        domain = best[2]
+        return domain, domain & reps, active, False
+
+    def _bad_children(
+        self,
+        current: int,
+        common: int,
+        upper: int,
+        domain: int,
+        reps: int,
+        perms: _Permutations,
+    ) -> Iterator[_BadState]:
+        for i in _indices(reps):
+            bit = 1 << i
+            # Exclude earlier members of the ENTIRE branching domain,
+            # not just its chosen orbit representatives. Retain all other
+            # candidates, even those with smaller indices.
+            allowed = upper & ~(domain & (bit - 1))
+            child_common = common & self.adjacency[i]
+            child = self._close_common(child_common, self.full, current | bit)
+            if child & ~allowed:
+                continue
+            yield child, child_common, allowed & child_common, perms
+
+    def bad_closed_containing(
+        self,
+        anchor: int,
+        *,
+        stabilizer_generators: Iterable[Iterable[int]] = (),
+        prune: Callable[[int, int], bool] | None = None,
+    ) -> Iterator[int]:
+        """Cover bad closed completes through an anchor without visiting all good ones.
+
+        With no stabilizer generators, yield every bad closed complete once.
+        With generators, yield an orbit cover, possibly with repeats across
+        orbits; every omitted bad complete has an equivalent represented one.
+        Generators must preserve incidence and fix the anchor. At each node
+        retain only supplied generators preserving its lower and upper masks;
+        this conservative subgroup need not be the full stabilizer.
+
+        At a good node, choose an orbit of common incidence stars. Every
+        bad extension must include a member outside their intersection.
+        At a bad node branch over all remaining candidates. Select minimum
+        representatives in the invariant branch domain. In each child forbid
+        only the earlier members of that domain, not all earlier indices.
+
+        The optional callback receives (closed, upper), also at good nodes.
+        A True return skips that whole interval. With pruning the orbit-cover
+        guarantee is relative to yielded nodes and callback-certified intervals.
+        """
+        if not 0 <= anchor < len(self.family):
+            raise ValueError("anchor out of range")
+        perms = self._validated_generators(stabilizer_generators)
+        if any(p[anchor] != anchor for p in perms):
+            raise ValueError("stabilizer generators must fix the anchor")
+        root = self.close(1 << anchor)
+        common = self.common(root)
+        stack: list[Iterator[_BadState]] = [iter(((root, common, common, perms),))]
+        while stack:
+            try:
+                current, common, upper, perms = next(stack[-1])
+            except StopIteration:
+                stack.pop()
+                continue
+            if prune is not None and prune(current, upper):
+                continue
+            domain, reps, active, bad = self._bad_branch_plan(current, upper, perms)
+            if bad:
+                yield current
+            if reps:
+                children = self._bad_children(
+                    current, common, upper, domain, reps, active
+                )
+                stack.append(children)
+
     def _validated_generators(
         self, generators: Iterable[Iterable[int]]
     ) -> tuple[tuple[int, ...], ...]:
@@ -268,7 +426,7 @@ class ClosedNecktieIndex:
         for perm in perms:
             if (
                 sorted(perm) != list(range(n))
-                or {sum(1 << perm[i] for i in _indices(s)) for s in stars} != stars
+                or {_image_mask(s, perm) for s in stars} != stars
             ):
                 raise ValueError("generators must preserve family incidence")
         return perms
