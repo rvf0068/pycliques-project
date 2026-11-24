@@ -153,11 +153,12 @@ def twin_classes(graph: nx.Graph) -> list[list[Hashable]]:
 
 
 def pared_graph(graph: nx.Graph) -> nx.Graph:
-    """Return the pared graph (one vertex per twin class, no dominated nodes).
+    """Return one representative per maximal closed-neighborhood class.
 
-    The operation keeps one representative from each twin class and removes
-    representatives that are dominated without being twins. The result is a
-    subgraph of the input graph.
+    The operation removes every strictly dominated closed-neighborhood
+    class and retains one representative of each remaining twin class.
+    The resulting induced subgraph need not be stiff: further paring can
+    become possible after this simultaneous step.
 
     This was defined in [Prisner92]_.
 
@@ -171,26 +172,16 @@ def pared_graph(graph: nx.Graph) -> nx.Graph:
     >>> sorted(pared_graph(nx.path_graph(4)).nodes())
     [1, 2]
     """
-    twins = twin_classes(graph)
+    neighborhoods = {v: closed_neighborhood(graph, v) for v in graph}
+    representatives: dict[frozenset[Hashable], Hashable] = {}
+    for vertex, neighborhood in neighborhoods.items():
+        representatives.setdefault(frozenset(neighborhood), vertex)
 
-    # Identify representatives
-    reps = [aclass[0] for aclass in twins]
-
-    nodes_to_keep = []
-    for vertex in reps:
-        if not is_dominated_vertex(graph, vertex):
-            nodes_to_keep.append(vertex)
-        else:
-            # The vertex is dominated; check if it is only dominated by a twin.
-            # Since is_dominated_vertex returned True, the call with
-            # return_dominator=True is guaranteed to return (True, dominator).
-            _, dominator = is_dominated_vertex(graph, vertex, return_dominator=True)
-            neigh_v = closed_neighborhood(graph, vertex)
-            neigh_dom = closed_neighborhood(graph, dominator)
-            # If neighborhoods match, they are twins -> keep representative
-            if neigh_v == neigh_dom:
-                nodes_to_keep.append(vertex)
-
+    nodes_to_keep = [
+        vertex
+        for vertex in representatives.values()
+        if not any(neighborhoods[vertex] < neighborhoods[w] for w in graph[vertex])
+    ]
     return graph.subgraph(nodes_to_keep).copy()
 
 
