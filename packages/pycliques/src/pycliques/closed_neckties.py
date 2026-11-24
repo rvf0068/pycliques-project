@@ -309,7 +309,7 @@ class ClosedNecktieIndex:
         root = self._close_common(self.full, maximal)
         yield from self._closed_subsets(root, maximal, prune)
 
-def _bad_branch_plan(
+    def _bad_branch_plan(
         self, current: int, upper: int, perms: _Permutations
     ) -> tuple[int, int, _Permutations, bool]:
         """Choose an invariant branching domain hitting every bad extension."""

@@ -213,3 +213,78 @@ def test_implicit_index_rejects_negative_cache():
     graph = ImplicitCliqueGraph.from_family([{0}])
     with pytest.raises(ValueError):
         ClosedNecktieIndex.from_implicit(graph, cache_size=-1)
+
+
+def test_adaptive_bad_search_against_literal_intersections():
+    for base in nx.graph_atlas_g():
+        if len(base) > 6:
+            break
+        family = list(map(frozenset, nx.find_cliques(base)))
+        index = ClosedNecktieIndex(family, lazy=True)
+        graph = nx.Graph()
+        graph.add_nodes_from(range(len(family)))
+        graph.add_edges_from(
+            (i, j) for i, j in combinations(graph, 2) if family[i] & family[j]
+        )
+        maximal = [set(q) for q in nx.find_cliques(graph)]
+        bad = set()
+        for complete in nx.enumerate_all_cliques(graph):
+            closed = set.intersection(*(q for q in maximal if set(complete) <= q))
+            if not set.intersection(*(set(family[i]) for i in closed)):
+                bad.add(sum(1 << i for i in closed))
+        for anchor in graph:
+            want = {m for m in bad if m & (1 << anchor)}
+            got = list(index.bad_closed_containing(anchor))
+            assert set(got) == want
+            assert len(got) == len(want)
+
+
+def test_adaptive_symmetry_cover_and_pruning():
+    base = nx.octahedral_graph()
+    family = list(map(frozenset, nx.find_cliques(base)))
+    index = ClosedNecktieIndex(family)
+    ids = {q: i for i, q in enumerate(family)}
+    perms = [
+        tuple(ids[frozenset(p[v] for v in q)] for q in family)
+        for p in nx.algorithms.isomorphism.GraphMatcher(base, base).isomorphisms_iter()
+    ]
+    for anchor in range(len(family)):
+        stabilizers = [p for p in perms if p[anchor] == anchor]
+        expected = {m for m in index.closed_containing(anchor) if index.is_bad(m)}
+        search = index.bad_closed_containing(anchor, stabilizer_generators=stabilizers)
+        got = set(search)
+        assert got <= expected
+        for m in expected:
+            images = {
+                sum(1 << p[i] for i in range(len(family)) if m & (1 << i))
+                for p in stabilizers
+            }
+            assert images & got
+
+        intervals = []
+
+        def prune(m, e):
+            if m.bit_count() >= 2 and m % 3 == 0:
+                intervals.append((m, e))
+                return True
+            return False
+
+        got = set(
+            index.bad_closed_containing(
+                anchor, stabilizer_generators=stabilizers, prune=prune
+            )
+        )
+        for m in expected:
+            images = {
+                sum(1 << p[i] for i in range(len(family)) if m & (1 << i))
+                for p in stabilizers
+            }
+            assert images & got or any(
+                a & x == a and x & b == x for x in images for a, b in intervals
+            )
+
+    moving = next(p for p in perms if p[0] != 0)
+    with pytest.raises(ValueError):
+        list(index.bad_closed_containing(0, stabilizer_generators=[moving]))
+    with pytest.raises(ValueError):
+        list(index.bad_closed_containing(-1))
