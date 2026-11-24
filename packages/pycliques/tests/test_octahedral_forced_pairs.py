@@ -159,15 +159,18 @@ def test_forced_pairs_exceed_requested_target_dimension() -> None:
 def test_no_forced_pair_fallback_finds_and_exhausts() -> None:
     """The ordinary completion search must remain complete without forcing.
 
-    In the complement, C5 has no induced matching of two edges, whereas
-    C6 and C7 do have a vertex-dominating induced matching of two edges.
-    All cycles have minimum degree two, so neither isolated-vertex nor
-    compulsory-pair propagation can settle the initial residual.
+    In the complement, C5 has no induced matching of two edges, C6 and
+    C7 admit dominating induced matchings of two edges, C8 cannot have
+    three, and C9 does admit three. All cycles have minimum degree two;
+    neither isolated-vertex nor compulsory-pair propagation settles the
+    initial residual.
     """
-    for length, expected in (
-        (5, OctahedralBlindStatus.EXHAUSTED),
-        (6, OctahedralBlindStatus.FOUND),
-        (7, OctahedralBlindStatus.FOUND),
+    for length, target_dimension, expected in (
+        (5, 3, OctahedralBlindStatus.EXHAUSTED),
+        (6, 3, OctahedralBlindStatus.FOUND),
+        (7, 3, OctahedralBlindStatus.FOUND),
+        (8, 4, OctahedralBlindStatus.EXHAUSTED),
+        (9, 4, OctahedralBlindStatus.FOUND),
     ):
         complement = nx.disjoint_union(nx.complete_graph(2), nx.cycle_graph(length))
         graph = nx.complement(complement)
@@ -175,13 +178,13 @@ def test_no_forced_pair_fallback_finds_and_exhausts() -> None:
         screen = screen_forced_pairs(_nonedge(graph), common)
         assert screen.possible and screen.forced_pairs == ()
         result = complete_dominating_octahedron(
-            graph, [(0, 1)], target_dimension=3, max_states=10000
+            graph, [(0, 1)], target_dimension=target_dimension, max_states=10000
         )
         assert result.status is expected
-        assert result.states_explored > 1
         if result.status is OctahedralBlindStatus.FOUND:
+            assert result.states_explored > 1
             assert result.antipodal_pairs is not None
-            assert len(result.antipodal_pairs) == 3
+            assert len(result.antipodal_pairs) == target_dimension
 
     # A target dimension too large for C6 is excluded by the ordinary
     # exact search, rather than by the forced-pair screen.
