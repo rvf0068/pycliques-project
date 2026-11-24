@@ -21,6 +21,14 @@ class UniformStrongCollapseCertificate:
     apex: Hashable
 
 
+@dataclass(frozen=True)
+class UniformStrongCollapseReduction:
+    """Verified-capable prefix, with a complete certificate if a cone was found."""
+
+    moves: tuple[Move, ...]
+    certificate: UniformStrongCollapseCertificate | None
+
+
 def _normalize(
     fixed: Iterable[Iterable[Hashable]],
     possible: Iterable[Iterable[Hashable]],
@@ -42,17 +50,18 @@ def _effective(fixed: Family, possible: Family) -> Family:
     return (maximal | optional) - {frozenset()}
 
 
-def uniform_strong_collapse_certificate(
+def uniform_strong_collapse_reduction(
     fixed: Iterable[Iterable[Hashable]],
     possible: Iterable[Iterable[Hashable]],
-) -> UniformStrongCollapseCertificate | None:
-    """Find a uniform strong collapse of every intermediate family.
+) -> UniformStrongCollapseReduction:
+    """Find a uniform strong-collapse prefix on an interval.
 
     Discard possible faces contained in a mandatory face, retaining maximal
     mandatory faces. In the resulting effective family, inclusion of the
     incidence pattern of v in that of w permits deletion of v uniformly.
     Repeat after restricting to the surviving vertices. A common vertex of
-    the effective family is a uniform cone apex. None is inconclusive.
+    the effective family is a uniform cone apex. If no cone is found, retain
+    the prefix; its moves still preserve every intermediate homotopy type.
 
     Inputs are nonempty families of nonempty sets, with fixed contained in
     possible as families. Duplicate sets are immaterial. The ordinary
@@ -77,7 +86,8 @@ def uniform_strong_collapse_certificate(
         for v in order:
             pattern = incidence[v]
             if pattern == full:
-                return UniformStrongCollapseCertificate(tuple(moves), v)
+                cert = UniformStrongCollapseCertificate(tuple(moves), v)
+                return UniformStrongCollapseReduction(tuple(moves), cert)
             for w in retained:
                 if pattern & incidence[w] == pattern:
                     moves.append((v, w))
@@ -86,9 +96,59 @@ def uniform_strong_collapse_certificate(
             else:
                 retained.append(v)
         if not removed:
-            return None
+            return UniformStrongCollapseReduction(tuple(moves), None)
         m = _project(m, removed)
         e = _project(e, removed)
+
+
+def uniform_strong_collapse_certificate(
+    fixed: Iterable[Iterable[Hashable]],
+    possible: Iterable[Iterable[Hashable]],
+) -> UniformStrongCollapseCertificate | None:
+    """Find a uniform collapse to a cone; None means inconclusive.
+
+    Use uniform_strong_collapse_reduction to retain partial moves on failure.
+    """
+    return uniform_strong_collapse_reduction(fixed, possible).certificate
+
+
+def _replay_uniform_prefix(
+    m: Family, e: Family, moves: Iterable[Move]
+) -> tuple[Family, Family] | None:
+    live: set[Hashable] = set().union(*e)
+    for move in moves:
+        if not isinstance(move, (tuple, list)) or len(move) != 2:
+            return None
+        v, w = move
+        if v == w or v not in live or w not in live:
+            return None
+        containing = [g for g in m if w in g]
+        for f in e:
+            if v in f and w not in f and not any(f <= g for g in containing):
+                return None
+        live.remove(v)
+        m = _project(m, {v})
+        e = _project(e, {v})
+    return m, e
+
+
+def verify_uniform_strong_collapse_prefix(
+    fixed: Iterable[Iterable[Hashable]],
+    possible: Iterable[Iterable[Hashable]],
+    moves: Iterable[Move],
+) -> bool:
+    """Replay moves without requiring a cone endpoint.
+
+    The same direct containment check as for a full certificate is used.
+    A valid prefix also works on every nested interval, skipping a move
+    if its removed vertex is absent. Projecting its fixed and possible
+    families onto the surviving vertices permits further certified moves.
+    """
+    try:
+        m, e = _normalize(fixed, possible)
+        return _replay_uniform_prefix(m, e, moves) is not None
+    except (TypeError, ValueError):
+        return False
 
 
 def verify_uniform_strong_collapse_certificate(
@@ -108,20 +168,10 @@ def verify_uniform_strong_collapse_certificate(
         return False
     try:
         m, e = _normalize(fixed, possible)
-        live: set[Hashable] = set().union(*e)
-        for move in certificate.moves:
-            if not isinstance(move, (tuple, list)) or len(move) != 2:
-                return False
-            v, w = move
-            if v == w or v not in live or w not in live:
-                return False
-            containing = [g for g in m if w in g]
-            for f in e:
-                if v in f and w not in f and not any(f <= g for g in containing):
-                    return False
-            live.remove(v)
-            m = _project(m, {v})
-            e = _project(e, {v})
+        projected = _replay_uniform_prefix(m, e, certificate.moves)
+        if projected is None:
+            return False
+        m, e = projected
         apex = certificate.apex
         containing = [g for g in m if apex in g]
         return bool(containing) and all(
