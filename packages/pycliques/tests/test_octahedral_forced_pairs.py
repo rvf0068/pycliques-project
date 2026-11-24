@@ -154,3 +154,44 @@ def test_forced_pairs_exceed_requested_target_dimension() -> None:
         graph, [(0, 1)], target_dimension=2, max_states=100
     )
     assert result.status is OctahedralBlindStatus.EXHAUSTED
+
+
+def test_no_forced_pair_fallback_finds_and_exhausts() -> None:
+    """The ordinary completion search must remain complete without forcing.
+
+    In the complement, C5 has no induced matching of two edges, whereas
+    C6 and C7 do have a vertex-dominating induced matching of two edges.
+    All cycles have minimum degree two, so neither isolated-vertex nor
+    compulsory-pair propagation can settle the initial residual.
+    """
+    for length, expected in (
+        (5, OctahedralBlindStatus.EXHAUSTED),
+        (6, OctahedralBlindStatus.FOUND),
+        (7, OctahedralBlindStatus.FOUND),
+    ):
+        complement = nx.disjoint_union(
+            nx.complete_graph(2), nx.cycle_graph(length)
+        )
+        graph = nx.complement(complement)
+        common = ((1 << len(graph)) - 1) & ~3
+        screen = screen_forced_pairs(_nonedge(graph), common)
+        assert screen.possible and screen.forced_pairs == ()
+        result = complete_dominating_octahedron(
+            graph, [(0, 1)], target_dimension=3, max_states=10000
+        )
+        assert result.status is expected
+        assert result.states_explored > 1
+        if result.status is OctahedralBlindStatus.FOUND:
+            assert result.antipodal_pairs is not None
+            assert len(result.antipodal_pairs) == 3
+
+    # A target dimension too large for C6 is excluded by the ordinary
+    # exact search, rather than by the forced-pair screen.
+    complement = nx.disjoint_union(
+        nx.complete_graph(2), nx.cycle_graph(6)
+    )
+    graph = nx.complement(complement)
+    overlarge = complete_dominating_octahedron(
+        graph, [(0, 1)], target_dimension=4, max_states=10000
+    )
+    assert overlarge.status is OctahedralBlindStatus.EXHAUSTED
