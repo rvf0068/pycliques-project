@@ -183,9 +183,7 @@ class ImplicitCliqueGraph:
         closed = self._closed(q, self.active_mask)
         return self._meeting_family_mask(closed, self.active_mask) & ~closed
 
-    def universal_common_neighborhood_partners_mask(
-        self, q: int, p: int
-    ) -> int:
+    def universal_common_neighborhood_partners_mask(self, q: int, p: int) -> int:
         """Find all nonneighbors r of q for which p is a universal witness.
 
         The witness p must belong to the common open neighborhood of q and r
