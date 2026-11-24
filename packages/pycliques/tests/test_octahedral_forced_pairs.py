@@ -6,7 +6,6 @@ import random
 from itertools import combinations
 
 import networkx as nx
-
 from pycliques.octahedral_blind import (
     OctahedralBlindStatus,
     complete_dominating_octahedron,
