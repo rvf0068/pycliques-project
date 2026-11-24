@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import itertools
 import math
-from collections.abc import Hashable
+from collections.abc import Hashable, Iterable
 from functools import lru_cache, singledispatch
 from math import comb
 from typing import TypeAlias
@@ -121,6 +121,15 @@ def clique_graph(
     if indexed is None:
         return None
     cliques, cliques_of = indexed
+    return _clique_graph_from_index(cliques, cliques_of, max_edges)
+
+
+def _clique_graph_from_index(
+    cliques: Iterable[Clique],
+    cliques_of: dict[Hashable, set[Clique]],
+    max_edges: int | None,
+) -> nx.Graph | None:
+    """Build an intersection graph from a previously enumerated clique family."""
     clique_graph = nx.Graph()
     clique_graph.add_nodes_from(cliques)
 
