@@ -6,7 +6,7 @@ No adjacency matrix or edge list of the clique graph is stored.
 
 from __future__ import annotations
 
-from collections.abc import Hashable, Iterator
+from collections.abc import Hashable, Iterable, Iterator
 from dataclasses import dataclass
 
 import networkx as nx
@@ -25,7 +25,7 @@ def _bits(mask: int) -> Iterator[int]:
 class ImplicitCliqueGraph:
     """An induced subgraph of a clique intersection graph.
 
-    Construct with from_graph. IDs are positions in clique_masks; paring
+    Construct with from_graph or from_family. IDs index clique_masks; paring
     preserves those IDs and all original incidence data. Base vertices
     may be arbitrary hashable NetworkX labels.
     """
@@ -53,6 +53,36 @@ class ImplicitCliqueGraph:
                 return None
             masks.append(sum(1 << positions[v] for v in clique))
         masks.sort()
+        return cls._from_masks(labels, masks)
+
+    @classmethod
+    def from_family(
+        cls, family: Iterable[Iterable[Hashable]]
+    ) -> ImplicitCliqueGraph:
+        """Build the intersection graph of a supplied nonempty-set family.
+
+        Member IDs follow input order, with base labels in first-seen order.
+        Distinct nonempty members are required. The caller is responsible
+        for supplying the full maximal-clique family when representing K(G).
+        No maximal-clique enumeration or explicit edge construction occurs.
+        """
+        positions: dict[Hashable, int] = {}
+        masks: list[int] = []
+        seen: set[int] = set()
+        for member in family:
+            mask = 0
+            for v in member:
+                mask |= 1 << positions.setdefault(v, len(positions))
+            if not mask or mask in seen:
+                raise ValueError("family must consist of distinct nonempty sets")
+            seen.add(mask)
+            masks.append(mask)
+        return cls._from_masks(tuple(positions), masks)
+
+    @classmethod
+    def _from_masks(
+        cls, labels: tuple[Hashable, ...], masks: list[int]
+    ) -> ImplicitCliqueGraph:
         # Build incidence via bytearrays instead of repeatedly copying
         # large Python integers once for every clique incidence.
         width = (len(masks) + 7) // 8
@@ -62,6 +92,11 @@ class ImplicitCliqueGraph:
                 incidence_bytes[v][i // 8] |= 1 << (i % 8)
         incidence = tuple(int.from_bytes(row, "little") for row in incidence_bytes)
         return cls(labels, tuple(masks), (1 << len(masks)) - 1, incidence)
+
+    @property
+    def incidence_masks(self) -> tuple[int, ...]:
+        """Incidence stars in base-label order, including inactive member IDs."""
+        return self._incidence
 
     def __len__(self) -> int:
         return self.active_mask.bit_count()
