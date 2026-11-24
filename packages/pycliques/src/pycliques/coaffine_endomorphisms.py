@@ -86,9 +86,7 @@ def find_coaffine_endomorphism(
     n = len(nodes)
     positions = {v: i for i, v in enumerate(nodes)}
     neighbors = [tuple(positions[w] for w in graph[v]) for v in nodes]
-    closed = [
-        (1 << i) | sum(1 << j for j in row) for i, row in enumerate(neighbors)
-    ]
+    closed = [(1 << i) | sum(1 << j for j in row) for i, row in enumerate(neighbors)]
     full = (1 << n) - 1
     domains = [full ^ mask for mask in closed]
     states = assignments = revisions = 0
@@ -137,9 +135,7 @@ def find_coaffine_endomorphism(
         states += 1
         undecided = [i for i, mask in enumerate(d) if mask.bit_count() > 1]
         if not undecided:
-            return {
-                nodes[i]: nodes[mask.bit_length() - 1] for i, mask in enumerate(d)
-            }
+            return {nodes[i]: nodes[mask.bit_length() - 1] for i, mask in enumerate(d)}
         x = min(undecided, key=lambda i: (d[i].bit_count(), -len(neighbors[i])))
         choices = d[x]
         while choices:
