@@ -1,7 +1,6 @@
 """Tests for the facet-indexed relative collapse engine."""
 
 import pytest
-
 from pycombtop.indexed_relative_collapse import (
     indexed_relative_collapse,
     verify_indexed_relative_collapse,

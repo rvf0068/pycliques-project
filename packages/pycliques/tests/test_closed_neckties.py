@@ -4,7 +4,6 @@ from itertools import combinations
 
 import networkx as nx
 import pytest
-
 from pycliques.closed_neckties import ClosedNecktieIndex, check_closed_centers
 from pycliques.homotopy_invariance import is_center
 from pycliques.poset_homotopy import h_closure_from_neighbors
