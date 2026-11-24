@@ -6,9 +6,15 @@ homotopy criterion of Larrion--Neumann-Lara--Pizana (as stated in Theorem
 The index itself works for arbitrary distinct nonempty sets.
 """
 
+from __future__ import annotations
+
 from collections import defaultdict
-from collections.abc import Callable, Hashable, Iterable, Iterator
+from collections.abc import Callable, Hashable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
+from functools import lru_cache
+from typing import Generic, TypeVar, overload
+
+from .implicit_clique_graph import ImplicitCliqueGraph
 
 
 def _indices(mask: int) -> Iterator[int]:
@@ -18,14 +24,57 @@ def _indices(mask: int) -> Iterator[int]:
         mask ^= bit
 
 
+_T = TypeVar("_T")
+
+
+class _IndexedSequence(Sequence[_T], Generic[_T]):
+    """Read-only, optionally cached sequence without materializing all items."""
+
+    def __init__(self, size: int, get: Callable[[int], _T]) -> None:
+        self._size = size
+        self._get = get
+
+    def __len__(self) -> int:
+        return self._size
+
+    @overload
+    def __getitem__(self, index: int) -> _T: ...
+
+    @overload
+    def __getitem__(self, index: slice) -> tuple[_T, ...]: ...
+
+    def __getitem__(self, index: int | slice) -> _T | tuple[_T, ...]:
+        if isinstance(index, slice):
+            return tuple(self._get(i) for i in range(*index.indices(self._size)))
+        if index < 0:
+            index += self._size
+        if not 0 <= index < self._size:
+            raise IndexError(index)
+        return self._get(index)
+
+
 class ClosedNecktieIndex:
     """Index a family in input order, using integer masks for its subfamilies.
 
-    No NetworkX intersection graph or maximal cliques of that graph are
-    constructed. Incidence stars and closed neighborhoods are indexed once.
+    No NetworkX intersection graph is constructed. Incidence stars are
+    indexed once; neighborhoods can be eager or lazily cached.
     """
 
-    def __init__(self, family: Iterable[Iterable[Hashable]]) -> None:
+    def __init__(
+        self,
+        family: Iterable[Iterable[Hashable]],
+        *,
+        lazy: bool = False,
+        cache_size: int = 256,
+    ) -> None:
+        """Use lazy=True to keep only incidence and a bounded neighborhood cache."""
+        if cache_size < 0:
+            raise ValueError("cache_size must be nonnegative")
+        self.family: Sequence[frozenset[Hashable]]
+        self.adjacency: Sequence[int]
+        if lazy:
+            self._init_implicit(ImplicitCliqueGraph.from_family(family), cache_size)
+            return
         self.family = tuple(frozenset(q) for q in family)
         if any(not q for q in self.family) or len(set(self.family)) != len(self.family):
             raise ValueError("family must consist of distinct nonempty sets")
@@ -35,6 +84,32 @@ class ClosedNecktieIndex:
             for v in q:
                 self.stars[v] |= 1 << i
         self.adjacency = tuple(self._union(q) for q in self.family)
+
+    @classmethod
+    def from_implicit(
+        cls, graph: ImplicitCliqueGraph, *, cache_size: int = 256
+    ) -> ClosedNecktieIndex:
+        """Share an implicit graph's incidence; decode members only as needed.
+
+        A full, unpared implicit graph is required, to retain contiguous
+        member IDs. The caller must supply the full maximal-clique family
+        for applications of the homotopy criterion.
+        """
+        result = cls.__new__(cls)
+        result._init_implicit(graph, cache_size)
+        return result
+
+    def _init_implicit(self, graph: ImplicitCliqueGraph, cache_size: int) -> None:
+        if cache_size < 0:
+            raise ValueError("cache_size must be nonnegative")
+        n = len(graph.clique_masks)
+        self.full = (1 << n) - 1
+        if graph.active_mask != self.full:
+            raise ValueError("expected a full unpared implicit family")
+        self.stars = dict(zip(graph.base_vertices, graph.incidence_masks, strict=True))
+        self.family = _IndexedSequence(n, graph.clique)
+        lookup = lru_cache(maxsize=cache_size)(graph.closed_neighborhood_mask)
+        self.adjacency = _IndexedSequence(n, lookup)
 
     def _union(self, vertices: Iterable[Hashable]) -> int:
         result = 0
@@ -63,12 +138,20 @@ class ClosedNecktieIndex:
         common = self.common(mask)
         if mask & common != mask:
             raise ValueError("expected a complete mask")
-        return self._close_common(common, self.full)
+        return self._close_common(common, self.full, mask)
 
-    def _close_common(self, common: int, within: int) -> int:
-        neighbors = self.adjacency
-        candidates = _indices(common & within)
-        return sum(1 << i for i in candidates if neighbors[i] & common == common)
+    def _close_common(self, common: int, within: int, known: int = 0) -> int:
+        # A nonneighbor of any candidate in common cannot be universal.
+        # Always test against the original common, never a shrinking subset.
+        universal = known & within
+        candidates = common & within & ~universal
+        while candidates:
+            bit = candidates & -candidates
+            disjoint = common & ~self.adjacency[bit.bit_length() - 1]
+            if not disjoint:
+                universal |= bit
+            candidates &= ~(bit | disjoint)
+        return universal
 
     def is_bad(self, mask: int) -> bool:
         """Whether the nonempty subfamily has empty total intersection."""
@@ -135,7 +218,7 @@ class ClosedNecktieIndex:
             bit = candidates & -candidates
             stack.append((current, common, candidates ^ bit))
             child_common = common & self.adjacency[bit.bit_length() - 1]
-            child = self._close_common(child_common, within)
+            child = self._close_common(child_common, within, current | bit)
             if (child & ~current) & (bit - 1):
                 continue
             later = child_common & within & ~((bit << 1) - 1)
@@ -145,11 +228,17 @@ class ClosedNecktieIndex:
             yield child
             stack.append((child, child_common, later & ~child))
 
-    def closed_containing(self, anchor: int) -> Iterator[int]:
-        """Enumerate each closed complete containing the given index once."""
+    def closed_containing(
+        self, anchor: int, *, prune: Callable[[int, int], bool] | None = None
+    ) -> Iterator[int]:
+        """Enumerate closed completes containing anchor, optionally pruning.
+
+        The callback has the same interval semantics as closed_within.
+        Here the upper family need not be a complete.
+        """
         if not 0 <= anchor < len(self.family):
             raise ValueError("anchor out of range")
-        yield from self._closed_subsets(self.close(1 << anchor), self.full)
+        yield from self._closed_subsets(self.close(1 << anchor), self.full, prune)
 
     def closed_within(
         self,
@@ -199,8 +288,17 @@ class ClosedNecktieIndex:
             remaining -= orbit
             yield anchor
 
-    def closed_representatives(
+    def vertex_orbit_representatives(
         self, generators: Iterable[Iterable[int]] = ()
+    ) -> Iterator[int]:
+        """Yield one member ID per orbit, after validating incidence symmetry."""
+        yield from self._vertex_orbit_reps(self._validated_generators(generators))
+
+    def closed_representatives(
+        self,
+        generators: Iterable[Iterable[int]] = (),
+        *,
+        prune: Callable[[int, int], bool] | None = None,
     ) -> Iterator[int]:
         """Cover all closed completes using representatives of vertex orbits.
 
@@ -211,15 +309,17 @@ class ClosedNecktieIndex:
         """
         perms = self._validated_generators(generators)
         for anchor in self._vertex_orbit_reps(perms):
-            yield from self.closed_containing(anchor)
+            yield from self.closed_containing(anchor, prune=prune)
 
     def _maximal_completes(self, anchor: int | None = None) -> Iterator[int]:
         """Pivoted Bron-Kerbosch on the existing neighborhood bitsets."""
-        neighbors = tuple(a & ~(1 << i) for i, a in enumerate(self.adjacency))
+        def neighbors(i: int) -> int:
+            return self.adjacency[i] & ~(1 << i)
+
         if anchor is None:
             stack = [(0, self.full, 0)]
         else:
-            stack = [(1 << anchor, neighbors[anchor], 0)]
+            stack = [(1 << anchor, neighbors(anchor), 0)]
         while stack:
             chosen, candidates, excluded = stack.pop()
             if not candidates:
@@ -227,10 +327,10 @@ class ClosedNecktieIndex:
                     yield chosen
                 continue
             pivots = _indices(candidates | excluded)
-            pivot = max(pivots, key=lambda i: (candidates & neighbors[i]).bit_count())
-            for i in _indices(candidates & ~neighbors[pivot]):
+            pivot = max(pivots, key=lambda i: (candidates & neighbors(i)).bit_count())
+            for i in _indices(candidates & ~neighbors(pivot)):
                 bit = 1 << i
-                near = neighbors[i]
+                near = neighbors(i)
                 stack.append((chosen | bit, candidates & near, excluded & near))
                 candidates &= ~bit
                 excluded |= bit
