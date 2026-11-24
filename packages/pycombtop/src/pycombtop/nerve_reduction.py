@@ -73,9 +73,7 @@ def alternating_nerve_reduction(facets: Iterable[int]) -> NerveReduction:
     return NerveReduction(current, tuple(counts))
 
 
-def verify_nerve_reduction(
-    facets: Iterable[int], certificate: NerveReduction
-) -> bool:
+def verify_nerve_reduction(facets: Iterable[int], certificate: NerveReduction) -> bool:
     """Replay by explicit set incidences, independently of the bitset dual."""
     try:
         masks = tuple(facets)
@@ -91,7 +89,7 @@ def verify_nerve_reduction(
         while len(current) > 1:
             old_count = len(current)
             for _ in range(2):
-                vertices = set().union(*current)
+                vertices: set[int] = set().union(*current)
                 incidence = {
                     frozenset(i for i, f in enumerate(current) if v in f)
                     for v in vertices
