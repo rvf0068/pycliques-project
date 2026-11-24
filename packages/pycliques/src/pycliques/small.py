@@ -248,16 +248,19 @@ def _sequence_vertex_key(vertex: Hashable) -> tuple:
     raise ValueError("unsupported label for relabeling; supply vertex_key")
 
 
-def _sequence_relabel(
-    graph: nx.Graph, vertices: list[Hashable]
-) -> nx.Graph:
+def _sequence_relabel(graph: nx.Graph, vertices: list[Hashable]) -> nx.Graph:
     """Number nodes in the given order, preserving graph attributes."""
     labels = {v: i for i, v in enumerate(vertices)}
     numbered = nx.relabel_nodes(graph, labels, copy=True)
     result = nx.Graph()
     result.graph.update(numbered.graph)
     result.add_nodes_from((i, numbered.nodes[i]) for i in range(len(vertices)))
-    result.add_edges_from(numbered.edges(data=True))
+    result.add_edges_from(
+        (u, v, numbered[u][v])
+        for u in range(len(vertices))
+        for v in sorted(numbered[u])
+        if u <= v
+    )
     return result
 
 

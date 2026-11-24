@@ -1326,7 +1326,8 @@ def test_sequence_stable_labeled_inputs_and_unpared_mode():
         b = CliqueSequence(second, relabel=True, pare=pare)
         for n in range(3):
             assert a[n] is not None and b[n] is not None
-            assert set(a[n]) == set(b[n])
+            assert list(a[n]) == list(b[n])
+            assert all(list(a[n][v]) == list(b[n][v]) for v in a[n])
             assert {frozenset(e) for e in a[n].edges} == {
                 frozenset(e) for e in b[n].edges
             }

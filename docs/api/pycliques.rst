@@ -266,3 +266,13 @@ and the clique family with the same labels.
        raw.remove_node(v)
    assert nx.is_isomorphic(raw, seq[0])
    assert seq[0].order() == 1
+
+For completeness, the dismantling reduction is local: if v is dominated
+by w in G, each maximal clique q containing v also contains w. If q
+without v is not maximal in G without v, extend it to a maximal clique
+p of G without v. Then p is also maximal in G, does not contain v, and
+dominates q as a vertex of K(G), since every clique meeting q also meets
+q without v. Delete all such q. The surviving cliques correspond
+bijectively to the maximal cliques of G without v by removing v, and
+their intersection relation is unchanged. Iterating proves the claim
+for complete paring and all subsequent iterates.
