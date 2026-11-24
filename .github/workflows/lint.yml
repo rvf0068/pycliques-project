@@ -30,7 +30,7 @@ jobs:
         run: uv run ruff check packages/
 
       - name: Ruff format check
-        run: uv run ruff format --check packages/ || (uv run ruff format --diff packages/pycliques/src/pycliques/octahedral_forced_pairs.py packages/pycliques/tests/test_octahedral_forced_pairs.py; exit 1)
+        run: uv run ruff format --check packages/
 
       - name: Mypy
         run: uv run mypy packages/
