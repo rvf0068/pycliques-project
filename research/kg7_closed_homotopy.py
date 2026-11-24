@@ -12,6 +12,7 @@ from itertools import combinations
 import networkx as nx
 
 from pycliques import ClosedNecktieIndex, check_closed_centers, clique_graph
+from pycombtop import check_closed_trace_contractibility
 from pycombtop.nerve_reduction import (
     alternating_nerve_reduction,
     verify_nerve_reduction,
@@ -57,11 +58,22 @@ def main():
     parser.add_argument("--max-checks", type=int, default=100_000)
     parser.add_argument("--iterate", type=int, default=2, choices=[0, 1, 2])
     parser.add_argument("--verify", action="store_true")
+    parser.add_argument("--uniform", action="store_true")
     args = parser.parse_args()
     if args.max_checks < 0:
         parser.error("--max-checks must be nonnegative")
     family, generators = family_and_generators(args.iterate)
     index = ClosedNecktieIndex(family)
+    if args.uniform:
+        result = check_closed_trace_contractibility(
+            index, generators=generators, max_nodes=args.max_checks
+        )
+        print(result, flush=True)
+        if result.proved:
+            print("PROVED: LPV08 Theorem 5.7 contractibility hypothesis")
+        else:
+            print("INCONCLUSIVE: incomplete enumeration or unresolved local complex")
+        return
     centers = check_closed_centers(
         index, generators=generators, max_checks=args.max_checks
     )

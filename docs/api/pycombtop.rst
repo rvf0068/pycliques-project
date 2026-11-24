@@ -93,3 +93,18 @@ or a relative-face budget exit is inconclusive.
    :members:
    :show-inheritance:
    :member-order: bysource
+
+
+Uniform strong collapses
+------------------------
+
+.. automodule:: pycombtop.strong_collapses
+   :members:
+   :undoc-members:
+
+Closed-trace contractibility
+----------------------------
+
+.. automodule:: pycombtop.closed_trace_contractibility
+   :members:
+   :undoc-members:

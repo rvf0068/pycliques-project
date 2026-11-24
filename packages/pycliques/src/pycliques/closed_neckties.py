@@ -7,7 +7,7 @@ The index itself works for arbitrary distinct nonempty sets.
 """
 
 from collections import defaultdict
-from collections.abc import Hashable, Iterable, Iterator
+from collections.abc import Callable, Hashable, Iterable, Iterator
 from dataclasses import dataclass
 
 
@@ -63,9 +63,12 @@ class ClosedNecktieIndex:
         common = self.common(mask)
         if mask & common != mask:
             raise ValueError("expected a complete mask")
+        return self._close_common(common, self.full)
+
+    def _close_common(self, common: int, within: int) -> int:
         neighbors = self.adjacency
-        universal = (i for i in _indices(common) if neighbors[i] & common == common)
-        return sum(1 << i for i in universal)
+        candidates = _indices(common & within)
+        return sum(1 << i for i in candidates if neighbors[i] & common == common)
 
     def is_bad(self, mask: int) -> bool:
         """Whether the nonempty subfamily has empty total intersection."""
@@ -111,40 +114,65 @@ class ClosedNecktieIndex:
                 maximal.append(pattern)
         return tuple(maximal)
 
-    def closed_containing(self, anchor: int) -> Iterator[int]:
-        """Enumerate each closed complete containing the given index once.
-
-        Close-by-One: an extension by index i is canonical exactly when the
-        closure introduces no new index smaller than i. Only vertices in the
-        current common closed neighborhood can extend a complete.
-        """
-        if not 0 <= anchor < len(self.family):
-            raise ValueError("anchor out of range")
-        root = self.close(1 << anchor)
-        stack = [(root, self.common(root) & ~root)]
-        yield root
+    def _closed_subsets(
+        self,
+        root: int,
+        within: int,
+        prune: Callable[[int, int], bool] | None = None,
+    ) -> Iterator[int]:
+        """Canonical augmentation with global closure and a restricted domain."""
+        common = self.common(root) if root else self.full
+        upper = common & within
+        if root:
+            if prune is not None and prune(root, upper):
+                return
+            yield root
+        stack = [(root, common, upper & ~root)]
         while stack:
-            current, candidates = stack.pop()
+            current, common, candidates = stack.pop()
             if not candidates:
                 continue
             bit = candidates & -candidates
-            stack.append((current, candidates ^ bit))
-            child = self.close(current | bit)
+            stack.append((current, common, candidates ^ bit))
+            child_common = common & self.adjacency[bit.bit_length() - 1]
+            child = self._close_common(child_common, within)
             if (child & ~current) & (bit - 1):
                 continue
+            later = child_common & within & ~((bit << 1) - 1)
+            upper = child | later
+            if prune is not None and prune(child, upper):
+                continue
             yield child
-            stack.append((child, self.common(child) & ~child & ~((bit << 1) - 1)))
+            stack.append((child, child_common, later & ~child))
 
-    def closed_representatives(
-        self, generators: Iterable[Iterable[int]] = ()
+    def closed_containing(self, anchor: int) -> Iterator[int]:
+        """Enumerate each closed complete containing the given index once."""
+        if not 0 <= anchor < len(self.family):
+            raise ValueError("anchor out of range")
+        yield from self._closed_subsets(self.close(1 << anchor), self.full)
+
+    def closed_within(
+        self,
+        maximal: int,
+        *,
+        prune: Callable[[int, int], bool] | None = None,
     ) -> Iterator[int]:
-        """Cover all closed completes using representatives of vertex orbits.
+        """Enumerate nonempty closed completes within a maximal complete.
 
-        Each supplied permutation must preserve the set of incidence stars;
-        graph automorphisms alone need not preserve the original nerve.
-        Completes can recur across anchors. With no generators every vertex
-        is an anchor.
+        Closure is computed in the whole intersection graph, not the induced
+        complete. The optional callback receives (closed, upper), masks with
+        closed contained in upper. Returning True skips this node and all
+        its canonical descendants, each of which lies in that interval.
+        The caller must justify any pruning; without it this is exhaustive.
         """
+        if self.common(maximal) != maximal:
+            raise ValueError("expected a maximal complete")
+        root = self._close_common(self.full, maximal)
+        yield from self._closed_subsets(root, maximal, prune)
+
+    def _validated_generators(
+        self, generators: Iterable[Iterable[int]]
+    ) -> tuple[tuple[int, ...], ...]:
         n = len(self.family)
         perms = tuple(tuple(p) for p in generators)
         stars = set(self.stars.values())
@@ -154,7 +182,10 @@ class ClosedNecktieIndex:
                 or {sum(1 << perm[i] for i in _indices(s)) for s in stars} != stars
             ):
                 raise ValueError("generators must preserve family incidence")
-        remaining = set(range(n))
+        return perms
+
+    def _vertex_orbit_reps(self, perms: tuple[tuple[int, ...], ...]) -> Iterator[int]:
+        remaining = set(range(len(self.family)))
         while remaining:
             anchor = min(remaining)
             orbit = {anchor}
@@ -166,7 +197,75 @@ class ClosedNecktieIndex:
                         orbit.add(w)
                         queue.append(w)
             remaining -= orbit
+            yield anchor
+
+    def closed_representatives(
+        self, generators: Iterable[Iterable[int]] = ()
+    ) -> Iterator[int]:
+        """Cover all closed completes using representatives of vertex orbits.
+
+        Each supplied permutation must preserve the set of incidence stars;
+        graph automorphisms alone need not preserve the original nerve.
+        Completes can recur across anchors. With no generators every vertex
+        is an anchor.
+        """
+        perms = self._validated_generators(generators)
+        for anchor in self._vertex_orbit_reps(perms):
             yield from self.closed_containing(anchor)
+
+    def _maximal_completes(self, anchor: int | None = None) -> Iterator[int]:
+        """Pivoted Bron-Kerbosch on the existing neighborhood bitsets."""
+        neighbors = tuple(a & ~(1 << i) for i, a in enumerate(self.adjacency))
+        if anchor is None:
+            stack = [(0, self.full, 0)]
+        else:
+            stack = [(1 << anchor, neighbors[anchor], 0)]
+        while stack:
+            chosen, candidates, excluded = stack.pop()
+            if not candidates:
+                if chosen and not excluded:
+                    yield chosen
+                continue
+            pivots = _indices(candidates | excluded)
+            pivot = max(pivots, key=lambda i: (candidates & neighbors[i]).bit_count())
+            for i in _indices(candidates & ~neighbors[pivot]):
+                bit = 1 << i
+                near = neighbors[i]
+                stack.append((chosen | bit, candidates & near, excluded & near))
+                candidates &= ~bit
+                excluded |= bit
+
+    def maximal_complete_orbits(
+        self, generators: Iterable[Iterable[int]] = ()
+    ) -> Iterator[tuple[int, int]]:
+        """Yield (maximal complete mask, orbit size) under incidence symmetries.
+
+        Enumerate maximal completes through vertex-orbit representatives,
+        then generate their full orbits by the supplied permutations. Every
+        maximal complete belongs to exactly one yielded orbit. With no
+        generators, yield all maximal completes with orbit size one.
+        """
+        perms = self._validated_generators(generators)
+        if not perms:
+            for maximal in self._maximal_completes():
+                yield maximal, 1
+            return
+        remaining: set[int] = set()
+        for anchor in self._vertex_orbit_reps(perms):
+            remaining.update(self._maximal_completes(anchor))
+        while remaining:
+            maximal = remaining.pop()
+            orbit = {maximal}
+            queue = [maximal]
+            for mask in queue:
+                indices = tuple(_indices(mask))
+                for perm in perms:
+                    image = sum(1 << perm[i] for i in indices)
+                    if image not in orbit:
+                        orbit.add(image)
+                        queue.append(image)
+                        remaining.discard(image)
+            yield min(orbit), len(orbit)
 
 
 @dataclass(frozen=True)
