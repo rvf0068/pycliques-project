@@ -118,9 +118,7 @@ class ImplicitCliqueGraph:
 
     def number_of_edges(self) -> int:
         """Count edges exactly without constructing them."""
-        return sum(
-            self._closed(v, self.active_mask).bit_count() - 1 for v in self
-        ) // 2
+        return sum(self._closed(v, self.active_mask).bit_count() - 1 for v in self) // 2
 
     def to_networkx(self, *, max_edges: int | None = None) -> nx.Graph | None:
         """Materialize using stable integer IDs; refuse over-budget graphs."""
