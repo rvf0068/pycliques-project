@@ -289,3 +289,31 @@ def test_small_census_analysis_matches_direct_complex_computation():
         ]
         for free_face, coface in direct_collapse.pairs
     ]
+
+
+def test_closed_homotopy_driver_separates_center_and_contractibility(monkeypatch, capsys):
+    """Actual graph where all h-closures have contractible traces but no center
+    exists for some necktie. The two sufficient conditions are independent
+    in the sense that failure of the stronger does not refute the weaker.
+    """
+    import sys
+    import networkx as nx
+    from research import kg7_closed_homotopy as driver
+
+    graph = nx.from_graph6_bytes(b"Iy~s~V]ng")
+    family = list(map(frozenset, nx.find_cliques(graph)))
+    monkeypatch.setattr(driver, "family_and_generators", lambda _: (family, []))
+    monkeypatch.setattr(
+        sys, "argv", ["kg7_closed_homotopy", "--max-checks", "100000", "--verify"]
+    )
+    driver.main()
+    output = capsys.readouterr().out
+    assert "Center criterion fails" in output
+    assert "PROVED: LPV08 Theorem 5.7 contractibility hypothesis" in output
+    assert "INCONCLUSIVE:" not in output
+
+    monkeypatch.setattr(sys, "argv", ["kg7_closed_homotopy", "--max-checks", "0"])
+    driver.main()
+    output = capsys.readouterr().out
+    assert "INCONCLUSIVE:" in output
+    assert "PROVED:" not in output

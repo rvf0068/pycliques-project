@@ -605,3 +605,13 @@ def test_deletion_of_single_vertex_is_deletion():
 
     sc = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1, 2}])
     assert deletion(sc, {0}).facet_set == sc.deletion(0).facet_set
+
+
+def test_nerve_of_sets_large_incidence_family():
+    family = [{0, i} for i in range(1, 101)]
+    nerve = nerve_of_sets(family)
+    assert nerve.dimension() == 99
+    assert len(nerve.facet_set) == 1
+    assert nerve.facet_set == {Simplex(Simplex(s) for s in family)}
+    assert nerve_of_sets([set(), {0}, {0}]).facet_set == {Simplex([Simplex({0})])}
+    assert not nerve_of_sets([]).facet_set

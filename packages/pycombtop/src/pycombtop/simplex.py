@@ -3,7 +3,6 @@ from __future__ import annotations
 import math
 from collections import defaultdict
 from collections.abc import Callable, Generator, Iterable
-from functools import reduce
 from itertools import chain, combinations
 from typing import Literal
 
@@ -548,14 +547,18 @@ def nerve_of_sets(sets: Iterable[set | frozenset]) -> SimplicialComplex:
     2
     """
 
-    def _non_empty_intersection(s: set) -> bool:
-        if not s:  # pragma: no cover
-            return False
-        intersect = reduce(lambda x, y: x.intersection(y), list(s))
-        return len(intersect) != 0
-
-    vertices = [Simplex(s) for s in sets]
-    return SimplicialComplex(vertices, function=_non_empty_intersection)
+    # Every simplex of the nerve is contained in the incidence star of a
+    # common element. Its maximal faces are precisely the maximal such stars.
+    vertices = {Simplex(s) for s in sets}
+    incidence: dict = defaultdict(set)
+    for member in vertices:
+        for element in member:
+            incidence[element].add(member)
+    maximal: list[Simplex] = []
+    for star in sorted({Simplex(s) for s in incidence.values()}, key=len, reverse=True):
+        if not any(star <= facet for facet in maximal):
+            maximal.append(star)
+    return SimplicialComplex(vertices, facet_set=maximal)
 
 
 def clique_complex(graph: nx.Graph) -> SimplicialComplex:

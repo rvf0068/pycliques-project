@@ -205,3 +205,17 @@ Surfaces
    :undoc-members:
    :show-inheritance:
    :member-order: bysource
+
+Closed Neckties
+---------------
+
+The bitset index computes the intersection of maximal completes extending
+an input complete without enumerating those maximal completes. The incidence
+patterns also give exact center tests. Use incidence-preserving permutation
+generators to reduce the enumeration to vertex-orbit representatives. A
+failed center condition does not establish a failed homotopy equivalence.
+
+.. automodule:: pycliques.closed_neckties
+   :members:
+   :show-inheritance:
+   :member-order: bysource
