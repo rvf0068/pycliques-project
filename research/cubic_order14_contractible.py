@@ -32,9 +32,6 @@ def main():
         if a.task == "topology":
             h = limited(30, pt.homotopy_type_with_verdict, p, max_simplices=100000)
             report(index=a.index, level=k, task="homotopy", status="TIMEOUT" if h is None else "EXACT" if h.is_exact else "INEXACT", spheres=None if h is None else h.wedge.spheres, reason=None if h is None else h.reason)
-            if k < 2:
-                h = limited(30, pt.homotopy_type_clique_graph_via_independent_neighborhood, p)
-                report(index=a.index, level=k, task="independent-neighborhood", result=str(h))
         elif a.task == "retractions":
             for seed in range(1 if k < 2 else 6):
                 order = list(p)
