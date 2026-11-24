@@ -119,3 +119,38 @@ def test_partial_target_integration_and_positive_completion() -> None:
     )
     assert completion.status is OctahedralBlindStatus.FOUND
     assert set(completion.antipodal_pairs or ()) == {(0, 1), (2, 3), (4, 5), (6, 7)}
+
+
+def test_forced_pair_recursion_propagates_exhaustion_and_limit() -> None:
+    # In H = K2 + K2 + C5, after fixing the first K2, the next K2
+    # is compulsory. However, a single antipodal pair cannot dominate
+    # the remaining C5 by open H-neighborhoods. This exercises the
+    # forced-recursion negative result (not just an immediate obstruction).
+    complement = nx.disjoint_union_all(
+        [nx.complete_graph(2), nx.complete_graph(2), nx.cycle_graph(5)]
+    )
+    graph = nx.complement(complement)
+    check = screen_forced_pairs(_nonedge(graph), ((1 << len(graph)) - 1) & ~3)
+    assert check.possible
+    assert check.forced_pairs == ((2, 3),)
+
+    result = complete_dominating_octahedron(
+        graph, [(0, 1)], target_dimension=2, max_states=100
+    )
+    assert result.status is OctahedralBlindStatus.EXHAUSTED
+
+    limited = complete_dominating_octahedron(
+        graph, [(0, 1)], target_dimension=2, max_states=1
+    )
+    assert limited.status is OctahedralBlindStatus.LIMIT_REACHED
+
+
+def test_forced_pairs_exceed_requested_target_dimension() -> None:
+    # An O4 host has four compulsory antipodal pairs; retaining one
+    # while requesting O2 leaves insufficient dimensions for the other
+    # three. This must be an exact EXHAUSTED result.
+    graph = nx.complete_multipartite_graph(2, 2, 2, 2)
+    result = complete_dominating_octahedron(
+        graph, [(0, 1)], target_dimension=2, max_states=100
+    )
+    assert result.status is OctahedralBlindStatus.EXHAUSTED
