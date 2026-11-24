@@ -129,3 +129,15 @@ def test_pared_index_with_return_cp():
     pi, cp = pared_index(nx.path_graph(4), return_cp=True)
     assert pi == 2
     assert isinstance(cp, nx.Graph)
+
+
+def test_pared_graph_removes_strictly_dominated_twin_class():
+    """A twin found first must not hide a strict dominator."""
+    for edges in (
+        [(0, 1), (0, 2), (1, 2), (2, 3)],
+        [(0, 2), (1, 2), (2, 3), (0, 1)],
+    ):
+        graph = nx.Graph(edges)
+        assert set(pared_graph(graph)) == {2}
+        assert pared_index(graph) == 1
+        assert len(graph) == 4
