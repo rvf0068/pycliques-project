@@ -71,8 +71,7 @@ def search_proper_stiff_retraction(
     upper = n - 1 if max_target_order is None else min(n - 1, max_target_order)
     positions = {v: i for i, v in enumerate(nodes)}
     closed = [
-        (1 << i) | sum(1 << positions[w] for w in graph[v])
-        for i, v in enumerate(nodes)
+        (1 << i) | sum(1 << positions[w] for w in graph[v]) for i, v in enumerate(nodes)
     ]
     subsets = stiff = eligible = states = assignments = 0
 
