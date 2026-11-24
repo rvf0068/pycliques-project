@@ -63,7 +63,8 @@ class ClosedNecktieIndex:
         common = self.common(mask)
         if mask & common != mask:
             raise ValueError("expected a complete mask")
-        universal = (i for i in _indices(common) if self.adjacency[i] & common == common)
+        neighbors = self.adjacency
+        universal = (i for i in _indices(common) if neighbors[i] & common == common)
         return sum(1 << i for i in universal)
 
     def is_bad(self, mask: int) -> bool:
