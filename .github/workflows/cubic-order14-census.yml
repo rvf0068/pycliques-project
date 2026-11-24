@@ -1,0 +1,30 @@
+name: Cubic order-14 research census
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'research/cubic_order14_census.py'
+      - '.github/workflows/cubic-order14-census.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  census:
+    name: Census shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv sync --frozen --python 3.11
+      - run: uv run python -m pycliques.octahedral_coaffine_native --build
+      - run: uv run python research/cubic_order14_census.py --shard ${{ matrix.shard }} --shards 12 --deep --output order14-${{ matrix.shard }}.jsonl
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cubic14-${{ matrix.shard }}
+          path: order14-${{ matrix.shard }}.jsonl
