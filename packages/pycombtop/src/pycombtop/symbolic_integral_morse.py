@@ -219,7 +219,10 @@ def symbolic_integral_morse_certificate(
     and the upper Smith factors are units. A separate one-circle
     criterion handles critical cells in dimensions 0 through 3 when
     the 1-skeleton has one loop and primitive 2- and 3-cell attaching
-    degrees. Unsupported patterns give exact homology but no wedge.
+    degrees. With one critical 1-cell, no critical 0-cells in the
+    augmented matching, and only critical 2-cells otherwise, a zero
+    d2 preserves the circle and gives a wedge of 1- and 2-spheres.
+    Unsupported patterns give exact homology but no wedge.
     """
     if min(max_nodes, max_critical, max_gradient_states) < 1 or max_vertices < 0:
         raise ValueError("resource limits must be positive; max_vertices >= 0")
@@ -284,6 +287,10 @@ def symbolic_integral_morse_certificate(
         elif len(degrees) == 2 and degrees[0] >= 2 and degrees[1] == degrees[0] + 1:
             if not torsion:  # integer Smith invariants are all 1 or 0
                 wedge = {d: b for d, b in betti.items() if b}
+        elif degrees == [1, 2] and critical[1] == 1 and ranks.get(2, 0) == 0:
+            # The unaugmented CW model has one vertex and one loop.
+            # Each 2-cell attaching map is classified by its degree in Z.
+            wedge = dict(critical)
         else:
             positive_betti = {d: b for d, b in betti.items() if b}
             wedge = _wedge_after_01_cancellation(
