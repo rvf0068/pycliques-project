@@ -3,16 +3,16 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'research/cubic_order14_census.py'
+      - 'research/cubic_order14_pass2.py'
       - '.github/workflows/cubic-order14-census.yml'
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   census:
-    name: Census shard ${{ matrix.shard }}
+    name: Second pass shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -22,9 +22,9 @@ jobs:
       - uses: astral-sh/setup-uv@v4
       - run: uv sync --frozen --python 3.11
       - run: uv run python -m pycliques.octahedral_coaffine_native --build
-      - run: uv run python research/cubic_order14_census.py --shard ${{ matrix.shard }} --shards 12 --deep --output order14-${{ matrix.shard }}.jsonl
+      - run: uv run python research/cubic_order14_pass2.py --shard ${{ matrix.shard }} --shards 12 --output order14-pass2-${{ matrix.shard }}.jsonl
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: cubic14-${{ matrix.shard }}
-          path: order14-${{ matrix.shard }}.jsonl
+          name: cubic14-pass2-${{ matrix.shard }}
+          path: order14-pass2-${{ matrix.shard }}.jsonl
