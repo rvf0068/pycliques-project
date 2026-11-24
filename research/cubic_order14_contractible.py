@@ -50,7 +50,7 @@ def main():
             report(index=a.index, level=k, task="coaffine-any", result=str(v))
         else:
             if k < 2:
-                v = limited(30, pc.classify_clique_behavior_with_clockwork_pair_search, p, tries=2, bound=60, retraction_depth=1, clockwork_fallback=True, induced_clockwork_depth=1, clockwork_retract_depth=1, clockwork_max_candidates=5000)
+                v = limited(30, pc.classify_clique_behavior_with_clockwork_pair_search, p, tries=2, bound=60, clockwork_fallback=True, induced_clockwork_depth=1, clockwork_retract_depth=1, clockwork_max_candidates=5000)
                 report(index=a.index, level=k, task="classifier", verdict=None if v is None else v.verdict.name, reason=None if v is None else v.reason)
             v = limited(20, pc.search_proper_stiff_retraction, p, max_target_order=12) if len(p) <= 34 else None
             report(index=a.index, level=k, task="proper-stiff", result=str(v))
