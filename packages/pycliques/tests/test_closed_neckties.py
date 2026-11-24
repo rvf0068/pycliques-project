@@ -24,9 +24,7 @@ def test_against_explicit_completes(family):
     graph = nx.Graph()
     graph.add_nodes_from(range(len(family)))
     graph.add_edges_from(
-        (i, j)
-        for i, j in combinations(graph, 2)
-        if set(family[i]) & set(family[j])
+        (i, j) for i, j in combinations(graph, 2) if set(family[i]) & set(family[j])
     )
     closed_sets = set()
     for complete in nx.enumerate_all_cliques(graph):
@@ -38,9 +36,7 @@ def test_against_explicit_completes(family):
         assert index.centers(mask) == sum(
             1 << i for i in h if is_center(family[i], [family[j] for j in complete])
         )
-        assert index.is_bad(mask) == (
-            not set.intersection(*(set(family[j]) for j in complete))
-        )
+        assert index.is_bad(mask) == (not set.intersection(*(set(family[j]) for j in complete)))
     for anchor in graph:
         got = list(index.closed_containing(anchor))
         assert len(got) == len(set(got))

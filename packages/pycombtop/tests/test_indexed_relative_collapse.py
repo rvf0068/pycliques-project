@@ -29,9 +29,7 @@ def test_relative_collapse_and_independent_replay():
 
 def test_large_preserved_simplex_is_not_expanded():
     target = SimplicialComplex(range(100), facet_set=[set(range(100))])
-    source = SimplicialComplex(
-        range(102), facet_set=[set(range(100)), {0, 100, 101}]
-    )
+    source = SimplicialComplex(range(102), facet_set=[set(range(100)), {0, 100, 101}])
     result = indexed_relative_collapse(source, target, max_bad_faces=6)
     assert result.status is CollapseStatus.PROVED
     assert len(result.pairs) == 3

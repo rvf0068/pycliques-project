@@ -85,9 +85,7 @@ def verify_nerve_reduction(
         def maximal(family: set[frozenset[int]]) -> list[frozenset[int]]:
             return sorted(
                 (
-                    f
-                    for f in family
-                    if f and not any(f < other for other in family)
+                    f for f in family if f and not any(f < other for other in family)
                 ),
                 key=lambda f: (-len(f), sum(1 << v for v in f)),
             )

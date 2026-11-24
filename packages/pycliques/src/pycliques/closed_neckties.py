@@ -63,9 +63,7 @@ class ClosedNecktieIndex:
         common = self.common(mask)
         if mask & common != mask:
             raise ValueError("expected a complete mask")
-        return sum(
-            1 << i for i in _indices(common) if self.adjacency[i] & common == common
-        )
+        return sum(1 << i for i in _indices(common) if self.adjacency[i] & common == common)
 
     def is_bad(self, mask: int) -> bool:
         """Whether the nonempty subfamily has empty total intersection."""
@@ -149,9 +147,10 @@ class ClosedNecktieIndex:
         perms = tuple(tuple(p) for p in generators)
         stars = set(self.stars.values())
         for perm in perms:
-            if sorted(perm) != list(range(n)) or {
-                sum(1 << perm[i] for i in _indices(s)) for s in stars
-            } != stars:
+            if (
+                sorted(perm) != list(range(n))
+                or {sum(1 << perm[i] for i in _indices(s)) for s in stars} != stars
+            ):
                 raise ValueError("generators must preserve family incidence")
         remaining = set(range(n))
         while remaining:

@@ -613,7 +613,5 @@ def test_nerve_of_sets_large_incidence_family():
     assert nerve.dimension() == 99
     assert len(nerve.facet_set) == 1
     assert nerve.facet_set == {Simplex(Simplex(s) for s in family)}
-    assert nerve_of_sets([set(), {0}, {0}]).facet_set == {
-        Simplex([Simplex({0})])
-    }
+    assert nerve_of_sets([set(), {0}, {0}]).facet_set == {Simplex([Simplex({0})])}
     assert not nerve_of_sets([]).facet_set

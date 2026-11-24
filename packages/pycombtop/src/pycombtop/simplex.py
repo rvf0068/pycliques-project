@@ -555,9 +555,7 @@ def nerve_of_sets(sets: Iterable[set | frozenset]) -> SimplicialComplex:
         for element in member:
             incidence[element].add(member)
     maximal: list[Simplex] = []
-    for star in sorted(
-        {Simplex(s) for s in incidence.values()}, key=len, reverse=True
-    ):
+    for star in sorted({Simplex(s) for s in incidence.values()}, key=len, reverse=True):
         if not any(star <= facet for facet in maximal):
             maximal.append(star)
     return SimplicialComplex(vertices, facet_set=maximal)
