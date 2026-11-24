@@ -23,6 +23,49 @@ Clockwork
    :show-inheritance:
    :member-order: bysource
 
+Clockwork Target Libraries
+--------------------------
+
+A complementary approach to induced-subgraph search constructs a finite
+library of theorem-certified divergent clockworks, then searches for
+ordinary retractions onto these fixed targets. A positive verified
+retraction certifies divergence; a negative result is restricted to the
+targets actually checked. Neither construction nor recognition is a
+complete enumeration of all divergent clockworks.
+
+.. code-block:: python
+
+   from pycliques.clockwork_library import generate_divergent_clockwork_library
+   from pycliques.retractions import retracts, verify_retraction_witness
+
+   library = generate_divergent_clockwork_library(
+       [(1, 1, 1), (2, 1, 1)], crown_size=2
+   )
+   # G is a graph to classify.
+   for target in library.targets:
+       H = target.graph
+       witness = retracts(G, H)
+       if isinstance(witness, tuple):
+           assert verify_retraction_witness(G, H, witness)
+           break
+
+The original order-nine census pilot (November 2026,
+https://github.com/rvf0068/pycliques-census/pull/2) found 13 nonisomorphic
+targets of orders nine and ten with these parameters. All eight tested
+second pared clique iterates had no retraction onto the generated library.
+The reported per-case runtime was 0.8--1.6 seconds; the earlier bounded
+induced-subgraph pilot had seven timeouts and one candidate-limit result.
+These are historical observations, not a negative result about other
+clockworks or later iterates. The same PR reported exact homotopy agreement
+between the original and first clique graph for all 54 historical cases
+(46 spheres of dimension two and eight wedges of a circle and a
+two-sphere); that pilot is superseded by the full homotopy census.
+
+.. automodule:: pycliques.clockwork_library
+   :members:
+   :show-inheritance:
+   :member-order: bysource
+
 Clockwork Search
 ----------------
 
