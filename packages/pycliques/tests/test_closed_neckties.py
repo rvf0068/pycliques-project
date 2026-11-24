@@ -77,3 +77,57 @@ def test_bad_input():
             index.close(mask)
     with pytest.raises(ValueError):
         list(index.closed_containing(2))
+
+
+@pytest.mark.parametrize(
+    "family",
+    [
+        [],
+        [{0}],
+        [{0, 1}, {1, 2}, {2, 3}],
+        [{0, 1}, {1, 2}, {2, 0}],
+        list(map(frozenset, nx.find_cliques(nx.octahedral_graph()))),
+    ],
+)
+def test_restricted_closure_and_maximal_completes(family):
+    index = ClosedNecktieIndex(family)
+    graph = nx.Graph()
+    graph.add_nodes_from(range(len(family)))
+    graph.add_edges_from(
+        (i, j) for i, j in combinations(graph, 2) if family[i] & family[j]
+    )
+    maximal = {sum(1 << i for i in q) for q in nx.find_cliques(graph)}
+    assert set(index.maximal_complete_orbits()) == {(q, 1) for q in maximal}
+    masks = [sum(1 << i for i in q) for q in nx.enumerate_all_cliques(graph)]
+    all_closed = {index.close(mask) for mask in masks}
+    for q in maximal:
+        expected = {m for m in all_closed if m & q == m}
+        got = list(index.closed_within(q))
+        assert set(got) == expected
+        assert len(got) == len(expected)
+
+        intervals = []
+
+        def prune(m, e):
+            assert m & e == m and e & q == e
+            if m.bit_count() >= 2:
+                intervals.append((m, e))
+                return True
+            return False
+
+        remaining = set(index.closed_within(q, prune=prune))
+        covered = set()
+        for a, b in intervals:
+            covered.update(m for m in expected if a & m == a and m & b == m)
+        assert remaining | covered == expected
+
+
+def test_maximal_complete_orbits_with_symmetry():
+    index = ClosedNecktieIndex([{0, 1}, {1, 2}, {2, 3}, {3, 0}])
+    assert list(index.maximal_complete_orbits([(1, 2, 3, 0)])) == [(3, 4)]
+    with pytest.raises(ValueError):
+        list(index.maximal_complete_orbits([(1, 0, 2, 3)]))
+    with pytest.raises(ValueError):
+        list(index.closed_within(1))
+    with pytest.raises(ValueError):
+        list(index.closed_within(5))
