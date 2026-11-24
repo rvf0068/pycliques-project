@@ -56,17 +56,24 @@ def family_and_generators(iterate: int):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--max-checks", type=int, default=100_000)
-    parser.add_argument("--iterate", type=int, default=2, choices=[0, 1, 2])
+    parser.add_argument("--iterate", type=int, default=2, choices=[0, 1, 2, 3])
     parser.add_argument("--verify", action="store_true")
     parser.add_argument("--uniform", action="store_true")
+    parser.add_argument("--lazy", action="store_true")
+    parser.add_argument("--strategy", choices=["maximal", "vertex"], default="maximal")
     args = parser.parse_args()
     if args.max_checks < 0:
         parser.error("--max-checks must be nonnegative")
+    if args.iterate == 3 and not (args.lazy and args.uniform and args.strategy == "vertex"):
+        parser.error("iterate 3 requires --lazy --uniform --strategy vertex")
     family, generators = family_and_generators(args.iterate)
-    index = ClosedNecktieIndex(family)
+    index = ClosedNecktieIndex(family, lazy=args.lazy)
     if args.uniform:
         result = check_closed_trace_contractibility(
-            index, generators=generators, max_nodes=args.max_checks
+            index,
+            generators=generators,
+            max_nodes=args.max_checks,
+            strategy=args.strategy,
         )
         print(result, flush=True)
         if result.proved:

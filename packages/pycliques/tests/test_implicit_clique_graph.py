@@ -122,3 +122,21 @@ def test_cubic_77_large_implicit_iterate() -> None:
     assert pared.core.number_of_edges() == 2_896_524_461
     assert verify_implicit_paring(implicit, pared)
     assert pared.core.to_networkx(max_edges=1_000_000) is None
+
+
+def test_supplied_family_preserves_ids() -> None:
+    family = [{"c", "a"}, {"a", "b"}, {"d"}]
+    implicit = ImplicitCliqueGraph.from_family(iter(family))
+    assert [implicit.clique(i) for i in implicit] == family
+    assert implicit.closed_neighborhood_mask(0) == 3
+    assert implicit.closed_neighborhood_mask(1) == 3
+    assert implicit.closed_neighborhood_mask(2) == 4
+    assert implicit.incidence_masks == tuple(
+        sum(1 << i for i, f in enumerate(family) if v in f)
+        for v in implicit.base_vertices
+    )
+    assert not ImplicitCliqueGraph.from_family([])
+    invalid_families: list[list[list[int]]] = [[[]], [[1], [1, 1]]]
+    for invalid in invalid_families:
+        with pytest.raises(ValueError):
+            ImplicitCliqueGraph.from_family(invalid)

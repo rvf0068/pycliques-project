@@ -1,6 +1,6 @@
 """Verify the local contractibility hypothesis of LPV08, Theorem 5.7."""
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 
 from pycliques.closed_neckties import ClosedNecktieIndex
@@ -22,6 +22,7 @@ class ClosedTraceResult:
     pruned_intervals: int
     individual_certificates: int
     unresolved: int | None = None
+    strategy: str = "maximal"
 
 
 class _NodeLimit(Exception):
@@ -33,6 +34,7 @@ def check_closed_trace_contractibility(
     *,
     generators: Iterable[Iterable[int]] = (),
     max_nodes: int | None = None,
+    strategy: str = "maximal",
 ) -> ClosedTraceResult:
     """Check all nonempty closed completes using uniform strong collapses.
 
@@ -43,14 +45,25 @@ def check_closed_trace_contractibility(
     never evidence of noncontractibility. The budget counts nonempty
     closed nodes visited, including repeats across maximal completes;
     orbit enumeration itself is not subject to that budget.
+    Strategy 'vertex' starts from vertex orbits without enumerating maximal
+    completes; covered_maximal_completes is then zero (not counted).
     """
     if max_nodes is not None and max_nodes < 0:
         raise ValueError("max_nodes must be nonnegative or None")
+    if strategy not in {"maximal", "vertex"}:
+        raise ValueError("strategy must be maximal or vertex")
     visited = completed = covered = pruned = individual = 0
 
     def result(proved: bool, unresolved: int | None = None) -> ClosedTraceResult:
         return ClosedTraceResult(
-            proved, visited, completed, covered, pruned, individual, unresolved
+            proved,
+            visited,
+            completed,
+            covered,
+            pruned,
+            individual,
+            unresolved,
+            strategy,
         )
 
     def certify(m: int, e: int) -> bool:
@@ -73,9 +86,17 @@ def check_closed_trace_contractibility(
             return True
         return False
 
+    def searches() -> Iterator[tuple[Iterator[int], int]]:
+        if strategy == "vertex":
+            for anchor in index.vertex_orbit_representatives(generators):
+                yield index.closed_containing(anchor, prune=prune), 0
+        else:
+            for maximal, size in index.maximal_complete_orbits(generators):
+                yield index.closed_within(maximal, prune=prune), size
+
     try:
-        for maximal, size in index.maximal_complete_orbits(generators):
-            for closed in index.closed_within(maximal, prune=prune):
+        for search, size in searches():
+            for closed in search:
                 # A common vertex already supplies a cone point.
                 if index.is_bad(closed):
                     if not certify(closed, closed):

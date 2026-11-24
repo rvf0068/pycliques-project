@@ -105,6 +105,14 @@ Uniform strong collapses
 Closed-trace contractibility
 ----------------------------
 
+Use ``check_closed_trace_contractibility(index, strategy="vertex")`` to
+search through vertex-orbit representatives directly, without first
+enumerating maximal completes. The default ``strategy="maximal"`` retains
+the existing maximal-complete-orbit strategy. The vertex strategy is
+particularly useful for lazy indices of very large clique graphs. It may
+still require many search nodes; a limit or unresolved trace is
+inconclusive, not a counterexample to homotopy equivalence.
+
 .. automodule:: pycombtop.closed_trace_contractibility
    :members:
    :undoc-members:

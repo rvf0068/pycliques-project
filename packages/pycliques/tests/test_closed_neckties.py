@@ -6,6 +6,7 @@ import networkx as nx
 import pytest
 from pycliques.closed_neckties import ClosedNecktieIndex, check_closed_centers
 from pycliques.homotopy_invariance import is_center
+from pycliques.implicit_clique_graph import ImplicitCliqueGraph
 from pycliques.poset_homotopy import h_closure_from_neighbors
 
 
@@ -19,8 +20,9 @@ from pycliques.poset_homotopy import h_closure_from_neighbors
         list(map(frozenset, nx.find_cliques(nx.octahedral_graph()))),
     ],
 )
-def test_against_explicit_completes(family):
-    index = ClosedNecktieIndex(family)
+@pytest.mark.parametrize("lazy", [False, True])
+def test_against_explicit_completes(family, lazy):
+    index = ClosedNecktieIndex(family, lazy=lazy, cache_size=2)
     graph = nx.Graph()
     graph.add_nodes_from(range(len(family)))
     graph.add_edges_from(
@@ -89,8 +91,9 @@ def test_bad_input():
         list(map(frozenset, nx.find_cliques(nx.octahedral_graph()))),
     ],
 )
-def test_restricted_closure_and_maximal_completes(family):
-    index = ClosedNecktieIndex(family)
+@pytest.mark.parametrize("lazy", [False, True])
+def test_restricted_closure_and_maximal_completes(family, lazy):
+    index = ClosedNecktieIndex(family, lazy=lazy, cache_size=2)
     graph = nx.Graph()
     graph.add_nodes_from(range(len(family)))
     graph.add_edges_from(
@@ -131,3 +134,82 @@ def test_maximal_complete_orbits_with_symmetry():
         list(index.closed_within(1))
     with pytest.raises(ValueError):
         list(index.closed_within(5))
+
+
+def test_shared_implicit_index_and_anchored_pruning():
+    family = [{0, 1}, {1, 2}, {2, 3}, {3, 0}]
+    implicit = ImplicitCliqueGraph.from_family(family)
+    index = ClosedNecktieIndex.from_implicit(implicit, cache_size=0)
+    assert tuple(index.family) == tuple(map(frozenset, family))
+    assert index.family[-1] == family[-1]
+    assert index.family[:2] == tuple(map(frozenset, family[:2]))
+    assert index.adjacency[0] == 11
+    with pytest.raises(IndexError):
+        _ = index.family[4]
+    with pytest.raises(IndexError):
+        _ = index.family[-5]
+    stars = zip(implicit.base_vertices, implicit.incidence_masks, strict=True)
+    assert index.stars == dict(stars)
+    assert list(index.vertex_orbit_representatives([(1, 2, 3, 0)])) == [0]
+    expected = set(index.closed_containing(0))
+    intervals = []
+
+    def prune(m, e):
+        intervals.append((m, e))
+        return True
+
+    assert not list(index.closed_containing(0, prune=prune))
+    for m in expected:
+        assert any(a & m == a and m & b == m for a, b in intervals)
+    pared = ImplicitCliqueGraph.from_family([{0}, {0, 1}]).pare().core
+    with pytest.raises(ValueError):
+        ClosedNecktieIndex.from_implicit(pared)
+    with pytest.raises(ValueError):
+        ClosedNecktieIndex(family, lazy=True, cache_size=-1)
+
+
+def test_anchored_pruning_covers_all_small_graph_traces():
+    # Use literal intersections of maximal completes as the independent
+    # oracle; do not call the implementation's closure to build expectations.
+    for base in nx.graph_atlas_g():
+        if len(base) > 5:
+            break
+        family = list(map(frozenset, nx.find_cliques(base)))
+        graph = nx.Graph()
+        graph.add_nodes_from(range(len(family)))
+        graph.add_edges_from(
+            (i, j) for i, j in combinations(graph, 2) if family[i] & family[j]
+        )
+        maximal = [set(q) for q in nx.find_cliques(graph)]
+        expected = set()
+        for complete in nx.enumerate_all_cliques(graph):
+            containing = [q for q in maximal if set(complete) <= q]
+            closed = set.intersection(*containing)
+            expected.add(sum(1 << i for i in closed))
+        for cache_size in (0, 2):
+            index = ClosedNecktieIndex(family, lazy=True, cache_size=cache_size)
+            for anchor in graph:
+                want = {m for m in expected if m & (1 << anchor)}
+                got = list(index.closed_containing(anchor))
+                assert set(got) == want
+                assert len(got) == len(want)
+                intervals = []
+
+                def prune(m, e):
+                    assert m & e == m
+                    assert m in want
+                    if m.bit_count() >= 2 and m.bit_count() % 2 == 0:
+                        intervals.append((m, e))
+                        return True
+                    return False
+
+                remaining = set(index.closed_containing(anchor, prune=prune))
+                assert remaining <= want
+                for m in want - remaining:
+                    assert any(a & m == a and m & b == m for a, b in intervals)
+
+
+def test_implicit_index_rejects_negative_cache():
+    graph = ImplicitCliqueGraph.from_family([{0}])
+    with pytest.raises(ValueError):
+        ClosedNecktieIndex.from_implicit(graph, cache_size=-1)

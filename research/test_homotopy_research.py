@@ -317,3 +317,33 @@ def test_closed_homotopy_driver_separates_center_and_contractibility(monkeypatch
     output = capsys.readouterr().out
     assert "INCONCLUSIVE:" in output
     assert "PROVED:" not in output
+
+
+def test_fourth_iterate_driver_requires_lazy_vertex_strategy(monkeypatch, capsys):
+    import sys
+    from research import kg7_closed_homotopy as driver
+
+    calls = []
+
+    def family(iterate):
+        calls.append(iterate)
+        return [frozenset({0})], []
+
+    monkeypatch.setattr(driver, "family_and_generators", family)
+    monkeypatch.setattr(sys, "argv", ["kg7_closed_homotopy", "--iterate", "3"])
+    with pytest.raises(SystemExit) as exc:
+        driver.main()
+    assert exc.value.code == 2
+    assert not calls
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "kg7_closed_homotopy",
+            "--iterate", "3", "--lazy", "--uniform",
+            "--strategy", "vertex", "--max-checks", "0",
+        ],
+    )
+    driver.main()
+    assert calls == [3]
+    assert "INCONCLUSIVE:" in capsys.readouterr().out
