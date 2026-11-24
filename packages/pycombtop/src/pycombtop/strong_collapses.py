@@ -67,6 +67,7 @@ def uniform_strong_collapse_certificate(
             for v in facet:
                 incidence[v] = incidence.get(v, 0) | (1 << i)
         full = (1 << len(effective)) - 1
+
         def priority(v: Hashable) -> tuple[int, str]:
             return -incidence[v].bit_count(), repr(v)
 
