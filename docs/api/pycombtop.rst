@@ -80,3 +80,16 @@ necessary condition and do not detect integral torsion.
    result = relative_collapse(X, N)
    assert result.status is CollapseStatus.PROVED
    assert verify_relative_collapse(X, N, result.pairs)
+
+Indexed Relative Collapse
+-------------------------
+
+The greedy indexed engine enumerates only faces outside the preserved
+subcomplex, and replays any complete certificate using direct coface tests.
+It can be used before the original backtracking engine; a greedy dead end
+or a relative-face budget exit is inconclusive.
+
+.. automodule:: pycombtop.indexed_relative_collapse
+   :members:
+   :show-inheritance:
+   :member-order: bysource

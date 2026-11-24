@@ -65,6 +65,10 @@ from .hopf_wedge import (
     verify_hopf_wedge,
     verify_reduced_hopf_wedge,
 )
+from .indexed_relative_collapse import (
+    indexed_relative_collapse,
+    verify_indexed_relative_collapse,
+)
 from .integral_morse import (
     IntegralMorseCertificate,
     bipartite_shore_facets,
@@ -239,5 +243,7 @@ __all__ = [
     "CollapseResult",
     "CollapseStatus",
     "relative_collapse",
+    "indexed_relative_collapse",
+    "verify_indexed_relative_collapse",
     "verify_relative_collapse",
 ]

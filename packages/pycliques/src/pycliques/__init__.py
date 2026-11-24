@@ -46,6 +46,11 @@ from .clockwork_search import (
     verify_clockwork_retraction_certificate,
     verify_clockwork_retraction_certificate_detailed,
 )
+from .closed_neckties import (
+    ClosedCenterResult,
+    ClosedNecktieIndex,
+    check_closed_centers,
+)
 from .coaffinations import (
     CoaffinePair,
     automorphisms,
@@ -264,6 +269,9 @@ __all__ = [
     "build_octahedral_boolean_model",
     "degree_histogram",
     "enumerate_maximal_intersecting_families",
+    "ClosedCenterResult",
+    "ClosedNecktieIndex",
+    "check_closed_centers",
     "ClosedCliqueIntersections",
     "ThreeHellyResult",
     "ThreeHellyStatus",

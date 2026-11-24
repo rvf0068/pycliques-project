@@ -31,9 +31,7 @@ def _relative_masks(
     if any(v not in index for f in target.facet_set for v in f):
         raise ValueError("target must be a subcomplex of source")
     target_masks = {sum(index[v] for v in f) for f in target.facet_set}
-    if any(
-        not any(t & s == t for s in source_masks) for t in target_masks
-    ):
+    if any(not any(t & s == t for s in source_masks) for t in target_masks):
         raise ValueError("target must be a subcomplex of source")
 
     # Every face contained in a target facet has all its subfaces there too.
@@ -158,9 +156,7 @@ def verify_indexed_relative_collapse(
         for pair in pairs:
             if not isinstance(pair, (tuple, list)) or len(pair) != 2:
                 return False
-            lower, upper = (
-                sum(index[v] for v in frozenset(face)) for face in pair
-            )
+            lower, upper = (sum(index[v] for v in frozenset(face)) for face in pair)
             if (
                 not lower
                 or lower not in live

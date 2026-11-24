@@ -36,21 +36,20 @@ def test_large_preserved_simplex_is_not_expanded():
     result = indexed_relative_collapse(source, target, max_bad_faces=6)
     assert result.status is CollapseStatus.PROVED
     assert len(result.pairs) == 3
-    assert indexed_relative_collapse(
-        source, target, max_bad_faces=5
-    ).status is CollapseStatus.INCONCLUSIVE
+    limited = indexed_relative_collapse(source, target, max_bad_faces=5)
+    assert limited.status is CollapseStatus.INCONCLUSIVE
     assert not verify_indexed_relative_collapse(
         source, target, result.pairs, max_bad_faces=5
     )
-    assert indexed_relative_collapse(
-        target, target, max_bad_faces=0
-    ).status is CollapseStatus.PROVED
+    identical = indexed_relative_collapse(target, target, max_bad_faces=0)
+    assert identical.status is CollapseStatus.PROVED
 
 
 def test_dead_end_and_bad_target():
     source = SimplicialComplex(range(3), facet_set=[{0, 1}, {1, 2}, {0, 2}])
     target = SimplicialComplex(range(3), facet_set=[{0}])
-    assert indexed_relative_collapse(source, target).status is CollapseStatus.INCONCLUSIVE
+    result = indexed_relative_collapse(source, target)
+    assert result.status is CollapseStatus.INCONCLUSIVE
     with pytest.raises(ValueError):
         indexed_relative_collapse(
             source, SimplicialComplex(range(3), facet_set=[{0, 1, 2}])

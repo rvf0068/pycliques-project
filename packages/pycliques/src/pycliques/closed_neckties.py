@@ -27,9 +27,7 @@ class ClosedNecktieIndex:
 
     def __init__(self, family: Iterable[Iterable[Hashable]]) -> None:
         self.family = tuple(frozenset(q) for q in family)
-        if any(not q for q in self.family) or len(set(self.family)) != len(
-            self.family
-        ):
+        if any(not q for q in self.family) or len(set(self.family)) != len(self.family):
             raise ValueError("family must consist of distinct nonempty sets")
         self.full = (1 << len(self.family)) - 1
         self.stars: dict[Hashable, int] = defaultdict(int)
@@ -135,9 +133,7 @@ class ClosedNecktieIndex:
             if (child & ~current) & (bit - 1):
                 continue
             yield child
-            stack.append(
-                (child, self.common(child) & ~child & ~((bit << 1) - 1))
-            )
+            stack.append((child, self.common(child) & ~child & ~((bit << 1) - 1)))
 
     def closed_representatives(
         self, generators: Iterable[Iterable[int]] = ()
