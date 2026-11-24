@@ -53,6 +53,46 @@ def family_and_generators(iterate: int):
     return family, generators
 
 
+def anchor_stabilizer_provider(generators):
+    """Use the compact S7 action to lift only needed stabilizer generators."""
+    identity = tuple(range(7))
+    words = {identity: ()}
+    queue = [identity]
+    for p in queue:
+        for k in range(6):
+            moved = tuple(2 * k + 1 - v if v in (k, k + 1) else v for v in p)
+            if moved not in words:
+                words[moved] = (*words[p], k)
+                queue.append(moved)
+    assert len(words) == 5040
+
+    def act(vertex, word):
+        for k in word:
+            vertex = generators[k][vertex]
+        return vertex
+
+    def provider(anchor):
+        stabilizer = [p for p, word in words.items() if act(anchor, word) == anchor]
+        selected = []
+        reached = {identity}
+        for p in stabilizer:
+            if p in reached:
+                continue
+            selected.append(p)
+            pending = list(reached)
+            for q in pending:
+                for r in selected:
+                    moved = tuple(r[v] for v in q)
+                    if moved not in reached:
+                        reached.add(moved)
+                        pending.append(moved)
+        assert reached == set(stabilizer)
+        n = len(generators[0])
+        return [tuple(act(v, words[p]) for v in range(n)) for p in selected]
+
+    return provider
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--max-checks", type=int, default=100_000)
@@ -60,20 +100,29 @@ def main():
     parser.add_argument("--verify", action="store_true")
     parser.add_argument("--uniform", action="store_true")
     parser.add_argument("--lazy", action="store_true")
-    parser.add_argument("--strategy", choices=["maximal", "vertex"], default="maximal")
+    parser.add_argument(
+        "--strategy", choices=["maximal", "vertex", "bad_vertex"], default="maximal"
+    )
+    parser.add_argument("--stabilizers", action="store_true")
     args = parser.parse_args()
     if args.max_checks < 0:
         parser.error("--max-checks must be nonnegative")
-    if args.iterate == 3 and not (args.lazy and args.uniform and args.strategy == "vertex"):
-        parser.error("iterate 3 requires --lazy --uniform --strategy vertex")
+    if args.iterate == 3 and not (
+        args.lazy and args.uniform and args.strategy in {"vertex", "bad_vertex"}
+    ):
+        parser.error("iterate 3 requires --lazy --uniform and a vertex strategy")
+    if args.stabilizers and not (args.uniform and args.strategy == "bad_vertex"):
+        parser.error("--stabilizers requires --uniform --strategy bad_vertex")
     family, generators = family_and_generators(args.iterate)
     index = ClosedNecktieIndex(family, lazy=args.lazy)
     if args.uniform:
+        provider = anchor_stabilizer_provider(generators) if args.stabilizers else None
         result = check_closed_trace_contractibility(
             index,
             generators=generators,
             max_nodes=args.max_checks,
             strategy=args.strategy,
+            anchor_stabilizers=provider,
         )
         print(result, flush=True)
         if result.proved:
