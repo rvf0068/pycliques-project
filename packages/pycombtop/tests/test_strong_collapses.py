@@ -102,6 +102,9 @@ def test_prefix_replay_on_every_small_intermediate_family():
         optional = [f for f in possible if f not in fixed]
         for mask in range(1 << len(optional)):
             family = fixed + [f for i, f in enumerate(optional) if mask & (1 << i)]
+            assert verify_uniform_strong_collapse_prefix(
+                family, family, reduction.moves
+            )
             current = set(family)
             for v, w in reduction.moves:
                 facets = {q for q in current if not any(q < p for p in current)}
@@ -109,3 +112,21 @@ def test_prefix_replay_on_every_small_intermediate_family():
                 current = {q - {v} for q in current if q - {v}}
             assert current
     assert partial > 0
+
+
+def test_prefix_replay_skips_absent_optional_vertices():
+    fixed = [{0, 1}, {1, 2}, {0, 2}]
+    possible = fixed + [{0, 3, 4}]
+    reduction = uniform_strong_collapse_reduction(fixed, possible)
+    assert reduction.certificate is None
+    assert {v for v, _ in reduction.moves} == {3, 4}
+    assert verify_uniform_strong_collapse_prefix(fixed, possible, reduction.moves)
+    assert verify_uniform_strong_collapse_prefix(fixed, fixed, reduction.moves)
+    assert verify_uniform_strong_collapse_prefix(fixed, fixed, [(3, 4)])
+    assert not verify_uniform_strong_collapse_prefix(fixed, fixed, [(0, 4)])
+    assert not verify_uniform_strong_collapse_prefix(fixed, fixed, [(3, 3)])
+
+    # Full certificates retain their original strict replay semantics.
+    simplex = [{0, 1}]
+    cert = UniformStrongCollapseCertificate(((3, 4),), 0)
+    assert not verify_uniform_strong_collapse_certificate(simplex, simplex, cert)

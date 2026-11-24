@@ -113,14 +113,24 @@ def uniform_strong_collapse_certificate(
 
 
 def _replay_uniform_prefix(
-    m: Family, e: Family, moves: Iterable[Move]
+    m: Family,
+    e: Family,
+    moves: Iterable[Move],
+    *,
+    skip_absent: bool = False,
 ) -> tuple[Family, Family] | None:
     live: set[Hashable] = set().union(*e)
     for move in moves:
         if not isinstance(move, (tuple, list)) or len(move) != 2:
             return None
         v, w = move
-        if v == w or v not in live or w not in live:
+        if v == w:
+            return None
+        if v not in live:
+            if skip_absent:
+                continue
+            return None
+        if w not in live:
             return None
         containing = [g for g in m if w in g]
         for f in e:
@@ -141,12 +151,13 @@ def verify_uniform_strong_collapse_prefix(
 
     The same direct containment check as for a full certificate is used.
     A valid prefix also works on every nested interval, skipping a move
-    if its removed vertex is absent. Projecting its fixed and possible
-    families onto the surviving vertices permits further certified moves.
+    if its removed vertex is absent, even when its dominator is also absent.
+    A present removed vertex still requires a present, valid dominator.
+    Projecting the families onto surviving vertices permits further moves.
     """
     try:
         m, e = _normalize(fixed, possible)
-        return _replay_uniform_prefix(m, e, moves) is not None
+        return _replay_uniform_prefix(m, e, moves, skip_absent=True) is not None
     except (TypeError, ValueError):
         return False
 
