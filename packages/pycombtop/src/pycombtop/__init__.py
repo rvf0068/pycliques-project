@@ -125,6 +125,11 @@ from .simplex import (
     oriented_complex,
     relative_betti_numbers,
 )
+from .strong_collapses import (
+    UniformStrongCollapseCertificate,
+    uniform_strong_collapse_certificate,
+    verify_uniform_strong_collapse_certificate,
+)
 from .symbolic_dong import SymbolicDongCertificate, symbolic_dong_certificate
 from .symbolic_integral_morse import (
     SymbolicIntegralMorseCertificate,
@@ -243,6 +248,9 @@ __all__ = [
     "CollapseResult",
     "CollapseStatus",
     "relative_collapse",
+    "UniformStrongCollapseCertificate",
+    "uniform_strong_collapse_certificate",
+    "verify_uniform_strong_collapse_certificate",
     "indexed_relative_collapse",
     "verify_indexed_relative_collapse",
     "verify_relative_collapse",
