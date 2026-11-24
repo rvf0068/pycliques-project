@@ -5,7 +5,8 @@ its unique codimension-one coface. This certifies an acyclic matching.
 With one critical vertex and remaining cells in dimensions d,d+1 (d>=2),
 zero boundary in the integral Morse complex implies all attachments are
 null by Hurewicz. The same holds for d=1 if there is exactly one
-critical 1-cell: every loop in the resulting circle is classified by degree. See Forman, A User's Guide to Discrete Morse Theory,
+critical 1-cell: every loop in the resulting circle is classified by degree.
+See Forman, A User's Guide to Discrete Morse Theory,
 Sections 2 and 7, and Hatcher, Algebraic Topology, Theorem 4.32.
 """
 
