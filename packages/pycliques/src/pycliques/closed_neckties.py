@@ -116,14 +116,21 @@ class ClosedNecktieIndex:
         *,
         lazy: bool = False,
         cache_size: int = 256,
+        cache_witnesses: bool = False,
     ) -> None:
-        """Use lazy=True to keep only incidence and a bounded neighborhood cache."""
+        """Use lazy=True for incidence and a bounded neighborhood cache.
+
+        Optional cache_witnesses stores one verified nonneighbor per member,
+        reused only when both endpoints lie in the current common neighborhood.
+        """
         if cache_size < 0:
             raise ValueError("cache_size must be nonnegative")
         self.family: Sequence[frozenset[Hashable]]
         self.adjacency: Sequence[int]
+        self._witnesses: list[int] | None = None
         if lazy:
             self._init_implicit(ImplicitCliqueGraph.from_family(family), cache_size)
+            self._init_witnesses(cache_witnesses)
             return
         self.family = tuple(frozenset(q) for q in family)
         if any(not q for q in self.family) or len(set(self.family)) != len(self.family):
@@ -134,10 +141,15 @@ class ClosedNecktieIndex:
             for v in q:
                 self.stars[v] |= 1 << i
         self.adjacency = tuple(self._union(q) for q in self.family)
+        self._init_witnesses(cache_witnesses)
 
     @classmethod
     def from_implicit(
-        cls, graph: ImplicitCliqueGraph, *, cache_size: int = 256
+        cls,
+        graph: ImplicitCliqueGraph,
+        *,
+        cache_size: int = 256,
+        cache_witnesses: bool = False,
     ) -> ClosedNecktieIndex:
         """Share an implicit graph's incidence; decode members only as needed.
 
@@ -147,6 +159,7 @@ class ClosedNecktieIndex:
         """
         result = cls.__new__(cls)
         result._init_implicit(graph, cache_size)
+        result._init_witnesses(cache_witnesses)
         return result
 
     def _init_implicit(self, graph: ImplicitCliqueGraph, cache_size: int) -> None:
@@ -160,6 +173,9 @@ class ClosedNecktieIndex:
         self.family = _IndexedSequence(n, graph.clique)
         lookup = lru_cache(maxsize=cache_size)(graph.closed_neighborhood_mask)
         self.adjacency = _IndexedSequence(n, lookup)
+
+    def _init_witnesses(self, enabled: bool) -> None:
+        self._witnesses = [-1] * len(self.family) if enabled else None
 
     def _union(self, vertices: Iterable[Hashable]) -> int:
         result = 0
@@ -190,16 +206,67 @@ class ClosedNecktieIndex:
             raise ValueError("expected a complete mask")
         return self._close_common(common, self.full, mask)
 
+    def close_if_within(self, mask: int, allowed: int) -> int | None:
+        """Return the global closure, or None if it is not contained in allowed.
+
+        Check forbidden candidates first. This never returns a partial
+        closure: one forbidden universal vertex proves rejection.
+        """
+        if not 0 <= allowed <= self.full:
+            raise ValueError("allowed mask out of range")
+        common = self.common(mask)
+        if mask & common != mask:
+            raise ValueError("expected a complete mask")
+        return self._try_close_common(common, self.full, mask, allowed=allowed)
+
     def _close_common(self, common: int, within: int, known: int = 0) -> int:
-        # A nonneighbor of any candidate in common cannot be universal.
-        # Always test against the original common, never a shrinking subset.
+        result = self._try_close_common(common, within, known)
+        assert result is not None
+        return result
+
+    def _try_close_common(
+        self,
+        common: int,
+        within: int,
+        known: int = 0,
+        *,
+        allowed: int | None = None,
+    ) -> int | None:
+        # The original common neighborhood is never shrunk for the test.
+        # Only the candidate set is reduced.
         universal = known & within
+        forbidden = 0 if allowed is None else common & within & ~allowed
+        if universal & forbidden:
+            return None
         candidates = common & within & ~universal
+        witnesses = self._witnesses
         while candidates:
-            bit = candidates & -candidates
-            disjoint = common & ~self.adjacency[bit.bit_length() - 1]
+            pool = candidates & forbidden or candidates
+            bit = pool & -pool
+            i = bit.bit_length() - 1
+            if witnesses is not None:
+                w = witnesses[i]
+                if w >= 0 and common & (1 << w):
+                    candidates &= ~(bit | (1 << w))
+                    continue
+            disjoint = common & ~self.adjacency[i]
             if not disjoint:
+                if bit & forbidden:
+                    return None
                 universal |= bit
+            elif witnesses is not None:
+                witnesses[i] = (disjoint & -disjoint).bit_length() - 1
+                # Remember reciprocal nonedges for candidates eliminated
+                # by this query. Byte iteration avoids copying a large
+                # integer once per set bit.
+                removed = disjoint & candidates
+                for offset, byte in enumerate(
+                    removed.to_bytes((removed.bit_length() + 7) // 8, "little")
+                ):
+                    while byte:
+                        b = byte & -byte
+                        witnesses[8 * offset + b.bit_length() - 1] = i
+                        byte ^= b
             candidates &= ~(bit | disjoint)
         return universal
 
@@ -235,6 +302,21 @@ class ClosedNecktieIndex:
         self._validate(mask)
         return tuple(self.family[i] for i in _indices(mask))
 
+    def projected_members(
+        self, mask: int, vertices: Iterable[Hashable]
+    ) -> tuple[frozenset[Hashable], ...]:
+        """Restrict members to vertices using incidence, discarding empty sets.
+
+        This avoids decoding full clique members of a lazy index. Member
+        order is preserved, and equal nonempty projections are allowed.
+        """
+        self._validate(mask)
+        rows: dict[int, set[Hashable]] = defaultdict(set)
+        for v in vertices:
+            for i in _indices(self.stars.get(v, 0) & mask):
+                rows[i].add(v)
+        return tuple(frozenset(rows[i]) for i in sorted(rows))
+
     def nerve_facets(self, mask: int) -> tuple[int, ...]:
         """Maximal incidence stars restricted to the specified subfamily."""
         self._validate(mask)
@@ -268,8 +350,11 @@ class ClosedNecktieIndex:
             bit = candidates & -candidates
             stack.append((current, common, candidates ^ bit))
             child_common = common & self.adjacency[bit.bit_length() - 1]
-            child = self._close_common(child_common, within, current | bit)
-            if (child & ~current) & (bit - 1):
+            allowed = current | (within & ~(bit - 1))
+            child = self._try_close_common(
+                child_common, within, current | bit, allowed=allowed
+            )
+            if child is None:
                 continue
             later = child_common & within & ~((bit << 1) - 1)
             upper = child | later
@@ -361,8 +446,10 @@ class ClosedNecktieIndex:
             # candidates, even those with smaller indices.
             allowed = upper & ~(domain & (bit - 1))
             child_common = common & self.adjacency[i]
-            child = self._close_common(child_common, self.full, current | bit)
-            if child & ~allowed:
+            child = self._try_close_common(
+                child_common, self.full, current | bit, allowed=allowed
+            )
+            if child is None:
                 continue
             yield child, child_common, allowed & child_common, perms
 
