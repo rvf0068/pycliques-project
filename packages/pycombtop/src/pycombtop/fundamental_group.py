@@ -53,6 +53,7 @@ Public API
 from __future__ import annotations
 
 from collections import deque
+from collections.abc import Hashable, Sequence
 from dataclasses import dataclass
 
 import networkx as nx
@@ -140,6 +141,75 @@ def _triangles(graph: nx.Graph) -> list[tuple[int, int, int]]:
 # ---------------------------------------------------------------------------
 # Main algorithm
 # ---------------------------------------------------------------------------
+
+
+def verify_connected_link_order(graph: nx.Graph, order: Sequence[Hashable]) -> bool:
+    """Replay a vertex order proving simple connectivity by van Kampen.
+
+    Start with one vertex. Each subsequent vertex must have a nonempty
+    connected neighborhood among earlier vertices. Failure is inconclusive.
+    """
+    if (
+        not graph
+        or graph.is_directed()
+        or graph.is_multigraph()
+        or nx.number_of_selfloops(graph)
+    ):
+        return False
+    try:
+        if len(order) != len(graph) or set(order) != set(graph):
+            return False
+        seen = {order[0]}
+        for vertex in order[1:]:
+            link = seen.intersection(graph[vertex])
+            if not link or not nx.is_connected(graph.subgraph(link)):
+                return False
+            seen.add(vertex)
+        return True
+    except (TypeError, KeyError):
+        return False
+
+
+def connected_link_order(
+    graph: nx.Graph, *, max_roots: int = 5
+) -> tuple[Hashable, ...] | None:
+    """Find a replayable sufficient certificate of simple connectivity.
+
+    Try up to max_roots starting vertices in decreasing degree order.
+    Begin with their closed neighborhood (a cone), then greedily append
+    vertices with connected links in the current induced graph. None
+    means this sufficient search did not succeed, not that pi_1 is nontrivial.
+    """
+    if type(max_roots) is not int or max_roots < 1:
+        raise ValueError("max_roots must be a positive integer")
+    if (
+        not isinstance(graph, nx.Graph)
+        or graph.is_directed()
+        or graph.is_multigraph()
+        or nx.number_of_selfloops(graph)
+    ):
+        raise ValueError("Require a simple undirected loopless graph")
+    if not graph:
+        return None
+    vertices = tuple(graph)
+    roots = sorted(vertices, key=lambda v: -len(graph[v]))[:max_roots]
+    for root in roots:
+        order = [root, *graph[root]]
+        seen = set(order)
+        while len(seen) < len(graph):
+            for v in vertices:
+                if v in seen:
+                    continue
+                link = seen.intersection(graph[v])
+                if link and nx.is_connected(graph.subgraph(link)):
+                    seen.add(v)
+                    order.append(v)
+                    break
+            else:
+                break
+        if len(seen) == len(graph) and verify_connected_link_order(graph, order):
+            return tuple(order)
+    return None
 
 
 def fundamental_group(graph: nx.Graph) -> FundamentalRecord:
