@@ -43,7 +43,9 @@ def test_classifier_uses_early_facet_morse_certificate(monkeypatch):
     # This clique graph has high dimension and at least 20 facets.
     g = nx.from_graph6_bytes(b"H?~vf~}")
     k = clique_graph(g)
-    verdict = homotopy_type_with_verdict(k, max_vertices=64, max_simplices=25000)
+    verdict = homotopy_type_with_verdict(
+        k, max_vertices=64, max_simplices=25000, recursive_betti_states=0
+    )
     assert verdict.is_exact and not verdict.is_limited
     assert verdict.wedge.spheres == {3: 30}
     assert verdict.reason == Theorem.FACET_MORSE

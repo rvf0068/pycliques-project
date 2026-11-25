@@ -34,7 +34,9 @@ def test_symbolic_integral_morse_c7_k3_and_classifier():
     assert proof.torsion == {}
     assert proof.wedge_spheres == {3: 1, 4: 2}
     assert proof.gradient_states > 0
-    verdict = homotopy_type_with_verdict(graph, max_vertices=64, max_simplices=25_000)
+    verdict = homotopy_type_with_verdict(
+        graph, max_vertices=64, max_simplices=25_000, recursive_betti_states=0
+    )
     assert verdict.is_exact and not verdict.is_limited
     assert verdict.wedge.spheres == {3: 1, 4: 2}
     assert verdict.reason == Theorem.SYMBOLIC_INTEGRAL_MORSE

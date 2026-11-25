@@ -9,6 +9,13 @@ from enum import Enum
 class Theorem:
     """Human-readable mathematical justifications, not bare theorem names."""
 
+    RECURSIVE_BETTI_HUREWICZ = (
+        "A face-free deletion-link recurrence gives upper bounds over every "
+        "field and the exact reduced Euler characteristic. A connected-link "
+        "order or verified uniform conicity proves simple connectivity. "
+        "The universal coefficient, Hurewicz and Whitehead theorems certify "
+        "contractibility or a wedge in the sole possible positive dimension."
+    )
     CONTRACTIBLE_POINT = "A one-vertex clique complex is a point."
     S_COLLAPSE_TO_POINT = (
         "Graph s-collapse reduction to a point: s-dismantlable vertex and "
