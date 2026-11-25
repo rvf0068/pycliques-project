@@ -18,6 +18,7 @@ from sympy import ZZ, Matrix
 from sympy.matrices.normalforms import smith_normal_form
 
 from ._symbolic_morse_gradient import _MorseLimit, morse_boundaries
+from .fundamental_group import connected_link_order
 from .simplex import _stable_vertex_key
 from .symbolic_dong import _ZDD, _DiagramLimit
 
@@ -40,6 +41,7 @@ class SymbolicIntegralMorseCertificate:
     diagram_nodes: int
     gradient_states: int
     critical_masks: tuple[int, ...]
+    connectivity_order: tuple[Hashable, ...] | None = None
 
 
 def _wedge_after_01_cancellation(
@@ -222,7 +224,11 @@ def symbolic_integral_morse_certificate(
     degrees. With one critical 1-cell, no critical 0-cells in the
     augmented matching, and only critical 2-cells otherwise, a zero
     d2 preserves the circle and gives a wedge of 1- and 2-spheres.
-    Unsupported patterns give exact homology but no wedge.
+    For other critical-cell patterns, torsion-free integral homology in
+    at most two consecutive degrees >=2 (or acyclicity), together with a
+    verified connected-link order, also proves a wedge by relative
+    Hurewicz and Whitehead. Unsupported patterns give exact homology
+    but no wedge.
     """
     if min(max_nodes, max_critical, max_gradient_states) < 1 or max_vertices < 0:
         raise ValueError("resource limits must be positive; max_vertices >= 0")
@@ -300,6 +306,13 @@ def symbolic_integral_morse_certificate(
                 wedge = _wedge_after_one_circle_cancellation(
                     critical, boundaries, positive_betti, torsion
                 )
+        connectivity_order = None
+        if wedge is None and not torsion:
+            support = sorted(d for d, rank in betti.items() if rank)
+            if not support or (support[0] >= 2 and support[-1] - support[0] <= 1):
+                connectivity_order = connected_link_order(graph)
+                if connectivity_order is not None:
+                    wedge = {d: b for d, b in betti.items() if b}
         return SymbolicIntegralMorseCertificate(
             critical=critical,
             boundaries=boundaries,
@@ -310,6 +323,7 @@ def symbolic_integral_morse_certificate(
             diagram_nodes=len(diagram.variables) - 2,
             gradient_states=states,
             critical_masks=masks,
+            connectivity_order=connectivity_order,
         )
     except (MemoryError, RecursionError, _DiagramLimit, _MorseLimit):
         return None
