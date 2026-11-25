@@ -318,9 +318,7 @@ def test_general_backend_validation(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(ValueError, match="at most 2048"):
         general.find_coaffine_endomorphism(nx.empty_graph(2049), backend="native")
     with pytest.raises(ValueError, match="64-bit"):
-        general.find_coaffine_endomorphism(
-            graph, backend="native", max_states=1 << 65
-        )
+        general.find_coaffine_endomorphism(graph, backend="native", max_states=1 << 65)
     assert general.find_coaffine_endomorphism(
         graph, backend="auto", max_states=1 << 65
     ).endomorphism is not None
@@ -344,7 +342,7 @@ def test_general_native_rejects_unverified_witness(
     monkeypatch.setattr(
         general,
         "run_coaffine_native",
-        lambda *a, **k: NativeCoaffineRawResult(
+        lambda *a, **k: native.NativeCoaffineRawResult(
             "FOUND", 1, 0, 0, endomorphism=mapping
         ),
     )
@@ -361,7 +359,7 @@ def test_general_native_limit_is_inconclusive(
     monkeypatch.setattr(
         general,
         "run_coaffine_native",
-        lambda *a, **k: NativeCoaffineRawResult("LIMIT_REACHED", 2, 3, 4),
+        lambda *a, **k: native.NativeCoaffineRawResult("LIMIT_REACHED", 2, 3, 4),
     )
     result = general.find_coaffine_endomorphism(nx.cycle_graph(5), backend="native")
     assert result.status is general.RetractionSearchStatus.LIMIT_REACHED
