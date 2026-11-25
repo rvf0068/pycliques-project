@@ -111,7 +111,9 @@ def test_c6_third_iterate_certificate():
 
 def test_classifier_uses_symbolic_matching_before_simplex_budget():
     graph = c6_third_iterate()
-    result = homotopy_type_with_verdict(graph, max_vertices=64, max_simplices=25_000)
+    result = homotopy_type_with_verdict(
+        graph, max_vertices=64, max_simplices=25_000, recursive_betti_states=0
+    )
     assert result.is_exact and not result.is_limited
     assert result.wedge.spheres == {7: 11}
     assert result.reason == Theorem.SYMBOLIC_DONG_MATCHING
