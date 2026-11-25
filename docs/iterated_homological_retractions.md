@@ -112,5 +112,62 @@ spheres (or contractibility in the acyclic case). Mixed support is not a
 wedge certificate. Uniform conicity is an alternative existing proof of
 simple connectivity; no optimization or simplex enumeration is required.
 Use `recursive_betti_states=0` to skip this strategy for the current call.
-The total state budget is shared by the three neighbor orders. All other
+The total state budget is shared by the three fixed neighbor orders and
+an adaptive fallback. All other
 classification strategies and the vertex limit remain in effect.
+
+### Adaptive local bounds
+
+Pass `adaptive_pivots=2` to `recursive_betti_upper_bounds` in all-degree
+mode to try two low-degree pivots and alternative neighbor orders at each
+subproblem. Coefficientwise minima of valid bounds remain valid over every
+field. Euler characteristics are carried separately: after taking minima
+the alternating sum of bounds need not be the true Euler characteristic.
+Disconnected complements split as joins, so the shifted bound polynomials
+multiply. The state and cache budgets still apply; a limited run is
+inconclusive. Fixed-policy and finite-degree calls retain their semantics.
+
+### Integral homology in consecutive dimensions
+
+The existing `symbolic_integral_morse_certificate` now also uses a
+connected-link order when the integral Morse boundary computation has
+torsion-free reduced homology supported in at most two consecutive degrees
+at least two (or no reduced homology). The new `connectivity_order` field
+records that sufficient witness when this fallback proves a wedge.
+
+The theorem follows by choosing a wedge of lowest-dimensional spheres
+representing an integral homology basis and taking the mapping cylinder
+of its map into the simply connected complex. The pair is d-connected,
+so relative Hurewicz and the exact sequences show that every homology
+class in degree d+1 is spherical as well. The resulting integral homology
+equivalence between simply connected CW complexes is a homotopy
+equivalence. A gap of two or more degrees or nonzero torsion is not
+covered by this criterion.
+
+The classification cascade tries the natural symbolic order first, then
+two distinct deterministic degree orders as bounded fallbacks. The
+canonical-order Hopf verification is unchanged. Individual symbolic
+certificate calls still accept an explicit vertex order for replay.
+
+### Exact clique counts without a clique family
+
+```python
+import networkx as nx
+from pycliques import count_maximal_cliques
+
+G = nx.complete_multipartite_graph(*([2] * 24))
+assert count_maximal_cliques(G) == 2**24
+assert count_maximal_cliques(G.subgraph(range(20))) == 2**10
+```
+
+This new counting operation in the existing clique module does not allocate
+the vertices or edges of the next clique graph. It counts independent
+dominating sets of the complement by memoized branching. The state tracks
+undominated vertices and eligible choices; each solution occurs in the
+branch of its first chosen closed neighbor of the pivot. Complement
+components of the remaining undominated vertices have independent
+choices and multiply their counts. A resource limit returns None, not zero.
+
+Every maximal clique of an induced subgraph extends to a distinct maximal
+clique of the original graph, giving a certified lower bound on the order
+of its clique graph. This is not by itself a clique-divergence certificate.
