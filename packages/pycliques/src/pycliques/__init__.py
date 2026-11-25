@@ -115,6 +115,10 @@ from .helly_cover import (
     satisfies_helly_gate_condition,
     verify_helly_edge_cover,
 )
+from .homological_retractions import (
+    HomologicalRetractionObstruction,
+    find_homological_retraction_obstruction,
+)
 from .homotopy_invariance import (
     check_closed_clique_intersection_contractibility,
     completes_of_size,
@@ -266,10 +270,6 @@ from .surfaces import (
     is_regular,
     is_surface,
     open_neighborhood,
-)
-from .homological_retractions import (
-    HomologicalRetractionObstruction,
-    find_homological_retraction_obstruction,
 )
 from .targeted_retractions import (
     TargetRetractionResult,
