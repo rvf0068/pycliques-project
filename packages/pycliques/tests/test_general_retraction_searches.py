@@ -5,6 +5,7 @@ from __future__ import annotations
 from itertools import combinations, product
 
 import networkx as nx
+import pycliques.coaffine_endomorphisms as coaffine
 import pytest
 from pycliques import (
     RetractionSearchStatus,
@@ -195,3 +196,20 @@ def test_cubic_coaffine_obstruction(code: bytes) -> None:
             nxt = clique_graph(graph)
             assert nxt is not None
             graph = completely_pared_graph(nxt)
+
+
+def test_portable_coaffine_time_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    # A deterministic clock avoids a timing-dependent test.
+    ticks = iter((0.0, 2.0))
+    monkeypatch.setattr(coaffine.time, "monotonic", lambda: next(ticks))
+    result = find_coaffine_endomorphism(
+        nx.cycle_graph(5), backend="python", time_limit=1
+    )
+    assert result.status is RetractionSearchStatus.LIMIT_REACHED
+    assert result.endomorphism is None
+
+
+def test_portable_rejects_invalid_witness(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(coaffine, "verify_coaffine_endomorphism", lambda *a: False)
+    with pytest.raises(AssertionError, match="invalid witness"):
+        find_coaffine_endomorphism(nx.cycle_graph(5), backend="python")
