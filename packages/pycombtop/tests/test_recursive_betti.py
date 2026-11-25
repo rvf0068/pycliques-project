@@ -2,7 +2,6 @@
 
 import networkx as nx
 import pytest
-
 from pycombtop import recursive_betti_upper_bounds
 from pycombtop.bounded_betti import bounded_reduced_betti_mod2
 
