@@ -266,3 +266,95 @@ def test_native_rediscovers_mckay_253650_o12(
         result.retraction[v] == result.endomorphism[result.endomorphism[v]]
         for v in pared
     )
+
+
+@pytest.mark.parametrize("value_order", ["label", "fiber"])
+def test_general_native_matches_python(
+    native_binary: Path, monkeypatch: pytest.MonkeyPatch, value_order: str
+) -> None:
+    _native(monkeypatch, native_binary)
+    for graph in nx.graph_atlas_g()[:53]:
+        native = pycliques.find_coaffine_endomorphism(
+            graph, backend="native", value_order=value_order
+        )
+        portable = pycliques.find_coaffine_endomorphism(
+            graph, backend="python", value_order=value_order
+        )
+        assert native.status is portable.status
+        if native.status is RetractionSearchStatus.FOUND:
+            assert native.endomorphism is not None
+            assert pycliques.verify_coaffine_endomorphism(graph, native.endomorphism)
+        else:
+            assert native.endomorphism is None
+
+
+@pytest.mark.parametrize("backend", ["native", "python"])
+def test_fiber_order_and_general_leaf_semantics(
+    native_binary: Path, monkeypatch: pytest.MonkeyPatch, backend: str
+) -> None:
+    _native(monkeypatch, native_binary)
+    # A coaffine map of C5 need not have an octahedral square.
+    graph = nx.cycle_graph(5)
+    general = pycliques.find_coaffine_endomorphism(
+        graph, backend=backend, value_order="fiber"
+    )
+    assert general.status is RetractionSearchStatus.FOUND
+    octahedral = pycliques.find_octahedral_retraction_coaffine(
+        graph, backend=backend, value_order="fiber"
+    )
+    assert octahedral.status is RetractionSearchStatus.EXHAUSTED
+    graph = nx.octahedral_graph()
+    result = pycliques.find_octahedral_retraction_coaffine(
+        graph, backend=backend, value_order="fiber"
+    )
+    assert result.dimension == 3
+    with pytest.raises(ValueError, match="value_order"):
+        pycliques.find_coaffine_endomorphism(graph, value_order="invalid")
+    with pytest.raises(ValueError, match="value_order"):
+        pycliques.find_octahedral_retraction_coaffine(graph, value_order="invalid")
+
+
+@pytest.mark.slow
+def test_native_rediscovers_cubic_379_o20(
+    native_binary: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Rebuild the host using CliqueSequence; no saved host, pairs or map."""
+    _native(monkeypatch, native_binary)
+    graph = nx.complement(nx.from_graph6_bytes(b"M{O___IA_H?_?T?R?"))
+    seq = pycliques.CliqueSequence(
+        graph, bound=1000, relabel=True, pare_initial=True
+    )
+    host = seq[2]
+    assert host is not None
+    assert (len(host), host.number_of_edges()) == (541, 132098)
+    result = pycliques.find_octahedral_retraction_coaffine(
+        host,
+        backend="native",
+        value_order="fiber",
+        max_states=10_000,
+        time_limit=30,
+    )
+    assert result.status is RetractionSearchStatus.FOUND
+    assert result.dimension == 20
+    assert result.retraction is not None
+    assert result.inclusion is not None
+    assert result.endomorphism is not None
+    target = host.subgraph(result.inclusion.values())
+    assert pycliques.verify_coaffine_endomorphism(host, result.endomorphism)
+    assert pycliques.verify_retraction_witness(
+        host, target, (result.retraction, result.inclusion)
+    )
+    assert all(
+        result.retraction[v] == result.endomorphism[result.endomorphism[v]]
+        for v in host
+    )
+    general = pycliques.find_coaffine_endomorphism(
+        host,
+        backend="native",
+        value_order="fiber",
+        max_states=10_000,
+        time_limit=30,
+    )
+    assert general.status is RetractionSearchStatus.FOUND
+    assert general.endomorphism is not None
+    assert pycliques.verify_coaffine_endomorphism(host, general.endomorphism)
