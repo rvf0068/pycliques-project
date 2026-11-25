@@ -1,4 +1,4 @@
-"""Exact symbolic Dong matching for a graph clique complex using a ZDD.
+r"""Exact symbolic Dong matching for a graph clique complex using a ZDD.
 
 A zero-suppressed decision diagram stores a family of sets, not individual
 simplices. Node (v, low, high) denotes low union {s union {v}: s in high}.

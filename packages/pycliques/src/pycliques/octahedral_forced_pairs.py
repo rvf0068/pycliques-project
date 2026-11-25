@@ -18,12 +18,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-
-def _bits(mask: int):
-    while mask:
-        bit = mask & -mask
-        yield bit.bit_length() - 1
-        mask -= bit
+from ._bitsets import iter_indices as _bits
 
 
 @dataclass(frozen=True)

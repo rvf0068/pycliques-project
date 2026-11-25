@@ -12,7 +12,7 @@ test: ## Run tests with pytest against the workspace env
 	uv run pytest --doctest-modules
 
 research-test: ## Run fast research regression tests (includes order 7)
-	uv run pytest research/test_homotopy_research.py -m "not slow"
+	uv run pytest research -m "not slow"
 
 research-test-slow: ## Run the scheduled order-8 research regression test
 	uv run pytest research/test_homotopy_research.py -m slow

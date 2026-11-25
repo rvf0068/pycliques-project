@@ -172,3 +172,23 @@ def test_simultaneous_paring_matches_definition_on_graph_atlas():
             assert nx.is_isomorphic(
                 completely_pared_graph(host), completely_pared_graph(pared)
             )
+
+
+def test_pared_core_matches_sequential_folds_on_small_graphs():
+    from pycliques.dominated import _pare_with_folds, dominates, find_dominated_vertex
+
+    graphs = [g for g in nx.graph_atlas_g() if len(g) <= 5]
+    looped = nx.path_graph(4)
+    looped.add_edge(0, 0)
+    graphs.extend([looped, nx.MultiGraph(looped), nx.DiGraph(looped)])
+    for graph in graphs:
+        result, folds = _pare_with_folds(graph, deterministic=True)
+        replay = graph.copy()
+        for vertex, dominator in folds:
+            assert find_dominated_vertex(replay) == vertex
+            assert dominates(replay, dominator, vertex)
+            replay.remove_node(vertex)
+        assert find_dominated_vertex(replay) is None
+        assert list(replay) == list(result) and set(replay.edges()) == set(
+            result.edges()
+        )

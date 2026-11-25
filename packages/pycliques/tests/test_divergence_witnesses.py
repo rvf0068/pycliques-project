@@ -199,3 +199,48 @@ def test_nonreflexive_nan_node_label_does_not_preserve_diagonal_bits():
     assert witness is not None
     assert witness.dimension == 3
     assert verify_special_octahedron_witness(graph, witness)
+
+
+def test_schema_three_positive_records_and_wrong_origin():
+    from copy import deepcopy
+
+    from pycliques.certificate_records import graph6, serialize_result, verify_record
+
+    cycle = nx.cycle_graph(4)
+    octahedron = nx.octahedral_graph()
+    graph = nx.relabel_nodes(octahedron, {v: ("v", v) for v in octahedron})
+    found = small._test_iterate_certificates(small.CliqueSequence(graph), 1, 0, ())
+    assert found is not None
+    verdict, reason, cert = found
+    behavior = small.CliqueBehavior(verdict, reason, 1, False, graph, cert)
+    special = serialize_result(graph, behavior)
+    assert verify_record(special) and special["proof_status"] == "verified_local"
+    tampered = deepcopy(special)
+    tampered["proof"]["antipode_indices"] = []
+    assert not verify_record(tampered)
+    tampered = deepcopy(special)
+    tampered["proof"]["origin_graph6"] = graph6(cycle)
+    assert verify_record(tampered, verify_iterate=False) and not verify_record(tampered)
+    identity = {v: v for v in graph}
+    mapping = small.Certificate.from_retraction(graph, graph, 0, (identity, identity))
+    retracted = serialize_result(graph, replace(behavior, certificate=mapping))
+    assert verify_record(retracted)
+    tampered = deepcopy(retracted)
+    tampered["proof"]["target_graph6"] = graph6(cycle)
+    tampered["proof"]["target_reference"] = None
+    assert not verify_record(tampered)
+    helly = serialize_result(cycle, small.classify_clique_behavior(cycle))
+    assert verify_record(helly) and helly["proof"]["rule"] == "eventually_clique_helly"
+    for proof in (
+        None,
+        {"schema": 2},
+        {**helly["proof"], "iterate_index": True},
+        {**helly["proof"], "rule": "unknown"},
+    ):
+        assert not verify_record({**helly, "proof": proof})
+    assert (
+        serialize_result(graph, replace(behavior, verdict=Verdict.INDETERMINATE))[
+            "proof"
+        ]
+        is None
+    )

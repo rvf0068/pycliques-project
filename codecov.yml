@@ -1,4 +1,4 @@
-# Coverage is uploaded separately by each of the 4 x 4 CI test matrix jobs.
+# Coverage is uploaded separately by each package on Python 3.12.
 # Reporting project coverage on partial uploads previously generated
 # transient false failures while the slowest pycliques tests were running.
 #

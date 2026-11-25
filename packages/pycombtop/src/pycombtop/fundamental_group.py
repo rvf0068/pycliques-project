@@ -20,14 +20,15 @@ The algorithm works as follows:
    Every edge in T gets label = identity (the trivial word).
 
 2. Process remaining edges one by one:
+
    - If a new edge completes a triangle with two already-labelled edges,
      its label is determined: label(x,y) = label(x,z) * label(z,y)
      for any common neighbour z already in the spanning subgraph.
    - If a new edge does NOT complete any triangle, it introduces a new
      free generator of the fundamental group.
 
-3. Every triangle {x, y, z} in the clique complex gives a relator:
-     label(x,y) * label(y,z) * label(z,x) = 1
+3. Every triangle {x, y, z} in the clique complex gives the relator
+   ``label(x,y) * label(y,z) * label(z,x) = 1``.
 
 4. The fundamental group is the finitely presented group with the
    generators and relators collected above.
@@ -55,6 +56,7 @@ from collections import deque
 from dataclasses import dataclass
 
 import networkx as nx
+from sympy import Matrix
 from sympy.combinatorics import Permutation, PermutationGroup
 from sympy.combinatorics.fp_groups import FpGroup
 from sympy.combinatorics.free_groups import FreeGroup, free_group
@@ -87,11 +89,7 @@ class FundamentalRecord:
     relators : list
         The relators (as free-group words) added to present the group.
     rank : int
-        The rank (number of generators) of the fundamental group,
-        equal to |E(G)| - |V(G)| + 1  minus the number of triangles
-        that killed generators.  This equals the first Betti number
-        beta_1 of Delta(G) when Delta(G) is simply connected, and the rank of
-        the abelianisation otherwise.
+        Historical name for the number of generators in this presentation.
     """
 
     group: FpGroup
@@ -100,6 +98,11 @@ class FundamentalRecord:
     spanning_tree: set
     relators: list
     rank: int
+
+    @property
+    def generator_count(self) -> int:
+        """Number of presentation generators, before abelianizing the relations."""
+        return self.rank
 
     def __str__(self) -> str:  # pragma: no cover
         return (
@@ -418,8 +421,7 @@ def first_homology_rank(graph: nx.Graph) -> int:
     """Return the rank of H_1(Delta(G), Z) -- the first Betti number beta_1.
 
     This equals the rank of the abelianisation of pi_1(Delta(G)).
-    For a clique complex it is also |E| - |V| + c - (number of triangles
-    that kill generators), where c is the number of connected components.
+    Each relator contributes its signed exponent sums to the relation matrix.
 
     .. rubric:: Parameters
 
@@ -432,7 +434,15 @@ def first_homology_rank(graph: nx.Graph) -> int:
         beta_1(Delta(G)).
     """
     rec = fundamental_group(graph)
-    return rec.rank
+    if not rec.relators:
+        return rec.generator_count
+    relations = []
+    for word in rec.relators:
+        sums = [0] * rec.generator_count
+        for letter in word:
+            sums[abs(letter) - 1] += 1 if letter > 0 else -1
+        relations.append(sums)
+    return rec.generator_count - int(Matrix(relations).rank())
 
 
 # ---------------------------------------------------------------------------
@@ -481,7 +491,7 @@ def fundamental_group_as_permutation_group(
     rec = fundamental_group(graph)
     fp = rec.group
 
-    if rec.rank == 0:
+    if rec.generator_count == 0:
         return PermutationGroup(Permutation(0))
 
     try:
@@ -604,7 +614,7 @@ def covering_graph(
     # negative = inverse).  We work with right cosets of H.
     # ------------------------------------------------------------------
 
-    ngens = rec.rank
+    ngens = rec.generator_count
 
     if ngens == 0:
         # pi_1 is trivial -> only one coset -> cover = graph itself

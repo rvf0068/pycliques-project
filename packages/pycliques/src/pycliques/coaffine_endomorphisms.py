@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 import networkx as nx
 
+from ._graph_utils import is_simple_graph
 from .octahedral_coaffine_native import (
     MAX_NATIVE_ORDER,
     find_coaffine_native_executable,
@@ -23,12 +24,7 @@ from .retractions import RetractionSearchStatus
 
 
 def _validate_graph(graph: nx.Graph) -> None:
-    if (
-        not isinstance(graph, nx.Graph)
-        or graph.is_directed()
-        or graph.is_multigraph()
-        or nx.number_of_selfloops(graph)
-    ):
+    if not is_simple_graph(graph):
         raise ValueError("require a simple undirected loopless graph")
 
 

@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.11"
 dependencies = [
     "networkx>=3.6",
+    "numpy",
     "pycliques",
     "sympy",
     "scipy>=1.11",

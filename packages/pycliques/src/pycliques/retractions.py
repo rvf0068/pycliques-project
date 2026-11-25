@@ -169,15 +169,13 @@ def _extend_retraction(
 ) -> Iterator[tuple[tuple[Hashable, Hashable], ...]]:
     """Generator to backtrack and complete a retraction from large to small."""
     ret = dict(state)
-    remaining = list(set(large.nodes()) - set(ret.keys()))
-
-    for v in remaining:
-        for w in _extension_of_map(large, small, ret, v):
-            if len(ret) == large.order() - 1:
-                yield ((v, w),)
-            else:
-                for res in _extend_retraction(large, small, state + ((v, w),)):
-                    yield ((v, w),) + res
+    v = next(vertex for vertex in large if vertex not in ret)
+    for w in _extension_of_map(large, small, ret, v):
+        if len(ret) + 1 == len(large):
+            yield ((v, w),)
+        else:
+            for extension in _extend_retraction(large, small, state + ((v, w),)):
+                yield ((v, w),) + extension
 
 
 class RetractionSearchStatus(Enum):
@@ -325,7 +323,11 @@ def bounded_retraction(
 
 
 def retraction(large: nx.Graph, small: nx.Graph) -> Iterator[tuple[dict, dict]]:
-    """Yield all retractions from ``large`` onto ``small``.
+    """Yield each projection once per representative induced inclusion.
+
+    Inclusions are taken up to automorphisms of both graphs. For the chosen
+    inclusion every adjacency-or-equality preserving projection fixing its
+    image is enumerated, without quotienting projections by its stabilizer.
 
     Each retraction is a pair of dictionaries:
 

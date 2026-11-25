@@ -11,14 +11,8 @@ from dataclasses import dataclass
 
 import networkx as nx
 
+from ._bitsets import iter_indices as _bits
 from .coaffine_endomorphisms import _validate_graph
-
-
-def _bits(mask: int) -> Iterator[int]:
-    while mask:
-        bit = mask & -mask
-        yield bit.bit_length() - 1
-        mask ^= bit
 
 
 @dataclass(frozen=True)

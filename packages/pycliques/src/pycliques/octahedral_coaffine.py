@@ -22,6 +22,7 @@ from dataclasses import dataclass
 
 import networkx as nx
 
+from ._graph_utils import is_simple_graph
 from .coaffine_endomorphisms import (
     _search_coaffine_python,
     _validate_search_order,
@@ -107,12 +108,7 @@ def find_octahedral_retraction_coaffine(
     >>> result.dimension
     3
     """
-    if (
-        not isinstance(graph, nx.Graph)
-        or graph.is_directed()
-        or graph.is_multigraph()
-        or nx.number_of_selfloops(graph)
-    ):
+    if not is_simple_graph(graph):
         raise ValueError("require a simple undirected loopless NetworkX graph")
     if type(min_dimension) is not int or min_dimension < 3:
         raise ValueError("min_dimension must be an integer >= 3")

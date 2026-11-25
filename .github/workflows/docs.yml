@@ -3,12 +3,14 @@ name: Build and Deploy Docs
 on:
   push:
     branches: ["main"]
+  pull_request:
+    branches: ["main"]
   workflow_dispatch:
 
 # Serialize Pages deployments: overlapping pushes must never deploy at once.
 # Keep the running release instead of cancelling it mid-deployment.
 concurrency:
-  group: github-pages
+  group: docs-${{ github.event.pull_request.number || 'github-pages' }}
   cancel-in-progress: false
 
 jobs:
@@ -26,21 +28,20 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Install Workspace and Doc Dependencies
-        run: uv sync --group dev
+        run: uv sync --locked --no-default-groups --group docs
 
       - name: Build Sphinx
-        run: |
-          source .venv/bin/activate
-          cd docs
-          make html
+        run: .venv/bin/sphinx-build -W --keep-going -b html docs docs/_build/html
 
       - name: Upload artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
           name: ${{ env.PAGES_ARTIFACT_NAME }}
           path: docs/_build/html
 
   deploy:
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     permissions:

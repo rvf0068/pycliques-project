@@ -15,6 +15,7 @@ mean any complete set.
    :maxdepth: 2
    :caption: Contents
 
+   methods
    api/index
    research/partition_lattice
    research/helly_cover

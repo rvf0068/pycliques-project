@@ -24,13 +24,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v4
       - name: Install Python documentation dependencies
-        run: uv sync --group dev
+        run: uv sync --locked --no-default-groups --group docs
       - name: Install TeX Live tools
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq latexmk texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended xindy
       - name: Build package PDF via the documented command
-        run: make pdf
+        run: PATH="$PWD/.venv/bin:$PATH" make -C docs latexpdf
       - name: Upload compiled documentation
         if: success()
         uses: actions/upload-artifact@v4

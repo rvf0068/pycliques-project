@@ -425,3 +425,17 @@ def test_covering_graph_is_connected_for_normal_subgroup():
     # For abelian groups (like Z), all subgroups are normal
     cover = covering_graph(G, [[1, 1]], rec=rec)
     assert nx.is_connected(cover)
+
+
+def test_torsion_relations_kill_rational_rank():
+    from pycombtop import first_homology_rank, fundamental_group, relative_betti_numbers
+
+    graph = nx.from_graph6_bytes(b"JEhbtj{rve?")
+    record = fundamental_group(graph)
+    assert record.rank == record.generator_count == 1
+    assert record.relators == [[1, 1]]
+    assert (
+        first_homology_rank(graph)
+        == relative_betti_numbers(nx.find_cliques(graph), lambda _: False)[1]
+        == 0
+    )

@@ -922,3 +922,20 @@ def test_collapse_large_simplex_uses_certified_fast_path():
     simplex = SimplicialComplex(set(range(20)), facet_set=[set(range(20))])
     result = collapse(simplex)
     assert len(result.vertex_set) == 1
+
+
+def test_verdict_exposes_only_proved_wedges_and_labels_field():
+    from pycombtop import BettiProfile, HomotopyKind
+
+    cycle = nx.cycle_graph(4)
+    exact = homotopy_type_with_verdict(cycle)
+    assert exact.kind is HomotopyKind.EXACT_WEDGE
+    assert exact.proved_wedge == WedgeOfSpheres.sphere(1)
+    limited = homotopy_type_with_verdict(cycle, max_vertices=2)
+    assert limited.kind is HomotopyKind.LIMITED
+    assert limited.proved_wedge is None and limited.betti_profile is None
+    assert limited.limit_reason == "vertex limit 2 exceeded"
+    result = homotopy_type_with_verdict(nx.disjoint_union(cycle, cycle))
+    assert result.kind is HomotopyKind.BETTI_ONLY and result.proved_wedge is None
+    assert result.betti_profile == BettiProfile((1, 2), 2)
+    assert "GF(2)" in str(result)

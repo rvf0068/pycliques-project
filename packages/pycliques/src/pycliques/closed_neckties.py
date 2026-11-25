@@ -14,15 +14,8 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Generic, TypeVar, overload
 
+from ._bitsets import iter_indices as _indices
 from .implicit_clique_graph import ImplicitCliqueGraph
-
-
-def _indices(mask: int) -> Iterator[int]:
-    while mask:
-        bit = mask & -mask
-        yield bit.bit_length() - 1
-        mask ^= bit
-
 
 _Permutations = tuple[tuple[int, ...], ...]
 _BadState = tuple[int, int, int, _Permutations]

@@ -1,6 +1,7 @@
 from typing import Literal, cast
 
 import networkx as nx
+import pytest
 from pycombtop import (
     Simplex,
     SimplicialComplex,
@@ -420,7 +421,10 @@ def test_neighborhood_complex_facets_are_neighborhoods():
     g = nx.path_graph(4)
     nc = neighborhood_complex(g)
     expected = {frozenset(g.neighbors(v)) for v in g.nodes() if list(g.neighbors(v))}
-    assert {frozenset(f) for f in nc.facet_set} == expected
+    assert nc.facet_set == {
+        face for face in expected if not any(face < other for other in expected)
+    }
+    assert nc.is_clique_complex()
 
 
 def test_neighborhood_complex_no_edges():
@@ -615,3 +619,35 @@ def test_nerve_of_sets_large_incidence_family():
     assert nerve.facet_set == {Simplex(Simplex(s) for s in family)}
     assert nerve_of_sets([set(), {0}, {0}]).facet_set == {Simplex([Simplex({0})])}
     assert not nerve_of_sets([]).facet_set
+
+
+def test_generators_define_membership_and_single_degree_faces():
+    complex_ = SimplicialComplex(
+        range(17), [range(16), [0, 1]], function=lambda _: False
+    )
+    assert complex_.vertex_set == set(range(16))
+    assert complex_.is_clique_complex()
+    assert complex_.facet_set == {frozenset(range(16))}
+    edges = set(complex_.faces_of_dimension(1))
+    assert len(edges) == 120 and complex_.skeleton(1).facet_set == edges
+    assert set(complex_.faces_of_dimension(-2)) == set()
+    with pytest.raises(ValueError, match="outside"):
+        SimplicialComplex({1}, [[2]])
+
+
+def test_empty_realizations_have_no_homotopy_wedge():
+    from pycombtop import homotopy_type_sc_with_verdict, homotopy_type_with_verdict
+
+    void = SimplicialComplex([], [])
+    empty_face = clique_complex(nx.Graph())
+    assert void.all_simplices() == set()
+    assert empty_face.all_simplices() == {frozenset()}
+    assert (
+        SimplicialComplex({1}, function=lambda s: not s).facet_set
+        == empty_face.facet_set
+    )
+    for complex_ in (void, empty_face):
+        with pytest.raises(ValueError, match="nonempty realization"):
+            homotopy_type_sc_with_verdict(complex_)
+    with pytest.raises(ValueError, match="nonempty realization"):
+        homotopy_type_with_verdict(nx.Graph())

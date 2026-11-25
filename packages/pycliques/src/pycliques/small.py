@@ -2,28 +2,21 @@
 
 from __future__ import annotations
 
-import argparse
-import gzip
 import logging
 import math
-import os
-import sys
 from collections.abc import Callable, Hashable, Iterator
 from dataclasses import dataclass
-from enum import Enum, auto
 from itertools import combinations
-from pathlib import Path
-from tempfile import NamedTemporaryFile
 from typing import cast
 
 import networkx as nx
-from rich.logging import RichHandler
 
-from pycliques import __version__
+from pycliques.classification_types import Certificate as Certificate
+from pycliques.classification_types import CliqueBehavior as CliqueBehavior
+from pycliques.classification_types import ReferenceStatus as ReferenceStatus
+from pycliques.classification_types import Verdict as Verdict
+from pycliques.clique_sequence import CliqueSequence as CliqueSequence
 from pycliques.cliques import (
-    Clique,
-    _clique_graph_from_index,
-    _cliques_by_vertex,
     clique_graph,
 )
 from pycliques.clockwork import (
@@ -54,17 +47,33 @@ from pycliques.cutpoints import (
     local_bridges,
     remove_edge_not_in_triangle,
 )
-from pycliques.dominated import completely_pared_graph, dominates, find_dominated_vertex
+from pycliques.dominated import completely_pared_graph
 from pycliques.helly import is_clique_helly
 from pycliques.known_octahedral_witnesses import (
     snub_o24_matches_source,
     snub_o24_pairs_for_iterates,
 )
-from pycliques.named import complement_of_cycle, snub_disphenoid, suspension_of_cycle
+from pycliques.named import complement_of_cycle, suspension_of_cycle
 from pycliques.octahedral_retractions import find_octahedral_retraction
+from pycliques.references import (
+    _REFERENCE_GRAPHS as _REFERENCE_GRAPHS,
+)
+from pycliques.references import (
+    ReferenceSelection,
+    current_references,
+    reference_scope,
+)
+from pycliques.references import (
+    clear_reference_graphs as clear_reference_graphs,
+)
+from pycliques.references import (
+    register_reference_graph as register_reference_graph,
+)
+from pycliques.references import (
+    select_reference_graphs as select_reference_graphs,
+)
 from pycliques.retractions import (
     RetractionSearchStatus,
-    SpecialOctahedronWitness,
     find_special_octahedron_witness,
     retracts,
     special_octahedra_dimension,
@@ -76,100 +85,35 @@ from pycliques.targeted_retractions import (
     verify_targeted_retraction,
 )
 
+from ._graph_utils import same_labeled_graph as _same_labeled_graph
+from .indeterminate_files import (  # noqa: F401 -- historical entry points
+    _graph6_string,
+    _indeterminate_file_path,
+    _is_known_indeterminate,
+    _load_indeterminate_file_entries,
+    _load_indeterminate_file_entries_with_metadata,
+    _load_indeterminate_graphs,
+    _save_indeterminate,
+    _serialize_certificate,
+    _update_processed_indeterminate,
+)
+from .small_cli import (  # noqa: F401 -- historical entry points
+    _main,
+    _main_clockwork_pairs,
+    _parse_args,
+    _parse_clockwork_pair_args,
+    _recheck_indeterminate_file,
+    _run_fast_pass_indeterminate,
+    _setup_logging,
+    main,
+    main_clockwork_pairs,
+)
+
 _logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Verdict enum and CliqueSequence
+# Classifier rule types
 # ---------------------------------------------------------------------------
-
-
-class Verdict(Enum):
-    """Classification outcome for a graph's clique behavior."""
-
-    CONVERGENT = auto()
-    DIVERGENT = auto()
-    INDETERMINATE = auto()
-
-
-class ReferenceStatus(Enum):
-    """Whether a registered reference graph is proved or only conjectured."""
-
-    PROVEN = auto()
-    CONJECTURED = auto()
-
-
-@dataclass(frozen=True)
-class Certificate:
-    """Structured provenance for a classification decision.
-
-    An inference rule returns ``None`` when it establishes no verdict.  An
-    ``INDETERMINATE`` result is reserved for a conditional conclusion or for
-    the global classifier after all applicable rules have been exhausted.
-    """
-
-    rule: str
-    target: nx.Graph | None = None
-    target_status: str | None = None
-    target_label: str | None = None
-    map: tuple[dict, dict] | dict | None = None
-    edge: tuple[Hashable, Hashable] | None = None
-    m: int | None = None
-    n: int | None = None
-    radius: int | None = None
-    source: nx.Graph | None = None
-    source_coaffination: dict[Hashable, Hashable] | None = None
-    target_coaffination: dict[Hashable, Hashable] | None = None
-    theorem_base_graph: nx.Graph | None = None
-    suspension_vertices: tuple[Hashable, Hashable] | None = None
-    base_graph: nx.Graph | None = None
-    base_coaffination: dict[Hashable, Hashable] | None = None
-    clockwork_structure: ClockworkStructure | None = None
-    iterate_index: int | None = None
-    special_octahedron: SpecialOctahedronWitness | None = None
-
-
-@dataclass(frozen=True)
-class CliqueBehavior:
-    """Result of classifying a graph under clique-graph iteration.
-
-    ``INDETERMINATE`` means that the available sufficient tests did not
-    decide the behavior within the configured limits.  It is not a
-    mathematical assertion that the graph is neither convergent nor
-    divergent.
-
-    Individual inference rules return ``None`` when they establish no
-    verdict.  ``INDETERMINATE`` is returned by the global classifier only
-    after the applicable rules have been exhausted, or when a conclusion is
-    explicitly conditional on a conjecture.
-
-    .. rubric:: Attributes
-
-    verdict : Verdict
-        The classification supplied by the available tests.
-    reason : str
-        Explanation of the deciding test or why classification was
-        indeterminate.
-    iterations_checked : int
-        Number of iterated clique graphs inspected, including the input.
-    bound_exceeded : bool
-        Whether a clique-graph computation exceeded the clique bound.
-    pared_graph : networkx.Graph
-        Completely pared copy of the input graph used by the classifier.
-    certificate : Certificate | None
-        Structured justification for the inference rule that established the
-        verdict, when available.
-    observations : tuple[InducedClockworkWitness, ...]
-        Verified induced divergent clockworks found by opt-in searches. These
-        structural observations do not, on their own, establish divergence.
-    """
-
-    verdict: Verdict
-    reason: str
-    iterations_checked: int
-    bound_exceeded: bool
-    pared_graph: nx.Graph
-    certificate: Certificate | None = None
-    observations: tuple[InducedClockworkWitness, ...] = ()
 
 
 #: Type alias for one inference rule's result.
@@ -216,7 +160,8 @@ def _classify_suspension_2_coaffination(
             return (
                 Verdict.DIVERGENT,
                 (
-                    "[LNP09, Theorem 4.6]: graph is the suspension of a connected graph "
+                    "[LNP09, Theorem 4.6]: graph is the suspension of a "
+                    "connected graph "
                     "H admitting a 2-coaffination; hence it is expansive and "
                     "therefore clique divergent"
                 ),
@@ -233,342 +178,25 @@ def _classify_suspension_2_coaffination(
     return None
 
 
-def _sequence_vertex_key(vertex: Hashable) -> tuple:
-    """A stable total-order key for ordinary graph labels."""
-    if isinstance(vertex, int):
-        return (0, vertex)
-    if isinstance(vertex, str):
-        return (1, vertex)
-    if isinstance(vertex, bytes):
-        return (2, vertex)
-    if isinstance(vertex, tuple):
-        return (3, tuple(_sequence_vertex_key(v) for v in vertex))
-    if isinstance(vertex, frozenset):
-        return (4, tuple(sorted(_sequence_vertex_key(v) for v in vertex)))
-    raise ValueError("unsupported label for relabeling; supply vertex_key")
-
-
-def _sequence_relabel(graph: nx.Graph, vertices: list[Hashable]) -> nx.Graph:
-    """Number nodes in the given order, preserving graph attributes."""
-    labels = {v: i for i, v in enumerate(vertices)}
-    numbered = nx.relabel_nodes(graph, labels, copy=True)
-    result = nx.Graph()
-    result.graph.update(numbered.graph)
-    result.add_nodes_from((i, numbered.nodes[i]) for i in range(len(vertices)))
-    result.add_edges_from(
-        (u, v, numbered[u][v])
-        for u in range(len(vertices))
-        for v in sorted(numbered[u])
-        if u <= v
-    )
-    return result
-
-
-def _sequence_pare(
-    graph: nx.Graph, *, deterministic: bool
-) -> tuple[nx.Graph, tuple[tuple[Hashable, Hashable], ...]]:
-    """Use the usual deletion order and record a valid current dominator."""
-    current = graph.copy()
-    rank = {v: i for i, v in enumerate(current)}
-    moves: list[tuple[Hashable, Hashable]] = []
-    while (vertex := find_dominated_vertex(current)) is not None:
-        candidates = list(current[vertex])
-        if deterministic:
-            candidates.sort(key=rank.__getitem__)
-        dominator = next(
-            w for w in candidates if w != vertex and dominates(current, w, vertex)
-        )
-        moves.append((vertex, dominator))
-        current.remove_node(vertex)
-    return current, tuple(moves)
-
-
-class CliqueSequence:
-    """Lazily cache clique iterates, with optional paring and stable labels.
-
-    By default the supplied graph is level zero, assumed already pared, and
-    later levels are completely pared as in the original API. Set
-    ``pare_initial=True`` to pare the starting graph as well. Set
-    ``pare=False`` for the actual clique iterates (incompatible with
-    ``pare_initial=True``).
-
-    With ``relabel=True``, the input is numbered in deterministic label order,
-    raw clique vertices in lexicographic order of their preceding integer
-    vertices, and survivors in raw integer order. This is not graph
-    canonization. A custom ``vertex_key`` may order other input labels; its
-    keys must be distinct, stable and mutually comparable. The default
-    supports integers, strings, bytes, and nested tuples and frozensets.
-
-    The clique count and edge limits apply to each raw positive iterate,
-    before paring. Requesting a clique family alone does not construct any
-    edges at that level. Returned graphs should be treated as read-only.
-
-    .. rubric:: Examples
-
-    >>> import networkx as nx
-    >>> seq = CliqueSequence(nx.path_graph(4), relabel=True, pare_initial=True)
-    >>> seq[0].order()
-    1
-    >>> len(seq.paring_certificate(0))
-    3
-    >>> seq = CliqueSequence(nx.octahedral_graph(), pare=False, relabel=True)
-    >>> len(seq.clique_family(1))
-    8
-    >>> seq.graph_count
-    1
-    >>> seq[1].order()
-    8
-    """
-
-    def __init__(
-        self,
-        graph: nx.Graph,
-        bound: int | float = 30,
-        *,
-        pare: bool = True,
-        relabel: bool = False,
-        max_edges: int | None = None,
-        pare_initial: bool = False,
-        vertex_key: Callable[[Hashable], tuple] | None = None,
-    ) -> None:
-        if bound < 0 or (max_edges is not None and max_edges < 0):
-            raise ValueError("bounds must be nonnegative")
-        if pare_initial and not pare:
-            raise ValueError("pare_initial requires pare=True")
-        if vertex_key is not None and not relabel:
-            raise ValueError("vertex_key requires relabel=True")
-        self._bound = bound
-        self._pare = pare
-        self._relabel = relabel
-        self._max_edges = max_edges
-        self._exhausted = False
-        self._families: dict[int, tuple[Clique, ...]] = {}
-        self._raw_graphs: dict[int, nx.Graph] = {}
-        self._raw_maps: dict[int, dict[Hashable, Hashable]] = {}
-        self._maps: dict[int, dict[Hashable, Hashable]] = {}
-        self._certificates: dict[int, tuple[tuple[Hashable, Hashable], ...]] = {}
-
-        vertices: list[Hashable] = list(graph)
-        if relabel:
-            key = vertex_key or _sequence_vertex_key
-            vertices.sort(key=key)
-            keys = [key(v) for v in vertices]
-            if any(a == b for a, b in zip(keys, keys[1:])):
-                raise ValueError("vertex_key must distinguish all input vertices")
-            raw = _sequence_relabel(graph, vertices)
-            raw_map: dict[Hashable, Hashable] = dict(enumerate(vertices))
-        else:
-            raw = graph
-            raw_map = {v: v for v in vertices}
-        self._raw_graphs[0] = raw
-        self._raw_maps[0] = raw_map
-        self._graphs: list[nx.Graph] = []
-        self._append(0, raw, pare=pare_initial)
-
-    @property
-    def graph_count(self) -> int:
-        """Return the number of cached output iterates, including level zero."""
-        return len(self._graphs)
-
-    @property
-    def exhausted(self) -> bool:
-        """Whether a clique-count or edge bound prevented a requested level."""
-        return self._exhausted
-
-    def _append(self, i: int, raw: nx.Graph, *, pare: bool) -> None:
-        if pare:
-            graph, moves = _sequence_pare(raw, deterministic=self._relabel)
-        else:
-            graph, moves = raw, ()
-        survivors: list[Hashable] = list(graph)
-        raw_map = self._raw_maps[i]
-        if self._relabel:
-            survivors.sort(key=lambda v: cast(int, v))
-            self._maps[i] = {j: raw_map[v] for j, v in enumerate(survivors)}
-            if moves:
-                graph = _sequence_relabel(graph, survivors)
-        else:
-            self._maps[i] = {v: raw_map[v] for v in survivors}
-        self._certificates[i] = moves
-        self._graphs.append(graph)
-
-    def clique_family(self, i: int) -> tuple[Clique, ...] | None:
-        """Return the full maximal-clique family of ``seq[i-1]``.
-
-        For positive i only. With relabeling, its tuple indices are the raw
-        integer labels at level i, before paring. The final graph's labels
-        may differ. No edges of the requested raw level are constructed.
-        Return None if a preceding graph or this clique family exceeds a
-        bound.
-        """
-        if i <= 0:
-            raise IndexError("clique_family requires a positive iterate")
-        if i in self._families:
-            return self._families[i]
-        previous = self[i - 1]
-        if previous is None or self._exhausted:
-            return None
-        indexed = _cliques_by_vertex(previous, self._bound)
-        if indexed is None:
-            self._exhausted = True
-            return None
-        family = indexed[0]
-        if self._relabel:
-            family.sort(key=lambda q: tuple(sorted(q)))
-        result = tuple(family)
-        self._families[i] = result
-        self._raw_maps[i] = (
-            dict(enumerate(result)) if self._relabel else {q: q for q in result}
-        )
-        return result
-
-    def _build_raw(self, i: int) -> nx.Graph | None:
-        if i in self._raw_graphs:
-            return self._raw_graphs[i]
-        family = self.clique_family(i)
-        if family is None:
-            return None
-        # Reuse the family, including when it was obtained before edge
-        # construction. Build edges exactly as clique_graph does.
-        previous = self._graphs[i - 1]
-        incidence: dict[Hashable, set[Clique]] = {v: set() for v in previous}
-        for q in family:
-            for v in q:
-                incidence[v].add(q)
-        raw = _clique_graph_from_index(family, incidence, self._max_edges)
-        if raw is None:
-            self._exhausted = True
-            return None
-        if self._relabel:
-            raw = _sequence_relabel(raw, list(family))
-        return raw
-
-    def raw_iterate(self, i: int) -> nx.Graph | None:
-        """Return and cache the raw level before any paring.
-
-        At zero this is the supplied graph, numbered if relabeling is enabled.
-        At positive i it is K(seq[i-1]), not necessarily K^i(G).
-        """
-        if i < 0:
-            raise IndexError("iterate must be nonnegative")
-        if i < len(self._graphs) and not self._certificates[i]:
-            return self._graphs[i]
-        raw = self._build_raw(i)
-        if raw is not None:
-            self._raw_graphs[i] = raw
-        return raw
-
-    def raw_label_map(self, i: int) -> dict[Hashable, Hashable] | None:
-        """Map raw labels to preceding cliques (input labels at level zero).
-
-        This needs only the clique family, not the raw edges.
-        """
-        if i < 0:
-            raise IndexError("iterate must be nonnegative")
-        if i > 0 and self.clique_family(i) is None:
-            return None
-        return dict(self._raw_maps[i])
-
-    def label_map(self, i: int) -> dict[Hashable, Hashable] | None:
-        """Map surviving output labels to their original cliques or labels."""
-        if self[i] is None:
-            return None
-        return dict(self._maps[i])
-
-    def paring_certificate(
-        self, i: int
-    ) -> tuple[tuple[Hashable, Hashable], ...] | None:
-        """Return ordered (deleted vertex, dominator) pairs in raw labels.
-
-        An empty tuple means no deletion; None means the level is unavailable.
-        Replay on raw_iterate(i), before compacting the surviving labels.
-        """
-        if self[i] is None:
-            return None
-        return self._certificates[i]
-
-    def __getitem__(self, i: int) -> nx.Graph | None:
-        """Return the requested output level, or None if a bound was exceeded."""
-        if i < 0:
-            raise IndexError("iterate must be nonnegative")
-        while len(self._graphs) <= i and not self._exhausted:
-            level = len(self._graphs)
-            raw = self._build_raw(level)
-            if raw is None:
-                return None
-            self._append(level, raw, pare=self._pare)
-        if i < len(self._graphs):
-            return self._graphs[i]
-        return None
-
-
 # ---------------------------------------------------------------------------
 # Classifier functions
 # ---------------------------------------------------------------------------
 
 _MAX_ITERATIONS = 9
-_REFERENCE_GRAPHS: dict[bytes, tuple[nx.Graph, ReferenceStatus, str | None]] = {}
-
-
-def _canonical_reference_key(graph: nx.Graph) -> bytes:
-    """Return a canonical graph6 key for a graph while preserving arbitrary labels."""
-    numbered = nx.convert_node_labels_to_integers(graph)
-    return cast(bytes, nx.to_graph6_bytes(numbered, header=False))
-
-
-def register_reference_graph(
-    graph: nx.Graph,
-    *,
-    status: ReferenceStatus = ReferenceStatus.PROVEN,
-    label: str | None = None,
-) -> None:
-    """Register a graph whose clique behavior is known independently of the classifier.
-
-    The status distinguishes a proven divergent reference graph from a merely
-    conjectured one. The classifier uses the same inference rules for every
-    registered graph, so future reference facts can be added without branching
-    on individual graph names.
-
-    label : str, optional
-        Human-readable identifier for the reference graph, used in certificates
-        and saved indeterminate-file metadata.
-    """
-    _REFERENCE_GRAPHS[_canonical_reference_key(graph)] = (graph.copy(), status, label)
-
-
-def clear_reference_graphs() -> None:
-    """Clear all registered divergent reference graphs."""
-    _REFERENCE_GRAPHS.clear()
-
-
-register_reference_graph(
-    snub_disphenoid(),
-    status=ReferenceStatus.PROVEN,
-    label="snub_disphenoid",
-)
-
-register_reference_graph(
-    nx.octahedral_graph(),
-    status=ReferenceStatus.PROVEN,
-    label="octahedral_graph",
-)
 
 
 def _reference_match(
     graph: nx.Graph,
 ) -> tuple[nx.Graph, ReferenceStatus, str | None] | None:
     """Return the first registered reference graph isomorphic to *graph*, if any."""
-    for ref_graph, status, label in _REFERENCE_GRAPHS.values():
-        if nx.is_isomorphic(graph, ref_graph):
+    for ref_graph, status, label in current_references(_REFERENCE_GRAPHS.values()):
+        if (
+            len(graph) == len(ref_graph)
+            and graph.size() == ref_graph.size()
+            and nx.is_isomorphic(graph, ref_graph)
+        ):
             return ref_graph, status, label
     return None
-
-
-def _summarize_reference_status(status: ReferenceStatus) -> str:
-    """Render the reference status in the certificate vocabulary used by the API."""
-    if status is ReferenceStatus.PROVEN:
-        return "proven_divergent"
-    return "conjectured_divergent"
 
 
 def _reference_identifier(reference_graph: nx.Graph, label: str | None) -> str:
@@ -626,7 +254,7 @@ def _classify_reference_dependency(
     not make the overall graph indeterminate.
     """
     conditional: ClassifierResult | None = None
-    for ref_graph, status, label in _REFERENCE_GRAPHS.values():
+    for ref_graph, status, label in current_references(_REFERENCE_GRAPHS.values()):
         retraction = retracts(graph, ref_graph)
         if isinstance(retraction, tuple):
             ident = _reference_identifier(ref_graph, label)
@@ -683,7 +311,8 @@ def _classify_local_bridge(
         if h_behavior.verdict is Verdict.CONVERGENT:
             return (
                 Verdict.CONVERGENT,
-                "contracting a local bridge yields a convergent graph by [FANP13, Theorem 6.1]",
+                "contracting a local bridge yields a convergent graph by "
+                "[FANP13, Theorem 6.1]",
                 Certificate(
                     rule="local_bridge",
                     target=h,
@@ -697,7 +326,8 @@ def _classify_local_bridge(
         if h_behavior.verdict is Verdict.DIVERGENT:
             return (
                 Verdict.DIVERGENT,
-                "contracting a local bridge yields a divergent graph by [FANP13, Theorem 6.1]",
+                "contracting a local bridge yields a divergent graph by "
+                "[FANP13, Theorem 6.1]",
                 Certificate(
                     rule="local_bridge",
                     target=h,
@@ -736,7 +366,7 @@ def classify_local_bridge(
     tries: int = _MAX_ITERATIONS,
     bound: int = 30,
 ) -> ClassifierResult | None:
-    """Classify clique behavior by contracting local bridges according to [FANP13, Theorem 6.1].
+    """Apply [FANP13, Theorem 6.1] by contracting local bridges.
 
     .. rubric:: Parameters
 
@@ -1044,7 +674,7 @@ def _classify_clockwork_pair_map(
     max_source_order: int = 40,
     bound: int = 30,
 ) -> ClassifierResult | None:
-    """Classify by [LNP06, Theorem 2.6] applied to [LNP06, Theorem 3.1], or return ``None``.
+    """Apply [LNP06, Theorems 2.6 and 3.1], returning None when inconclusive.
 
     Searches for an admissible graph morphism of coaffine pairs
     ``f: (R_{2m}^n, sigma) -> (graph, tau)`` for some ``m`` in
@@ -1232,13 +862,6 @@ def classify_clockwork_pair_map(
     return result
 
 
-def _same_labeled_graph(left: nx.Graph, right: nx.Graph) -> bool:
-    """Compare graph labels and edges while ignoring graph/node attributes."""
-    return set(left) == set(right) and {frozenset(edge) for edge in left.edges()} == {
-        frozenset(edge) for edge in right.edges()
-    }
-
-
 def _valid_theorem_coaffination(
     graph: nx.Graph,
     coaffination: dict[Hashable, Hashable],
@@ -1308,7 +931,9 @@ def verify_clockwork_pair_map_certificate(
     direct_rule = "theorem_2_6_clockwork_pair_map"
     clique_rule = "theorem_2_6_clockwork_pair_map_clique_graph"
     if certificate.rule not in {direct_rule, clique_rule}:
-        return invalid("Certificate rule is not a [LNP06, Theorem 2.6] clockwork-pair rule.")
+        return invalid(
+            "Certificate rule is not a [LNP06, Theorem 2.6] clockwork-pair rule."
+        )
     if (
         not isinstance(certificate.m, int)
         or not isinstance(certificate.n, int)
@@ -1462,14 +1087,7 @@ def _special_octahedron_certificate(graph: nx.Graph, index: int) -> Certificate 
     witness = find_special_octahedron_witness(graph)
     if witness is None:
         return None
-    return Certificate(
-        rule="special_octahedron",
-        source=graph,
-        target=graph,
-        target_status="proven_divergent",
-        iterate_index=index,
-        special_octahedron=witness,
-    )
+    return Certificate.from_special_octahedron(graph, index, witness)
 
 
 def _test_eventually_special_octahedra(
@@ -1489,26 +1107,6 @@ def _test_eventually_special_octahedra(
                 _special_octahedron_certificate(g, i),
             )
     return None
-
-
-def _make_retraction_test(
-    target: nx.Graph, label: str, *, iterate_index: int = 0
-) -> Classifier:
-    """Check a selected pared iterate for retraction to a divergent target.
-
-    A retraction of K^i(G) onto a proven divergent target implies clique
-    divergence of G. The default iterate index 0 keeps existing callers.
-    """
-    def _test(seq: CliqueSequence) -> ClassifierResult | None:
-        g = seq[iterate_index]
-        if g is not None and retracts(g, target):
-            return (
-                Verdict.DIVERGENT,
-                f"{label} (pared iterate {iterate_index})",
-                None,
-            )
-        return None
-    return _test
 
 
 def _make_clique_retraction_test(target: nx.Graph, label: str) -> Classifier:
@@ -1548,9 +1146,8 @@ def _test_iterate_certificates(
     A known target preset may construct its required iterate first.
     """
     octahedron_limited = False
-    snub_seeded = (
-        "snub_o24" in octahedron_retract_presets
-        and snub_o24_matches_source(seq[0])
+    snub_seeded = "snub_o24" in octahedron_retract_presets and snub_o24_matches_source(
+        seq[0]
     )
     # Try the supplied octahedral embedding before any general
     # Helly/special-octahedron recognition. No projection
@@ -1576,14 +1173,13 @@ def _test_iterate_certificates(
                         seeded_witness = (seeded.retraction, seeded.inclusion)
                         if not verify_retraction_witness(graph, target, seeded_witness):
                             raise AssertionError("Seeded O24 witness failed replay")
-                        seeded_certificate = Certificate(
+                        seeded_certificate = Certificate.from_retraction(
+                            graph,
+                            target,
+                            4,
+                            seeded_witness,
                             rule="octahedron_retraction_seeded",
-                            source=graph,
-                            target=target,
-                            target_status="proven_divergent",
-                            target_label="O_24",
-                            map=seeded_witness,
-                            iterate_index=4,
+                            label="O_24",
                         )
                         return (
                             Verdict.DIVERGENT,
@@ -1614,15 +1210,9 @@ def _test_iterate_certificates(
                 witness = retracts(graph, target)
                 if witness:
                     certificate = (
-                        Certificate(
-                            rule="retracts",
-                            source=graph,
-                            target=target,
-                            target_status="proven_divergent",
-                            iterate_index=i,
-                            map=witness,
-                        )
-                        if isinstance(witness, tuple) else None
+                        Certificate.from_retraction(graph, target, i, witness)
+                        if isinstance(witness, tuple)
+                        else None
                     )
                     return (
                         Verdict.DIVERGENT,
@@ -1657,23 +1247,20 @@ def _test_iterate_certificates(
                 assert result.target_kind is not None
                 target = graph.subgraph(result.target_vertices).copy()
                 dimension = int(result.target_kind.split(":")[1])
-                certificate = Certificate(
+                certificate = Certificate.from_retraction(
+                    graph,
+                    target,
+                    i,
+                    (result.projection, {v: v for v in target}),
                     rule="octahedron_retraction",
-                    source=graph,
-                    target=target,
-                    target_status="proven_divergent",
-                    target_label=f"O_{dimension}",
-                    map=(result.projection, {v: v for v in target}),
-                    iterate_index=i,
+                    label=f"O_{dimension}",
                 )
                 return (
                     Verdict.DIVERGENT,
                     f"pared iterate {i} retracts onto O_{dimension}",
                     certificate,
                 )
-            octahedron_limited |= (
-                result.status is TargetSearchStatus.LIMIT_REACHED
-            )
+            octahedron_limited |= result.status is TargetSearchStatus.LIMIT_REACHED
     if octahedron_limited:
         return (
             Verdict.INDETERMINATE,
@@ -1683,20 +1270,30 @@ def _test_iterate_certificates(
     return None
 
 
+@dataclass(frozen=True)
+class _ClockworkLimits:
+    fallback: bool = False
+    max_order: int = 12
+    max_candidates: int = 5000
+
+
+@dataclass(frozen=True)
+class _OctahedralSearch:
+    iterates: tuple[int, ...] = ()
+    dimensions: tuple[int, ...] = (4,)
+    max_patterns: int = 5_000
+    max_states: int = 100_000
+    max_assignments: int = 500_000
+    presets: tuple[str, ...] = ()
+
+
 def _default_classifiers(
     tries: int,
     clockwork_depth: int = 2,
     *,
     retraction_depth: int = 1,
-    clockwork_fallback: bool = False,
-    clockwork_fallback_max_order: int = 12,
-    clockwork_fallback_max_candidates: int = 5000,
-    octahedron_retract_iterates: tuple[int, ...] = (),
-    octahedron_dimensions: tuple[int, ...] = (4,),
-    octahedron_max_patterns: int = 5_000,
-    octahedron_max_states: int = 100_000,
-    octahedron_max_assignments: int = 500_000,
-    octahedron_retract_presets: tuple[str, ...] = (),
+    clockwork: _ClockworkLimits = _ClockworkLimits(),
+    octahedral: _OctahedralSearch = _OctahedralSearch(),
 ) -> list[Classifier]:
     """Check clockwork, then Helly/retractions/special octahedra per iterate.
 
@@ -1715,21 +1312,21 @@ def _default_classifiers(
             seq,
             tries,
             clockwork_depth,
-            fallback_enabled=clockwork_fallback,
-            fallback_max_order=clockwork_fallback_max_order,
-            fallback_max_candidates=clockwork_fallback_max_candidates,
+            fallback_enabled=clockwork.fallback,
+            fallback_max_order=clockwork.max_order,
+            fallback_max_candidates=clockwork.max_candidates,
         ),
         lambda seq: _test_iterate_certificates(
             seq,
             tries,
             retraction_depth,
             targets,
-            octahedron_retract_iterates=octahedron_retract_iterates,
-            octahedron_dimensions=octahedron_dimensions,
-            octahedron_max_patterns=octahedron_max_patterns,
-            octahedron_max_states=octahedron_max_states,
-            octahedron_max_assignments=octahedron_max_assignments,
-            octahedron_retract_presets=octahedron_retract_presets,
+            octahedron_retract_iterates=octahedral.iterates,
+            octahedron_dimensions=octahedral.dimensions,
+            octahedron_max_patterns=octahedral.max_patterns,
+            octahedron_max_states=octahedral.max_states,
+            octahedron_max_assignments=octahedral.max_assignments,
+            octahedron_retract_presets=octahedral.presets,
         ),
     ]
 
@@ -1737,6 +1334,7 @@ def _default_classifiers(
 def classify_clique_behavior(
     graph: nx.Graph,
     *,
+    references: ReferenceSelection | None = None,
     tries: int = _MAX_ITERATIONS,
     bound: int = 30,
     extension_budget: int = 1,
@@ -1798,6 +1396,8 @@ def classify_clique_behavior(
     bound : int, optional
         Maximum number of cliques allowed at each iteration
         (default: 30).
+    references : tuple, optional
+        Snapshot from select_reference_graphs, inherited by recursive calls.
     clockwork_depth : int, optional
         Number of iterates checked directly for clockwork structure
         (default: 2, preserving the historical G and K(G) check).
@@ -1831,8 +1431,7 @@ def classify_clique_behavior(
         Use (3,) to inspect only K^3(G). Requires tries >= 4.
     octahedron_dimensions : tuple[int, ...], optional
         Exact dimensions d >= 3 to test (default: (4,)).
-    octahedron_max_patterns, octahedron_max_states,
-    octahedron_max_assignments : int, optional
+    octahedron_max_patterns, octahedron_max_states, octahedron_max_assignments
         Positive bounds for each selected iterate's candidate and CSP search.
         Reaching a limit never establishes the absence of a retraction.
     octahedron_retract_presets : tuple[str, ...], optional
@@ -1861,287 +1460,309 @@ def classify_clique_behavior(
     True
 
     """
-    if tries < 1:
-        raise ValueError("tries must be at least 1")
-    if bound < 1:
-        raise ValueError("bound must be at least 1")
-    if clockwork_depth < 0:
-        raise ValueError("clockwork_depth must be non-negative")
-    if retraction_depth not in (0, 1, 2):
-        raise ValueError("retraction_depth must be 0, 1, or 2")
-    if clockwork_fallback_max_order < 0:
-        raise ValueError("clockwork_fallback_max_order must be non-negative")
-    if clockwork_fallback_max_candidates < 1:
-        raise ValueError("clockwork_fallback_max_candidates must be at least 1")
-    if induced_clockwork_depth < 0:
-        raise ValueError("induced_clockwork_depth must be non-negative")
-    if clockwork_retract_depth < 0:
-        raise ValueError("clockwork_retract_depth must be non-negative")
-    if clockwork_max_order < 0:
-        raise ValueError("clockwork_max_order must be non-negative")
-    if clockwork_max_candidates < 1:
-        raise ValueError("clockwork_max_candidates must be at least 1")
-    if clockwork_max_retraction_attempts < 1:
-        raise ValueError("clockwork_max_retraction_attempts must be at least 1")
-    if clockwork_max_retraction_states < 1:
-        raise ValueError("clockwork_max_retraction_states must be at least 1")
-    if clockwork_max_retraction_assignments < 1:
-        raise ValueError("clockwork_max_retraction_assignments must be at least 1")
-    if (
-        any(type(i) is not int or i < 0 or i >= tries
-            for i in octahedron_retract_iterates)
-        or len(set(octahedron_retract_iterates)) != len(octahedron_retract_iterates)
-    ):
-        raise ValueError("octahedron_retract_iterates must be distinct indices < tries")
-    if (
-        not octahedron_dimensions
-        or any(type(d) is not int or d < 3 for d in octahedron_dimensions)
-        or len(set(octahedron_dimensions)) != len(octahedron_dimensions)
-    ):
-        raise ValueError("octahedron_dimensions must be distinct integers >= 3")
-    if min(
-        octahedron_max_patterns,
-        octahedron_max_states,
-        octahedron_max_assignments,
-    ) < 1:
-        raise ValueError("octahedron search budgets must be positive")
-    if (
-        len(set(octahedron_retract_presets)) != len(octahedron_retract_presets)
-        or any(preset != "snub_o24" for preset in octahedron_retract_presets)
-    ):
-        raise ValueError("Unknown or duplicated octahedron retraction preset")
-    if "snub_o24" in octahedron_retract_presets and (tries < 5 or bound < 1076):
-        raise ValueError("snub_o24 requires tries >= 5 and bound >= 1076")
-
-    pared_graph = completely_pared_graph(graph)
-    seq = CliqueSequence(pared_graph, bound=bound)
-    conditional_result: ClassifierResult | None = None
-
-    # Opt-in research replay must execute the solver rather than stop at
-    # the independently proven snub reference classification.
-    seeded_snub_requested = (
-        "snub_o24" in octahedron_retract_presets
-        and snub_o24_matches_source(pared_graph)
+    selection = (
+        current_references(_REFERENCE_GRAPHS.values())
+        if references is None
+        else references
     )
-    reference_result = (
-        None if seeded_snub_requested else _classify_reference_graph(pared_graph)
-    )
-    if reference_result is not None:
-        verdict, reason, certificate = reference_result
-        if verdict is Verdict.INDETERMINATE:
-            if conditional_result is None:
-                conditional_result = reference_result
-        else:
-            return CliqueBehavior(
-                verdict, reason, seq.graph_count, False, pared_graph, certificate
+    with reference_scope(selection):
+        if tries < 1:
+            raise ValueError("tries must be at least 1")
+        if bound < 1:
+            raise ValueError("bound must be at least 1")
+        if clockwork_depth < 0:
+            raise ValueError("clockwork_depth must be non-negative")
+        if retraction_depth not in (0, 1, 2):
+            raise ValueError("retraction_depth must be 0, 1, or 2")
+        if clockwork_fallback_max_order < 0:
+            raise ValueError("clockwork_fallback_max_order must be non-negative")
+        if clockwork_fallback_max_candidates < 1:
+            raise ValueError("clockwork_fallback_max_candidates must be at least 1")
+        if induced_clockwork_depth < 0:
+            raise ValueError("induced_clockwork_depth must be non-negative")
+        if clockwork_retract_depth < 0:
+            raise ValueError("clockwork_retract_depth must be non-negative")
+        if clockwork_max_order < 0:
+            raise ValueError("clockwork_max_order must be non-negative")
+        if clockwork_max_candidates < 1:
+            raise ValueError("clockwork_max_candidates must be at least 1")
+        if clockwork_max_retraction_attempts < 1:
+            raise ValueError("clockwork_max_retraction_attempts must be at least 1")
+        if clockwork_max_retraction_states < 1:
+            raise ValueError("clockwork_max_retraction_states must be at least 1")
+        if clockwork_max_retraction_assignments < 1:
+            raise ValueError("clockwork_max_retraction_assignments must be at least 1")
+        if any(
+            type(i) is not int or i < 0 or i >= tries
+            for i in octahedron_retract_iterates
+        ) or len(set(octahedron_retract_iterates)) != len(octahedron_retract_iterates):
+            raise ValueError(
+                "octahedron_retract_iterates must be distinct indices < tries"
             )
-
-    theorem_4_6_result = _classify_suspension_2_coaffination(graph)
-    if theorem_4_6_result is not None:
-        verdict, reason, certificate = theorem_4_6_result
-        if verdict is Verdict.INDETERMINATE:
-            if conditional_result is None:
-                conditional_result = theorem_4_6_result
-        else:
-            return CliqueBehavior(
-                verdict, reason, seq.graph_count, False, pared_graph, certificate
+        if (
+            not octahedron_dimensions
+            or any(type(d) is not int or d < 3 for d in octahedron_dimensions)
+            or len(set(octahedron_dimensions)) != len(octahedron_dimensions)
+        ):
+            raise ValueError("octahedron_dimensions must be distinct integers >= 3")
+        if (
+            min(
+                octahedron_max_patterns,
+                octahedron_max_states,
+                octahedron_max_assignments,
             )
+            < 1
+        ):
+            raise ValueError("octahedron search budgets must be positive")
+        if len(set(octahedron_retract_presets)) != len(
+            octahedron_retract_presets
+        ) or any(preset != "snub_o24" for preset in octahedron_retract_presets):
+            raise ValueError("Unknown or duplicated octahedron retraction preset")
+        if "snub_o24" in octahedron_retract_presets and (tries < 5 or bound < 1076):
+            raise ValueError("snub_o24 requires tries >= 5 and bound >= 1076")
 
-    for classifier in _default_classifiers(
-        tries,
-        clockwork_depth,
-        retraction_depth=retraction_depth,
-        clockwork_fallback=clockwork_fallback,
-        clockwork_fallback_max_order=clockwork_fallback_max_order,
-        clockwork_fallback_max_candidates=clockwork_fallback_max_candidates,
-        octahedron_retract_iterates=octahedron_retract_iterates,
-        octahedron_dimensions=octahedron_dimensions,
-        octahedron_max_patterns=octahedron_max_patterns,
-        octahedron_max_states=octahedron_max_states,
-        octahedron_max_assignments=octahedron_max_assignments,
-        octahedron_retract_presets=octahedron_retract_presets,
-    ):
-        result = classifier(seq)
-        if result is not None:
-            verdict, reason, certificate = result
+        pared_graph = completely_pared_graph(graph)
+        seq = CliqueSequence(pared_graph, bound=bound)
+        conditional_result: ClassifierResult | None = None
+
+        # Opt-in research replay must execute the solver rather than stop at
+        # the independently proven snub reference classification.
+        seeded_snub_requested = (
+            "snub_o24" in octahedron_retract_presets
+            and snub_o24_matches_source(pared_graph)
+        )
+        reference_result = (
+            None if seeded_snub_requested else _classify_reference_graph(pared_graph)
+        )
+        if reference_result is not None:
+            verdict, reason, certificate = reference_result
             if verdict is Verdict.INDETERMINATE:
                 if conditional_result is None:
-                    conditional_result = result
+                    conditional_result = reference_result
             else:
                 return CliqueBehavior(
                     verdict, reason, seq.graph_count, False, pared_graph, certificate
                 )
 
-    reference_dependency = _classify_reference_dependency(pared_graph)
-    if reference_dependency is not None:
-        verdict, reason, certificate = reference_dependency
-        if verdict is Verdict.INDETERMINATE:
-            if conditional_result is None:
-                conditional_result = reference_dependency
-        else:
-            return CliqueBehavior(
-                verdict, reason, seq.graph_count, False, pared_graph, certificate
-            )
+        theorem_4_6_result = _classify_suspension_2_coaffination(graph)
+        if theorem_4_6_result is not None:
+            verdict, reason, certificate = theorem_4_6_result
+            if verdict is Verdict.INDETERMINATE:
+                if conditional_result is None:
+                    conditional_result = theorem_4_6_result
+            else:
+                return CliqueBehavior(
+                    verdict, reason, seq.graph_count, False, pared_graph, certificate
+                )
 
-    local_bridge_result = _classify_local_bridge(
-        pared_graph,
-        tries=tries,
-        bound=bound,
-        extension_budget=extension_budget,
-        retraction_depth=retraction_depth,
-    )
-    if local_bridge_result is not None:
-        verdict, reason, certificate = local_bridge_result
-        if verdict is Verdict.INDETERMINATE:
-            if conditional_result is None:
-                conditional_result = local_bridge_result
-        else:
-            return CliqueBehavior(
-                verdict, reason, seq.graph_count, False, pared_graph, certificate
-            )
+        for classifier in _default_classifiers(
+            tries,
+            clockwork_depth,
+            retraction_depth=retraction_depth,
+            clockwork=_ClockworkLimits(
+                clockwork_fallback,
+                clockwork_fallback_max_order,
+                clockwork_fallback_max_candidates,
+            ),
+            octahedral=_OctahedralSearch(
+                octahedron_retract_iterates,
+                octahedron_dimensions,
+                octahedron_max_patterns,
+                octahedron_max_states,
+                octahedron_max_assignments,
+                octahedron_retract_presets,
+            ),
+        ):
+            result = classifier(seq)
+            if result is not None:
+                verdict, reason, certificate = result
+                if verdict is Verdict.INDETERMINATE:
+                    if conditional_result is None:
+                        conditional_result = result
+                else:
+                    return CliqueBehavior(
+                        verdict,
+                        reason,
+                        seq.graph_count,
+                        False,
+                        pared_graph,
+                        certificate,
+                    )
 
-    non_triangle_edge_result = _classify_non_triangle_edge(
-        pared_graph,
-        tries=tries,
-        bound=bound,
-        extension_budget=extension_budget,
-        retraction_depth=retraction_depth,
-    )
-    if non_triangle_edge_result is not None:
-        verdict, reason, certificate = non_triangle_edge_result
-        if verdict is Verdict.INDETERMINATE:
-            if conditional_result is None:
-                conditional_result = non_triangle_edge_result
-        else:
-            return CliqueBehavior(
-                verdict, reason, seq.graph_count, False, pared_graph, certificate
-            )
+        reference_dependency = _classify_reference_dependency(pared_graph)
+        if reference_dependency is not None:
+            verdict, reason, certificate = reference_dependency
+            if verdict is Verdict.INDETERMINATE:
+                if conditional_result is None:
+                    conditional_result = reference_dependency
+            else:
+                return CliqueBehavior(
+                    verdict, reason, seq.graph_count, False, pared_graph, certificate
+                )
 
-    inverse_extension_result = _classify_inverse_cutpoint_extension(
-        pared_graph,
-        tries=tries,
-        bound=bound,
-        extension_budget=extension_budget,
-        retraction_depth=retraction_depth,
-    )
-    if inverse_extension_result is not None:
-        verdict, reason, certificate = inverse_extension_result
-        if verdict is Verdict.INDETERMINATE:
-            if conditional_result is None:
-                conditional_result = inverse_extension_result
-        else:
-            return CliqueBehavior(
-                verdict, reason, seq.graph_count, False, pared_graph, certificate
-            )
+        local_bridge_result = _classify_local_bridge(
+            pared_graph,
+            tries=tries,
+            bound=bound,
+            extension_budget=extension_budget,
+            retraction_depth=retraction_depth,
+        )
+        if local_bridge_result is not None:
+            verdict, reason, certificate = local_bridge_result
+            if verdict is Verdict.INDETERMINATE:
+                if conditional_result is None:
+                    conditional_result = local_bridge_result
+            else:
+                return CliqueBehavior(
+                    verdict, reason, seq.graph_count, False, pared_graph, certificate
+                )
 
-    observations: list[InducedClockworkWitness] = []
-    search_limited = False
-    for i in range(clockwork_retract_depth):
-        iterate = seq[i]
-        if iterate is None:
-            break
-        iterate_prefix: list[nx.Graph] = []
-        for iterate_number in range(i + 1):
-            cached = seq[iterate_number]
-            if cached is None:
+        non_triangle_edge_result = _classify_non_triangle_edge(
+            pared_graph,
+            tries=tries,
+            bound=bound,
+            extension_budget=extension_budget,
+            retraction_depth=retraction_depth,
+        )
+        if non_triangle_edge_result is not None:
+            verdict, reason, certificate = non_triangle_edge_result
+            if verdict is Verdict.INDETERMINATE:
+                if conditional_result is None:
+                    conditional_result = non_triangle_edge_result
+            else:
+                return CliqueBehavior(
+                    verdict, reason, seq.graph_count, False, pared_graph, certificate
+                )
+
+        inverse_extension_result = _classify_inverse_cutpoint_extension(
+            pared_graph,
+            tries=tries,
+            bound=bound,
+            extension_budget=extension_budget,
+            retraction_depth=retraction_depth,
+        )
+        if inverse_extension_result is not None:
+            verdict, reason, certificate = inverse_extension_result
+            if verdict is Verdict.INDETERMINATE:
+                if conditional_result is None:
+                    conditional_result = inverse_extension_result
+            else:
+                return CliqueBehavior(
+                    verdict, reason, seq.graph_count, False, pared_graph, certificate
+                )
+
+        observations: list[InducedClockworkWitness] = []
+        search_limited = False
+        for i in range(clockwork_retract_depth):
+            iterate = seq[i]
+            if iterate is None:
                 break
-            iterate_prefix.append(cached)
-        if len(iterate_prefix) != i + 1:
-            break
-        retraction_search = find_divergent_clockwork_retract(
-            iterate,
-            max_target_order=clockwork_max_order,
-            max_candidates=clockwork_max_candidates,
-            max_retraction_attempts=clockwork_max_retraction_attempts,
-            max_retraction_states=clockwork_max_retraction_states,
-            max_retraction_assignments=clockwork_max_retraction_assignments,
-            recognition_max_order=clockwork_fallback_max_order,
-            recognition_max_candidates=clockwork_fallback_max_candidates,
-            replay_clique_bound=bound,
-            iterate_index=i,
-            origin_graph=pared_graph,
-            iterate_graphs=tuple(iterate_prefix),
-        )
-        if retraction_search.certificate is not None:
-            certificate = Certificate(
-                rule="induced_clockwork_retraction",
-                target=retraction_search.certificate.target_graph,
-                target_status="proven_divergent",
-                map=retraction_search.certificate.retraction_map,
-                source=iterate,
-                clockwork_structure=retraction_search.certificate.structure,
+            iterate_prefix: list[nx.Graph] = []
+            for iterate_number in range(i + 1):
+                cached = seq[iterate_number]
+                if cached is None:
+                    break
+                iterate_prefix.append(cached)
+            if len(iterate_prefix) != i + 1:
+                break
+            retraction_search = find_divergent_clockwork_retract(
+                iterate,
+                max_target_order=clockwork_max_order,
+                max_candidates=clockwork_max_candidates,
+                max_retraction_attempts=clockwork_max_retraction_attempts,
+                max_retraction_states=clockwork_max_retraction_states,
+                max_retraction_assignments=clockwork_max_retraction_assignments,
+                recognition_max_order=clockwork_fallback_max_order,
+                recognition_max_candidates=clockwork_fallback_max_candidates,
+                replay_clique_bound=bound,
                 iterate_index=i,
+                origin_graph=pared_graph,
+                iterate_graphs=tuple(iterate_prefix),
             )
+            if retraction_search.certificate is not None:
+                certificate = Certificate(
+                    rule="induced_clockwork_retraction",
+                    target=retraction_search.certificate.target_graph,
+                    target_status="proven_divergent",
+                    map=retraction_search.certificate.retraction_map,
+                    source=iterate,
+                    clockwork_structure=retraction_search.certificate.structure,
+                    iterate_index=i,
+                )
+                return CliqueBehavior(
+                    Verdict.DIVERGENT,
+                    f"iterate {i} retracts onto a divergent clockwork graph",
+                    seq.graph_count,
+                    seq.exhausted,
+                    pared_graph,
+                    certificate,
+                    tuple(observations),
+                )
+            search_limited |= (
+                retraction_search.status is ClockworkSearchStatus.LIMIT_REACHED
+            )
+
+        for i in range(induced_clockwork_depth):
+            iterate = seq[i]
+            if iterate is None:
+                break
+            induced_search = find_induced_clockwork_subgraphs(
+                iterate,
+                max_order=clockwork_max_order,
+                max_candidates=clockwork_max_candidates,
+                divergent_only=True,
+                iterate_index=i,
+                recognition_max_order=clockwork_fallback_max_order,
+                recognition_max_candidates=clockwork_fallback_max_candidates,
+            )
+            observations.extend(induced_search.witnesses)
+            search_limited |= (
+                induced_search.status is ClockworkSearchStatus.LIMIT_REACHED
+            )
+
+        bound_exceeded = seq.exhausted
+        if observations:
+            indices = sorted({witness.iterate_index for witness in observations})
+            reason = (
+                "induced divergent clockwork found at iterate(s) "
+                f"{indices}; induced containment alone does not certify divergence"
+            )
+        elif search_limited:
+            reason = (
+                "clockwork search resource limit reached; "
+                "behavior remains indeterminate"
+            )
+        else:
+            reason = (
+                "clique count exceeded bound"
+                if bound_exceeded
+                else "behavior is indeterminate under the available tests"
+            )
+        if conditional_result is not None:
+            _, conditional_reason, conditional_certificate = conditional_result
             return CliqueBehavior(
-                Verdict.DIVERGENT,
-                f"iterate {i} retracts onto a divergent clockwork graph",
+                Verdict.INDETERMINATE,
+                conditional_reason,
                 seq.graph_count,
-                seq.exhausted,
+                bound_exceeded,
                 pared_graph,
-                certificate,
-                tuple(observations),
+                conditional_certificate,
+                observations=tuple(observations),
             )
-        search_limited |= (
-            retraction_search.status is ClockworkSearchStatus.LIMIT_REACHED
-        )
-
-    for i in range(induced_clockwork_depth):
-        iterate = seq[i]
-        if iterate is None:
-            break
-        induced_search = find_induced_clockwork_subgraphs(
-            iterate,
-            max_order=clockwork_max_order,
-            max_candidates=clockwork_max_candidates,
-            divergent_only=True,
-            iterate_index=i,
-            recognition_max_order=clockwork_fallback_max_order,
-            recognition_max_candidates=clockwork_fallback_max_candidates,
-        )
-        observations.extend(induced_search.witnesses)
-        search_limited |= induced_search.status is ClockworkSearchStatus.LIMIT_REACHED
-
-    bound_exceeded = seq.exhausted
-    if observations:
-        indices = sorted({witness.iterate_index for witness in observations})
-        reason = (
-            "induced divergent clockwork found at iterate(s) "
-            f"{indices}; induced containment alone does not certify divergence"
-        )
-    elif search_limited:
-        reason = (
-            "clockwork search resource limit reached; behavior remains indeterminate"
-        )
-    else:
-        reason = (
-            "clique count exceeded bound"
-            if bound_exceeded
-            else "behavior is indeterminate under the available tests"
-        )
-    if conditional_result is not None:
-        _, conditional_reason, conditional_certificate = conditional_result
         return CliqueBehavior(
             Verdict.INDETERMINATE,
-            conditional_reason,
+            reason,
             seq.graph_count,
             bound_exceeded,
             pared_graph,
-            conditional_certificate,
             observations=tuple(observations),
         )
-    return CliqueBehavior(
-        Verdict.INDETERMINATE,
-        reason,
-        seq.graph_count,
-        bound_exceeded,
-        pared_graph,
-        observations=tuple(observations),
-    )
 
 
 def classify_clique_behavior_with_clockwork_pair_search(
     graph: nx.Graph,
     *,
+    references: ReferenceSelection | None = None,
     tries: int = _MAX_ITERATIONS,
     bound: int = 30,
     extension_budget: int = 1,
@@ -2168,7 +1789,7 @@ def classify_clique_behavior_with_clockwork_pair_search(
     max_source_order: int = 40,
     clockwork_pair_bound: int | None = None,
 ) -> CliqueBehavior:
-    """Run the fast pass, then the expensive [LNP06, Theorem 2.6] pass if still unresolved.
+    """Run the fast pass, then [LNP06, Theorem 2.6] on unresolved graphs.
 
     This is the two-stage workflow used by the ``small-behavior-clockwork-pairs``
     CLI: :func:`classify_clique_behavior` (the fast pass) is run first, and
@@ -2197,6 +1818,7 @@ def classify_clique_behavior_with_clockwork_pair_search(
     """
     fast = classify_clique_behavior(
         graph,
+        references=references,
         tries=tries,
         bound=bound,
         extension_budget=extension_budget,
@@ -2242,208 +1864,6 @@ def classify_clique_behavior_with_clockwork_pair_search(
         certificate,
         fast.observations,
     )
-
-
-_DEFAULT_DATA_DIR = Path(".")
-
-
-def _indeterminate_file_path(order: int, data_dir: Path) -> Path:
-    """Return the path for the indeterminate-graphs file of a given order."""
-    return data_dir / f"indeterminate_order_{order}.txt"
-
-
-def _serialize_certificate(certificate: Certificate | None) -> str:
-    """Render certificate metadata for the indeterminate-graphs file."""
-    if certificate is None:
-        return "- - -"
-    target_label = certificate.target_label or "-"
-    target_status = certificate.target_status or "-"
-    return f"{certificate.rule} {target_status} {target_label}"
-
-
-def _save_indeterminate(
-    order: int,
-    indeterminate: list[tuple[int, nx.Graph, Certificate | None]],
-    data_dir: Path,
-    *,
-    replace: bool = False,
-) -> None:
-    """Save indeterminate pared graphs to a human-readable file.
-
-    Each line contains the original graph index, the order of the pared
-    graph, its graph6 string, and certificate metadata when available.
-
-    If the file already exists, the new results are merged with the
-    existing entries.  Duplicate indices are resolved in favour of the
-    new run so that re-processing a range always updates the record.  When
-    ``replace`` is true, the file is replaced by exactly the supplied
-    indeterminate entries.
-    """
-    path = _indeterminate_file_path(order, data_dir)
-
-    # Load existing entries keyed by original index.
-    existing: dict[int, str] = {}
-    if path.is_file() and not replace:
-        with path.open("r", encoding="utf-8") as f:
-            for line in f:
-                stripped = line.strip()
-                if not stripped or stripped.startswith("#"):
-                    continue
-                parts = stripped.split(maxsplit=5)
-                existing[int(parts[0])] = stripped
-        _logger.info(
-            f"Found existing file with {len(existing)} entries; merging new results"
-        )
-
-    # Build lines for the new entries (overwrite any duplicate index).
-    for idx, graph, certificate in indeterminate:
-        g = nx.convert_node_labels_to_integers(graph)
-        g6 = nx.to_graph6_bytes(g, header=False).decode("ascii").strip()
-        existing[idx] = f"{idx} {g.order()} {g6} {_serialize_certificate(certificate)}"
-
-    # Write everything back sorted by index.
-    temporary_path: Path | None = None
-    try:
-        with NamedTemporaryFile(
-            "w",
-            encoding="utf-8",
-            dir=path.parent,
-            prefix=f".{path.name}.",
-            suffix=".tmp",
-            delete=False,
-        ) as f:
-            temporary_path = Path(f.name)
-            f.write(
-                f"# Indeterminate clique behavior - connected graphs of order {order}\n"
-            )
-            f.write(
-                "# Format: original_index pared_order graph6 certificate_rule "
-                "certificate_target_status certificate_target_label\n"
-            )
-            for idx in sorted(existing):
-                f.write(f"{existing[idx]}\n")
-        os.replace(temporary_path, path)
-    finally:
-        if temporary_path is not None and temporary_path.exists():
-            temporary_path.unlink()
-    _logger.info(f"Saved {len(existing)} indeterminate graphs to {path}")
-
-
-def _update_processed_indeterminate(
-    order: int,
-    processed_indices: set[int],
-    indeterminate: list[tuple[int, nx.Graph, Certificate | None]],
-    data_dir: Path,
-) -> None:
-    """Replace unresolved rows for processed indices, preserving all others."""
-    existing = _load_indeterminate_file_entries_with_metadata(order, data_dir)
-    previous_by_index = {
-        index: (graph, certificate) for index, graph, certificate in existing
-    }
-    retained = [entry for entry in existing if entry[0] not in processed_indices]
-    refreshed = []
-    for index, graph, certificate in indeterminate:
-        previous = previous_by_index.get(index)
-        if (
-            certificate is None
-            and previous is not None
-            and previous[1] is not None
-            and nx.is_isomorphic(graph, previous[0])
-        ):
-            certificate = previous[1]
-        refreshed.append((index, graph, certificate))
-    _save_indeterminate(
-        order,
-        retained + refreshed,
-        data_dir,
-        replace=True,
-    )
-
-
-def _graph6_string(graph: nx.Graph) -> str:
-    """Return a graph6 string after normalizing arbitrary node labels."""
-    numbered = nx.convert_node_labels_to_integers(graph)
-    return cast(str, nx.to_graph6_bytes(numbered, header=False).decode("ascii").strip())
-
-
-def _recheck_indeterminate_file(
-    entries: list[tuple[int, nx.Graph, Certificate | None]],
-    bound: int,
-    classifier: Classifier | None = None,
-) -> list[tuple[int, nx.Graph, Certificate | None]]:
-    """Re-run a classifier on graphs saved as indeterminate."""
-    still_indeterminate: list[tuple[int, nx.Graph, Certificate | None]] = []
-    for index, graph, saved_certificate in entries:
-        _logger.info("Studying graph %s (%s)", index, _graph6_string(graph))
-        if classifier is None:
-            behavior = classify_clique_behavior(graph, bound=bound)
-            if behavior.verdict is Verdict.INDETERMINATE:
-                still_indeterminate.append(
-                    (
-                        index,
-                        behavior.pared_graph,
-                        behavior.certificate or saved_certificate,
-                    )
-                )
-            else:
-                _logger.info(
-                    "Graph %s is now %s: %s",
-                    index,
-                    behavior.verdict.name,
-                    behavior.reason,
-                )
-        else:
-            sequence = CliqueSequence(graph, bound=bound)
-            rule_result = classifier(sequence)
-            if rule_result is None:
-                still_indeterminate.append((index, graph, saved_certificate))
-            else:
-                verdict, reason, certificate = rule_result
-                _logger.info("Graph %s is now %s: %s", index, verdict.name, reason)
-
-    return still_indeterminate
-
-
-def _load_indeterminate_graphs(
-    max_order: int,
-    data_dir: Path,
-) -> dict[int, list[nx.Graph]]:
-    """Load indeterminate graphs from files for all orders less than *max_order*.
-
-    .. rubric:: Returns
-
-    dict[int, list[nx.Graph]]
-        Graphs grouped by their vertex count so that lookups only need to
-        test isomorphism against candidates of the same size.
-    """
-    by_vertex_count: dict[int, list[nx.Graph]] = {}
-    for order in range(1, max_order):
-        path = _indeterminate_file_path(order, data_dir)
-        if not path.is_file():
-            continue
-        count = 0
-        with path.open("r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                parts = line.split(maxsplit=5)
-                g6_str = parts[2]
-                graph = nx.from_graph6_bytes(g6_str.encode("ascii"))
-                n = graph.order()
-                by_vertex_count.setdefault(n, []).append(graph)
-                count += 1
-        _logger.info(f"Loaded {count} indeterminate graphs from order-{order} file")
-    return by_vertex_count
-
-
-def _is_known_indeterminate(
-    graph: nx.Graph,
-    known: dict[int, list[nx.Graph]],
-) -> bool:
-    """Return whether *graph* is isomorphic to any known indeterminate graph."""
-    candidates = known.get(graph.order(), [])
-    return any(nx.is_isomorphic(graph, c) for c in candidates)
 
 
 def test_eventually_helly(
@@ -2539,677 +1959,6 @@ def eventually_retracts_specially(
     seq = CliqueSequence(graph, bound=bound)
     result = _test_eventually_special_octahedra(seq, tries)
     return True if result is not None else None
-
-
-def _parse_args(args: list[str]) -> argparse.Namespace:
-    """Parse command-line arguments for the small-graphs script."""
-    parser = argparse.ArgumentParser(description="Clique behavior of small graphs")
-    parser.add_argument(
-        "--version", action="version", version=f"pycliques {__version__}"
-    )
-    parser.add_argument(
-        dest="n", help="Order of graphs to consider (e.g., 6)", type=int, metavar="INT"
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        dest="loglevel",
-        help="Set loglevel to DEBUG",
-        action="store_const",
-        const=logging.DEBUG,
-        default=logging.INFO,
-    )
-    parser.add_argument(
-        "--no-save",
-        dest="save",
-        help="Do not save indeterminate graphs to file",
-        action="store_false",
-        default=True,
-    )
-    parser.add_argument(
-        "--no-lookup",
-        dest="lookup",
-        help="Do not look up pared graphs in prior indeterminate files",
-        action="store_false",
-        default=True,
-    )
-    parser.add_argument(
-        "--from-indeterminate-file",
-        dest="from_indeterminate_file",
-        help=(
-            "Read graphs from indeterminate_order_<n>.txt, re-run the default "
-            "tests, and remove graphs that are resolved"
-        ),
-        action="store_true",
-        default=False,
-    )
-    parser.add_argument(
-        "--exclude-conjectured-divergent",
-        dest="exclude_conjectured_divergent",
-        help=(
-            "In --from-indeterminate-file mode, do not re-run graphs whose "
-            "saved certificate marks them conjectured divergent"
-        ),
-        action="store_true",
-        default=False,
-    )
-    parser.add_argument(
-        "--check-clique-retraction",
-        dest="check_clique_retraction",
-        help=(
-            "In --from-indeterminate-file mode, run the seq[1] retraction "
-            "test to complement(C_10)"
-        ),
-        action="store_true",
-        default=False,
-    )
-    parser.add_argument(
-        "--data-dir",
-        dest="data_dir",
-        help="Directory for indeterminate graph files (default: current directory)",
-        type=Path,
-        default=_DEFAULT_DATA_DIR,
-    )
-    parser.add_argument(
-        "--bound",
-        dest="bound",
-        help="Maximum number of cliques allowed at each iteration (default: 30)",
-        type=int,
-        default=30,
-        metavar="INT",
-    )
-    parser.add_argument(
-        "--start",
-        dest="start",
-        help="First graph index to process, inclusive (default: 0)",
-        type=int,
-        default=None,
-        metavar="INT",
-    )
-    parser.add_argument(
-        "--end",
-        dest="end",
-        help="Last graph index to process, inclusive (default: last graph)",
-        type=int,
-        default=None,
-        metavar="INT",
-    )
-    parser.add_argument(
-        "--output-file",
-        dest="output_file",
-        help=(
-            "Write one verdict line per graph to this file. "
-            "Format: index TAB verdict TAB reason"
-        ),
-        type=Path,
-        default=None,
-        metavar="FILE",
-    )
-    parser.add_argument(
-        "--skip-dominated",
-        dest="skip_dominated",
-        help="Skip graphs that have dominated vertices (default: True)",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-    )
-    return parser.parse_args(args)
-
-
-def _setup_logging(loglevel: int):
-    """Configure Rich logging for the CLI entry point."""
-    logging.basicConfig(
-        level=loglevel, format="%(message)s", datefmt="[%X]", handlers=[RichHandler()]
-    )
-
-
-def _main(args: list[str]):
-    """Run the small-graph classification from parsed CLI arguments."""
-    from pyg6data.lists import _dict_connected, _get_data_file_path
-
-    parsed_args = _parse_args(args)
-    _setup_logging(parsed_args.loglevel)
-
-    order = parsed_args.n
-    save = parsed_args.save
-    lookup = parsed_args.lookup
-    data_dir: Path = parsed_args.data_dir
-    start: int | None = parsed_args.start
-    end: int | None = parsed_args.end
-    output_file: Path | None = parsed_args.output_file
-    skip_dominated: bool = parsed_args.skip_dominated
-    bound: int = parsed_args.bound
-
-    if order not in _dict_connected:
-        _logger.error(f"Error: Internal data for order {order} not available.")
-        sys.exit(1)
-
-    if start is not None and start < 0:
-        _logger.error("--start must be a non-negative integer.")
-        sys.exit(1)
-
-    if end is not None and end < 0:
-        _logger.error("--end must be a non-negative integer.")
-        sys.exit(1)
-
-    if start is not None and end is not None and start > end:
-        _logger.error("--start must be less than or equal to --end.")
-        sys.exit(1)
-
-    if parsed_args.from_indeterminate_file:
-        entries_with_metadata = _load_indeterminate_file_entries_with_metadata(
-            order, data_dir
-        )
-        entries = [
-            (index, graph, certificate)
-            for index, graph, certificate in entries_with_metadata
-            if not (
-                parsed_args.exclude_conjectured_divergent
-                and certificate is not None
-                and certificate.target_status == "conjectured_divergent"
-            )
-        ]
-        excluded: list[tuple[int, nx.Graph, Certificate | None]] = [
-            (index, graph, certificate)
-            for index, graph, certificate in entries_with_metadata
-            if parsed_args.exclude_conjectured_divergent
-            and certificate is not None
-            and certificate.target_status == "conjectured_divergent"
-        ]
-        _logger.info(
-            "Rechecking %s graphs from %s...",
-            len(entries),
-            _indeterminate_file_path(order, data_dir),
-        )
-        recheck_classifier = None
-        if parsed_args.check_clique_retraction:
-            recheck_classifier = _make_clique_retraction_test(
-                complement_of_cycle(10),
-                "clique graph retracts to Comp(C_10)",
-            )
-        still_indeterminate = _recheck_indeterminate_file(
-            entries, bound, classifier=recheck_classifier
-        )
-        if save:
-            _save_indeterminate(
-                order,
-                still_indeterminate + excluded,
-                data_dir,
-                replace=True,
-            )
-        _logger.info(
-            "Recheck complete: %s remain indeterminate, %s resolved.",
-            len(still_indeterminate),
-            len(entries) - len(still_indeterminate),
-        )
-        return
-
-    _logger.info("Precomputing target mathematical structures...")
-    # Load previously saved indeterminate graphs for smaller orders
-    known_indeterminate: dict[int, list[nx.Graph]] = {}
-    if lookup:
-        known_indeterminate = _load_indeterminate_graphs(order, data_dir)
-
-    convergent: list[int] = []
-    divergent: list[int] = []
-    further: list[int] = []
-    further_pared: list[tuple[int, nx.Graph, Certificate | None]] = []
-    further_graphs: list[tuple[int, nx.Graph, Certificate | None]] = []
-    reducible: list[int] = []
-    processed_indices: set[int] = set()
-
-    range_msg = ""
-    if start is not None or end is not None:
-        lo = start if start is not None else 0
-        hi = end if end is not None else "last"
-        range_msg = f" (indices {lo}-{hi})"
-    _logger.info(
-        f"Beginning analysis of connected graphs of order {order}{range_msg}..."
-    )
-
-    # 2. Securely resolve the dataset path
-    data_path = _get_data_file_path(_dict_connected[order])
-
-    import contextlib
-
-    output_ctx = (
-        open(output_file, "w", encoding="utf-8")  # noqa: WPS515
-        if output_file is not None
-        else contextlib.nullcontext()
-    )
-
-    index = -1
-    with output_ctx as verdict_file:
-        if verdict_file is not None:
-            verdict_file.write("# index\tverdict\treason\n")
-            _logger.info(f"Writing verdicts to {output_file}")
-
-        with data_path.open("rb") as raw_file:
-            with gzip.open(raw_file, "rt", encoding="utf-8") as graph_file:
-                for index, line in enumerate(graph_file):
-                    if start is not None and index < start:
-                        continue
-                    if end is not None and index > end:
-                        break
-                    processed_indices.add(index)
-
-                    if index > 0 and index % 10000 == 0:  # pragma: no cover
-                        _logger.info(f"Processed up to index {index}...")
-
-                    assert isinstance(line, str)
-                    graph = nx.from_graph6_bytes(bytes(line.strip(), "utf-8"))
-
-                    if skip_dominated and find_dominated_vertex(graph) is not None:
-                        reducible.append(index)
-                        if verdict_file is not None:
-                            verdict_file.write(
-                                f"{index}\tREDUCIBLE\thas dominated vertices\n"
-                            )
-                        _logger.debug(f"Graph {index}: has dominated vertices")
-                        continue
-
-                    result = classify_clique_behavior(graph, bound=bound)
-                    if result.verdict is Verdict.CONVERGENT:
-                        convergent.append(index)
-                        verdict_label = "CONVERGENT"
-                        reason = result.reason
-                    elif result.verdict is Verdict.DIVERGENT:
-                        divergent.append(index)
-                        verdict_label = "DIVERGENT"
-                        reason = result.reason
-                    else:
-                        further.append(index)
-                        further_graphs.append(
-                            (index, result.pared_graph, result.certificate)
-                        )
-                        verdict_label = "INDETERMINATE"
-                        if lookup and _is_known_indeterminate(
-                            result.pared_graph, known_indeterminate
-                        ):
-                            further_pared.append(
-                                (index, result.pared_graph, result.certificate)
-                            )
-                            reason = "reduces to known indeterminate graph"
-                        else:
-                            reason = result.reason
-
-                    if verdict_file is not None:
-                        verdict_file.write(f"{index}\t{verdict_label}\t{reason}\n")
-                    _logger.debug(f"Graph {index}: {reason}")
-
-    total_processed = len(convergent) + len(divergent) + len(further) + len(reducible)
-    _logger.info(f"Analysis Complete! Processed {total_processed} total graphs.")
-    _logger.info(f"Indices that deserve further study: {further}")
-    _logger.info(f"Total convergent graphs: {len(convergent)}")
-    _logger.info(f"Total divergent graphs: {len(divergent)}")
-    _logger.info(f"Total reducible graphs skipped: {len(reducible)}")
-    _logger.info(f"Total graphs reduced to indeterminate: {len(further_pared)}")
-    _logger.info(f"Total indeterminate graphs (further study): {len(further)}")
-
-    if save:
-        if start is None and end is None:
-            _save_indeterminate(order, further_graphs, data_dir, replace=True)
-        else:
-            _update_processed_indeterminate(
-                order, processed_indices, further_graphs, data_dir
-            )
-
-
-def main():  # pragma: no cover
-    """Entry point for the ``clique-behavior`` console script."""
-    _main(sys.argv[1:])
-
-
-# ---------------------------------------------------------------------------
-# Second-stage CLI: optional [LNP06, Theorem 2.6] pass over fast-pass INDETERMINATE
-# graphs. See classify_clique_behavior_with_clockwork_pair_search for the classifier
-# orchestration; this section only handles CLI parsing, dataset iteration,
-# and reporting.
-# ---------------------------------------------------------------------------
-
-
-def _load_indeterminate_file_entries(
-    order: int, data_dir: Path
-) -> list[tuple[int, nx.Graph]]:
-    """Load ``(index, graph)`` pairs previously saved for *order* by the fast pass."""
-    return [
-        (index, graph)
-        for index, graph, _certificate in (
-            _load_indeterminate_file_entries_with_metadata(order, data_dir)
-        )
-    ]
-
-
-def _load_indeterminate_file_entries_with_metadata(
-    order: int, data_dir: Path
-) -> list[tuple[int, nx.Graph, Certificate | None]]:
-    """Load saved indeterminate entries together with certificate metadata."""
-    path = _indeterminate_file_path(order, data_dir)
-    entries: list[tuple[int, nx.Graph, Certificate | None]] = []
-    if not path.is_file():
-        return entries
-    with path.open("r", encoding="utf-8") as f:
-        for line in f:
-            stripped = line.strip()
-            if not stripped or stripped.startswith("#"):
-                continue
-            parts = stripped.split(maxsplit=5)
-            certificate = None
-            if len(parts) >= 6 and parts[3] != "-":
-                certificate = Certificate(
-                    rule=parts[3],
-                    target_status=None if parts[4] == "-" else parts[4],
-                    target_label=None if parts[5] == "-" else parts[5],
-                )
-            entries.append(
-                (
-                    int(parts[0]),
-                    nx.from_graph6_bytes(parts[2].encode("ascii")),
-                    certificate,
-                )
-            )
-    return entries
-
-
-def _run_fast_pass_indeterminate(
-    order: int,
-    *,
-    data_dir: Path,
-    start: int | None,
-    end: int | None,
-    skip_dominated: bool,
-    bound: int,
-) -> tuple[int, int, list[tuple[int, nx.Graph, Certificate | None]], set[int]]:
-    """Run the fast pass over the dataset, returning only INDETERMINATE graphs.
-
-    .. rubric:: Returns
-
-    tuple[int, int, list[tuple[int, nx.Graph, Certificate | None]], set[int]]
-        ``(convergent_count, divergent_count, indeterminate, processed_indices)``
-        where ``processed_indices`` includes resolved and skipped graphs, and
-        ``indeterminate`` holds ``(index, pared_graph, certificate)`` for
-        every graph the fast pass left ``INDETERMINATE``.
-    """
-    from pyg6data.lists import _dict_connected, _get_data_file_path
-
-    data_path = _get_data_file_path(_dict_connected[order])
-    convergent = 0
-    divergent = 0
-    indeterminate: list[tuple[int, nx.Graph, Certificate | None]] = []
-    processed_indices: set[int] = set()
-
-    with data_path.open("rb") as raw_file:
-        with gzip.open(raw_file, "rt", encoding="utf-8") as graph_file:
-            for index, line in enumerate(graph_file):
-                if start is not None and index < start:
-                    continue
-                if end is not None and index > end:
-                    break
-                processed_indices.add(index)
-                graph = nx.from_graph6_bytes(bytes(line.strip(), "utf-8"))
-                if skip_dominated and find_dominated_vertex(graph) is not None:
-                    continue
-                result = classify_clique_behavior(graph, bound=bound)
-                if result.verdict is Verdict.CONVERGENT:
-                    convergent += 1
-                elif result.verdict is Verdict.DIVERGENT:
-                    divergent += 1
-                else:
-                    indeterminate.append(
-                        (index, result.pared_graph, result.certificate)
-                    )
-
-    return convergent, divergent, indeterminate, processed_indices
-
-
-def _parse_clockwork_pair_args(args: list[str]) -> argparse.Namespace:
-    """Parse command-line arguments for the [LNP06, Theorem 2.6] second-stage script."""
-    parser = argparse.ArgumentParser(
-        description=(
-            "[LNP06, Theorem 2.6] (coaffination) pass over graphs the fast "
-            "small-behavior pass left INDETERMINATE"
-        )
-    )
-    parser.add_argument(
-        "--version", action="version", version=f"pycliques {__version__}"
-    )
-    parser.add_argument(
-        dest="n", help="Order of graphs to consider (e.g., 9)", type=int, metavar="INT"
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        dest="loglevel",
-        help="Set loglevel to DEBUG",
-        action="store_const",
-        const=logging.DEBUG,
-        default=logging.INFO,
-    )
-    parser.add_argument(
-        "--data-dir",
-        dest="data_dir",
-        help="Directory for indeterminate graph files (default: current directory)",
-        type=Path,
-        default=_DEFAULT_DATA_DIR,
-    )
-    parser.add_argument(
-        "--from-indeterminate-file",
-        dest="from_indeterminate_file",
-        help=(
-            "Read candidates from the indeterminate_order_<n> file saved by "
-            "a previous fast pass instead of rerunning it"
-        ),
-        action="store_true",
-        default=False,
-    )
-    parser.add_argument(
-        "--start",
-        dest="start",
-        help="First graph index to process, inclusive (default: 0)",
-        type=int,
-        default=None,
-        metavar="INT",
-    )
-    parser.add_argument(
-        "--end",
-        dest="end",
-        help="Last graph index to process, inclusive (default: last graph)",
-        type=int,
-        default=None,
-        metavar="INT",
-    )
-    parser.add_argument(
-        "--skip-dominated",
-        dest="skip_dominated",
-        help="Skip graphs that have dominated vertices (default: True)",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-    )
-    parser.add_argument(
-        "--fast-bound",
-        dest="fast_bound",
-        help="Clique bound used when rerunning the fast pass (default: 30)",
-        type=int,
-        default=30,
-        metavar="INT",
-    )
-    parser.add_argument(
-        "--max-m",
-        dest="max_m",
-        help="Maximum clockwork parameter m to try; radius = m + 1 (default: 3)",
-        type=int,
-        default=3,
-        metavar="INT",
-    )
-    parser.add_argument(
-        "--max-n",
-        dest="max_n",
-        help="Maximum clockwork parameter n to try (default: 3)",
-        type=int,
-        default=3,
-        metavar="INT",
-    )
-    parser.add_argument(
-        "--max-coaffinations",
-        dest="max_coaffinations",
-        help="Maximum candidate target coaffinations examined per m (default: 20)",
-        type=int,
-        default=20,
-        metavar="INT",
-    )
-    parser.add_argument(
-        "--max-source-order",
-        dest="max_source_order",
-        help="Maximum order of R_{2m}^n to construct (default: 40)",
-        type=int,
-        default=40,
-        metavar="INT",
-    )
-    parser.add_argument(
-        "--bound",
-        dest="bound",
-        help=(
-            "Clique bound for the K(graph) fallback used by the [LNP06, Theorem 2.6] "
-            "search (default: 30)"
-        ),
-        type=int,
-        default=30,
-        metavar="INT",
-    )
-    parser.add_argument(
-        "--output-file",
-        dest="output_file",
-        help=(
-            "Write one verdict line per graph to this file. "
-            "Format: index TAB verdict TAB reason"
-        ),
-        type=Path,
-        default=None,
-        metavar="FILE",
-    )
-    parser.add_argument(
-        "--no-save",
-        dest="save",
-        help="Do not save the remaining indeterminate graphs to file",
-        action="store_false",
-        default=True,
-    )
-    return parser.parse_args(args)
-
-
-def _main_clockwork_pairs(args: list[str]):
-    """Run the [LNP06, Theorem 2.6] pass over fast-pass INDETERMINATE graphs."""
-    parsed_args = _parse_clockwork_pair_args(args)
-    _setup_logging(parsed_args.loglevel)
-
-    order = parsed_args.n
-    data_dir: Path = parsed_args.data_dir
-
-    if parsed_args.start is not None and parsed_args.start < 0:
-        _logger.error("--start must be a non-negative integer.")
-        sys.exit(1)
-    if parsed_args.end is not None and parsed_args.end < 0:
-        _logger.error("--end must be a non-negative integer.")
-        sys.exit(1)
-    if (
-        parsed_args.start is not None
-        and parsed_args.end is not None
-        and parsed_args.start > parsed_args.end
-    ):
-        _logger.error("--start must be less than or equal to --end.")
-        sys.exit(1)
-    if parsed_args.from_indeterminate_file and (
-        parsed_args.start is not None or parsed_args.end is not None
-    ):
-        _logger.error(
-            "--start and --end cannot be used with --from-indeterminate-file."
-        )
-        sys.exit(1)
-
-    candidates: list[tuple[int, nx.Graph, Certificate | None]]
-    if parsed_args.from_indeterminate_file:
-        candidates = _load_indeterminate_file_entries_with_metadata(order, data_dir)
-        processed_indices = {idx for idx, _, _ in candidates}
-        fast_convergent = fast_divergent = None
-    else:
-        from pyg6data.lists import _dict_connected
-
-        if order not in _dict_connected:
-            _logger.error(f"Error: Internal data for order {order} not available.")
-            sys.exit(1)
-        _logger.info("Running fast pass to collect INDETERMINATE graphs...")
-        (
-            fast_convergent,
-            fast_divergent,
-            candidates,
-            processed_indices,
-        ) = _run_fast_pass_indeterminate(
-            order,
-            data_dir=data_dir,
-            start=parsed_args.start,
-            end=parsed_args.end,
-            skip_dominated=parsed_args.skip_dominated,
-            bound=parsed_args.fast_bound,
-        )
-
-    _logger.info("Fast pass:")
-    _logger.info(f"    convergent:    {fast_convergent}")
-    _logger.info(f"    divergent:     {fast_divergent}")
-    _logger.info(f"    indeterminate: {len(candidates)}")
-
-    newly_divergent: list[tuple[int, nx.Graph, Certificate | None]] = []
-    still_indeterminate: list[tuple[int, nx.Graph, Certificate | None]] = []
-
-    import contextlib
-
-    output_ctx = (
-        open(parsed_args.output_file, "w", encoding="utf-8")  # noqa: WPS515
-        if parsed_args.output_file is not None
-        else contextlib.nullcontext()
-    )
-
-    with output_ctx as verdict_file:
-        if verdict_file is not None:
-            verdict_file.write("# index\tverdict\treason\n")
-
-        for idx, graph, fast_certificate in candidates:
-            theorem_result = classify_clockwork_pair_map(
-                graph,
-                max_m=parsed_args.max_m,
-                max_n=parsed_args.max_n,
-                max_coaffinations=parsed_args.max_coaffinations,
-                max_source_order=parsed_args.max_source_order,
-                bound=parsed_args.bound,
-            )
-            if theorem_result is not None:
-                _verdict, reason, certificate = theorem_result
-                newly_divergent.append((idx, graph, certificate))
-                if verdict_file is not None:
-                    verdict_file.write(f"{idx}\tDIVERGENT\t{reason}\n")
-            else:
-                still_indeterminate.append((idx, graph, fast_certificate))
-                if verdict_file is not None:
-                    verdict_file.write(
-                        f"{idx}\tINDETERMINATE\tunresolved by [LNP06, Theorem 2.6]\n"
-                    )
-
-    _logger.info("[LNP06, Theorem 2.6]:")
-    _logger.info(f"    newly divergent:         {len(newly_divergent)}")
-    _logger.info(f"    remaining indeterminate: {len(still_indeterminate)}")
-
-    if parsed_args.save:
-        if parsed_args.from_indeterminate_file:
-            _save_indeterminate(order, still_indeterminate, data_dir, replace=True)
-        elif parsed_args.start is None and parsed_args.end is None:
-            _save_indeterminate(order, still_indeterminate, data_dir, replace=True)
-        else:
-            _update_processed_indeterminate(
-                order, processed_indices, still_indeterminate, data_dir
-            )
-
-
-def main_clockwork_pairs():  # pragma: no cover
-    """Entry point for the ``small-behavior-clockwork-pairs`` console script."""
-    _main_clockwork_pairs(sys.argv[1:])
 
 
 if __name__ == "__main__":  # pragma: no cover

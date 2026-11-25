@@ -16,6 +16,8 @@ from typing import Any
 
 import networkx as nx
 
+from ._bitsets import iter_indices as _bits
+
 
 class HellyCoverStatus(Enum):
     """Outcome of candidate-universe propagation."""
@@ -276,13 +278,6 @@ def verify_helly_edge_cover(
         None,
         "the family is a Helly edge cover",
     )
-
-
-def _bits(mask: int) -> Iterable[int]:
-    while mask:
-        bit = mask & -mask
-        yield bit.bit_length() - 1
-        mask ^= bit
 
 
 def _mask_to_complete(mask: int, vertices: tuple[Hashable, ...]) -> frozenset[Hashable]:

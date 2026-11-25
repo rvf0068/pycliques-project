@@ -2,7 +2,6 @@
 
 import networkx as nx
 import pyhomrep
-from pycliques import clique_graph
 from pycombtop import clique_complex
 from pyhomrep.decomposition import MTS, blockI
 from pyhomrep.graphs import matching_graph
@@ -165,7 +164,16 @@ class TestDecomposition:
             ]
         )
         P, R = reduce_matrix(M)
-        assert P * M == M.rref()[0]
+        assert P * M == R == M.rref()[0]
+        for matrix in (
+            Matrix([[0], [2]]),
+            Matrix([[0, 0], [1, 2], [2, 4]]),
+            Matrix.zeros(2, 0),
+            Matrix.zeros(0, 3),
+        ):
+            transform, reduced = reduce_matrix(matrix)
+            assert transform * matrix == reduced == matrix.rref()[0]
+            assert transform.det() != 0
 
 
 class TestGraphs:
@@ -176,12 +184,6 @@ class TestGraphs:
         G = matching_graph(4)
         assert G.number_of_nodes() == 6
         assert G.number_of_edges() == 3
-
-    def test_clique_graph(self):
-        """Test clique graph construction."""
-        G = nx.cycle_graph(4)
-        K = clique_graph(G)
-        assert K.number_of_nodes() == 4
 
 
 class TestSimplicialComplex:

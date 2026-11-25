@@ -106,7 +106,7 @@ def p_simplex(sc: SimplicialComplex, p: int) -> list[tuple]:
     >>> p_simplex(sc, 5)
     []
     """
-    return [face for face in faces(sc) if len(face) == p + 1]
+    return sorted(tuple(sorted(face)) for face in sc.faces_of_dimension(p))
 
 
 def basis_group_oriented_p_chains(sc: SimplicialComplex, p: int) -> PChain | None:

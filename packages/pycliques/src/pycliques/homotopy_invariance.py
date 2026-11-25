@@ -629,14 +629,9 @@ def delta_of_clique_set(clique_set: Iterable[frozenset]) -> SimplicialComplex:
     >>> len(d.facet_set)
     1
     """
-    from pycombtop import Simplex, SimplicialComplex
+    from pycombtop.simplex import delta_of_clique_set as build_complex
 
-    generators = {Simplex(clique) for clique in clique_set}
-    facets = {
-        face for face in generators if not any(face < other for other in generators)
-    }
-    vertices = set().union(*(set(face) for face in facets)) if facets else set()
-    return SimplicialComplex(vertices, facet_set=facets)
+    return build_complex(clique_set)
 
 
 def _clique_index(

@@ -25,6 +25,7 @@ from enum import Enum, auto
 
 import networkx as nx
 
+from ._graph_utils import same_labeled_graph as _same_graph
 from .dominated import completely_pared_graph
 
 
@@ -80,14 +81,6 @@ def _nbrs_of_set(G: nx.Graph, vset: Iterable[int]) -> set[int]:
     for v in vset:
         result |= _nbrs(G, v)
     return result
-
-
-def _seg_idx(v: int, segs: list[set[int]]) -> int:
-    """Return the index of the segment containing *v*, or -1."""
-    for i, s in enumerate(segs):
-        if v in s:
-            return i
-    return -1
 
 
 def _find_cyclic_order(seg_adj: dict[int, set[int]], s: int) -> list[int] | None:
@@ -1301,12 +1294,6 @@ def remove_dominated_vertices(G: nx.Graph) -> nx.Graph:
 # -------------------------------------------------------------------
 # Clique-divergence decision: Theorem 3.6
 # -------------------------------------------------------------------
-
-
-def _same_graph(G: nx.Graph, H: nx.Graph) -> bool:
-    return set(G) == set(H) and {frozenset(edge) for edge in G.edges()} == {
-        frozenset(edge) for edge in H.edges()
-    }
 
 
 def clockwork_divergence_result(

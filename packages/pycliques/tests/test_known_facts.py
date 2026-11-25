@@ -17,7 +17,8 @@ from pycliques.named import (
 from pycliques.retractions import has_induced
 from pycliques.small import CliqueSequence, _make_clique_retraction_test
 from pycliques.surfaces import open_neighborhood
-from pycombtop.homotopy_type import WedgeOfSpheres, collapse, homotopy_type_with_verdict
+from pycombtop import CollapseStatus, SimplicialComplex, indexed_relative_collapse
+from pycombtop.homotopy_type import WedgeOfSpheres, homotopy_type_with_verdict
 from pycombtop.simplex import clique_complex, relative_betti_numbers
 
 
@@ -112,4 +113,7 @@ def test_fixture_2_has_documented_invariants():
 
     # The ordinary full clique complex remains collapsible; the obstruction
     # concerns the restricted violation-set collapse strategy.
-    assert len(collapse(clique_complex(kg)).vertex_set) == 1
+    vertex = next(iter(kg))
+    point = SimplicialComplex({vertex}, [{vertex}])
+    proof = indexed_relative_collapse(clique_complex(kg), point)
+    assert proof.status is CollapseStatus.PROVED

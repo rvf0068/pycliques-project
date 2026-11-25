@@ -304,3 +304,23 @@ def test_retractions_setup_logging_info():
     from pycliques.retractions import _setup_logging
 
     _setup_logging(logging.INFO)
+
+
+def test_retraction_has_one_yield_per_projection_and_inclusion():
+    from itertools import product
+
+    from pycliques.retractions import retraction, verify_retraction_witness
+
+    host, target = nx.path_graph(4), nx.path_graph(2)
+    answers = list(retraction(host, target))
+    pairs = {(tuple(sorted(p.items())), tuple(sorted(i.items()))) for p, i in answers}
+    assert len(pairs) == len(answers) == 8
+    for inclusion in {tuple(sorted(i.items())) for _, i in answers}:
+        expected = {
+            tuple(enumerate(values))
+            for values in product(target, repeat=len(host))
+            if verify_retraction_witness(
+                host, target, (dict(enumerate(values)), dict(inclusion))
+            )
+        }
+        assert {p for p, i in pairs if i == inclusion} == expected

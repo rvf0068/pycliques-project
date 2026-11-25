@@ -25,7 +25,6 @@ import numpy as np
 from sympy import eye
 from sympy.combinatorics import Permutation
 from sympy.combinatorics.partitions import IntegerPartition
-from sympy.core import S
 from sympy.matrices import Matrix, zeros
 
 from pyhomrep.pchains import PChain
@@ -338,41 +337,10 @@ def reduce_matrix(n: Matrix) -> tuple[MutableDenseMatrix, MutableDenseMatrix]:
     >>> P * M == M.rref()[0]
     True
     """
-    m = n.copy()
-    lead = 0
-    row_count = m.shape[0]
-    column_count = m.shape[1]
-    a = eye(row_count)
-
-    for r in range(row_count):
-        b1 = eye(row_count)
-        if column_count <= lead:
-            return a, m
-        i = r
-        while m[i, lead] == 0:
-            i = i + 1
-            if row_count == i:
-                i = r
-                lead = lead + 1
-                if column_count == lead:
-                    return a, m
-        b1.row_swap(i, r)
-        m.row_swap(i, r)
-        x = m[r, lead]
-        for k in range(column_count):
-            m[r, k] = S(m[r, k]) / x
-            if k < row_count:
-                b1[r, k] = S(b1[r, k]) / x
-        for i in range(row_count):
-            if i != r:
-                x = m[i, lead]
-                for k in range(column_count):
-                    m[i, k] = m[i, k] - m[r, k] * x
-                    if k < row_count:
-                        b1[i, k] = b1[i, k] - b1[r, k] * x
-        lead = lead + 1
-        a = b1 * a
-    return a, m
+    # Row reduction of [M | I] applies every operation to the full identity.
+    # Pivots in the right block affect only rows whose left block is zero.
+    reduced, _ = n.row_join(eye(n.rows)).rref()
+    return reduced[:, n.cols :], reduced[:, : n.cols]
 
 
 def permutation_in_simplex_test(vec: PChain, p: Permutation) -> PChain:
