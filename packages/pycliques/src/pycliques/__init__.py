@@ -267,6 +267,10 @@ from .surfaces import (
     is_surface,
     open_neighborhood,
 )
+from .homological_retractions import (
+    HomologicalRetractionObstruction,
+    find_homological_retraction_obstruction,
+)
 from .targeted_retractions import (
     TargetRetractionResult,
     TargetSearchStatus,
@@ -478,6 +482,8 @@ __all__ = [
     "verify_special_octahedron_witness",
     "TargetRetractionResult",
     "TargetSearchStatus",
+    "HomologicalRetractionObstruction",
+    "find_homological_retraction_obstruction",
     "search_targeted_retractions",
     "verify_targeted_retraction",
     # small
