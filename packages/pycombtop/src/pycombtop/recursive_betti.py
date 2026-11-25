@@ -59,6 +59,7 @@ def recursive_betti_upper_bounds(
     max_states: int = 100_000,
     max_cache: int = 100_000,
     neighbor_order: str = "descending",
+    adaptive_pivots: int = 0,
 ) -> RecursiveBettiBounds:
     """Bound reduced homology in degrees 0 through max_degree, or all degrees.
 
@@ -74,6 +75,12 @@ def recursive_betti_upper_bounds(
     bounds or Euler characteristic. The finite-degree mode is unchanged.
     Alternate neighbor orders can give tighter bounds; use descending,
     ascending, or reverse_ties (descending degree, reverse input ties).
+
+    Set adaptive_pivots to a positive integer in all-degree mode to try
+    that many low-degree pivots per subproblem, two local neighbor orders,
+    complement component splitting, and local Euler refinement. The exact
+    Euler characteristic is carried separately from the improved bounds.
+    The same state and cache budgets apply. Zero retains the fixed policy.
 
     The augmented empty independence complex has beta_(-1)=1; a
     nonempty complex has beta_(-1)=0. Isolated complement vertices
@@ -92,6 +99,10 @@ def recursive_betti_upper_bounds(
         raise ValueError("max_degree must be a nonnegative integer or None")
     if neighbor_order not in ("descending", "ascending", "reverse_ties"):
         raise ValueError("Unknown neighbor_order")
+    if type(adaptive_pivots) is not int or adaptive_pivots < 0:
+        raise ValueError("adaptive_pivots must be a nonnegative integer")
+    if adaptive_pivots and max_degree is not None:
+        raise ValueError("adaptive_pivots requires all-degree mode")
     if type(max_states) is not int or max_states < 1:
         raise ValueError("max_states must be a positive integer")
     if type(max_cache) is not int or max_cache < 0:
@@ -132,6 +143,9 @@ def recursive_betti_upper_bounds(
                 -v if neighbor_order == "reverse_ties" else v,
             ),
         )
+        yield from links(mask, neighbors)
+
+    def links(mask: int, neighbors: list[int]) -> Iterator[int]:
         remaining = mask
         for v in neighbors:
             bit = 1 << v
@@ -164,11 +178,95 @@ def recursive_betti_upper_bounds(
                 total[k + 1] += coefficient
         return tuple(total)
 
+    def components(mask: int) -> Iterator[int]:
+        while mask:
+            frontier = mask & -mask
+            component = 0
+            while frontier:
+                component |= frontier
+                mask ^= frontier
+                adjacent = 0
+                for v in indices(frontier):
+                    adjacent |= complement[v]
+                frontier = adjacent & mask
+            yield component
+
+    def refine(values: dict[int, int], chi: int) -> dict[int, int]:
+        result = RecursiveBettiBounds(values, 0, False, chi).euler_refined_upper_bounds
+        return {d: rank for d, rank in result.items() if rank}
+
+    @lru_cache(maxsize=max_cache)
+    def adaptive(mask: int) -> tuple[dict[int, int], int]:
+        nonlocal states
+        if not mask:
+            return {-1: 1}, -1
+        if states >= max_states:
+            raise _StateLimit
+        states += 1
+        degrees = {v: (complement[v] & mask).bit_count() for v in indices(mask)}
+        if 0 in degrees.values():
+            return {}, 0
+        parts = list(components(mask))
+        if len(parts) > 1:
+            product = {-1: 1}
+            chi = -1
+            for part in parts:
+                factor, euler_part = adaptive(part)
+                joined: dict[int, int] = {}
+                for d, a in product.items():
+                    for e, b in factor.items():
+                        degree = d + e + 1
+                        joined[degree] = joined.get(degree, 0) + a * b
+                product = joined
+                chi = -chi * euler_part
+                if not product:
+                    return {}, 0
+            return refine(product, chi), chi
+
+        pivots = sorted(
+            degrees,
+            key=lambda v: (
+                degrees[v],
+                -sum(degrees[w] for w in indices(complement[v] & mask)),
+                v,
+            ),
+        )[:adaptive_pivots]
+        best: dict[int, int] | None = None
+        chi = 0
+        for pivot in pivots:
+            neighbors = list(indices(complement[pivot] & mask))
+            descending = tuple(sorted(neighbors, key=lambda v: (-degrees[v], v)))
+            ascending = tuple(reversed(descending))
+            for order in dict.fromkeys((descending, ascending)):
+                candidate: dict[int, int] = {}
+                value = 0
+                for link in links(mask, list(order)):
+                    child, child_chi = adaptive(link)
+                    value -= child_chi
+                    for d, rank in child.items():
+                        candidate[d + 1] = candidate.get(d + 1, 0) + rank
+                if best is not None:
+                    if value != chi:
+                        raise ArithmeticError("Inconsistent Euler characteristic")
+                    candidate = {
+                        d: min(rank, candidate.get(d, 0))
+                        for d, rank in best.items()
+                    }
+                chi = value
+                best = refine(candidate, chi)
+                if len(best) <= 1 or abs(chi) == sum(best.values()):
+                    return best, chi
+        assert best is not None
+        return best, chi
+
     bounds: dict[int, int] = {}
     limited = False
     euler: int | None = None
     try:
-        if max_degree is None:
+        if adaptive_pivots:
+            values, euler = adaptive(full)
+            bounds = {d: values.get(d, 0) for d in range(len(nodes))}
+        elif max_degree is None:
             coefficients = polynomial(full)
             bounds = {
                 d: coefficients[d + 1] if d + 1 < len(coefficients) else 0
@@ -188,4 +286,5 @@ def recursive_betti_upper_bounds(
     finally:
         bound.cache_clear()
         polynomial.cache_clear()
+        adaptive.cache_clear()
     return RecursiveBettiBounds(bounds, states, limited, euler)
