@@ -214,6 +214,47 @@ def pared_index(graph: nx.Graph, return_cp: bool = False) -> int | tuple[int, nx
                 return pi
 
 
+def _pare_with_folds(
+    graph: nx.Graph, *, deterministic: bool = False
+) -> tuple[nx.Graph, tuple[tuple[Hashable, Hashable], ...]]:
+    """Fold in historical vertex order and retain the dominator of each deletion."""
+    current = graph.copy()
+    rank = {v: i for i, v in enumerate(current)}
+    closed = {v: closed_neighborhood(current, v) for v in current}
+    ordinary = not (
+        current.is_directed()
+        or current.is_multigraph()
+        or nx.number_of_selfloops(current)
+    )
+    moves: list[tuple[Hashable, Hashable]] = []
+    while True:
+        for vertex in current:
+            if not ordinary and not is_dominated_vertex(current, vertex):
+                continue
+            candidates = (
+                w
+                for w in current[vertex]
+                if w != vertex and closed[vertex] <= closed[w]
+            )
+            dominator = (
+                min(candidates, key=rank.__getitem__, default=None)
+                if deterministic
+                else next(candidates, None)
+            )
+            if dominator is not None:
+                break
+        else:
+            return current, tuple(moves)
+        affected = (
+            current.predecessors(vertex) if current.is_directed() else current[vertex]
+        )
+        for neighbor in affected:
+            closed[neighbor].discard(vertex)
+        del closed[vertex]
+        current.remove_node(vertex)
+        moves.append((vertex, dominator))
+
+
 def completely_pared_graph(graph: nx.Graph) -> nx.Graph:
     """Successively remove dominated vertices until reaching a fixed point.
 
@@ -226,18 +267,7 @@ def completely_pared_graph(graph: nx.Graph) -> nx.Graph:
     >>> sorted(completely_pared_graph(nx.path_graph(4)).nodes())
     [3]
     """
-    g1 = graph.copy()
-
-    while True:
-        n = g1.order()
-        # Find one dominated vertex and remove it in-place
-        x = find_dominated_vertex(g1)
-        if x is not None:
-            g1.remove_node(x)
-
-        # If the order didn't change (no dominated vertex found), we are done
-        if n == g1.order():
-            return g1
+    return _pare_with_folds(graph)[0]
 
 
 def is_dismantlable(graph: nx.Graph) -> bool:

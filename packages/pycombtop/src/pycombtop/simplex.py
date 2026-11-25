@@ -9,7 +9,7 @@ from typing import Literal
 import networkx as nx
 import numpy as np
 from networkx.algorithms import tournament
-from sympy import Matrix
+from sympy import SparseMatrix
 
 
 class Simplex(frozenset):
@@ -99,17 +99,46 @@ class SimplicialComplex:
     ) -> None:
         self.base_set = set(base_set)
 
-        # Determine the membership function
-        if function is not None:
-            self.function = function
+        self.function: Callable[..., bool]
+        if facet_set is None:
+            self.function = (
+                function if function is not None else self._default_is_simplex
+            )
+            self.facet_set = self._facet_set_from_function()
         else:
             self.function = self._default_is_simplex
+            faces = {Simplex(s) for s in facet_set}
+            if any(not face <= self.base_set for face in faces):
+                raise ValueError("generating face outside the base set")
+            self.facet_set = self._maximal_faces(faces)
 
-        # Determine the facets
-        if facet_set is not None:
-            self.facet_set = {Simplex(s) for s in facet_set}
-        else:
-            self.facet_set = self._facet_set_from_function()
+    @staticmethod
+    def _maximal_faces(faces: set[Simplex]) -> set[Simplex]:
+        """Index larger facets by vertex to discard redundant generators."""
+        if len({len(face) for face in faces}) <= 1:
+            return faces
+        facets: set[Simplex] = set()
+        containing: dict[object, list[Simplex]] = defaultdict(list)
+        for face in sorted(faces, key=len, reverse=True):
+            if not face:
+                continue  # A larger generator is present.
+            candidates = min((containing[v] for v in face), key=len)
+            if not any(face < other for other in candidates):
+                facets.add(face)
+                for vertex in face:
+                    containing[vertex].append(face)
+        return facets
+
+    @classmethod
+    def _from_maximal_faces(
+        cls, base_set: Iterable, facets: Iterable
+    ) -> SimplicialComplex:
+        """Construct from a family already known to be inclusion-maximal."""
+        result = cls.__new__(cls)
+        result.base_set = set(base_set)
+        result.facet_set = {Simplex(face) for face in facets}
+        result.function = result._default_is_simplex
+        return result
 
     def _default_is_simplex(self, s: set) -> bool:
         """Fallback membership function if none is provided."""
@@ -128,7 +157,7 @@ class SimplicialComplex:
 
         facets: set[Simplex] = set()
         # Evaluate subsets lazily to save memory
-        for r in reversed(range(1, len(self.base_set) + 1)):
+        for r in reversed(range(len(self.base_set))):
             for subset in combinations(self.base_set, r):
                 s = Simplex(subset)
                 if self.function(s):
@@ -183,18 +212,7 @@ class SimplicialComplex:
         False
         """
         vertices = self.base_set - {x}
-        containing = {f for f in self.facet_set if x in f}
-        not_containing = self.facet_set - containing
-
-        candidates = set(not_containing)
-        for s in containing:
-            candidates.add(Simplex(s - {x}))
-        # The shedding-vertex criterion and the subsequent algorithms
-        # require actual facets, not redundant nonmaximal faces.
-        good_facets = {
-            f for f in candidates if not any(f < other for other in candidates)
-        }
-        return SimplicialComplex(vertices, facet_set=good_facets)
+        return SimplicialComplex(vertices, facet_set=(f - {x} for f in self.facet_set))
 
     def link(self, x) -> SimplicialComplex:
         """Return the link of vertex *x* in the complex.
@@ -235,10 +253,21 @@ class SimplicialComplex:
         1
         """
 
-        def _new_function(s: set) -> bool:
-            return self.function(s) and len(s) <= n + 1
+        facets = {f for f in self.facet_set if f.dimension() < n}
+        facets.update(self.faces_of_dimension(n))
+        return self._from_maximal_faces(self.base_set, facets)
 
-        return SimplicialComplex(self.base_set, function=_new_function)
+    def faces_of_dimension(self, dimension: int) -> Generator[Simplex]:
+        """Yield the distinct faces of a single dimension, including -1."""
+        if dimension < -1:
+            return
+        seen: set[Simplex] = set()
+        for facet in self.facet_set:
+            for subset in combinations(facet, dimension + 1):
+                face = Simplex(subset)
+                if face not in seen:
+                    seen.add(face)
+                    yield face
 
     @property
     def vertex_set(self) -> set:
@@ -255,7 +284,7 @@ class SimplicialComplex:
         >>> sc.base_set == {0, 1, 2}
         True
         """
-        return {x for x in self.base_set if self.function({x})}
+        return set().union(*self.facet_set)
 
     def one_skeleton_graph(self) -> nx.Graph:
         """Return the 1-skeleton as a :class:`networkx.Graph`.
@@ -273,13 +302,9 @@ class SimplicialComplex:
         >>> g.number_of_edges()
         3
         """
-        vertices = self.vertex_set
         the_graph = nx.Graph()
-        the_graph.add_nodes_from(vertices)
-        edges = [
-            (i, j) for (i, j) in combinations(vertices, 2) if self.function({i, j})
-        ]
-        the_graph.add_edges_from(edges)
+        the_graph.add_nodes_from(self.vertex_set)
+        the_graph.add_edges_from(tuple(face) for face in self.faces_of_dimension(1))
         return the_graph
 
     def is_clique_complex(self) -> bool:
@@ -300,7 +325,7 @@ class SimplicialComplex:
         >>> sc.is_clique_complex()
         False
         """
-        return self == clique_complex(self.one_skeleton_graph())
+        return self.facet_set == clique_complex(self.one_skeleton_graph()).facet_set
 
     def all_simplices(self) -> set[Simplex]:
         """Return the set of all simplices in the complex.
@@ -490,44 +515,28 @@ def relative_betti_numbers(
 
     max_dim = max(by_dim)
 
-    def boundary_matrix(d: int) -> np.ndarray:
-        cols = by_dim.get(d, [])
-        rows = by_dim.get(d - 1, [])
+    def boundary_rank(d: int) -> int:
+        cols, rows = by_dim.get(d, []), by_dim.get(d - 1, [])
         if not cols or not rows:
-            return np.zeros((0, len(cols)), dtype=int)
-
-        matrix = np.zeros((len(rows), len(cols)), dtype=int)
-        row_index = {sigma: i for i, sigma in enumerate(rows)}
-
-        for j, sigma in enumerate(cols):
-            ordered = tuple(sorted(sigma, key=vertex_order.__getitem__))
-            for k in range(len(ordered)):
-                face = Simplex(ordered[:k] + ordered[k + 1 :])
-                if face in row_index:
-                    matrix[row_index[face], j] += (-1) ** k
-
-        return matrix
-
-    bettis: dict[int, int] = {}
-    for d in range(max_dim + 1):
-        current = by_dim.get(d, [])
-        if not current:
-            continue
-        d_matrix = boundary_matrix(d)
-        next_matrix = boundary_matrix(d + 1)
+            return 0
+        positions: dict[frozenset, int] = {face: i for i, face in enumerate(rows)}
+        entries = {}
+        for j, simplex in enumerate(cols):
+            ordered = sorted(simplex, key=vertex_order.__getitem__)
+            for k, vertex in enumerate(ordered):
+                i = positions.get(simplex - {vertex})
+                if i is not None:
+                    entries[i, j] = (-1) ** k
         if method == "exact":
-            rank_d = int(Matrix(d_matrix.tolist()).rank()) if d_matrix.size else 0
-            rank_next = (
-                int(Matrix(next_matrix.tolist()).rank()) if next_matrix.size else 0
-            )
-        else:
-            rank_d = int(np.linalg.matrix_rank(d_matrix)) if d_matrix.size else 0
-            rank_next = (
-                int(np.linalg.matrix_rank(next_matrix)) if next_matrix.size else 0
-            )
-        bettis[d] = len(current) - rank_d - rank_next
+            # The domain matrix performs exact elimination over the integers.
+            return int(SparseMatrix(len(rows), len(cols), entries).to_DM().rank())
+        matrix = np.zeros((len(rows), len(cols)), dtype=int)
+        for (i, j), value in entries.items():
+            matrix[i, j] = value
+        return int(np.linalg.matrix_rank(matrix))
 
-    return bettis
+    ranks = [boundary_rank(d) for d in range(max_dim + 2)]
+    return {d: len(faces) - ranks[d] - ranks[d + 1] for d, faces in by_dim.items()}
 
 
 def nerve_of_sets(sets: Iterable[set | frozenset]) -> SimplicialComplex:
@@ -561,6 +570,12 @@ def nerve_of_sets(sets: Iterable[set | frozenset]) -> SimplicialComplex:
     return SimplicialComplex(vertices, facet_set=maximal)
 
 
+def delta_of_clique_set(clique_set: Iterable[frozenset]) -> SimplicialComplex:
+    """Union of the full simplices generated by the supplied cliques."""
+    faces = [Simplex(clique) for clique in clique_set]
+    return SimplicialComplex(set().union(*faces), facet_set=faces)
+
+
 def clique_complex(graph: nx.Graph) -> SimplicialComplex:
     """Return the clique complex of an undirected graph.
 
@@ -578,8 +593,8 @@ def clique_complex(graph: nx.Graph) -> SimplicialComplex:
     >>> cc.dimension()
     3
     """
-    the_cliques = {Simplex(q) for q in nx.find_cliques(graph)}
-    return SimplicialComplex(graph.nodes(), facet_set=the_cliques)
+    facets = nx.find_cliques(graph) if graph else iter([[]])
+    return SimplicialComplex._from_maximal_faces(graph, facets)
 
 
 def nerve_of_cliques(graph: nx.Graph) -> SimplicialComplex:

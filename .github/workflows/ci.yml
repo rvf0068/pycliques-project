@@ -11,15 +11,15 @@ on:
 
 jobs:
   test:
+    env:
+      PYTHON_VERSION: ${{ matrix.python-version }}
+      PACKAGE: ${{ matrix.package }}
     name: Test ${{ matrix.package }} (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
-        # List your packages here. 
-        # Ideally, 'pyg6data' is tested first if others depend on it, 
-        # but parallel execution handles this fine.
         package: ["pycliques", "pyg6data", "pycombtop", "pyhomrep"]
 
     steps:
@@ -37,20 +37,21 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
-      - name: Install Dependencies
-        # This reads uv.lock and installs the whole workspace + dev tools (pytest)
-        run: uv sync
+      - name: Install locked test dependencies
+        run: uv sync --locked --python "$PYTHON_VERSION" --no-default-groups --group test
 
       - name: Run Tests
-        # Runs pytest on the specific package folder
-        # --cov generates the report for Codecov
         timeout-minutes: 15
         run: |
-          uv run pytest packages/${{ matrix.package }} \
-            --cov=packages/${{ matrix.package }}/src \
-            --cov-report=xml:coverage-${{ matrix.package }}.xml
+          .venv/bin/python -c 'import os, sys; assert ".".join(map(str, sys.version_info[:2])) == os.environ["PYTHON_VERSION"], sys.version'
+          args=(--durations=8)
+          if [[ "$PYTHON_VERSION" == "3.12" ]]; then
+            args+=(--cov="packages/$PACKAGE/src" --cov-report="xml:coverage-$PACKAGE.xml")
+          fi
+          .venv/bin/python -m pytest "packages/$PACKAGE" "${args[@]}"
 
       - name: Upload to Codecov
+        if: matrix.python-version == '3.12'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -94,16 +95,32 @@ jobs:
       - name: Set up Python 3.11
         run: uv python install 3.11
       - name: Install Dependencies
-        run: uv sync
+        run: uv sync --locked --python 3.11 --no-default-groups --group test
       - name: Run fast research tests
+        run: .venv/bin/python -m pytest research -m "not slow"
+
+  wheels:
+    name: Installed wheels and command-line entry points
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv build --all-packages --wheel --out-dir "$RUNNER_TEMP/wheels"
+      - name: Exercise base and cooperating packages outside the checkout
+        working-directory: ${{ runner.temp }}
         run: |
-          uv run pytest \
-            research/test_homotopy_research.py \
-            research/test_h_operator_census.py \
-            research/test_benchmark_order10_homotopy_cores.py \
-            research/test_helly_cover_certificates.py \
-            research/test_selected_helly_cover.py \
-            -m "not slow"
+          uv venv --python 3.12 wheel-env
+          export VIRTUAL_ENV="$PWD/wheel-env"
+          export PATH="$VIRTUAL_ENV/bin:$PATH"
+          uv pip install wheels/pycliques-*.whl
+          python -c 'import networkx as nx, pycliques as p; assert len(p.clique_graph(nx.cycle_graph(4))) == 4'
+          small-behavior --help
+          small-behavior-clockwork-pairs --help
+          find-retractions --help
+          uv pip install wheels/*.whl
+          python -c 'from pyg6data import graph_generator; from pycombtop import first_homology_rank; import pyhomrep; assert len(next(graph_generator(6))) == 6'
+          homotopy-indeterminate --help
+          extract-graphs --help
 
   research-order-eight:
     name: Order-8 research census (Python 3.11)
@@ -122,9 +139,9 @@ jobs:
       - name: Set up Python 3.11
         run: uv python install 3.11
       - name: Install Dependencies
-        run: uv sync
+        run: uv sync --locked --python 3.11 --no-default-groups --group test
       - name: Run order-8 candidate-count regression
-        run: uv run pytest research/test_homotopy_research.py -m slow
+        run: uv run --no-sync --python 3.11 pytest research/test_homotopy_research.py -m slow
 
   research-helly-certificate-replay:
     name: Full Helly-cover certificate replay (Python 3.11)
@@ -144,12 +161,12 @@ jobs:
       - name: Set up Python 3.11
         run: uv python install 3.11
       - name: Install Dependencies
-        run: uv sync
+        run: uv sync --locked --python 3.11 --no-default-groups --group test
       - name: Replay rank-four certificate
         run: |
-          uv run python research/o8_helly_cover_certificates.py \
+          uv run --no-sync --python 3.11 python research/o8_helly_cover_certificates.py \
             --check research/results/o8_four_uniform_helly_certificate.json
       - name: Replay rank-four/five certificate
         run: |
-          uv run python research/o8_helly_cover_certificates.py \
+          uv run --no-sync --python 3.11 python research/o8_helly_cover_certificates.py \
             --check research/results/o8_helly_gate_certificate.json

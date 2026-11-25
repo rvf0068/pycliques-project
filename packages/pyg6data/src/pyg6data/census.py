@@ -1,181 +1,261 @@
-"""Checkpointable exhaustive graph-census utilities."""
+"""Bounded, resumable censuses over the bundled connected graphs."""
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
-import tempfile
-from collections.abc import Callable
+import sqlite3
+from collections import deque
+from collections.abc import Callable, Iterator
 from concurrent.futures import ProcessPoolExecutor
+from contextlib import ExitStack, closing
+from itertools import islice
 from pathlib import Path
-from typing import Any, cast
+from tempfile import TemporaryDirectory
+from typing import Any
 
 import networkx as nx
 
-from .lists import graph_generator
+from .lists import _get_data_file_path, graph6_resource, iter_graph6_records
 
 CensusRecord = dict[str, Any]
+Predicate = Callable[[nx.Graph], bool]
+Evaluator = Callable[[nx.Graph], Any]
 
 
-def _graph6(graph: nx.Graph) -> str:
-    """Return a headerless ASCII graph6 encoding."""
-    encoded = nx.to_graph6_bytes(graph, header=False).decode("ascii").strip()
-    return cast(str, encoded)
-
-
-def _evaluate_graph6(
-    encoded: str,
-    predicate: Callable[[nx.Graph], bool],
-    evaluator: Callable[[nx.Graph], Any],
-) -> tuple[str, Any]:
-    """Evaluate one serialized graph in a worker process."""
+def _evaluate(
+    index: int, encoded: str, predicate: Predicate, evaluator: Evaluator
+) -> CensusRecord:
+    row: CensusRecord = {"index": index, "graph6": encoded}
     graph = nx.from_graph6_bytes(encoded.encode("ascii"))
-    if not predicate(graph):
-        return "filtered", None
-    return "ok", evaluator(graph)
-
-
-def _write_checkpoint(
-    path: Path, completed: set[int], records: list[CensusRecord]
-) -> None:
-    """Atomically write the current census state as JSON."""
-    payload = {"completed": sorted(completed), "records": records}
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary_name = tempfile.mkstemp(
-        prefix=f".{path.name}.", dir=path.parent, text=True
-    )
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as checkpoint:
-            json.dump(payload, checkpoint, sort_keys=True)
-            checkpoint.write("\n")
-        os.replace(temporary_name, path)
-    finally:
-        if os.path.exists(temporary_name):
-            os.unlink(temporary_name)
+        if predicate(graph):
+            row.update(status="ok", result=repr(evaluator(graph)))
+        else:
+            row.update(status="filtered", result=None)
+    except Exception as error:
+        row.update(status="error", exception=f"{type(error).__name__}: {error}")
+    return row
 
 
-def _read_checkpoint(path: Path) -> tuple[set[int], list[CensusRecord]]:
-    """Read a checkpoint, rejecting malformed or incomplete JSON."""
-    with path.open("r", encoding="utf-8") as checkpoint:
-        payload = json.load(checkpoint)
-    completed = {int(index) for index in payload["completed"]}
-    records = list(payload["records"])
-    return completed, records
+def _validate(row: CensusRecord, index: int, encoded: str) -> None:
+    if (
+        not isinstance(row, dict)
+        or type(row.get("index")) is not int
+        or (row["index"] != index or row.get("graph6") != encoded)
+    ):
+        raise ValueError(f"Checkpoint record disagrees with source at index {index}")
+    status = row.get("status")
+    if not (
+        (status == "ok" and isinstance(row.get("result"), str))
+        or (status == "filtered" and "result" in row and row["result"] is None)
+        or (status == "error" and isinstance(row.get("exception"), str))
+    ):
+        raise ValueError(f"Invalid checkpoint result at index {index}")
+
+
+def _open_checkpoint(path: Path, order: int, run_id: str | None) -> sqlite3.Connection:
+    if not isinstance(run_id, str) or not run_id.strip():
+        raise ValueError(
+            "Set run_id to identify the checkpointed predicate and evaluator"
+        )
+    resource = graph6_resource(order)
+    with _get_data_file_path(resource).open("rb") as stream:
+        source_hash = hashlib.sha256()
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            source_hash.update(block)
+        digest = source_hash.hexdigest()
+    identity = json.dumps([1, "connected", order, resource, digest, run_id])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    db = sqlite3.connect(path)
+    try:
+        with db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS metadata "
+                "(id INTEGER PRIMARY KEY CHECK(id=1), identity TEXT NOT NULL)"
+            )
+            db.execute("INSERT OR IGNORE INTO metadata VALUES (1, ?)", (identity,))
+            if db.execute("SELECT identity FROM metadata WHERE id=1").fetchone() != (
+                identity,
+            ):
+                raise ValueError(
+                    "Checkpoint belongs to a different source, order, schema or run_id"
+                )
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS records "
+                "(idx INTEGER PRIMARY KEY CHECK(idx>=0), record TEXT NOT NULL)"
+            )
+    except sqlite3.DatabaseError as error:
+        db.close()
+        raise ValueError(
+            "Unreadable checkpoint; use import_legacy_checkpoint for historical JSON"
+        ) from error
+    except BaseException:
+        db.close()
+        raise
+    return db
+
+
+def import_legacy_checkpoint(
+    source: Path, destination: Path, *, order: int, run_id: str
+) -> None:
+    """Import historical JSON to a new database after validating all rows.
+
+    Supply the original evaluator's identifier. The old file cannot establish
+    that fact. The original and any existing destination are preserved.
+    """
+    payload = json.loads(source.read_text(encoding="utf-8"))
+    if (
+        not isinstance(payload, dict)
+        or not isinstance(payload.get("completed"), list)
+        or not isinstance(payload.get("records"), list)
+    ):
+        raise ValueError("Expected legacy checkpoint with completed and records lists")
+    indices, rows = payload["completed"], payload["records"]
+    if any(type(index) is not int or index < 0 for index in indices) or any(
+        not isinstance(row, dict) or type(row.get("index")) is not int for row in rows
+    ):
+        raise ValueError("Invalid legacy checkpoint index")
+    by_index = {row["index"]: row for row in rows}
+    if (
+        len(indices) != len(set(indices))
+        or len(by_index) != len(rows)
+        or set(indices) != by_index.keys()
+    ):
+        raise ValueError("Legacy completed indices and records disagree")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(dir=destination.parent) as directory:
+        path = Path(directory) / "checkpoint"
+        with closing(_open_checkpoint(path, order, run_id)) as db, db:
+            for index, encoded in iter_graph6_records(order):
+                if not by_index:
+                    break
+                if index in by_index:
+                    row = by_index.pop(index)
+                    _validate(row, index, encoded)
+                    db.execute(
+                        "INSERT INTO records VALUES (?, ?)", (index, json.dumps(row))
+                    )
+            if by_index:
+                raise ValueError("Legacy checkpoint contains out-of-range indices")
+        os.link(path, destination)
+
+
+def iter_graph_census(
+    order: int,
+    predicate: Predicate,
+    evaluator: Evaluator,
+    *,
+    checkpoint: Path | None = None,
+    run_id: str | None = None,
+    checkpoint_interval: int = 100,
+    workers: int = 1,
+) -> Iterator[CensusRecord]:
+    """Yield results in original index order with at most twice workers in flight.
+
+    A SQLite checkpoint binds the source digest and order to the caller's
+    run_id. Change the identifier when the evaluator, filter or parameters
+    change. Committed intervals survive interruption. Historical JSON can be
+    imported with import_legacy_checkpoint. Parallel callables must be picklable.
+    """
+    if checkpoint_interval < 1 or workers < 1:
+        raise ValueError("checkpoint_interval and workers must be positive")
+    source = iter_graph6_records(order)
+    with ExitStack() as stack:
+        db = (
+            stack.enter_context(closing(_open_checkpoint(checkpoint, order, run_id)))
+            if checkpoint is not None
+            else None
+        )
+        pool = (
+            stack.enter_context(ProcessPoolExecutor(workers)) if workers > 1 else None
+        )
+
+        def results():
+            for index, encoded in source:
+                cached = (
+                    db.execute(
+                        "SELECT record FROM records WHERE idx=?", (index,)
+                    ).fetchone()
+                    if db is not None
+                    else None
+                )
+                if cached is not None:
+                    row = json.loads(cached[0])
+                    _validate(row, index, encoded)
+                    yield row, None, False
+                elif pool is None:
+                    yield _evaluate(index, encoded, predicate, evaluator), None, True
+                else:
+                    yield (
+                        None,
+                        pool.submit(_evaluate, index, encoded, predicate, evaluator),
+                        True,
+                    )
+
+        pending = results()
+        queue = deque(islice(pending, 2 * workers if pool else 1))
+        dirty = 0
+        count = 0
+        while queue:
+            row, future, fresh = queue.popleft()
+            if future is not None:
+                row = future.result()
+            assert row is not None
+            if fresh and db is not None:
+                saved = db.execute(
+                    "INSERT OR IGNORE INTO records VALUES (?, ?)",
+                    (count, json.dumps(row)),
+                )
+                if saved.rowcount == 0:
+                    # Another worker process using this checkpoint committed first.
+                    original = db.execute(
+                        "SELECT record FROM records WHERE idx=?", (count,)
+                    ).fetchone()
+                    cached_row = json.loads(original[0])
+                    _validate(cached_row, count, row["graph6"])
+                    row = cached_row
+                dirty += 1
+                if dirty == checkpoint_interval:
+                    db.commit()
+                    dirty = 0
+            count += 1
+            yield row
+            queue.extend(islice(pending, 1))
+        if db is not None:
+            if db.execute(
+                "SELECT 1 FROM records WHERE idx>=? LIMIT 1", (count,)
+            ).fetchone():
+                raise ValueError("Checkpoint contains out-of-range indices")
+            db.commit()
 
 
 def run_graph_census(
     order: int,
-    predicate: Callable[[nx.Graph], bool],
-    evaluator: Callable[[nx.Graph], Any],
+    predicate: Predicate,
+    evaluator: Evaluator,
     *,
     checkpoint: Path | None = None,
+    run_id: str | None = None,
     checkpoint_interval: int = 100,
     workers: int = 1,
 ) -> list[CensusRecord]:
-    """Run a resumable census over connected graphs of a fixed order.
+    """Collect iter_graph_census in source order. Use the iterator for large runs.
 
-    Graphs are streamed from :func:`pyg6data.lists.graph_generator`. Each
-    record contains the source index, graph6 encoding, status, and either the
-    evaluator result or exception text. A checkpoint is replaced atomically at
-    the requested interval, so an interrupted run can resume without losing
-    completed records.
-
-    .. rubric:: Parameters
-
-    order : int
-        Order of the connected graphs to enumerate.
-    predicate : callable
-        Filter applied before evaluation.
-    evaluator : callable
-        Function evaluated for graphs accepted by *predicate*.
-    checkpoint : pathlib.Path, optional
-        JSON checkpoint file used for resume. No checkpoint is written when
-        omitted.
-    checkpoint_interval : int, optional
-        Number of processed graph indices between checkpoint writes.
-    workers : int, optional
-        Number of worker processes. ``1`` runs in the calling process. When
-        greater than one, *predicate* and *evaluator* must be picklable.
-
-    .. rubric:: Returns
-
-    list[dict]
-        Result records sorted by graph index.
-
-    .. rubric:: Examples
-
-    >>> from pyg6data.census import run_graph_census
-    >>> records = run_graph_census(6, lambda g: g.number_of_nodes() == 6,
-    ...                            lambda g: g.number_of_edges())
-    >>> len(records)
+    >>> rows = run_graph_census(6, lambda g: True, lambda g: len(g))
+    >>> len(rows)
     112
     """
-    if checkpoint_interval < 1:
-        raise ValueError("checkpoint_interval must be positive")
-    if workers < 1:
-        raise ValueError("workers must be positive")
-
-    completed: set[int] = set()
-    records: list[CensusRecord] = []
-    if checkpoint is not None and checkpoint.exists():
-        completed, records = _read_checkpoint(checkpoint)
-
-    pending: list[tuple[int, str]] = [
-        (index, _graph6(graph))
-        for index, graph in enumerate(graph_generator(order, connected=True))
-        if index not in completed
-    ]
-
-    def consume(index: int, encoded: str, status: str, value: Any) -> None:
-        record: CensusRecord = {
-            "index": index,
-            "graph6": encoded,
-            "status": status,
-        }
-        if status == "ok":
-            record["result"] = repr(value)
-        elif status == "filtered":
-            record["result"] = None
-        else:
-            record["exception"] = value
-        records.append(record)
-        completed.add(index)
-
-    def process_one(index: int, encoded: str) -> None:
-        graph = nx.from_graph6_bytes(encoded.encode("ascii"))
-        try:
-            if not predicate(graph):
-                consume(index, encoded, "filtered", None)
-                return
-            consume(index, encoded, "ok", evaluator(graph))
-        except Exception as error:  # census runs must survive one bad graph
-            consume(index, encoded, "error", f"{type(error).__name__}: {error}")
-
-    if workers == 1:
-        for processed, (index, encoded) in enumerate(pending, 1):
-            process_one(index, encoded)
-            if checkpoint is not None and processed % checkpoint_interval == 0:
-                _write_checkpoint(checkpoint, completed, records)
-    else:
-        with ProcessPoolExecutor(max_workers=workers) as pool:
-            futures = {
-                pool.submit(_evaluate_graph6, encoded, predicate, evaluator): (
-                    index,
-                    encoded,
-                )
-                for index, encoded in pending
-            }
-            for processed, future in enumerate(futures, 1):
-                index, encoded = futures[future]
-                try:
-                    status, value = future.result()
-                    consume(index, encoded, status, value)
-                except Exception as error:
-                    consume(index, encoded, "error", f"{type(error).__name__}: {error}")
-                if checkpoint is not None and processed % checkpoint_interval == 0:
-                    _write_checkpoint(checkpoint, completed, records)
-
-    records.sort(key=lambda record: record["index"])
-    if checkpoint is not None:
-        _write_checkpoint(checkpoint, completed, records)
-    return records
+    return list(
+        iter_graph_census(
+            order,
+            predicate,
+            evaluator,
+            checkpoint=checkpoint,
+            run_id=run_id,
+            checkpoint_interval=checkpoint_interval,
+            workers=workers,
+        )
+    )

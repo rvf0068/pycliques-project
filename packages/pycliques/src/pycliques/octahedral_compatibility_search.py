@@ -16,6 +16,7 @@ from collections.abc import Iterator
 
 import networkx as nx
 
+from ._graph_utils import is_simple_graph
 from .octahedral_nonlocal_search import (
     OctahedronSearchResult,
     OctahedronSearchStatus,
@@ -44,12 +45,7 @@ def find_induced_octahedron_compatibility(
     Each restart uses up to local_steps replacement attempts and samples
     at most pair_samples candidate pairs per greedy decision.
     """
-    if (
-        not isinstance(graph, nx.Graph)
-        or graph.is_directed()
-        or graph.is_multigraph()
-        or nx.number_of_selfloops(graph)
-    ):
+    if not is_simple_graph(graph):
         raise ValueError("require a simple undirected loopless NetworkX graph")
     if type(target_dimension) is not int or target_dimension < 3:
         raise ValueError("target_dimension must be an integer >= 3")

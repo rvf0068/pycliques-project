@@ -308,7 +308,7 @@ members, omitting empty projections.
    :member-order: bysource
 
 CliqueSequence: pared iterates and reproducible labels
------------------------------------------------------
+------------------------------------------------------
 
 Use ``CliqueSequence(G, bound=10000, pare=True, relabel=True,
 pare_initial=True)`` to construct completely pared iterates from an

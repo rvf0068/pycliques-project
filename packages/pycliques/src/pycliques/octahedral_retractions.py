@@ -14,6 +14,7 @@ from dataclasses import dataclass
 
 import networkx as nx
 
+from ._graph_utils import is_simple_graph
 from .retractions import (
     BoundedRetractionResult,
     RetractionSearchStatus,
@@ -54,12 +55,7 @@ def find_octahedral_retraction(
     undirected simple loopless NetworkX graph. Graph edges may collapse
     to a vertex, as in the standard clique-graph morphism convention.
     """
-    if (
-        not isinstance(graph, nx.Graph)
-        or graph.is_multigraph()
-        or graph.is_directed()
-        or nx.number_of_selfloops(graph)
-    ):
+    if not is_simple_graph(graph):
         raise ValueError("Require an undirected simple loopless graph")
     if (
         not isinstance(max_states, int)

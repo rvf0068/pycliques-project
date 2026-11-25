@@ -202,7 +202,9 @@ def test_eventual_helly_public_api_agrees_with_classifier():
 
 def test_classify_clique_behavior_bound_exceeded():
     """The public result reports when the clique bound aborts iteration."""
-    result = classify_clique_behavior(dominated_vertex_free_non_helly(), bound=3)
+    result = classify_clique_behavior(
+        dominated_vertex_free_non_helly(), bound=3, extension_budget=0
+    )
 
     assert result.verdict is Verdict.INDETERMINATE
     assert result.bound_exceeded is True
@@ -220,7 +222,9 @@ def test_clique_sequence_reports_bound_exhaustion():
 
 def test_classify_clique_behavior_respects_iteration_limit():
     """An exhausted iteration limit is distinct from a clique-bound abort."""
-    result = classify_clique_behavior(dominated_vertex_free_non_helly(), tries=1)
+    result = classify_clique_behavior(
+        dominated_vertex_free_non_helly(), tries=1, extension_budget=0
+    )
 
     assert result.verdict is Verdict.INDETERMINATE
     assert result.iterations_checked == 1

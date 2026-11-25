@@ -192,3 +192,24 @@ def test_graph6_label_roundtrips_in_indeterminate_file(isolated_registry, tmp_pa
     assert loaded.rule == "reference"
     assert loaded.target_status == "conjectured_divergent"
     assert loaded.target_label == cert.target_label
+
+
+def test_isomorphic_registration_and_scoped_selection(isolated_registry):
+    from pycliques.small import classify_clique_behavior, select_reference_graphs
+
+    graph = nx.octahedral_graph()
+    register_reference_graph(
+        graph, status=ReferenceStatus.CONJECTURED, label="candidate"
+    )
+    assert select_reference_graphs(proved_only=True) == ()
+    other = nx.relabel_nodes(graph, {v: str(v) for v in graph})
+    register_reference_graph(other, label="proved")
+    register_reference_graph(graph, status=ReferenceStatus.CONJECTURED, label="older")
+    facts = select_reference_graphs(proved_only=True)
+    assert len(facts) == 1 and facts[0][2] == "proved"
+    result = classify_clique_behavior(graph, references=())
+    assert result.certificate is None or result.certificate.rule != "reference"
+    default = classify_clique_behavior(graph)
+    assert (
+        default.certificate is not None and default.certificate.target_label == "proved"
+    )

@@ -379,8 +379,7 @@ def test_clockwork_pairs_range_update_preserves_outside_rows_and_adds_survivor(
     )
     new_unresolved = nx.path_graph(5)
     monkeypatch.setattr(
-        small,
-        "_run_fast_pass_indeterminate",
+        "pycliques.small_cli._run_fast_pass_indeterminate",
         lambda *args, **kwargs: (
             0,
             0,
@@ -418,8 +417,7 @@ def test_clockwork_pairs_full_fresh_pass_replaces_the_unresolved_cohort(
         tmp_path,
     )
     monkeypatch.setattr(
-        small,
-        "_run_fast_pass_indeterminate",
+        "pycliques.small_cli._run_fast_pass_indeterminate",
         lambda *args, **kwargs: (1, 0, [], {0}),
     )
 

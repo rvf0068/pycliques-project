@@ -12,16 +12,11 @@ from enum import Enum
 
 import networkx as nx
 
+from ._bitsets import iter_indices as _bits
+from ._graph_utils import is_simple_graph
 from .octahedral_forced_pairs import screen_forced_pairs
 from .octahedral_nonlocal_search import verify_induced_octahedron
 from .octahedral_pair_cover import pair_cover_obstructs
-
-
-def _bits(mask: int):
-    while mask:
-        bit = mask & -mask
-        yield bit.bit_length() - 1
-        mask ^= bit
 
 
 class OctahedralBlindStatus(Enum):
@@ -67,12 +62,7 @@ class _OctahedralMasks:
     """Bit-mask encoding with positions determined by graph iteration order."""
 
     def __init__(self, graph: nx.Graph):
-        if (
-            not isinstance(graph, nx.Graph)
-            or graph.is_directed()
-            or graph.is_multigraph()
-            or nx.number_of_selfloops(graph)
-        ):
+        if not is_simple_graph(graph):
             raise ValueError("require a simple undirected loopless NetworkX graph")
         self.nodes = tuple(graph)
         self.index = {x: i for i, x in enumerate(self.nodes)}

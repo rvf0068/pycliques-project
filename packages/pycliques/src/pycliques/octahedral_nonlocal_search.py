@@ -9,11 +9,14 @@ can certify clique divergence.
 from __future__ import annotations
 
 import random
-from collections.abc import Hashable, Iterator, Sequence
+from collections.abc import Hashable, Sequence
 from dataclasses import dataclass
 from enum import Enum
 
 import networkx as nx
+
+from ._bitsets import iter_indices as _bits
+from ._graph_utils import is_simple_graph
 
 
 class OctahedronSearchStatus(Enum):
@@ -30,13 +33,6 @@ class OctahedronSearchResult:
     restarts: int
     best_dimension: int
     best_common_neighbors: int | None
-
-
-def _bits(mask: int) -> Iterator[int]:
-    while mask:
-        low = mask & -mask
-        yield low.bit_length() - 1
-        mask ^= low
 
 
 def verify_induced_octahedron(
@@ -93,12 +89,7 @@ def find_induced_octahedron_amplified(
     LIMIT_REACHED means only that the search budget was exhausted. Use
     find_octahedral_retraction separately to establish a retraction.
     """
-    if (
-        not isinstance(graph, nx.Graph)
-        or graph.is_multigraph()
-        or graph.is_directed()
-        or nx.number_of_selfloops(graph)
-    ):
+    if not is_simple_graph(graph):
         raise ValueError("require a simple undirected graph")
     if type(target_dimension) is not int or target_dimension < 3:
         raise ValueError("target_dimension must be an integer >= 3")

@@ -9,6 +9,7 @@ Brendan McKay's page (https://users.cecs.anu.edu.au/~bdm/data/digraphs.html).
 
 import gzip
 from collections.abc import Iterator
+from contextlib import nullcontext
 from importlib import resources
 
 import networkx as nx
@@ -68,44 +69,32 @@ def _get_data_file_path(filename: str) -> resources.abc.Traversable:
     return resources.files(DATA_PACKAGE).joinpath(filename)
 
 
+def _records(filename: str) -> Iterator[str]:
+    with _get_data_file_path(filename).open("rb") as raw:
+        stream = gzip.open(raw, "rb") if filename.endswith(".gz") else nullcontext(raw)
+        with stream as lines:
+            for line in lines:
+                if encoded := line.strip():
+                    yield encoded.decode("ascii")
+
+
+def graph6_resource(n: int, connected: bool = True) -> str:
+    """Return the bundled graph6 resource name for this family and order."""
+    names = _dict_connected if connected else _dict_all
+    if n not in names:
+        raise ValueError(f"Data for n={n} (connected={connected}) is not available.")
+    return names[n]
+
+
+def iter_graph6_records(n: int, connected: bool = True) -> Iterator[tuple[int, str]]:
+    """Return zero-based indices and graph6 strings in bundled source order."""
+    return enumerate(_records(graph6_resource(n, connected)))
+
+
 def graph_generator(n: int, connected: bool = True) -> Iterator[nx.Graph]:
-    """
-    Yields NetworkX graphs from a g6.gz file.
-
-    Args:
-        n (int): Order of the graphs (number of nodes).
-        connected (bool): If True, reads connected graphs file; else,
-            reads all graphs file. Defaults to True.
-
-    Yields:
-        nx.Graph: A NetworkX graph read from the file.
-
-    Raises:
-        ValueError: If the requested order 'n' is not available.
-    """
-    the_dict = _dict_connected if connected else _dict_all
-
-    if n not in the_dict:
-        msg = f"Data for n={n} (connected={connected}) is not available."
-        raise ValueError(msg)
-
-    # Get the secure path to the file inside the installed package
-    filename = the_dict[n]
-    file_path = _get_data_file_path(filename)
-
-    if filename.endswith(".gz"):
-        with file_path.open("rb") as raw_file:
-            with gzip.open(raw_file, "rt", encoding="utf-8") as graph_file:
-                for graph_string in graph_file:
-                    graph_string = graph_string.strip()
-                    if graph_string:
-                        yield nx.from_graph6_bytes(graph_string.encode("utf-8"))
-    else:
-        with file_path.open("r", encoding="utf-8") as graph_file:
-            for graph_string in graph_file:
-                graph_string = graph_string.strip()
-                if graph_string:
-                    yield nx.from_graph6_bytes(graph_string.encode("utf-8"))
+    """Yield decoded graphs in the same order as iter_graph6_records."""
+    for _, encoding in iter_graph6_records(n, connected):
+        yield nx.from_graph6_bytes(encoding.encode("ascii"))
 
 
 def list_graphs(n: int, connected: bool = True) -> list[nx.Graph]:
@@ -115,17 +104,9 @@ def list_graphs(n: int, connected: bool = True) -> list[nx.Graph]:
 
 def small_torsion_graphs() -> list[nx.Graph]:
     """Loads the small-torsion graphs."""
-    file_path = _get_data_file_path("small-torsion.g6")
-    list_of_graphs = []
-    # This is a regular .g6 file (not gzipped)
-    with file_path.open("r", encoding="utf-8") as graph_file:
-        for graph_string in graph_file:
-            graph_string = graph_string.strip()
-            if graph_string:
-                list_of_graphs.append(
-                    nx.from_graph6_bytes(graph_string.encode("utf-8"))
-                )
-    return list_of_graphs
+    return [
+        nx.from_graph6_bytes(s.encode("ascii")) for s in _records("small-torsion.g6")
+    ]
 
 
 def cubic_graph_generator(n: int) -> Iterator[nx.Graph]:
@@ -160,22 +141,8 @@ def cubic_graph_generator(n: int) -> Iterator[nx.Graph]:
         msg = f"Cubic graph data for n={n} is not available."
         raise ValueError(msg)
 
-    filename = _dict_cubic[n]
-    file_path = _get_data_file_path(filename)
-
-    if filename.endswith(".gz"):
-        with file_path.open("rb") as raw_file:
-            with gzip.open(raw_file, "rt", encoding="utf-8") as graph_file:
-                for graph_string in graph_file:
-                    graph_string = graph_string.strip()
-                    if graph_string:
-                        yield nx.from_graph6_bytes(graph_string.encode("utf-8"))
-    else:
-        with file_path.open("r", encoding="utf-8") as graph_file:
-            for graph_string in graph_file:
-                graph_string = graph_string.strip()
-                if graph_string:
-                    yield nx.from_graph6_bytes(graph_string.encode("utf-8"))
+    for encoded in _records(_dict_cubic[n]):
+        yield nx.from_graph6_bytes(encoded.encode("ascii"))
 
 
 def list_cubic_graphs(n: int) -> list[nx.Graph]:
@@ -247,6 +214,12 @@ def parse_digraph6(d6_str: str) -> nx.DiGraph:
 
     data = [ord(c) - 63 for c in d6_str]
 
+    if any(value < 0 or value > 63 for value in data):
+        raise ValueError("Invalid digraph6 character")
+    if not data or (
+        data[0] == 63 and (len(data) < 4 or (data[1] == 63 and len(data) < 8))
+    ):
+        raise ValueError("String is too short to represent the digraph6 order")
     if data[0] <= 62:
         n = data[0]
         data = data[1:]
@@ -317,22 +290,8 @@ def digraph_generator(n: int) -> Iterator[nx.DiGraph]:
         msg = f"Digraph data for n={n} is not available."
         raise ValueError(msg)
 
-    filename = _dict_digraphs[n]
-    file_path = _get_data_file_path(filename)
-
-    if filename.endswith(".gz"):
-        with file_path.open("rb") as raw_file:
-            with gzip.open(raw_file, "rt", encoding="utf-8") as graph_file:
-                for line in graph_file:
-                    line = line.strip()
-                    if line:
-                        yield parse_digraph6(line)
-    else:
-        with file_path.open("r", encoding="utf-8") as graph_file:
-            for line in graph_file:
-                line = line.strip()
-                if line:
-                    yield parse_digraph6(line)
+    for encoded in _records(_dict_digraphs[n]):
+        yield parse_digraph6(encoded)
 
 
 def list_digraphs(n: int) -> list[nx.DiGraph]:

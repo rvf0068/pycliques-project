@@ -10,11 +10,11 @@ from itertools import combinations
 from math import inf
 
 import networkx as nx
+from pycliques.classification_types import Certificate
 from pycliques.cliques import Clique, clique_graph
 from pycliques.clockwork_pairs import clockwork_coaffine_pair
 from pycliques.clockwork_search import CertificateVerificationStatus
 from pycliques.coaffinations import CoaffinePair
-from pycliques.small import Certificate
 
 from .covering_divergence import (
     TriangularCoverDivergenceCertificate,

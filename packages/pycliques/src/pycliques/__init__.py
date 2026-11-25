@@ -2,6 +2,10 @@
 
 __version__ = "0.1.0"
 
+from importlib import import_module
+from typing import TYPE_CHECKING
+
+from .clique_sequence import CliqueSequence
 from .cliques import (
     Clique,
     Complete,
@@ -134,13 +138,6 @@ from .homotopy_invariance import (
     verify_discrete_morse_matching,
     witnesses_and_extension,
 )
-from .homotopy_research import (
-    EnumerationStatus,
-    HomotopyStructureResult,
-    MissingFaceCertificate,
-    homotopy_structure_certificates,
-    verify_homotopy_structure_certificates,
-)
 from .implicit_clique_graph import (
     ImplicitCliqueGraph,
     ImplicitParingResult,
@@ -176,10 +173,6 @@ from .octahedral_blind import (
     minimum_octahedral_repair,
     screen_partial_octahedral_retraction,
 )
-from .octahedral_blind_search import (
-    BlindOctahedralRetraction,
-    find_blind_octahedral_retraction,
-)
 from .octahedral_boolean import (
     MaximalIntersectingFamilies,
     OctahedralBooleanModel,
@@ -188,16 +181,6 @@ from .octahedral_boolean import (
     degree_histogram,
     enumerate_maximal_intersecting_families,
 )
-from .octahedral_coaffine import (
-    CoaffineOctahedronResult,
-    find_octahedral_retraction_coaffine,
-)
-from .octahedral_coaffine_native import build_coaffine_native
-from .octahedral_compatibility_search import find_induced_octahedron_compatibility
-from .octahedral_joint_fibers import (
-    PartialOctahedralFibers,
-    discover_partial_octahedral_fibers,
-)
 from .octahedral_nonlocal_search import (
     OctahedronSearchResult,
     OctahedronSearchStatus,
@@ -205,24 +188,6 @@ from .octahedral_nonlocal_search import (
     verify_induced_octahedron,
 )
 from .octahedral_retractions import find_octahedral_retraction
-from .octahedral_shore_retractions import find_octahedral_retraction_shores
-from .poset_homotopy import (
-    ClosedCliqueIntersections,
-    DoubleBoundHClosureResult,
-    DoubleBoundHClosureStatus,
-    SupportNerveConeCertificate,
-    ThreeHellyResult,
-    ThreeHellyStatus,
-    check_double_bound_h_closure_contractibility,
-    closed_clique_intersections,
-    h_closure_from_neighbors,
-    maximal_clique_hypergraph_is_3_helly,
-    strong_collapse_certificate,
-    support_nerve_cone_certificate,
-    support_nerve_facets,
-    verify_strong_collapse_certificate,
-    verify_support_nerve_cone_certificate,
-)
 from .retractions import (
     BoundedRetractionResult,
     RetractionSearchStatus,
@@ -243,25 +208,6 @@ from .retractions import (
     verify_retraction_witness,
     verify_special_octahedron_witness,
 )
-from .small import (
-    Certificate,
-    CliqueBehavior,
-    CliqueSequence,
-    ReferenceStatus,
-    Verdict,
-    classify_clique_behavior,
-    classify_clique_behavior_with_clockwork_pair_search,
-    classify_clockwork_pair_map,
-    classify_inverse_cutpoint_extension,
-    classify_local_bridge,
-    classify_non_triangle_edge,
-    clear_reference_graphs,
-    eventually_retracts_specially,
-    register_reference_graph,
-    suspension_bases,
-    test_eventually_helly,
-    verify_clockwork_pair_map_certificate,
-)
 from .stiff_retractions import StiffRetractionResult, search_proper_stiff_retraction
 from .surfaces import (
     is_closed_surface,
@@ -277,6 +223,142 @@ from .targeted_retractions import (
     search_targeted_retractions,
     verify_targeted_retraction,
 )
+
+# Keep the normal operator dispatch eager; load specialist search modules on demand.
+if TYPE_CHECKING:
+    from .homotopy_research import (
+        EnumerationStatus,
+        HomotopyStructureResult,
+        MissingFaceCertificate,
+        homotopy_structure_certificates,
+        verify_homotopy_structure_certificates,
+    )
+    from .octahedral_blind_search import (
+        BlindOctahedralRetraction,
+        find_blind_octahedral_retraction,
+    )
+    from .octahedral_coaffine import (
+        CoaffineOctahedronResult,
+        find_octahedral_retraction_coaffine,
+    )
+    from .octahedral_coaffine_native import build_coaffine_native
+    from .octahedral_compatibility_search import find_induced_octahedron_compatibility
+    from .octahedral_joint_fibers import (
+        PartialOctahedralFibers,
+        discover_partial_octahedral_fibers,
+    )
+    from .octahedral_shore_retractions import find_octahedral_retraction_shores
+    from .poset_homotopy import (
+        ClosedCliqueIntersections,
+        DoubleBoundHClosureResult,
+        DoubleBoundHClosureStatus,
+        SupportNerveConeCertificate,
+        ThreeHellyResult,
+        ThreeHellyStatus,
+        check_double_bound_h_closure_contractibility,
+        closed_clique_intersections,
+        h_closure_from_neighbors,
+        maximal_clique_hypergraph_is_3_helly,
+        strong_collapse_certificate,
+        support_nerve_cone_certificate,
+        support_nerve_facets,
+        verify_strong_collapse_certificate,
+        verify_support_nerve_cone_certificate,
+    )
+    from .small import (
+        Certificate,
+        CliqueBehavior,
+        ReferenceStatus,
+        Verdict,
+        classify_clique_behavior,
+        classify_clique_behavior_with_clockwork_pair_search,
+        classify_clockwork_pair_map,
+        classify_inverse_cutpoint_extension,
+        classify_local_bridge,
+        classify_non_triangle_edge,
+        clear_reference_graphs,
+        eventually_retracts_specially,
+        register_reference_graph,
+        select_reference_graphs,
+        suspension_bases,
+        test_eventually_helly,
+        verify_clockwork_pair_map_certificate,
+    )
+
+_LAZY_MODULES = {
+    "homotopy_research": (
+        "EnumerationStatus",
+        "HomotopyStructureResult",
+        "MissingFaceCertificate",
+        "homotopy_structure_certificates",
+        "verify_homotopy_structure_certificates",
+    ),
+    "octahedral_blind_search": (
+        "BlindOctahedralRetraction",
+        "find_blind_octahedral_retraction",
+    ),
+    "octahedral_coaffine": (
+        "CoaffineOctahedronResult",
+        "find_octahedral_retraction_coaffine",
+    ),
+    "octahedral_coaffine_native": ("build_coaffine_native",),
+    "octahedral_compatibility_search": ("find_induced_octahedron_compatibility",),
+    "octahedral_joint_fibers": (
+        "PartialOctahedralFibers",
+        "discover_partial_octahedral_fibers",
+    ),
+    "octahedral_shore_retractions": ("find_octahedral_retraction_shores",),
+    "poset_homotopy": (
+        "ClosedCliqueIntersections",
+        "DoubleBoundHClosureResult",
+        "DoubleBoundHClosureStatus",
+        "SupportNerveConeCertificate",
+        "ThreeHellyResult",
+        "ThreeHellyStatus",
+        "check_double_bound_h_closure_contractibility",
+        "closed_clique_intersections",
+        "h_closure_from_neighbors",
+        "maximal_clique_hypergraph_is_3_helly",
+        "strong_collapse_certificate",
+        "support_nerve_cone_certificate",
+        "support_nerve_facets",
+        "verify_strong_collapse_certificate",
+        "verify_support_nerve_cone_certificate",
+    ),
+    "small": (
+        "Certificate",
+        "CliqueBehavior",
+        "ReferenceStatus",
+        "Verdict",
+        "classify_clique_behavior",
+        "classify_clique_behavior_with_clockwork_pair_search",
+        "classify_clockwork_pair_map",
+        "classify_inverse_cutpoint_extension",
+        "classify_local_bridge",
+        "classify_non_triangle_edge",
+        "clear_reference_graphs",
+        "eventually_retracts_specially",
+        "register_reference_graph",
+        "select_reference_graphs",
+        "suspension_bases",
+        "test_eventually_helly",
+        "verify_clockwork_pair_map_certificate",
+    ),
+}
+
+
+def __getattr__(name: str):
+    for module, exports in _LAZY_MODULES.items():
+        if name in exports:
+            value = getattr(import_module(f".{module}", __name__), name)
+            globals()[name] = value
+            return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(__all__))
+
 
 __all__ = [
     "__version__",
@@ -503,6 +585,7 @@ __all__ = [
     "eventually_retracts_specially",
     "test_eventually_helly",
     "register_reference_graph",
+    "select_reference_graphs",
     "suspension_bases",
     # surfaces
     "is_closed_surface",

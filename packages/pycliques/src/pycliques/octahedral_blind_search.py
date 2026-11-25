@@ -15,6 +15,7 @@ from itertools import combinations, islice
 
 import networkx as nx
 
+from ._bitsets import iter_indices as _bit_indices
 from .octahedral_blind import (
     OctahedralBlindStatus,
     _OctahedralMasks,
@@ -122,13 +123,6 @@ def _repair_candidates(
         elif candidate > best[0]:
             heapq.heapreplace(best, candidate)
     return sorted(best, reverse=True)
-
-
-def _bit_indices(mask: int):
-    while mask:
-        bit = mask & -mask
-        yield bit.bit_length() - 1
-        mask ^= bit
 
 
 def find_blind_octahedral_retraction(

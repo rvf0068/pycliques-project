@@ -14,6 +14,7 @@ from enum import Enum, auto
 
 import networkx as nx
 
+from ._graph_utils import is_simple_graph
 from .homological_retractions import _validate_betti_bounds
 from .retractions import (
     RetractionSearchStatus,
@@ -205,12 +206,7 @@ def search_targeted_retractions(
     to exactly the requested dimensions; None preserves the historical
     all-dimensions search. This is especially useful for K^3 -> O_4.
     """
-    if (
-        not isinstance(graph, nx.Graph)
-        or graph.is_multigraph()
-        or graph.is_directed()
-        or nx.number_of_selfloops(graph)
-    ):
+    if not is_simple_graph(graph):
         raise ValueError("Require an undirected simple loopless graph")
     if len(set(families)) != len(families) or any(f not in FAMILIES for f in families):
         raise ValueError("Unknown or duplicated target family")

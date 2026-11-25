@@ -13,7 +13,6 @@ wheels/
 # Documentation builds
 docs/_build/
 
-# .gitignore
 
 # Coverage reports
 .coverage
@@ -21,16 +20,9 @@ docs/_build/
 coverage.xml
 htmlcov/
 *.cover
-order8.tsv
-order6.tsv
-.gitignore
-indeterminate_order_8.txt
 .vscode/settings.json
-order7.tsv
-packages/pycliques/src/pycliques/small.py
-indeterminate_order_9.txt
-order9.tsv
 /.ob-jupyter/
 /research/references/
 /research/handoffs/
-*.txt
+/order[0-9]*.tsv
+/indeterminate_order_*.txt

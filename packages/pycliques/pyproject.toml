@@ -14,6 +14,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+milp = ["scipy>=1.11"]
 data = [
     "pyg6data",
 ]

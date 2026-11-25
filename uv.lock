@@ -1679,6 +1679,9 @@ dependencies = [
 data = [
     { name = "pyg6data" },
 ]
+milp = [
+    { name = "scipy" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -1686,8 +1689,9 @@ requires-dist = [
     { name = "networkx", specifier = ">=3.6" },
     { name = "pyg6data", marker = "extra == 'data'", editable = "packages/pyg6data" },
     { name = "rich" },
+    { name = "scipy", marker = "extra == 'milp'", specifier = ">=1.11" },
 ]
-provides-extras = ["data"]
+provides-extras = ["milp", "data"]
 
 [[package]]
 name = "pycliques-project"
@@ -1713,6 +1717,18 @@ dev = [
     { name = "ruff" },
     { name = "sphinx" },
 ]
+docs = [
+    { name = "pydata-sphinx-theme" },
+    { name = "sphinx" },
+]
+lint = [
+    { name = "mypy" },
+    { name = "ruff" },
+]
+test = [
+    { name = "pytest" },
+    { name = "pytest-cov" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -1735,6 +1751,18 @@ dev = [
     { name = "ruff", specifier = ">=0.11.0" },
     { name = "sphinx", specifier = ">=9.0.4" },
 ]
+docs = [
+    { name = "pydata-sphinx-theme", specifier = ">=0.15.4" },
+    { name = "sphinx", specifier = ">=9.0.4" },
+]
+lint = [
+    { name = "mypy", specifier = ">=1.15.0" },
+    { name = "ruff", specifier = ">=0.11.0" },
+]
+test = [
+    { name = "pytest", specifier = ">=8.3.3" },
+    { name = "pytest-cov" },
+]
 
 [[package]]
 name = "pycombtop"
@@ -1743,6 +1771,7 @@ source = { editable = "packages/pycombtop" }
 dependencies = [
     { name = "gudhi" },
     { name = "networkx" },
+    { name = "numpy" },
     { name = "pycliques" },
     { name = "scipy" },
     { name = "sympy" },
@@ -1752,6 +1781,7 @@ dependencies = [
 requires-dist = [
     { name = "gudhi", specifier = "==3.13.0" },
     { name = "networkx", specifier = ">=3.6" },
+    { name = "numpy" },
     { name = "pycliques", editable = "packages/pycliques" },
     { name = "scipy", specifier = ">=1.11" },
     { name = "sympy" },
@@ -1811,7 +1841,6 @@ source = { editable = "packages/pyhomrep" }
 dependencies = [
     { name = "networkx" },
     { name = "numpy" },
-    { name = "pycliques" },
     { name = "pycombtop" },
     { name = "sympy" },
 ]
@@ -1820,7 +1849,6 @@ dependencies = [
 requires-dist = [
     { name = "networkx", specifier = ">=3.0" },
     { name = "numpy", specifier = ">=2.0.0" },
-    { name = "pycliques", editable = "packages/pycliques" },
     { name = "pycombtop", editable = "packages/pycombtop" },
     { name = "sympy", specifier = ">=1.14.0" },
 ]

@@ -1,5 +1,5 @@
 Two-shore exact retractions onto induced octahedra
-================================================
+==================================================
 
 Let X be a finite simple graph and T an induced octahedron
 O_d = complement(d K_2), with antipodal pairs (a_i,b_i).

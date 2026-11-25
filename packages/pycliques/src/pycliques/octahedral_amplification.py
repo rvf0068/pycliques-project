@@ -14,16 +14,13 @@ from dataclasses import dataclass
 
 import networkx as nx
 
+from ._bitsets import iter_indices as _bits
+from ._graph_utils import is_simple_graph
 from .complete_transversals import CompleteTransversalResult, find_complete_transversal
 
 
 def _check_graph(graph: nx.Graph) -> None:
-    if (
-        not isinstance(graph, nx.Graph)
-        or graph.is_directed()
-        or graph.is_multigraph()
-        or nx.number_of_selfloops(graph)
-    ):
+    if not is_simple_graph(graph):
         raise ValueError("Require an undirected simple loopless graph")
 
 
@@ -58,13 +55,6 @@ def _closed_masks(
         for i, node in enumerate(nodes)
     ]
     return nodes, positions, masks
-
-
-def _bits(mask: int):
-    while mask:
-        one = mask & -mask
-        yield one.bit_length() - 1
-        mask ^= one
 
 
 def is_dominating_octahedron(

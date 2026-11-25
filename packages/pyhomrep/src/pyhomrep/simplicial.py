@@ -106,7 +106,7 @@ def p_simplex(sc: SimplicialComplex, p: int) -> list[tuple]:
     >>> p_simplex(sc, 5)
     []
     """
-    return [face for face in faces(sc) if len(face) == p + 1]
+    return sorted(tuple(sorted(face)) for face in sc.faces_of_dimension(p))
 
 
 def basis_group_oriented_p_chains(sc: SimplicialComplex, p: int) -> PChain | None:
@@ -254,13 +254,6 @@ def matrix_symmetric_representate(sc: SimplicialComplex, p: int) -> Matrix | Non
         return eye(len(basisg.dic))
     else:
         return None
-        if p == 0:
-            basisg = basis_group_oriented_p_chains(sc, 0)
-            if basisg == 0:
-                return False
-            return eye(len(list(basisg.dic.keys())))
-        else:
-            return False
 
 
 def _cache(sc: SimplicialComplex) -> dict:

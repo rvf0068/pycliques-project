@@ -10,6 +10,7 @@ from math import comb, inf
 
 import networkx as nx
 
+from ._graph_utils import same_labeled_graph as _same_graph
 from .cliques import clique_graph
 from .clockwork import (
     ClockworkDivergenceStatus,
@@ -271,12 +272,6 @@ def find_induced_clockwork_subgraphs(
             else "All candidates within the specified order bound were checked."
         ),
     )
-
-
-def _same_graph(left: nx.Graph, right: nx.Graph) -> bool:
-    return set(left) == set(right) and {frozenset(edge) for edge in left.edges()} == {
-        frozenset(edge) for edge in right.edges()
-    }
 
 
 def verify_clockwork_retraction_certificate(

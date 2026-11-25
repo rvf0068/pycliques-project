@@ -15,23 +15,14 @@ from pathlib import Path
 
 import networkx as nx
 
+from ._bitsets import iter_indices as bit_indices
+from ._graph_utils import is_simple_graph
+
 
 def _validate_host_graph(graph: nx.Graph) -> None:
     """Require the graph model assumed by octahedral fiber search."""
-    if (
-        not isinstance(graph, nx.Graph)
-        or graph.is_directed()
-        or graph.is_multigraph()
-        or nx.number_of_selfloops(graph)
-    ):
+    if not is_simple_graph(graph):
         raise ValueError("require a simple undirected loopless NetworkX graph")
-
-
-def bit_indices(mask):
-    while mask:
-        z = mask & -mask
-        yield z.bit_length() - 1
-        mask ^= z
 
 
 class Masks:

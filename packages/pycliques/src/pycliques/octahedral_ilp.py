@@ -15,6 +15,8 @@ from math import isfinite
 
 import networkx as nx
 
+from ._graph_utils import is_simple_graph
+
 
 class OctahedronILPStatus(Enum):
     """Exact outcomes and bounded/inconclusive outcomes."""
@@ -96,12 +98,7 @@ def find_induced_octahedron_ilp(
     SciPy is loaded only on invocation; pip install scipy enables it.
     Do not use an unsuccessful bounded run as a negative certificate.
     """
-    if (
-        not isinstance(graph, nx.Graph)
-        or graph.is_directed()
-        or graph.is_multigraph()
-        or nx.number_of_selfloops(graph)
-    ):
+    if not is_simple_graph(graph):
         raise ValueError("graph must be a simple undirected loopless NetworkX Graph")
     if type(min_dimension) is not int or min_dimension < 2:
         raise ValueError("min_dimension must be an integer >= 2")

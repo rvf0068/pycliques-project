@@ -201,3 +201,21 @@ def test_list_digraphs_known_count_n3():
 def test_list_digraphs_known_count_n4():
     """Verify exactly 218 non-isomorphic digraphs on 4 vertices."""
     assert len(list_digraphs(4)) == 218
+
+
+@pytest.mark.parametrize("encoded", ["&", "&~", "&~?", "&~~???", "&!"])
+def test_malformed_digraph6_order(encoded):
+    with pytest.raises(ValueError):
+        parse_digraph6(encoded)
+
+
+def test_raw_record_indices_match_plain_and_compressed_graphs():
+    from pyg6data import iter_graph6_records
+
+    for connected in (False, True):
+        raw = list(iter_graph6_records(6, connected))
+        decoded = list_graphs(6, connected)
+        assert raw == [
+            (i, nx.to_graph6_bytes(g, header=False).decode("ascii").strip())
+            for i, g in enumerate(decoded)
+        ]

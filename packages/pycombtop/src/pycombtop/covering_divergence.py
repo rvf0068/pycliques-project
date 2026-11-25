@@ -8,12 +8,13 @@ from dataclasses import dataclass
 from itertools import combinations
 
 import networkx as nx
+from pycliques.classification_types import Certificate
 from pycliques.cliques import Clique, clique_graph
 from pycliques.clockwork_search import (
     CertificateVerificationResult,
     CertificateVerificationStatus,
 )
-from pycliques.small import Certificate, verify_clockwork_pair_map_certificate
+from pycliques.small import verify_clockwork_pair_map_certificate
 
 from .fundamental_group import covering_graph, fundamental_group
 
@@ -131,7 +132,7 @@ def verify_triangular_cover_divergence_certificate(
         if any(
             not isinstance(generator, int)
             or generator == 0
-            or abs(generator) > record.rank
+            or abs(generator) > record.generator_count
             for word in certificate.subgroup_words
             for generator in word
         ):

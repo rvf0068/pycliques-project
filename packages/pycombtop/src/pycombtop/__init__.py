@@ -44,6 +44,7 @@ from .fundamental_group import (
 from .hom_complex import graph_homomorphisms, hom_graph
 
 # homotopy_type
+from .homotopy_results import BettiProfile, HomotopyKind
 from .homotopy_type import (
     HomotopyVerdict,
     Theorem,
@@ -120,6 +121,7 @@ from .simplex import (
     clique_complex,
     complex_of_forests,
     deletion,
+    delta_of_clique_set,
     directed_neighborhood_complex,
     dong_matching,
     is_oriented_simplex,
@@ -187,6 +189,7 @@ __all__ = [
     "verify_weighted_conicity",
     "nerve_of_sets",
     "clique_complex",
+    "delta_of_clique_set",
     "nerve_of_cliques",
     "bounded_degree",
     "bounded_degree_complex",
@@ -222,6 +225,8 @@ __all__ = [
     "recursive_wedge_certificate",
     "verify_recursive_wedge",
     "HomotopyVerdict",
+    "HomotopyKind",
+    "BettiProfile",
     "Theorem",
     "RecursiveBettiBounds",
     "recursive_betti_upper_bounds",
