@@ -319,9 +319,10 @@ def test_general_backend_validation(monkeypatch: pytest.MonkeyPatch) -> None:
         general.find_coaffine_endomorphism(nx.empty_graph(2049), backend="native")
     with pytest.raises(ValueError, match="64-bit"):
         general.find_coaffine_endomorphism(graph, backend="native", max_states=1 << 65)
-    assert general.find_coaffine_endomorphism(
+    fallback = general.find_coaffine_endomorphism(
         graph, backend="auto", max_states=1 << 65
-    ).endomorphism is not None
+    )
+    assert fallback.endomorphism is not None
 
 
 @pytest.mark.parametrize(
