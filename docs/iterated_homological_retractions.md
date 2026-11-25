@@ -66,3 +66,51 @@ These obstructions also apply to special octahedra. If one transversal
 fix the octahedron pointwise and send each external vertex to an antipode
 b_i of a nonneighbor a_i. Such an i exists by maximality. No host edge
 can map to an antipodal pair, so this is an ordinary graph retraction.
+
+## Face-free exact homotopy certificates
+
+Call `recursive_betti_upper_bounds(G)` (or pass `max_degree=None`) to
+compute all degrees in one cached polynomial recurrence. The result contains
+explicit bounds for degrees 0 through `len(G)-1`; a resource-limited run
+returns no all-degree bounds. Passing an integer `max_degree` preserves
+the degree-by-degree search and its completed-degree results.
+
+The signed alternating sum of the polynomial coefficients is the exact
+reduced Euler characteristic: each deletion-link step is an equality for
+Euler characteristic. The `euler_refined_upper_bounds` property tightens
+the field-independent bounds using this identity. Positive bounds alone
+are not Betti ranks. The optional `neighbor_order` values `descending`,
+`ascending`, and `reverse_ties` change the deletion order, not soundness.
+
+```python
+import networkx as nx
+from pycombtop import (
+    connected_link_order,
+    recursive_betti_upper_bounds,
+    verify_connected_link_order,
+)
+
+G = nx.octahedral_graph()
+bounds = recursive_betti_upper_bounds(G)
+assert bounds.reduced_euler_characteristic == 1
+assert bounds.upper_bounds[2] == 1
+order = connected_link_order(G)
+assert order is not None and verify_connected_link_order(G, order)
+```
+
+A connected-link order starts at one vertex and adds vertices whose links
+in the preceding induced graph are nonempty and connected. Van Kampen
+then proves simple connectivity; failure of the search is inconclusive.
+
+On graphs of order 20--256, the existing `homotopy_type_with_verdict`
+cascade tries these bounded computations before symbolic Morse matching.
+If every possible reduced homology degree but one is excluded over all
+fields, simple connectivity and the universal coefficient theorem give
+free integral homology in that one degree. Its rank is determined by
+Euler characteristic. Hurewicz and Whitehead then prove the wedge of
+spheres (or contractibility in the acyclic case). Mixed support is not a
+wedge certificate. Uniform conicity is an alternative existing proof of
+simple connectivity; no optimization or simplex enumeration is required.
+Use `recursive_betti_states=0` to skip this strategy for the current call.
+The total state budget is shared by the three neighbor orders. All other
+classification strategies and the vertex limit remain in effect.
