@@ -127,3 +127,26 @@ def test_explicit_sparse_legacy_checkpoint_import(tmp_path):
     source.write_text(json.dumps(payload))
     with pytest.raises(ValueError, match="disagrees"):
         import_legacy_checkpoint(source, tmp_path / "bad", order=7, run_id="edges")
+
+
+def test_invalid_legacy_records_do_not_create_a_checkpoint(tmp_path):
+    import json
+
+    import pytest
+    from pyg6data import import_legacy_checkpoint, iter_graph6_records
+
+    source, target = tmp_path / "old.json", tmp_path / "new.sqlite"
+    index, graph6 = next(iter_graph6_records(6))
+    row = {"index": index, "graph6": graph6, "status": "ok", "result": "1"}
+    for payload in (
+        [],
+        {"completed": []},
+        {"completed": [True], "records": [row]},
+        {"completed": [index], "records": [{"index": []}]},
+        {"completed": [index], "records": [{**row, "status": "filtered"}]},
+        {"completed": [112], "records": [{**row, "index": 112}]},
+    ):
+        source.write_text(json.dumps(payload))
+        with pytest.raises(ValueError):
+            import_legacy_checkpoint(source, target, order=6, run_id="edges")
+        assert not target.exists()

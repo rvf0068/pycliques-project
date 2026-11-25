@@ -214,6 +214,31 @@ class TestSimplicialComplex:
 class TestBoundary:
     """Tests for boundary operator."""
 
+    def test_oriented_cycles_and_boundaries_on_two_triangles(self):
+        from pyhomrep.simplicial import (
+            image_boundary_op,
+            kernel_boundary_op,
+            matrix_symmetric_representate,
+        )
+        from sympy import Matrix
+
+        # The triangles 013 and 123 share edge 13 with opposite orientations.
+        sc = clique_complex(nx.Graph([(3, 2), (3, 1), (2, 1), (3, 0), (1, 0)]))
+        edges = p_simplex(sc, 1)
+        assert edges == [(0, 1), (0, 3), (1, 2), (1, 3), (2, 3)]
+        face_boundaries = Matrix([[1, -1, 0, 1, 0], [0, 0, 1, -1, 1]])
+        assert matrix_symmetric_representate(sc, 2) == face_boundaries.T
+        boundaries = image_boundary_op(sc, 2)
+        cycles = kernel_boundary_op(sc, 1)
+        assert len(cycles) == len(boundaries) == 2
+        for basis in (cycles, boundaries):
+            coordinates = Matrix(
+                [[chain.dic.get(edge, 0) for edge in edges] for chain in basis]
+            )
+            assert (
+                coordinates.rank() == coordinates.col_join(face_boundaries).rank() == 2
+            )
+
     def test_boundary_operator_vanishes(self):
         """Test that boundary^2 = 0."""
         v = PChain([(0, 1, 2), (0, 1, 3), (0, 2, 3), (1, 2, 3)], [1, 1, 1, 1])

@@ -254,13 +254,6 @@ def matrix_symmetric_representate(sc: SimplicialComplex, p: int) -> Matrix | Non
         return eye(len(basisg.dic))
     else:
         return None
-        if p == 0:
-            basisg = basis_group_oriented_p_chains(sc, 0)
-            if basisg == 0:
-                return False
-            return eye(len(list(basisg.dic.keys())))
-        else:
-            return False
 
 
 def _cache(sc: SimplicialComplex) -> dict:

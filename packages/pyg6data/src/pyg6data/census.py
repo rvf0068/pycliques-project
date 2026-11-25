@@ -107,11 +107,20 @@ def import_legacy_checkpoint(
     that fact. The original and any existing destination are preserved.
     """
     payload = json.loads(source.read_text(encoding="utf-8"))
+    if (
+        not isinstance(payload, dict)
+        or not isinstance(payload.get("completed"), list)
+        or not isinstance(payload.get("records"), list)
+    ):
+        raise ValueError("Expected legacy checkpoint with completed and records lists")
     indices, rows = payload["completed"], payload["records"]
+    if any(type(index) is not int or index < 0 for index in indices) or any(
+        not isinstance(row, dict) or type(row.get("index")) is not int for row in rows
+    ):
+        raise ValueError("Invalid legacy checkpoint index")
     by_index = {row["index"]: row for row in rows}
     if (
-        any(type(i) is not int or i < 0 for i in indices)
-        or len(indices) != len(set(indices))
+        len(indices) != len(set(indices))
         or len(by_index) != len(rows)
         or set(indices) != by_index.keys()
     ):
