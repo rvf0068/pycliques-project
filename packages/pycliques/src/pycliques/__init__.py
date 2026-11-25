@@ -115,6 +115,10 @@ from .helly_cover import (
     satisfies_helly_gate_condition,
     verify_helly_edge_cover,
 )
+from .homological_retractions import (
+    HomologicalRetractionObstruction,
+    find_homological_retraction_obstruction,
+)
 from .homotopy_invariance import (
     check_closed_clique_intersection_contractibility,
     completes_of_size,
@@ -478,6 +482,8 @@ __all__ = [
     "verify_special_octahedron_witness",
     "TargetRetractionResult",
     "TargetSearchStatus",
+    "HomologicalRetractionObstruction",
+    "find_homological_retraction_obstruction",
     "search_targeted_retractions",
     "verify_targeted_retraction",
     # small

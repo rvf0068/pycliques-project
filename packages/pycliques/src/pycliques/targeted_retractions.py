@@ -1,7 +1,7 @@
 """Bounded homology-guided retractions onto named graph families.
 
-Independent of pycombtop. Betti input consists only of degrees for which
-exact reduced homology over GF(2) has been determined. Missing means unknown.
+Independent of pycombtop. Betti input consists of exact reduced ranks or
+certified upper bounds over GF(2). Missing means unknown.
 The built-in target families search only targets with established divergence.
 Verification of older retractions remains valid, including nondivergent targets.
 """
@@ -14,6 +14,7 @@ from enum import Enum, auto
 
 import networkx as nx
 
+from .homological_retractions import _validate_betti_bounds
 from .retractions import (
     RetractionSearchStatus,
     bounded_retraction,
@@ -179,6 +180,7 @@ def search_targeted_retractions(
     *,
     families: Sequence[str] = FAMILIES,
     betti_numbers: Mapping[int, int] | None = None,
+    betti_upper_bounds: Mapping[int, int] | None = None,
     octahedron_dimensions: Sequence[int] | None = None,
     max_target_order: int = 16,
     max_patterns: int = 50_000,
@@ -193,6 +195,8 @@ def search_targeted_retractions(
 
     The supplied reduced GF(2) Betti numbers are trusted to be EXACT,
     may cover only selected dimensions, and are never computed here.
+    Certified upper bounds may also be supplied via betti_upper_bounds.
+    Exact ranks take precedence; inconsistent bounds raise ValueError.
     Missing dimensions NEVER imply vanishing. A HOMOLOGY_EXCLUDED result
     is relative to these supplied facts, not an independent certificate.
     Budgets apply separately to each family and LIMIT_REACHED is never
@@ -218,12 +222,13 @@ def search_targeted_retractions(
         or len(set(octahedron_dimensions)) != len(octahedron_dimensions)
     ):
         raise ValueError("Octahedron dimensions must be distinct integers >= 3")
-    known = {} if betti_numbers is None else dict(betti_numbers)
-    if any(
-        type(degree) is not int or degree < 0 or type(rank) is not int or rank < 0
-        for degree, rank in known.items()
-    ):
-        raise ValueError("Exact Betti degree and rank must be nonnegative integers")
+    exact = {} if betti_numbers is None else dict(betti_numbers)
+    known = {} if betti_upper_bounds is None else dict(betti_upper_bounds)
+    _validate_betti_bounds(exact)
+    _validate_betti_bounds(known)
+    if any(d in known and rank > known[d] for d, rank in exact.items()):
+        raise ValueError("Exact Betti rank exceeds supplied upper bound")
+    known.update(exact)
 
     results = {}
     for family in families:
