@@ -9,9 +9,27 @@ import networkx as nx
 import pycliques as pc
 import pycombtop as pt
 
-from cubic_order14_census import alarm, canon, code, limited
+from cubic_order14_census import (
+    alarm, canon, code, limited, min_octahedron_dimension, retraction_betti,
+)
 
 CUBICS = {182: "M{S__SE@?A?C?F?F?", 379: "M{O___IA_H?_?T?R?"}
+
+
+# Previously verified in order14-homological-filters.zip (README.md,
+# verify_inputs.py, verify_reduction.py, matchtree.cpp, check_vanish.cpp).
+# These facts refer to the relative pared iterates of the exact cubic codes
+# above, not to arbitrary graphs of the same order.
+def certified_profile(index, level, p):
+    expected = {182: (13, 27, 199), 379: (14, 34, 541)}
+    assert len(p) == expected[index][level]
+    if index == 182:
+        return dict.fromkeys(range(len(p)), 0)
+    if level == 0:
+        return dict.fromkeys(range(len(p)), 0)
+    if level == 1:
+        return {d: int(d == 5) for d in range(len(p))}
+    return dict.fromkeys(range(11), 0)
 
 
 def report(**kw):
@@ -33,13 +51,21 @@ def main():
             h = limited(30, pt.homotopy_type_with_verdict, p, max_simplices=100000)
             report(index=a.index, level=k, task="homotopy", status="TIMEOUT" if h is None else "EXACT" if h.is_exact else "INEXACT", spheres=None if h is None else h.wedge.spheres, reason=None if h is None else h.reason)
         elif a.task == "retractions":
-            for seed in range(1 if k < 2 else 6):
+            known = retraction_betti(p)
+            for d, b in certified_profile(a.index, k, p).items():
+                assert d not in known or known[d] == b
+                known[d] = b
+            minimum = min_octahedron_dimension(p, known)
+            report(index=a.index, level=k, task="homological-screen",
+                   exact_betti=known, min_dimension=minimum,
+                   all_octahedra_excluded=minimum > len(p)//2)
+            for seed in range((1 if k < 2 else 6) if minimum <= len(p)//2 else 0):
                 order = list(p)
                 random.Random(seed+182379).shuffle(order)
                 h = nx.Graph()
                 h.add_nodes_from(order)
                 h.add_edges_from(p.edges)
-                v = pc.find_octahedral_retraction_coaffine(h, max_states=3000000, time_limit=20, backend="native")
+                v = pc.find_octahedral_retraction_coaffine(h, min_dimension=minimum, max_states=3000000, time_limit=20, backend="native")
                 report(index=a.index, level=k, task="coaffine-oct", seed=seed, status=v.status.name, states=v.states_explored, pairs=v.antipodal_pairs, projection=v.retraction)
                 if v.status is pc.RetractionSearchStatus.FOUND:
                     assert pc.verify_retraction_witness(h, h.subgraph(v.inclusion.values()), (v.retraction, v.inclusion))
