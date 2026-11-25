@@ -29,7 +29,9 @@ def test_unknown_is_not_zero_and_bounds_are_one_sided():
     )
 
 
-@pytest.mark.parametrize("profile", [{-1: {0: 0}}, {0: {-1: 0}}, {0: {2: -1}}, {True: {2: 0}}])
+@pytest.mark.parametrize(
+    "profile", [{-1: {0: 0}}, {0: {-1: 0}}, {0: {2: -1}}, {True: {2: 0}}]
+)
 def test_invalid_profile(profile):
     with pytest.raises(ValueError):
         find_homological_retraction_obstruction(profile, {})
@@ -45,7 +47,9 @@ def test_named_search_accepts_upper_bounds_and_exact_values():
     allowed = search_targeted_retractions(graph, betti_upper_bounds={2: 4}, **kwargs)
     assert allowed["octahedra"].status is TargetSearchStatus.FOUND
     with pytest.raises(ValueError, match="Betti"):
-        search_targeted_retractions(graph, betti_numbers={2: 1}, betti_upper_bounds={2: 0})
+        search_targeted_retractions(
+            graph, betti_numbers={2: 1}, betti_upper_bounds={2: 0}
+        )
     with pytest.raises(ValueError, match="Betti"):
         search_targeted_retractions(graph, betti_upper_bounds={2: -1})
 
