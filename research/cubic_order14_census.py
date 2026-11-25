@@ -15,6 +15,7 @@ import networkx as nx
 import pycliques as pc
 import pycombtop as pt
 from pyg6data import cubic_graph_generator
+from pycombtop.bounded_betti import bounded_reduced_betti_mod2
 
 
 def code(g):
@@ -66,11 +67,52 @@ def hom(g):
             "spheres": h.wedge.spheres, "reason": h.reason}
 
 
-def behavior(g, deep):
+def retraction_betti(p, previous_hom=None):
+    """Use exact ranks or proved upper bounds, never guessed zeros.
+
+    The original graph and its completely pared core have the same
+    homotopy type. Later iterates need their own information.
+    """
+    if previous_hom is not None and previous_hom["status"] == "EXACT":
+        ranks = {int(d): b for d, b in previous_hom["spheres"].items()}
+        return {d: ranks.get(d, 0) for d in range(len(p))}
+    known = {}
+    if len(p) <= 75:
+        for degree in (None, 3):
+            betti = limited(3, bounded_reduced_betti_mod2, p,
+                            max_faces=100000, max_degree=degree)
+            if betti is not None:
+                known.update(betti)
+                if degree is None:
+                    known.update({d: 0 for d in range(max(betti, default=-1)+1, len(p))})
+                break
+    # Optional until the new library PR is merged. Zero entries are
+    # exact even in the original API; positive upper bounds are not.
+    recursive = getattr(pt, "recursive_betti_upper_bounds", None)
+    if recursive is not None and len(p) <= 2048:
+        bounds = limited(3, recursive, p, max_degree=6, max_states=10000)
+        if bounds is not None:
+            for d, upper in bounds.upper_bounds.items():
+                if d in known:
+                    assert known[d] <= upper
+                elif upper == 0:
+                    known[d] = 0
+    return known
+
+
+def min_octahedron_dimension(p, known):
+    d = 3
+    while d <= len(p)//2 and known.get(d-1) == 0:
+        d += 1
+    return d
+
+
+def behavior(g, deep, original_hom=None):
     p = canon(pc.completely_pared_graph(g))
     sizes = []
     log = []
     seen = []
+    homology = {}
     for k in range(3 if deep else 2):
         sizes.append(len(p))
         for j, old in enumerate(seen):
@@ -87,9 +129,12 @@ def behavior(g, deep):
                 assert pc.verify_special_octahedron_witness(p, s)
                 return dict(verdict="DIVERGENT", rule="special", level=k,
                             dimension=s.dimension, pairs=list(zip(s.clique, s.antipodes)), sizes=sizes)
+        known = retraction_betti(p, original_hom if k == 0 else None)
+        homology[k] = known
         if k == 0 or len(p) <= 70:
             t = limited(8, pc.search_targeted_retractions, p,
                         families=("octahedra", "cycle_complements", "suspensions"),
+                        betti_numbers=known,
                         max_target_order=16, max_patterns=3000,
                         max_states=10000, max_assignments=50000)
             if t:
@@ -99,7 +144,8 @@ def behavior(g, deep):
                         return dict(verdict="DIVERGENT", rule=f, level=k,
                                     target=list(v.target_vertices), projection=v.projection,
                                     kind=v.target_kind, sizes=sizes)
-        if len(p) <= 500:
+        min_dimension = min_octahedron_dimension(p, known)
+        if len(p) <= 500 and min_dimension <= len(p)//2:
             # Native search is independently checked by the package.
             for seed in range(2 if deep else 1):
                 order = list(p)
@@ -107,7 +153,7 @@ def behavior(g, deep):
                 h = nx.Graph()
                 h.add_nodes_from(order)
                 h.add_edges_from(p.edges)
-                v = pc.find_octahedral_retraction_coaffine(h, max_states=100000,
+                v = pc.find_octahedral_retraction_coaffine(h, min_dimension=min_dimension, max_states=100000,
                     time_limit=1.0 if deep else 0.3, backend="auto")
                 if v.status is pc.RetractionSearchStatus.FOUND:
                     assert pc.verify_retraction_witness(h, h.subgraph(v.inclusion.values()),
@@ -126,7 +172,7 @@ def behavior(g, deep):
         labels = sorted(nxt, key=lambda q: sum(1 << v for v in q))
         nxt = nx.relabel_nodes(nxt, {q: i for i, q in enumerate(labels)})
         p = canon(pc.completely_pared_graph(nxt))
-    return dict(verdict="INDETERMINATE", sizes=sizes, notes=log)
+    return dict(verdict="INDETERMINATE", sizes=sizes, notes=log, homology=homology)
 
 
 def main():
@@ -145,7 +191,7 @@ def main():
                 continue
             g = nx.complement(cubic)
             h = hom(g)
-            b = behavior(g, args.deep)
+            b = behavior(g, args.deep, h)
             row = dict(index=i, cubic=code(cubic), components=components, homotopy=h, behavior=b)
             line = json.dumps(row, sort_keys=True)
             out.write(line + "\n")
