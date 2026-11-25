@@ -9,6 +9,7 @@ homology vanishing (by the universal coefficient theorem).
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -79,7 +80,7 @@ def recursive_betti_upper_bounds(
     ]
     states = 0
 
-    def indices(mask: int):
+    def indices(mask: int) -> Iterator[int]:
         while mask:
             bit = mask & -mask
             yield bit.bit_length() - 1
