@@ -102,7 +102,9 @@ def test_c12_core_one_circle_morse_classification():
     assert result.torsion == {}
     assert result.betti == {2: 15}
     assert result.wedge_spheres == {2: 15}
-    verdict = homotopy_type_with_verdict(graph, max_vertices=80, max_simplices=100)
+    verdict = homotopy_type_with_verdict(
+        graph, max_vertices=80, max_simplices=100, recursive_betti_states=0
+    )
     assert verdict.is_exact
     assert verdict.wedge.spheres == {2: 15}
     assert verdict.reason == Theorem.SYMBOLIC_INTEGRAL_MORSE_ONE_CIRCLE
