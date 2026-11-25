@@ -9,6 +9,7 @@ from pycombtop import (
     find_weighted_conicity_certificate,
     homotopy_type_with_verdict,
     symbolic_integral_morse_certificate,
+    verify_connected_link_order,
     verify_weighted_conicity,
 )
 
@@ -51,7 +52,11 @@ def test_nonzero_integer_morse_boundary_is_not_misread_as_wedge():
     assert result.boundaries == {1: ((1,),)}
     assert result.betti == {}
     assert result.torsion == {}
-    assert result.wedge_spheres is None
+    # The incidence alone does not prove a wedge; the new independent
+    # simple-connectivity certificate does prove contractibility.
+    assert result.wedge_spheres == {}
+    assert result.connectivity_order is not None
+    assert verify_connected_link_order(graph, result.connectivity_order)
 
 
 @pytest.mark.parametrize(
