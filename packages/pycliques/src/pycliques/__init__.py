@@ -12,6 +12,7 @@ from .cliques import (
     NodeH,
     clique_graph,
     clique_graph_of_double_bound,
+    count_maximal_cliques,
     double_bound_graph,
     homotopy_clique_graph,
 )
@@ -376,6 +377,7 @@ __all__ = [
     "NodeH",
     "clique_graph",
     "clique_graph_of_double_bound",
+    "count_maximal_cliques",
     "double_bound_graph",
     "homotopy_clique_graph",
     "MaximalIntersectingFamilies",
