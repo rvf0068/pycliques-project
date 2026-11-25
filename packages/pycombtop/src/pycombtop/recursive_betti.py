@@ -144,7 +144,10 @@ def recursive_betti_upper_bounds(
             return int(mask == 0)
         if not mask or degree >= mask.bit_count():
             return 0
-        return sum(bound(link, degree - 1) for link in branches(mask))
+        total = 0
+        for link in branches(mask):
+            total += bound(link, degree - 1)
+        return total
 
     @lru_cache(maxsize=max_cache)
     def polynomial(mask: int) -> tuple[int, ...]:
