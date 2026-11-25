@@ -363,13 +363,19 @@ def _try_trivial(graph: nx.Graph) -> HomotopyVerdict | None:
     return None
 
 
-def _try_symbolic_dong(graph: nx.Graph) -> HomotopyVerdict | None:
+def _try_symbolic_dong_order(
+    graph: nx.Graph, vertex_order: list | None = None
+) -> HomotopyVerdict | None:
     """Bounded symbolic version of the same sequential Dong matching.
 
     Only a single critical dimension, with the augmented empty face paired,
     proves an exact wedge. Mixed critical dimensions are inconclusive.
     """
-    certificate = symbolic_dong_certificate(graph)
+    certificate = (
+        symbolic_dong_certificate(graph)
+        if vertex_order is None
+        else symbolic_dong_certificate(graph, vertex_order=vertex_order)
+    )
     if certificate is None:
         return None
     critical = certificate.critical
@@ -379,13 +385,21 @@ def _try_symbolic_dong(graph: nx.Graph) -> HomotopyVerdict | None:
         )
     # Mixed critical dimensions can still admit an exact integral Morse
     # boundary proof. Never infer a wedge from Betti numbers alone.
-    integral = symbolic_integral_morse_certificate(graph)
+    integral = (
+        symbolic_integral_morse_certificate(graph)
+        if vertex_order is None
+        else symbolic_integral_morse_certificate(
+            graph, vertex_order=vertex_order, max_critical=128
+        )
+    )
     if integral is None:
         return None
     if integral.wedge_spheres is not None:
         c0 = integral.critical.get(0, 0)
         c1 = integral.critical.get(1, 0)
-        if integral.wedge_spheres.get(1, 0) == 1 and c0 == 0 and c1 == 1:
+        if integral.connectivity_order is not None:
+            reason = Theorem.SYMBOLIC_INTEGRAL_MORSE_HUREWICZ
+        elif integral.wedge_spheres.get(1, 0) == 1 and c0 == 0 and c1 == 1:
             reason = Theorem.SYMBOLIC_INTEGRAL_MORSE_ZERO_DEGREE_CIRCLE
         elif c0 == c1 == 1:
             reason = Theorem.SYMBOLIC_INTEGRAL_MORSE_01_CANCELLATION
@@ -399,12 +413,38 @@ def _try_symbolic_dong(graph: nx.Graph) -> HomotopyVerdict | None:
         )
     # Only the narrow, independently checkable 2/4-cell Hopf case.
     # Neither Betti ranks nor an arbitrary vanishing boundary suffice.
+    # The cup-product witness uses the canonical symbolic vertex order.
+    if vertex_order is not None:
+        return None
     hopf = _from_morse(graph, integral, max_triangles=20_000)
     if hopf is not None and verify_hopf_wedge(graph, hopf):
         return HomotopyVerdict(
             wedge=WedgeOfSpheres(hopf.spheres),
             reason=Theorem.SYMBOLIC_HOPF_CUP_SQUARE,
         )
+    return None
+
+
+def _try_symbolic_dong(graph: nx.Graph) -> HomotopyVerdict | None:
+    """Try the original order, then two bounded deterministic degree orders."""
+    verdict = _try_symbolic_dong_order(graph)
+    if verdict is not None:
+        return verdict
+    natural = (
+        sorted(graph)
+        if all(isinstance(v, int) for v in graph)
+        else sorted(graph, key=_stable_vertex_key)
+    )
+    seen = {tuple(natural)}
+    for sign in (-1, 1):
+        order = sorted(natural, key=lambda v: sign * len(graph[v]))
+        key = tuple(order)
+        if key in seen:
+            continue
+        seen.add(key)
+        verdict = _try_symbolic_dong_order(graph, order)
+        if verdict is not None:
+            return verdict
     return None
 
 
