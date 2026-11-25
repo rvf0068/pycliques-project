@@ -36,10 +36,12 @@ from .flag_edge_star import (
 )
 from .fundamental_group import (
     FundamentalRecord,
+    connected_link_order,
     covering_graph,
     first_homology_rank,
     fundamental_group,
     fundamental_group_as_permutation_group,
+    verify_connected_link_order,
 )
 from .hom_complex import graph_homomorphisms, hom_graph
 
@@ -206,6 +208,8 @@ __all__ = [
     "covering_graph",
     "first_homology_rank",
     "fundamental_group",
+    "connected_link_order",
+    "verify_connected_link_order",
     "fundamental_group_as_permutation_group",
     # covering divergence
     "TriangularCoverDivergenceCertificate",
