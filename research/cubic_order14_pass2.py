@@ -9,7 +9,9 @@ from pathlib import Path
 import networkx as nx
 import pycliques as pc
 
-from cubic_order14_census import alarm, canon, code, limited
+from cubic_order14_census import (
+    alarm, canon, code, limited, min_octahedron_dimension, retraction_betti,
+)
 
 
 def join_certificate(g):
@@ -38,6 +40,7 @@ def search(g):
     sizes = [len(p)]
     counts = []
     stages = []
+    homology = {}
     join = limited(4, join_certificate, p)
     if join:
         return dict(join, sizes=sizes)
@@ -62,9 +65,11 @@ def search(g):
         if len(p) <= 350 and limited(5, pc.is_clique_helly, p) is True:
             return dict(verdict="CONVERGENT", rule="Helly", level=level,
                         sizes=sizes, clique_counts=counts)
+        known = retraction_betti(p)
+        homology[level] = known
         if len(p) <= 75:
             targets = limited(8, pc.search_targeted_retractions, p,
-                              max_target_order=18, max_patterns=20_000,
+                              betti_numbers=known, max_target_order=18, max_patterns=20_000,
                               max_states=100_000, max_assignments=500_000)
             if targets:
                 for family, v in targets.items():
@@ -74,14 +79,15 @@ def search(g):
                                     target=list(v.target_vertices), projection=v.projection,
                                     kind=v.target_kind, sizes=sizes, clique_counts=counts,
                                     host=code(p))
-        for seed in range(3):
+        minimum = min_octahedron_dimension(p, known)
+        for seed in range(3 if minimum <= len(p)//2 else 0):
             order = list(p)
             random.Random(14000 + seed).shuffle(order)
             h = nx.Graph()
             h.add_nodes_from(order)
             h.add_edges_from(p.edges)
             v = pc.find_octahedral_retraction_coaffine(
-                h, max_states=400000, time_limit=3.0, backend="native")
+                h, min_dimension=minimum, max_states=400000, time_limit=3.0, backend="native")
             if v.status is pc.RetractionSearchStatus.FOUND:
                 assert pc.verify_retraction_witness(
                     h, h.subgraph(v.inclusion.values()), (v.retraction, v.inclusion))
@@ -101,7 +107,7 @@ def search(g):
         # Higher iterates of large cores almost always exceed the
         # enumeration budget. Still try bounded implicit construction.
     return dict(verdict="INDETERMINATE", sizes=sizes,
-                clique_counts=counts, notes=stages)
+                clique_counts=counts, notes=stages, homology=homology)
 
 
 def main():
