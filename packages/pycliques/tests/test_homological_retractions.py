@@ -2,7 +2,6 @@
 
 import networkx as nx
 import pytest
-
 from pycliques import (
     HomologicalRetractionObstruction,
     TargetSearchStatus,
