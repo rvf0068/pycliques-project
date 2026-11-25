@@ -10,6 +10,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import networkx as nx
+import pycliques.coaffine_endomorphisms as general
 import pycliques.octahedral_coaffine as coaffine
 import pycliques.octahedral_coaffine_native as native
 import pytest
@@ -28,6 +29,8 @@ def _run_fake(
     returncode: int = 0,
     stderr: str = "",
     time_limit: float | None = 3.0,
+    min_dimension: int = 3,
+    value_order: str = "label",
 ):
     """Exercise the real parser while replacing only native process execution."""
     monkeypatch.setattr(
@@ -39,10 +42,11 @@ def _run_fake(
     )
     return run_coaffine_native(
         nx.octahedral_graph(),
-        min_dimension=3,
+        min_dimension=min_dimension,
         max_states=10,
         time_limit=time_limit,
         executable=Path("/not-executed"),
+        value_order=value_order,
     )
 
 
@@ -252,3 +256,117 @@ def test_native_cli_builds_real_binary(
     assert built.is_file()
     assert built.parent == tmp_path / "pycliques"
     assert built.name.startswith("coaffine-native-")
+
+
+@pytest.mark.parametrize(
+    ("output", "message"),
+    [
+        ("RESULT FOUND 1 0 0", "Missing native endomorphism witness"),
+        (
+            "RESULT FOUND 1 0 0\nPROJECTION 3 4 5 0 1 2",
+            "Missing native endomorphism witness",
+        ),
+        (
+            "RESULT FOUND 1 0 0\nENDOMORPHISM 3 4 bad 0 1 2",
+            "Malformed native endomorphism indices",
+        ),
+        (
+            "RESULT FOUND 1 0 0\nENDOMORPHISM 3 4 5",
+            "Native endomorphism has invalid labels",
+        ),
+        (
+            "RESULT FOUND 1 0 0\nENDOMORPHISM 3 4 5 0 1 6",
+            "Native endomorphism has invalid labels",
+        ),
+    ],
+)
+def test_general_protocol_rejects_bad_witnesses(
+    monkeypatch: pytest.MonkeyPatch, output: str, message: str
+) -> None:
+    with pytest.raises(RuntimeError, match=message):
+        _run_fake(monkeypatch, output, min_dimension=0, value_order="fiber")
+
+
+def test_general_protocol_accepts_witness(monkeypatch: pytest.MonkeyPatch) -> None:
+    result = _run_fake(
+        monkeypatch,
+        "RESULT FOUND 2 3 4\nENDOMORPHISM 3 4 5 0 1 2",
+        min_dimension=0,
+        value_order="fiber",
+    )
+    assert result.endomorphism == (3, 4, 5, 0, 1, 2)
+    assert result.pairs is result.projection is None
+
+
+def test_native_protocol_invalid_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    with pytest.raises(ValueError, match="value_order"):
+        _run_fake(monkeypatch, "", value_order="unknown")
+
+
+def test_general_backend_validation(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(general, "find_coaffine_native_executable", lambda: None)
+    graph = nx.cycle_graph(5)
+    with pytest.raises(ValueError, match="backend"):
+        general.find_coaffine_endomorphism(graph, backend="unknown")
+    with pytest.raises(RuntimeError, match="not built"):
+        general.find_coaffine_endomorphism(graph, backend="native")
+    assert general.find_coaffine_endomorphism(graph).endomorphism is not None
+
+    monkeypatch.setattr(
+        general, "find_coaffine_native_executable", lambda: Path("/not-executed")
+    )
+    with pytest.raises(ValueError, match="at most 2048"):
+        general.find_coaffine_endomorphism(nx.empty_graph(2049), backend="native")
+    with pytest.raises(ValueError, match="64-bit"):
+        general.find_coaffine_endomorphism(graph, backend="native", max_states=1 << 65)
+    fallback = general.find_coaffine_endomorphism(
+        graph, backend="auto", max_states=1 << 65
+    )
+    assert fallback.endomorphism is not None
+
+
+@pytest.mark.parametrize(
+    ("mapping", "message"),
+    [
+        (None, "missing an endomorphism"),
+        ((0, 1, 2, 3, 4), "invalid endomorphism"),
+    ],
+)
+def test_general_native_rejects_unverified_witness(
+    monkeypatch: pytest.MonkeyPatch,
+    mapping: tuple[int, ...] | None,
+    message: str,
+) -> None:
+    monkeypatch.setattr(
+        general, "find_coaffine_native_executable", lambda: Path("/not-executed")
+    )
+    monkeypatch.setattr(
+        general,
+        "run_coaffine_native",
+        lambda *a, **k: native.NativeCoaffineRawResult(
+            "FOUND", 1, 0, 0, endomorphism=mapping
+        ),
+    )
+    with pytest.raises(RuntimeError, match=message):
+        general.find_coaffine_endomorphism(nx.cycle_graph(5), backend="native")
+
+
+def test_general_native_limit_is_inconclusive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        general, "find_coaffine_native_executable", lambda: Path("/not-executed")
+    )
+    monkeypatch.setattr(
+        general,
+        "run_coaffine_native",
+        lambda *a, **k: native.NativeCoaffineRawResult("LIMIT_REACHED", 2, 3, 4),
+    )
+    result = general.find_coaffine_endomorphism(nx.cycle_graph(5), backend="native")
+    assert result.status is general.RetractionSearchStatus.LIMIT_REACHED
+    assert result.endomorphism is None
+    assert (result.states_explored, result.arc_revisions, result.assignments_tried) == (
+        2,
+        3,
+        4,
+    )

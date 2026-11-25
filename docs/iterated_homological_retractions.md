@@ -61,5 +61,8 @@ A returned witness records the violated inequality; None does not establish
 existence of a retraction. The routine deliberately does not compute clique
 iterates or homology itself, and pycliques remains independent of pycombtop.
 
-Do not use these obstructions to exclude special-octahedron witnesses:
-special octahedra need not be ordinary graph retracts.
+These obstructions also apply to special octahedra. If one transversal
+{a_i} of an induced octahedron is a maximal complete set in the host,
+fix the octahedron pointwise and send each external vertex to an antipode
+b_i of a nonneighbor a_i. Such an i exists by maximality. No host edge
+can map to an antipodal pair, so this is an ordinary graph retraction.

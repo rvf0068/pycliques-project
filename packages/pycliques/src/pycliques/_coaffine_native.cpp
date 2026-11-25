@@ -1,4 +1,4 @@
-// Standalone C++17 acceleration for pycliques octahedral-coaffine search.
+// Shared C++17 engine for coaffine endomorphisms and octahedral retractions.
 // Protocol v1: integer vertex positions, verified again by Python.
 // A bounded search reports LIMIT_REACHED, never a negative theorem.
 #include <algorithm>
@@ -22,11 +22,11 @@ int n = 0, min_dimension = 3;
 std::int64_t max_states = 20000, states = 0, revisions = 0, assignments = 0;
 double seconds_limit = 3600.0;
 Clock::time_point started;
-bool limited = false;
+bool limited = false, fiber_order = false;
 Mask full_vertices;
 std::vector<Mask> closed;
 std::vector<Mask> complement_open;
-std::vector<std::vector<int>> neighbors;
+std::vector<Mask> adjacency;
 std::vector<std::pair<int, int>> edges;
 std::vector<std::pair<int, int>> answer_pairs;
 std::vector<int> answer_projection, answer_endomorphism;
@@ -35,58 +35,73 @@ bool timed_out() {
     return std::chrono::duration<double>(Clock::now() - started).count() >= seconds_limit;
 }
 
-// Exact De Morgan dual:
-// union_{v in D} N_X[v] = V(X) \ intersection_{v in D} N_{complement(X)}(v).
-// In dense hosts the intersection typically becomes empty after few vertices.
-Mask support(const Mask& domain) {
+// Portable fixed-width bitset iteration. GNU libstdc++ provides a fast
+// extension; other C++17 implementations use the standard test operation.
+int next_bit(const Mask& bits, int previous = -1) {
+#ifdef __GLIBCXX__
+    return static_cast<int>(previous < 0 ? bits._Find_first() : bits._Find_next(previous));
+#else
+    for (int i = previous + 1; i < n; ++i)
+        if (bits.test(i)) return i;
+    return CAPACITY;
+#endif
+}
+
+// A value excluded from every possible image of v cannot be the image
+// of any neighbor of v. Store the transpose of the domains to apply
+// these deletions to all affected sources at once.
+Mask forbidden(const Mask& domain) {
     Mask excluded = full_vertices;
-    for (int v = 0; v < n; ++v) {
-        if (!domain.test(v)) continue;
+    for (int v = next_bit(domain); v < n; v = next_bit(domain, v)) {
         excluded &= complement_open[v];
-        if (excluded.none()) return full_vertices;
+        if (excluded.none()) break;
     }
-    return full_vertices & ~excluded;
+    return excluded;
 }
 
 struct State {
-    std::vector<Mask> domains;
-    std::vector<Mask> supports;
+    std::vector<Mask> domains, columns, processed;
 };
 
-// Queue a vertex only when its support union changes. A reduction of its
-// domain with unchanged support cannot remove values from any neighboring
-// domain: the neighboring constraint reads only the support union.
-bool propagate(State& state, std::deque<int>& queue) {
-    std::vector<unsigned char> queued(n, 0);
-    for (const int u : queue) queued[u] = 1;
-    std::uint64_t visits = 0;
+bool propagate(State& state, std::vector<int>& queue) {
+    Mask queued;
+    for (int u : queue) queued.set(u);
     while (!queue.empty()) {
-        const int v = queue.front();
-        queue.pop_front();
-        queued[v] = 0;
-        const Mask& supported = state.supports[v];
-        if (supported == full_vertices) continue;
-        for (const int u : neighbors[v]) {
-            if ((++visits % 8192) == 0 && timed_out()) {
-                limited = true;
-                return false;
-            }
-            const Mask revised = state.domains[u] & supported;
-            if (revised == state.domains[u]) continue;
-            ++revisions;
-            if (revised.none()) return false;
-            state.domains[u] = revised;
-            const Mask next_support = support(revised);
-            if (next_support != state.supports[u]) {
-                state.supports[u] = next_support;
-                if (!queued[u]) {
-                    queued[u] = 1;
+        if (timed_out()) {
+            limited = true;
+            return false;
+        }
+        const int v = queue.back();
+        queue.pop_back();
+        queued.reset(v);
+        if (state.domains[v].none()) return false;
+        const Mask bad = forbidden(state.domains[v]);
+        const Mask fresh = bad & ~state.processed[v];
+        state.processed[v] = bad;
+        for (int t = next_bit(fresh); t < n; t = next_bit(fresh, t)) {
+            const Mask removed = state.columns[t] & adjacency[v];
+            state.columns[t] &= ~removed;
+            for (int u = next_bit(removed); u < n; u = next_bit(removed, u)) {
+                ++revisions;
+                state.domains[u].reset(t);
+                if (state.domains[u].none()) return false;
+                if (!queued.test(u)) {
+                    queued.set(u);
                     queue.push_back(u);
                 }
             }
         }
     }
     return true;
+}
+
+void assign(State& state, int u, int t) {
+    Mask others = state.domains[u];
+    others.reset(t);
+    for (int v = next_bit(others); v < n; v = next_bit(others, v))
+        state.columns[v].reset(u);
+    state.domains[u].reset();
+    state.domains[u].set(t);
 }
 
 bool positive(const State& state) {
@@ -103,6 +118,10 @@ bool positive(const State& state) {
     }
     for (const auto& [u, v] : edges) {
         if (!closed[f[u]].test(f[v])) throw std::logic_error("not a weak endomorphism");
+    }
+    if (min_dimension == 0) {
+        answer_endomorphism = std::move(f);
+        return true;
     }
     std::set<int> image;
     for (int u = 0; u < n; ++u) {
@@ -154,24 +173,34 @@ bool dfs(const State& state) {
         const int size = static_cast<int>(state.domains[u].count());
         if (size == 0) throw std::logic_error("empty domain in dfs");
         if (size > 1 && (size < min_size ||
-                         (size == min_size && static_cast<int>(neighbors[u].size()) > max_degree))) {
+                         (size == min_size && static_cast<int>(adjacency[u].count()) > max_degree))) {
             pivot = u;
             min_size = size;
-            max_degree = static_cast<int>(neighbors[u].size());
+            max_degree = static_cast<int>(adjacency[u].count());
         }
     }
     if (pivot < 0) return positive(state);
-    for (int image = 0; image < n; ++image) {
-        if (!state.domains[pivot].test(image)) continue;
+    std::vector<int> choices;
+    for (int image = next_bit(state.domains[pivot]); image < n;
+         image = next_bit(state.domains[pivot], image)) {
+        choices.push_back(image);
+    }
+    if (fiber_order) {
+        // Keep the research prototype's ordering, including std::sort's
+        // implementation-defined ordering of equal-size fibers.
+        std::sort(choices.begin(), choices.end(), [&](int a, int b) {
+            return state.columns[a].count() > state.columns[b].count();
+        });
+    }
+    for (int image : choices) {
+        if (timed_out()) {
+            limited = true;
+            return false;
+        }
         ++assignments;
         State next = state;
-        next.domains[pivot].reset();
-        next.domains[pivot].set(image);
-        std::deque<int> queue;
-        if (next.supports[pivot] != closed[image]) {
-            next.supports[pivot] = closed[image];
-            queue.push_back(pivot);
-        }
+        assign(next, pivot, image);
+        std::vector<int> queue{pivot};
         if (propagate(next, queue) && dfs(next)) return true;
         if (limited) return false;
     }
@@ -182,6 +211,12 @@ void print_result(bool found) {
     std::cout << "RESULT " << (found ? "FOUND" : (limited ? "LIMIT_REACHED" : "EXHAUSTED"))
               << ' ' << states << ' ' << revisions << ' ' << assignments << '\n';
     if (!found) return;
+    if (min_dimension == 0) {
+        std::cout << "ENDOMORPHISM";
+        for (const int i : answer_endomorphism) std::cout << ' ' << i;
+        std::cout << '\n';
+        return;
+    }
     std::cout << "PAIRS";
     for (const auto& [a, b] : answer_pairs) std::cout << ' ' << a << ',' << b;
     std::cout << '\n' << "PROJECTION";
@@ -194,11 +229,16 @@ void print_result(bool found) {
 
 int main(int argc, char** argv) {
     try {
-        if (argc != 5) throw std::invalid_argument("usage: solver input.txt max_states time_seconds min_dimension");
+        if (argc != 5 && argc != 6) throw std::invalid_argument("usage: solver input.txt max_states time_seconds min_dimension");
         max_states = std::stoll(argv[2]);
         seconds_limit = std::stod(argv[3]);
         min_dimension = std::stoi(argv[4]);
-        if (max_states < 1 || seconds_limit <= 0 || min_dimension < 3) {
+        if (argc == 6) {
+            const std::string order = argv[5];
+            if (order != "fiber" && order != "label") throw std::invalid_argument("invalid value order");
+            fiber_order = order == "fiber";
+        }
+        if (max_states < 1 || seconds_limit <= 0 || (min_dimension != 0 && min_dimension < 3)) {
             throw std::invalid_argument("invalid bound");
         }
         std::ifstream input(argv[1]);
@@ -206,7 +246,7 @@ int main(int argc, char** argv) {
         if (!(input >> n >> m) || n < 0 || n > CAPACITY || m < 0 ||
             m > n * (n - 1) / 2) throw std::invalid_argument("invalid graph size");
         closed.assign(n, {});
-        neighbors.assign(n, {});
+        adjacency.assign(n, {});
         for (int u = 0; u < n; ++u) closed[u].set(u);
         std::set<std::pair<int, int>> seen;
         for (int k = 0; k < m; ++k) {
@@ -218,8 +258,8 @@ int main(int argc, char** argv) {
             if (!seen.emplace(u, v).second) throw std::invalid_argument("duplicate edge");
             closed[u].set(v);
             closed[v].set(u);
-            neighbors[u].push_back(v);
-            neighbors[v].push_back(u);
+            adjacency[u].set(v);
+            adjacency[v].set(u);
             edges.emplace_back(u, v);
         }
         started = Clock::now();
@@ -232,18 +272,14 @@ int main(int argc, char** argv) {
         for (int u = 0; u < n; ++u) {
             complement_open.push_back(full_vertices & ~closed[u]);
         }
-        State initial;
-        std::deque<int> queue;
+        State initial{complement_open, complement_open, std::vector<Mask>(n)};
+        std::vector<int> queue;
         for (int u = 0; u < n; ++u) {
-            const Mask domain = complement_open[u];
-            if (domain.none()) {
+            if (initial.domains[u].none()) {
                 print_result(false);
                 return 0;
             }
-            initial.domains.push_back(domain);
-            const Mask supported = support(domain);
-            initial.supports.push_back(supported);
-            if (supported != full_vertices) queue.push_back(u);
+            queue.push_back(u);
         }
         bool found = false;
         if (propagate(initial, queue)) found = dfs(initial);

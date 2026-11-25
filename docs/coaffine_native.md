@@ -55,37 +55,25 @@ The wrapper serializes temporary integer indices and maps the result
 back to original labels. Only the temporary graph is written to disk,
 under an automatically removed temporary directory.
 
-The C++ implementation propagates cached bitset neighborhood supports
-rather than revisiting each image individually. Each search state
-contains the current candidate domains and their support unions.
-Arc consistency removes image candidates inconsistent with
-neighboring domains. The solver branches exhaustively (until bounded)
-on a minimum-domain variable and verifies the second-iterate condition
-on each complete weak endomorphism.
+Both the general coaffine search and the octahedral search share the
+native engine and the portable Python CSP. In addition to the image
+domain R[v], store its transpose C[a], the sources that can map to a.
+When a domain shrinks, intersect the open complement neighborhoods of
+its possible images. Each newly forbidden image a is removed from
+C[a] intersected with the open source neighborhood of v; the rows and
+columns are updated together. This is exact arc consistency, not a
+heuristic relaxation.
 
-### Exact support-change-driven acceleration
+Both APIs accept `value_order="fiber"`, which tries images with larger
+possible fibers first. The historical `value_order="label"` remains
+the default. Ties in the fiber ordering can differ across backends or
+standard library implementations. Exhaustiveness and positive witness
+verification are unchanged. Counters named arc_revisions now count
+propagated individual domain-value deletions.
 
-For any nonempty domain \(D \subseteq V(X)\), the image values
-supported by adjacency or equality in the original graph are
-
-\[
-\operatorname{supp}_X(D)=\bigcup_{t\in D}N_X[t]
-=V(X)\setminus\bigcap_{t\in D}N_{\overline{X}}(t).
-\]
-
-The updated native engine computes the intersection of *open*
-complement neighborhoods and stops early if it becomes empty.
-This is the exact same support union, with no approximation.
-
-On each domain reduction the engine recomputes the support mask.
-**Only a strict change of that support mask queues work for adjacent
-source vertices.** A domain shrink that leaves its support unchanged
-cannot affect an adjacent variable: the arc constraint sees only
-the support mask, not the individual candidate identities.
-The initial queue likewise includes only variables with nonfull
-support. This is an exact arc-consistency fixed point, not a
-heuristic pruning rule, and preserves the exhaustive search status
-and the existing independently verified positive witness protocol.
+The general search accepts any verified coaffine endomorphism. The
+octahedral search continues past leaves whose squares do not meet
+the requested octahedral retraction condition.
 
 The larger 2,048-vertex bitsets permit experimentation on
 fourth pared clique iterates beyond the former 512-vertex limit.
@@ -147,3 +135,36 @@ The previous solver's result statuses and `CoaffineOctahedronResult`
 fields are retained. The native source has an explicit 2,048-vertex
 capacity; with `backend="auto"`, a larger graph goes through the
 unbounded Python implementation rather than generating a false negative.
+
+
+## Blind reproduction: cubic complement 379
+
+Use the existing deterministic CliqueSequence and fiber-first order.
+No archived host, target dimension, antipodal pairs or projection is read.
+
+```python
+import networkx as nx
+import pycliques as pc
+import pycombtop as pt
+
+G = nx.complement(nx.from_graph6_bytes(b"M{O___IA_H?_?T?R?"))
+seq = pc.CliqueSequence(G, bound=1000, relabel=True, pare_initial=True)
+P2 = seq[2]
+assert P2 is not None
+h0 = pt.homotopy_type_with_verdict(seq[0])
+h1 = pt.homotopy_type_with_verdict(seq[1])
+assert h0.is_exact and h0.wedge.spheres == {}
+assert h1.is_exact and h1.wedge.spheres == {5: 1}
+r = pc.find_octahedral_retraction_coaffine(
+    P2, backend="native", value_order="fiber", max_states=10000,
+    time_limit=30,
+)
+assert r.status is pc.RetractionSearchStatus.FOUND
+T = P2.subgraph(r.inclusion.values())
+assert pc.verify_retraction_witness(P2, T, (r.retraction, r.inclusion))
+print(r.dimension)
+```
+
+The O20 retraction proves clique divergence and a split integral
+homology summand in degree 19. It does not determine the full homotopy
+type of P2. No homology computation of P2 is required to discover it.

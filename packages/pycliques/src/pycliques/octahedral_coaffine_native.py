@@ -1,4 +1,4 @@
-"""Optional C++17 backend for exact coaffine octahedral-retraction search.
+"""Optional C++17 backend for coaffine endomorphisms and octahedral retracts.
 
 The native executable is built only upon explicit request, never at import or
 on an ordinary pycliques call. It accepts position-indexed graph data, not
@@ -104,8 +104,11 @@ def run_coaffine_native(
     max_states: int,
     time_limit: float | None,
     executable: Path,
+    value_order: str = "label",
 ) -> NativeCoaffineRawResult:
-    """Execute the bounded solver; do not trust or verify its projection here."""
+    """Execute the solver; min_dimension=0 requests any coaffine map."""
+    if value_order not in ("label", "fiber"):
+        raise ValueError("value_order must be 'label' or 'fiber'")
     nodes = list(graph)
     n = len(nodes)
     if n > MAX_NATIVE_ORDER:
@@ -129,6 +132,8 @@ def run_coaffine_native(
             str(time_limit if time_limit is not None else 1e12),
             str(min_dimension),
         ]
+        if value_order != "label":
+            command.append(value_order)
         try:
             completed = subprocess.run(
                 command,
@@ -166,6 +171,18 @@ def run_coaffine_native(
         if len(lines) != 1:
             raise RuntimeError("Unexpected witness in non-FOUND native output")
         return NativeCoaffineRawResult(status, states, revisions, assignments)
+    if min_dimension == 0:
+        if len(lines) != 2 or lines[1].split()[:1] != ["ENDOMORPHISM"]:
+            raise RuntimeError("Missing native endomorphism witness")
+        try:
+            mapping = tuple(map(int, lines[1].split()[1:]))
+        except ValueError as exc:
+            raise RuntimeError("Malformed native endomorphism indices") from exc
+        if len(mapping) != n or any(i < 0 or i >= n for i in mapping):
+            raise RuntimeError("Native endomorphism has invalid labels")
+        return NativeCoaffineRawResult(
+            status, states, revisions, assignments, endomorphism=mapping
+        )
     if len(lines) != 4:
         raise RuntimeError("Missing native retraction witness fields")
     pair_line = lines[1].split()
