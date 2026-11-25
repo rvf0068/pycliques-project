@@ -321,9 +321,7 @@ def test_native_rediscovers_cubic_379_o20(
     """Rebuild the host using CliqueSequence; no saved host, pairs or map."""
     _native(monkeypatch, native_binary)
     graph = nx.complement(nx.from_graph6_bytes(b"M{O___IA_H?_?T?R?"))
-    seq = pycliques.CliqueSequence(
-        graph, bound=1000, relabel=True, pare_initial=True
-    )
+    seq = pycliques.CliqueSequence(graph, bound=1000, relabel=True, pare_initial=True)
     host = seq[2]
     assert host is not None
     assert (len(host), host.number_of_edges()) == (541, 132098)
