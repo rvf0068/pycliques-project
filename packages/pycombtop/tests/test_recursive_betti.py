@@ -15,9 +15,7 @@ def test_all_small_graphs_against_exact_homology():
         exact = bounded_reduced_betti_mod2(graph, max_degree=4)
         assert not result.is_limited
         assert exact is not None
-        assert all(
-            result.upper_bounds[d] >= exact.get(d, 0) for d in range(5)
-        )
+        assert all(result.upper_bounds[d] >= exact.get(d, 0) for d in range(5))
         assert all(exact.get(d, 0) == 0 for d in result.known_zero_betti)
 
 
@@ -26,7 +24,8 @@ def test_octahedron_and_cone():
     result = recursive_betti_upper_bounds(graph, max_degree=4)
     assert result.upper_bounds == {0: 0, 1: 0, 2: 0, 3: 1, 4: 0}
     graph.add_edges_from((8, v) for v in range(8))
-    assert recursive_betti_upper_bounds(graph, max_degree=4).known_zero_betti == dict.fromkeys(range(5), 0)
+    result = recursive_betti_upper_bounds(graph, max_degree=4)
+    assert result.known_zero_betti == dict.fromkeys(range(5), 0)
 
 
 def test_limit_keeps_only_completed_degrees():
@@ -47,7 +46,12 @@ def test_arbitrary_labels_and_cache():
 
 @pytest.mark.parametrize(
     "kwargs",
-    [{"max_degree": -1}, {"max_states": 0}, {"max_cache": -1}, {"max_degree": True}],
+    [
+        {"max_degree": -1},
+        {"max_states": 0},
+        {"max_cache": -1},
+        {"max_degree": True},
+    ],
 )
 def test_invalid_budgets(kwargs):
     with pytest.raises(ValueError):
