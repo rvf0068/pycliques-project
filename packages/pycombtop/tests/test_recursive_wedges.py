@@ -238,6 +238,8 @@ def test_classifier_uses_integral_morse_when_recursive_search_is_inconclusive(
     import pycombtop.homotopy_type as ht
 
     monkeypatch.setattr(ht, "recursive_wedge_certificate", lambda graph: None)
+    # Exercise the older fallback throughout this test, including recursive calls.
+    monkeypatch.setattr(ht, "_try_recursive_betti_wedge", lambda *args: None)
     circle = nx.cycle_graph(25)
     # The cycle has 51 faces including the empty face.
     direct = homotopy_type_with_verdict(circle, max_simplices=51)
