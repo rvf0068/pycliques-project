@@ -110,8 +110,10 @@ def find_coaffine_endomorphism(
             )
         if max_states > (1 << 63) - 1:
             raise ValueError("Native max_states must fit in a signed 64-bit integer")
-    if executable is not None and len(graph) <= MAX_NATIVE_ORDER and (
-        max_states <= (1 << 63) - 1
+    if (
+        executable is not None
+        and len(graph) <= MAX_NATIVE_ORDER
+        and (max_states <= (1 << 63) - 1)
     ):
         native = run_coaffine_native(
             graph,
