@@ -17,13 +17,16 @@ Unlike coaffinations, these endomorphisms need NOT be automorphisms.
 from __future__ import annotations
 
 import math
-import time
-from collections import deque
 from collections.abc import Hashable
 from dataclasses import dataclass
 
 import networkx as nx
 
+from .coaffine_endomorphisms import (
+    _search_coaffine_python,
+    _validate_search_order,
+    verify_coaffine_endomorphism,
+)
 from .octahedral_coaffine_native import (
     MAX_NATIVE_ORDER,
     find_coaffine_native_executable,
@@ -65,6 +68,7 @@ def find_octahedral_retraction_coaffine(
     max_states: int = 20_000,
     time_limit: float | None = None,
     backend: str = "auto",
+    value_order: str = "label",
 ) -> CoaffineOctahedronResult:
     """Search for a retraction onto any induced octahedron with no seed.
 
@@ -72,10 +76,11 @@ def find_octahedral_retraction_coaffine(
     closed neighborhood of v; test whether f^2 is an idempotent
     projection onto an induced O_d, d>=min_dimension.
 
-    Constraint propagation uses exact arc consistency on all source
-    edges with bitmasked image domains; MRV branching searches every
-    assignment unless a state/time limit is reached. Search order is
-    deterministic for a fixed NetworkX vertex iteration order.
+    Transposed bitmasked image domains implement exact arc consistency.
+    MRV branching searches every assignment unless a limit is reached.
+    value_order='fiber' tries larger possible fibers first; the default
+    'label' preserves the historical branch order. Ties are deterministic
+    for a fixed backend, compiler and NetworkX vertex iteration order.
 
     EXHAUSTED is an exact negative certificate for ALL induced O_d
     retractions of the specified dimensions, not merely for selected
@@ -121,6 +126,7 @@ def find_octahedral_retraction_coaffine(
     ):
         raise ValueError("time_limit must be finite and strictly positive")
 
+    _validate_search_order(value_order)
     if backend not in ("auto", "python", "native"):
         raise ValueError("backend must be 'auto', 'python', or 'native'")
 
@@ -154,6 +160,7 @@ def find_octahedral_retraction_coaffine(
             max_states=max_states,
             time_limit=time_limit,
             executable=native_path,
+            value_order=value_order,
         )
         status = RetractionSearchStatus[native.status]
         if status is not RetractionSearchStatus.FOUND:
@@ -185,11 +192,7 @@ def find_octahedral_retraction_coaffine(
             len(image) != 2 * len(pairs)
             or set(r.values()) != image
             or any(r[u] != f[f[u]] for u in graph)
-            or any(f[u] == u or graph.has_edge(u, f[u]) for u in graph)
-            or any(
-                f[u] != f[v] and not graph.has_edge(f[u], f[v])
-                for u, v in graph.edges()
-            )
+            or not verify_coaffine_endomorphism(graph, f)
             or not verify_induced_octahedron(graph, pairs)
             or not verify_retraction_witness(graph, target, (r, inclusion))
         ):
@@ -205,173 +208,50 @@ def find_octahedral_retraction_coaffine(
             native.assignments_tried,
         )
 
-    nodes = list(graph)
-    n = len(nodes)
-    positions = {v: i for i, v in enumerate(nodes)}
-    neighbors = [tuple(positions[w] for w in graph[v]) for v in nodes]
-    closed = [sum(1 << j for j in neighbors[i]) | (1 << i) for i in range(n)]
-    full = (1 << n) - 1
-    domains = [full & ~closed[i] for i in range(n)]
-    start = time.monotonic()
-    states = 0
-    revisions = 0
-    assignments = 0
-
-    def outcome(
-        status: RetractionSearchStatus,
-        pairs: tuple[tuple[Hashable, Hashable], ...] | None = None,
-        projection: dict[Hashable, Hashable] | None = None,
-        inclusion: dict[Hashable, Hashable] | None = None,
-        endomorphism: dict[Hashable, Hashable] | None = None,
-    ) -> CoaffineOctahedronResult:
+    if len(graph) < 2 * min_dimension:
         return CoaffineOctahedronResult(
-            status,
-            pairs,
-            projection,
-            inclusion,
-            endomorphism,
-            states,
-            revisions,
-            assignments,
+            RetractionSearchStatus.EXHAUSTED, None, None, None, None, 0, 0, 0
         )
 
-    if n < 2 * min_dimension or any(mask == 0 for mask in domains):
-        return outcome(RetractionSearchStatus.EXHAUSTED)
-
-    class _TimeLimit(Exception):
-        pass
-
-    def check_time() -> None:
-        if time_limit is not None and time.monotonic() - start > time_limit:
-            raise _TimeLimit
-
-    def propagate(d: list[int], pending: deque[tuple[int, int]]) -> bool:
-        """Revise directed arcs (i,j): image(i)~image(j) or equality."""
-        nonlocal revisions
-        processed = 0
-        while pending:
-            processed += 1
-            if processed % 128 == 0:
-                check_time()
-            i, j = pending.popleft()
-            old = d[i]
-            new = old
-            bits = old
-            while bits:
-                bit = bits & -bits
-                bits -= bit
-                k = bit.bit_length() - 1
-                if not (closed[k] & d[j]):
-                    new ^= bit
-            if new != old:
-                revisions += 1
-                if not new:
-                    return False
-                d[i] = new
-                for x in neighbors[i]:
-                    if x != j:
-                        pending.append((x, i))
-        return True
-
-    def positive(
-        d: list[int],
-    ) -> (
-        tuple[
-            tuple[tuple[Hashable, Hashable], ...],
-            dict[Hashable, Hashable],
-            dict[Hashable, Hashable],
-            dict[Hashable, Hashable],
-        ]
-        | None
-    ):
-        f = [mask.bit_length() - 1 for mask in d]
-        if not all(
-            i != f[i] and not graph.has_edge(nodes[i], nodes[f[i]]) for i in range(n)
-        ):
-            raise AssertionError("Coaffine CSP returned invalid endomorphism")
-        if not all(
-            f[u] == f[v] or graph.has_edge(nodes[f[u]], nodes[f[v]])
-            for u in range(n)
-            for v in neighbors[u]
-        ):
-            raise AssertionError("Coaffine CSP returned a non-morphism")
-
-        r = [f[f[i]] for i in range(n)]
-        image = set(r)
+    def accept(f: dict[Hashable, Hashable]) -> bool:
+        projection = {v: f[f[v]] for v in graph}
+        image = set(projection.values())
         if len(image) < 2 * min_dimension or len(image) % 2:
-            return None
-        if any(r[j] != j for j in image):
-            return None
+            return False
+        if any(projection[v] != v for v in image):
+            return False
+        # The complement on the image must be a perfect matching.
+        target = graph.subgraph(image)
+        return all(d == 1 for _, d in nx.complement(target).degree())
 
-        pairs: list[tuple[Hashable, Hashable]] = []
-        remaining = set(image)
-        while remaining:
-            u = min(remaining)
-            missing = [
-                v for v in image if v != u and not graph.has_edge(nodes[u], nodes[v])
-            ]
-            if len(missing) != 1 or missing[0] not in remaining:
-                return None
-            v = missing[0]
-            if (
-                sum(w != v and not graph.has_edge(nodes[v], nodes[w]) for w in image)
-                != 1
-            ):
-                return None
-            pairs.append((nodes[u], nodes[v]))
-            remaining.difference_update((u, v))
-
-        opposite = tuple(pairs)
-        projection = {nodes[i]: nodes[r[i]] for i in range(n)}
-        endomorphism = {nodes[i]: nodes[f[i]] for i in range(n)}
-        target = graph.subgraph(nodes[i] for i in image)
+    result = _search_coaffine_python(
+        graph,
+        max_states=max_states,
+        time_limit=time_limit,
+        value_order=value_order,
+        accept=accept,
+    )
+    pairs = None
+    projection = None
+    inclusion = None
+    f = result.endomorphism
+    if f is not None:
+        projection = {v: f[f[v]] for v in graph}
+        image = set(projection.values())
+        target = graph.subgraph(image)
+        pairs = tuple(nx.complement(target).edges())
         inclusion = {v: v for v in target}
-        if not verify_induced_octahedron(graph, opposite):
+        if not verify_induced_octahedron(graph, pairs):
             raise AssertionError("Coaffine CSP produced non-octahedral target")
         if not verify_retraction_witness(graph, target, (projection, inclusion)):
             raise AssertionError("Coaffine CSP produced invalid retraction")
-        return opposite, projection, inclusion, endomorphism
-
-    limit = object()
-
-    def dfs(d: list[int]):
-        nonlocal states, assignments
-        if states >= max_states:
-            return limit
-        states += 1
-        check_time()
-        undecided = [i for i in range(n) if d[i].bit_count() > 1]
-        if not undecided:
-            return positive(d)
-        x = min(undecided, key=lambda i: (d[i].bit_count(), -len(neighbors[i])))
-        choices = d[x]
-        while choices:
-            bit = choices & -choices
-            choices -= bit
-            assignments += 1
-            candidate = d.copy()
-            candidate[x] = bit
-            if propagate(candidate, deque((i, x) for i in neighbors[x])):
-                result = dfs(candidate)
-                if result is limit or result is not None:
-                    return result
-        return None
-
-    try:
-        if not propagate(
-            domains,
-            deque((i, j) for i in range(n) for j in neighbors[i]),
-        ):
-            return outcome(RetractionSearchStatus.EXHAUSTED)
-        answer = dfs(domains)
-    except (_TimeLimit, RecursionError):
-        answer = limit
-
-    if answer is limit:
-        return outcome(RetractionSearchStatus.LIMIT_REACHED)
-    if answer is None:
-        return outcome(RetractionSearchStatus.EXHAUSTED)
-    pairs, projection, inclusion, endomorphism = answer
-    return outcome(
-        RetractionSearchStatus.FOUND, pairs, projection, inclusion, endomorphism
+    return CoaffineOctahedronResult(
+        result.status,
+        pairs,
+        projection,
+        inclusion,
+        f,
+        result.states_explored,
+        result.arc_revisions,
+        result.assignments_tried,
     )
