@@ -20,16 +20,43 @@ CUBICS = {182: "M{S__SE@?A?C?F?F?", 379: "M{O___IA_H?_?T?R?"}
 # verify_inputs.py, verify_reduction.py, matchtree.cpp, check_vanish.cpp).
 # These facts refer to the relative pared iterates of the exact cubic codes
 # above, not to arbitrary graphs of the same order.
-def certified_profile(index, level, p):
-    expected = {182: (13, 27, 199), 379: (14, 34, 541)}
-    assert len(p) == expected[index][level]
-    if index == 182:
-        return dict.fromkeys(range(len(p)), 0)
-    if level == 0:
-        return dict.fromkeys(range(len(p)), 0)
+EXPECTED_ORDERS = {182: (13, 27, 199), 379: (14, 34, 541)}
+
+
+def certified_profile(index, level):
+    order = EXPECTED_ORDERS[index][level]
+    if index == 182 or level == 0:
+        return dict.fromkeys(range(order), 0)
     if level == 1:
-        return {d: int(d == 5) for d in range(len(p))}
+        return {d: int(d == 5) for d in range(order)}
     return dict.fromkeys(range(11), 0)
+
+
+# Verified lower bounds from reference_verified.json in the same archive.
+# Graph 300's lower bound comes from the pass2.jsonl O_21 retraction.
+REFERENCE_PROFILES = {
+    i: {1: {5: b}}
+    for i, b in {113: 2, 193: 1, 204: 2, 210: 1, 216: 1,
+                 356: 1, 495: 5, 517: 12}.items()
+}
+REFERENCE_PROFILES[300] = {2: {20: 1}}
+
+
+def reference_obstructions(index, level):
+    screen = getattr(pc, "find_homological_retraction_obstruction", None)
+    if screen is None:
+        return None  # Requires library PR #54.
+    host = {j-level: certified_profile(index, j) for j in range(level, 3)}
+    obstructions = {}
+    for target, profile in REFERENCE_PROFILES.items():
+        witness = screen(host, profile)
+        if witness is not None:
+            obstructions[target] = dict(
+                iterate=witness.iterate, degree=witness.degree,
+                host_upper_bound=witness.host_upper_bound,
+                target_lower_bound=witness.target_lower_bound,
+            )
+    return obstructions
 
 
 def report(**kw):
@@ -51,14 +78,16 @@ def main():
             h = limited(30, pt.homotopy_type_with_verdict, p, max_simplices=100000)
             report(index=a.index, level=k, task="homotopy", status="TIMEOUT" if h is None else "EXACT" if h.is_exact else "INEXACT", spheres=None if h is None else h.wedge.spheres, reason=None if h is None else h.reason)
         elif a.task == "retractions":
+            assert len(p) == EXPECTED_ORDERS[a.index][k]
             known = retraction_betti(p)
-            for d, b in certified_profile(a.index, k, p).items():
+            for d, b in certified_profile(a.index, k).items():
                 assert d not in known or known[d] == b
                 known[d] = b
             minimum = min_octahedron_dimension(p, known)
             report(index=a.index, level=k, task="homological-screen",
                    exact_betti=known, min_dimension=minimum,
-                   all_octahedra_excluded=minimum > len(p)//2)
+                   all_octahedra_excluded=minimum > len(p)//2,
+                   reference_obstructions=reference_obstructions(a.index, k))
             for seed in range((1 if k < 2 else 6) if minimum <= len(p)//2 else 0):
                 order = list(p)
                 random.Random(seed+182379).shuffle(order)
