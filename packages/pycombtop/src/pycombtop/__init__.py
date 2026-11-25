@@ -84,6 +84,7 @@ from .morse_certificates import (
     facet_morse_certificate,
     graph_morse_certificate,
 )
+from .recursive_betti import RecursiveBettiBounds, recursive_betti_upper_bounds
 from .recursive_wedges import (
     RecursiveWedgeCertificate,
     recursive_wedge_certificate,
@@ -222,6 +223,8 @@ __all__ = [
     "verify_recursive_wedge",
     "HomotopyVerdict",
     "Theorem",
+    "RecursiveBettiBounds",
+    "recursive_betti_upper_bounds",
     "betti_numbers_graph",
     "betti_numbers_sc",
     "collapse",
