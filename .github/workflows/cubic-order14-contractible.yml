@@ -1,0 +1,26 @@
+name: Contractible cubic complements research
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'research/cubic_order14_contractible.py'
+      - '.github/workflows/cubic-order14-contractible.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        index: [182, 379]
+        task: [topology, retractions, structural]
+    name: Graph ${{ matrix.index }} / ${{ matrix.task }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - run: uv sync --frozen --python 3.11
+      - run: uv run python -m pycliques.octahedral_coaffine_native --build
+      - run: uv run python research/cubic_order14_contractible.py ${{ matrix.index }} ${{ matrix.task }}

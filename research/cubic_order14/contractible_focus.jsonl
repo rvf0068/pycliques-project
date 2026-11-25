@@ -1,0 +1,51 @@
+{"edges":60,"host":"LBj^^jx}~|~z~w","index":182,"level":0,"order":13}
+{"index":182,"level":0,"reason":"Graph s-collapse reduction to a point: s-dismantlable vertex and edge removals preserve the simple-homotopy type of the clique complex [BFJ2010].","spheres":{},"status":"EXACT","task":"homotopy"}
+{"edges":292,"host":"Z~~~~~~~~~~~z{zl|^~f~x~}{V{}F{V~|r~~VI~~zwv~x{~~ZD~f~m~n~f^w","index":182,"level":1,"order":27}
+{"index":182,"level":1,"reason":"A replayed decomposition by dominated-vertex folds, joins and vertex stars certifies the wedge. Each attaching map is null by cellular approximation or by a contracted carrier of the folded link image.","spheres":{},"status":"EXACT","task":"homotopy"}
+{"edges":18212,"host":null,"index":182,"level":2,"order":199}
+{"index":182,"level":2,"reason":null,"spheres":null,"status":"TIMEOUT","task":"homotopy"}
+{"edges":70,"host":"MBn^^^t|^u~^~i~k_","index":379,"level":0,"order":14}
+{"index":379,"level":0,"reason":"Graph s-collapse reduction to a point: s-dismantlable vertex and edge removals preserve the simple-homotopy type of the clique complex [BFJ2010].","spheres":{},"status":"EXACT","task":"homotopy"}
+{"edges":457,"host":"a~~~~~~~Fr}^zfFvt~w~~\\~~~~~x~~z~~m~~~Fw~q}V}ZzZzf{~b~{nb~~Fyn}o~j{~~{^f{~ynZw~~x|N~~mzv~~\\~vV~_","index":379,"level":1,"order":34}
+{"index":379,"level":1,"reason":"Dong's sequential augmented matching is acyclic. Exact signed gradient paths yield its integral Morse boundary. Critical cells lie in consecutive dimensions d,d+1 with d>=2; unit Smith invariants permit integral cancellation, and all remaining attaching maps are nullhomotopic by pi_d(wedge S^d)=Z^r [Dong2003, Forman1998, Hatcher].","spheres":{"5":1},"status":"EXACT","task":"homotopy"}
+{"edges":132098,"host":null,"index":379,"level":2,"order":541}
+{"index":379,"level":2,"reason":null,"spheres":null,"status":"TIMEOUT","task":"homotopy"}
+{"edges":60,"host":"LBj^^jx}~|~z~w","index":182,"level":0,"order":13}
+{"index":182,"level":0,"pairs":null,"projection":null,"seed":0,"states":4,"status":"EXHAUSTED","task":"coaffine-oct"}
+{"index":182,"level":0,"result":"CoaffineEndomorphismResult(status=<RetractionSearchStatus.EXHAUSTED: 2>, endomorphism=None, states_explored=4, assignments_tried=8, arc_revisions=45)","task":"coaffine-any"}
+{"edges":292,"host":"Z~~~~~~~~~~~z{zl|^~f~x~}{V{}F{V~|r~~VI~~zwv~x{~~ZD~f~m~n~f^w","index":182,"level":1,"order":27}
+{"index":182,"level":1,"pairs":null,"projection":null,"seed":0,"states":1,"status":"EXHAUSTED","task":"coaffine-oct"}
+{"index":182,"level":1,"result":"CoaffineEndomorphismResult(status=<RetractionSearchStatus.EXHAUSTED: 2>, endomorphism=None, states_explored=1, assignments_tried=3, arc_revisions=82)","task":"coaffine-any"}
+{"edges":18212,"host":null,"index":182,"level":2,"order":199}
+{"index":182,"level":2,"pairs":null,"projection":null,"seed":0,"states":1,"status":"EXHAUSTED","task":"coaffine-oct"}
+{"index":182,"level":2,"result":"CoaffineEndomorphismResult(status=<RetractionSearchStatus.EXHAUSTED: 2>, endomorphism=None, states_explored=1, assignments_tried=3, arc_revisions=2191)","task":"coaffine-any"}
+{"edges":70,"host":"MBn^^^t|^u~^~i~k_","index":379,"level":0,"order":14}
+{"index":379,"level":0,"pairs":null,"projection":null,"seed":0,"states":3,"status":"EXHAUSTED","task":"coaffine-oct"}
+{"index":379,"level":0,"result":"CoaffineEndomorphismResult(status=<RetractionSearchStatus.EXHAUSTED: 2>, endomorphism=None, states_explored=8, assignments_tried=17, arc_revisions=114)","task":"coaffine-any"}
+{"edges":457,"host":"a~~~~~~~Fr}^zfFvt~w~~\\~~~~~x~~z~~m~~~Fw~q}V}ZzZzf{~b~{nb~~Fyn}o~j{~~{^f{~ynZw~~x|N~~mzv~~\\~vV~_","index":379,"level":1,"order":34}
+{"index":379,"level":1,"pairs":null,"projection":null,"seed":0,"states":37,"status":"EXHAUSTED","task":"coaffine-oct"}
+{"index":379,"level":1,"result":"CoaffineEndomorphismResult(status=<RetractionSearchStatus.EXHAUSTED: 2>, endomorphism=None, states_explored=23, assignments_tried=59, arc_revisions=1878)","task":"coaffine-any"}
+{"edges":132098,"host":null,"index":379,"level":2,"order":541}
+{"index":379,"level":2,"pairs":null,"projection":null,"seed":0,"states":7129,"status":"LIMIT_REACHED","task":"coaffine-oct"}
+{"index":379,"level":2,"pairs":null,"projection":null,"seed":1,"states":15072,"status":"LIMIT_REACHED","task":"coaffine-oct"}
+{"index":379,"level":2,"pairs":null,"projection":null,"seed":2,"states":9726,"status":"LIMIT_REACHED","task":"coaffine-oct"}
+{"index":379,"level":2,"pairs":null,"projection":null,"seed":3,"states":21060,"status":"LIMIT_REACHED","task":"coaffine-oct"}
+{"index":379,"level":2,"pairs":null,"projection":null,"seed":4,"states":16899,"status":"LIMIT_REACHED","task":"coaffine-oct"}
+{"index":379,"level":2,"pairs":null,"projection":null,"seed":5,"states":20075,"status":"LIMIT_REACHED","task":"coaffine-oct"}
+{"index":379,"level":2,"result":"CoaffineEndomorphismResult(status=<RetractionSearchStatus.LIMIT_REACHED: 3>, endomorphism=None, states_explored=14, assignments_tried=16, arc_revisions=8582)","task":"coaffine-any"}
+{"edges":70,"host":"MBn^^^t|^u~^~i~k_","index":379,"level":0,"order":14}
+{"index":379,"level":0,"reason":null,"task":"classifier","verdict":null}
+{"index":379,"level":0,"result":"StiffRetractionResult(status=<RetractionSearchStatus.EXHAUSTED: 2>, target_vertices=None, retraction=None, subsets_checked=16354, stiff_candidates=368, neighborhood_candidates=84, states_explored=295, assignments_tried=211)","task":"proper-stiff"}
+{"edges":457,"host":"a~~~~~~~Fr}^zfFvt~w~~\\~~~~~x~~z~~m~~~Fw~q}V}ZzZzf{~b~{nb~~Fyn}o~j{~~{^f{~ynZw~~x|N~~mzv~~\\~vV~_","index":379,"level":1,"order":34}
+{"index":379,"level":1,"reason":null,"task":"classifier","verdict":null}
+{"index":379,"level":1,"result":"StiffRetractionResult(status=<RetractionSearchStatus.LIMIT_REACHED: 3>, target_vertices=None, retraction=None, subsets_checked=100000, stiff_candidates=2447, neighborhood_candidates=0, states_explored=0, assignments_tried=0)","task":"proper-stiff"}
+{"edges":132098,"host":null,"index":379,"level":2,"order":541}
+{"index":379,"level":2,"result":"None","task":"proper-stiff"}
+{"edges":60,"host":"LBj^^jx}~|~z~w","index":182,"level":0,"order":13}
+{"index":182,"level":0,"reason":null,"task":"classifier","verdict":null}
+{"index":182,"level":0,"result":"StiffRetractionResult(status=<RetractionSearchStatus.EXHAUSTED: 2>, target_vertices=None, retraction=None, subsets_checked=8177, stiff_candidates=200, neighborhood_candidates=31, states_explored=132, assignments_tried=101)","task":"proper-stiff"}
+{"edges":292,"host":"Z~~~~~~~~~~~z{zl|^~f~x~}{V{}F{V~|r~~VI~~zwv~x{~~ZD~f~m~n~f^w","index":182,"level":1,"order":27}
+{"index":182,"level":1,"reason":null,"task":"classifier","verdict":null}
+{"index":182,"level":1,"result":"StiffRetractionResult(status=<RetractionSearchStatus.LIMIT_REACHED: 3>, target_vertices=None, retraction=None, subsets_checked=100000, stiff_candidates=942, neighborhood_candidates=0, states_explored=0, assignments_tried=0)","task":"proper-stiff"}
+{"edges":18212,"host":null,"index":182,"level":2,"order":199}
+{"index":182,"level":2,"result":"None","task":"proper-stiff"}
