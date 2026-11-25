@@ -67,6 +67,7 @@ from .attachment_certificates import (
 from .elementary_collapses import _is_free_face as _is_free_face
 from .elementary_collapses import _remove_simplex as _remove_simplex
 from .elementary_collapses import collapse as collapse
+from .fundamental_group import connected_link_order
 from .homology_backend import HomologyResourceLimit, reduced_betti_facets_mod2
 from .homotopy_results import (
     BettiProfile as BettiProfile,
@@ -86,6 +87,7 @@ from .homotopy_results import (
 from .hopf_wedge import _from_morse, verify_hopf_wedge
 from .integral_morse import bipartite_shore_facets, integral_morse_certificate
 from .morse_certificates import facet_morse_certificate
+from .recursive_betti import RecursiveBettiBounds, recursive_betti_upper_bounds
 from .recursive_wedges import recursive_wedge_certificate
 from .s_collapses import complete_s_collapse, complete_s_collapse_edges
 from .simplex import (
@@ -104,6 +106,7 @@ from .wedge_certificates import (
     certified_flag_wedge_after_s_collapses,
     verify_folded_wedge_certificate,
 )
+from .weighted_conicity import verify_weighted_conicity
 
 # ---------------------------------------------------------------------------
 # Theorem citations
@@ -1043,12 +1046,62 @@ def _try_recursive_or_integral_wedge(
     return None
 
 
+def _try_recursive_betti_wedge(
+    graph: nx.Graph, max_states: int
+) -> HomotopyVerdict | None:
+    """Use field-independent homology bounds, never Betti ranks alone."""
+    if (
+        not max_states
+        or graph.is_directed()
+        or graph.is_multigraph()
+        or nx.number_of_selfloops(graph)
+    ):
+        return None
+    combined: dict[int, int] | None = None
+    spent = 0
+    for order in ("descending", "ascending", "reverse_ties"):
+        if spent >= max_states:
+            break
+        result = recursive_betti_upper_bounds(
+            graph, max_states=max_states - spent, neighbor_order=order
+        )
+        spent += result.states_explored
+        if result.is_limited or result.reduced_euler_characteristic is None:
+            break
+        euler = result.reduced_euler_characteristic
+        combined = (
+            dict(result.upper_bounds)
+            if combined is None
+            else {d: min(b, result.upper_bounds[d]) for d, b in combined.items()}
+        )
+        bounds = RecursiveBettiBounds(combined, spent, False, euler)
+        support = [d for d, b in bounds.euler_refined_upper_bounds.items() if b]
+        if len(support) > 1:
+            continue
+        if support and support[0] < 2:
+            return None
+        uniform = verify_weighted_conicity(graph, dict.fromkeys(graph, 1))
+        if uniform.connectivity < 1 and connected_link_order(graph) is None:
+            return None
+        spheres = {}
+        if support:
+            d = support[0]
+            rank = euler if d % 2 == 0 else -euler
+            if rank:
+                spheres = {d: rank}
+        return HomotopyVerdict(
+            WedgeOfSpheres(spheres), Theorem.RECURSIVE_BETTI_HUREWICZ
+        )
+    return None
+
+
 def homotopy_type_with_verdict(
     graph: nx.Graph,
     max_vertices: int | None = None,
     max_simplices: int | None = None,
     *,
     dong_seed: int = 0,
+    recursive_betti_states: int = 4096,
 ) -> HomotopyVerdict:
     """Compute the homotopy type of the clique complex of *graph*.
 
@@ -1069,6 +1122,11 @@ def homotopy_type_with_verdict(
         Local random seed for the six shuffled Dong vertex orders (the
         initial order is stable). Recursive subproblems use their default
         seed unless classified directly. All matchings are checked.
+
+    recursive_betti_states : int, optional
+        State budget for the face-free Hurewicz strategy on graphs with
+        20--256 vertices. Set to zero to skip this stage of the current call.
+        A failed or limited attempt falls through to the existing strategies.
 
     .. rubric:: Returns
 
@@ -1097,6 +1155,9 @@ def homotopy_type_with_verdict(
     if max_simplices is not None and max_simplices < 0:
         raise ValueError("max_simplices must be nonnegative or None")
 
+    if type(recursive_betti_states) is not int or recursive_betti_states < 0:
+        raise ValueError("recursive_betti_states must be a nonnegative integer")
+
     # Cheap exact certificates need no explicit enumeration of faces.
     # Preserve the strict vertex limit, but do not reject a cone or join
     # merely because the full flag complex is exponentially large.
@@ -1111,6 +1172,13 @@ def homotopy_type_with_verdict(
     )
     if v:
         return v
+
+    # Bounded face-free homology and simple connectivity can settle the
+    # type before allocating a symbolic diagram or enumerating simplices.
+    if 20 <= len(graph) <= 256 and recursive_betti_states:
+        v = _try_recursive_betti_wedge(graph, recursive_betti_states)
+        if v:
+            return v
 
     # Dong matching can resolve enormous face families via a bounded ZDD.
     # Its node cap is independent of max_simplices; on failure the usual
