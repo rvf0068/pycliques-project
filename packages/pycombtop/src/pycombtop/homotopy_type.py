@@ -1099,11 +1099,14 @@ def _try_recursive_betti_wedge(
         return None
     combined: dict[int, int] | None = None
     spent = 0
-    for order in ("descending", "ascending", "reverse_ties"):
+    for order in ("descending", "ascending", "reverse_ties", "adaptive"):
         if spent >= max_states:
             break
         result = recursive_betti_upper_bounds(
-            graph, max_states=max_states - spent, neighbor_order=order
+            graph,
+            max_states=max_states - spent,
+            neighbor_order="descending" if order == "adaptive" else order,
+            adaptive_pivots=2 if order == "adaptive" else 0,
         )
         spent += result.states_explored
         if result.is_limited or result.reduced_euler_characteristic is None:
