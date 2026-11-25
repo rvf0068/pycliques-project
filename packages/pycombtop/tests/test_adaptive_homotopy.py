@@ -123,9 +123,7 @@ def test_adaptive_bounds_against_exact_small_graphs():
         assert not result.is_limited
         exact = bounded_reduced_betti_mod2(graph, max_degree=5)
         assert exact is not None
-        assert all(
-            rank >= exact.get(d, 0) for d, rank in result.upper_bounds.items()
-        )
+        assert all(rank >= exact.get(d, 0) for d, rank in result.upper_bounds.items())
         chi = -1 + sum(
             (-1) ** (len(face) - 1) for face in nx.enumerate_all_cliques(graph)
         )
