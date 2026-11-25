@@ -21,7 +21,11 @@ admitting a coaffine endomorphism, not just octahedra, including cycle
 complements and suspensions of cycles of length at least four.
 It is not a convergence test. LIMIT_REACHED gives no obstruction.
 
-The existing octahedral native search is unchanged.
+Both coaffine searches now share the optional native backend and the
+portable transposed-domain search. Use backend='native', value_order='fiber'
+for the fiber-first search, after explicitly building the native engine.
+The octahedral search accepts only leaves whose squares are octahedral
+retractions; the general search accepts any verified coaffine map.
 
 ## Proper nontrivial stiff retracts
 
