@@ -231,26 +231,28 @@ def find_octahedral_retraction_coaffine(
         value_order=value_order,
         accept=accept,
     )
-    pairs = None
-    projection = None
-    inclusion = None
-    f = result.endomorphism
-    if f is not None:
-        projection = {v: f[f[v]] for v in graph}
-        image = set(projection.values())
+    portable_pairs: tuple[tuple[Hashable, Hashable], ...] | None = None
+    portable_projection: dict[Hashable, Hashable] | None = None
+    portable_inclusion: dict[Hashable, Hashable] | None = None
+    portable_f = result.endomorphism
+    if portable_f is not None:
+        portable_projection = {v: portable_f[portable_f[v]] for v in graph}
+        image = set(portable_projection.values())
         target = graph.subgraph(image)
-        pairs = tuple(nx.complement(target).edges())
-        inclusion = {v: v for v in target}
-        if not verify_induced_octahedron(graph, pairs):
+        portable_pairs = tuple(nx.complement(target).edges())
+        portable_inclusion = {v: v for v in target}
+        if not verify_induced_octahedron(graph, portable_pairs):
             raise AssertionError("Coaffine CSP produced non-octahedral target")
-        if not verify_retraction_witness(graph, target, (projection, inclusion)):
+        if not verify_retraction_witness(
+            graph, target, (portable_projection, portable_inclusion)
+        ):
             raise AssertionError("Coaffine CSP produced invalid retraction")
     return CoaffineOctahedronResult(
         result.status,
-        pairs,
-        projection,
-        inclusion,
-        f,
+        portable_pairs,
+        portable_projection,
+        portable_inclusion,
+        portable_f,
         result.states_explored,
         result.arc_revisions,
         result.assignments_tried,
