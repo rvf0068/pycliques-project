@@ -1,9 +1,11 @@
-name: Unseeded native coaffine O12 proof and portability checks
+name: Unseeded native coaffine proofs and portability checks
 
 on:
   pull_request:
     paths:
       - "packages/pycliques/src/pycliques/_coaffine_native.cpp"
+      - "packages/pycliques/src/pycliques/coaffine_endomorphisms.py"
+      - "research/replay_cubic14_379.py"
       - "packages/pycliques/src/pycliques/octahedral_coaffine.py"
       - "packages/pycliques/src/pycliques/octahedral_coaffine_native.py"
       - "packages/pycliques/tests/test_octahedral_coaffine_native.py"
@@ -16,7 +18,7 @@ permissions:
 
 jobs:
   native:
-    name: Native C++17 / Python 3.11 independent unseeded O12 reproduction
+    name: Native C++17 / Python 3.11 unseeded reproductions
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -34,9 +36,11 @@ jobs:
       - name: Measure accelerated wrapper coverage (diagnostic)
         run: |
           uv run pytest -q packages/pycliques/tests/test_octahedral_coaffine_native.py packages/pycliques/tests/test_octahedral_coaffine_native_protocol.py -m "not slow" --cov=pycliques.octahedral_coaffine_native --cov-report=term-missing
-      - name: Rediscover McKay 253650 P4 to O12 without a stored target
+      - name: Rediscover McKay 253650 and cubic 379 without stored targets
         run: uv run pytest -q packages/pycliques/tests/test_octahedral_coaffine_native.py -m slow
       - name: Test explicit build entry point
         run: |
           uv run python -m pycliques.octahedral_coaffine_native --build
           uv run python -c "import pycliques as pc, networkx as nx; r=pc.find_octahedral_retraction_coaffine(nx.octahedral_graph()); assert r.dimension == 3"
+      - name: Reproduce cubic 379 homotopy and divergence using both packages
+        run: uv run python research/replay_cubic14_379.py
