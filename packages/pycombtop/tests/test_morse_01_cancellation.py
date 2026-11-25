@@ -80,7 +80,9 @@ def test_c11_core_exact_consecutive_morse_wedge():
     assert certificate.torsion == {}
     assert certificate.betti == {2: 3, 3: 4}
     assert certificate.wedge_spheres == {2: 3, 3: 4}
-    verdict = homotopy_type_with_verdict(graph, max_vertices=80, max_simplices=100)
+    verdict = homotopy_type_with_verdict(
+        graph, max_vertices=80, max_simplices=100, recursive_betti_states=0
+    )
     assert verdict.is_exact
     assert verdict.wedge.spheres == {2: 3, 3: 4}
     assert verdict.reason == Theorem.SYMBOLIC_INTEGRAL_MORSE_01_CANCELLATION
