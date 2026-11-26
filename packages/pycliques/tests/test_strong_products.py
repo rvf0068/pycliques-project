@@ -19,6 +19,7 @@ from pycliques import (
         (nx.cycle_graph(4), nx.cycle_graph(4)),
         (nx.path_graph(3), nx.cycle_graph(5)),
         (nx.path_graph(4), nx.path_graph(4)),
+        (nx.complete_multipartite_graph(2, 2, 2), nx.cycle_graph(5)),
         (nx.complete_bipartite_graph(2, 3), nx.cycle_graph(5)),
     ],
 )
@@ -82,9 +83,7 @@ def test_malformed_coordinates():
     for value in ((-1, 0), (True, 0), (1,), [0, 0], (1, 0)):
         coords = dict(split.coordinates)
         coords[(0, 0)] = value
-        assert not verify_strong_product_split(
-            graph, replace(split, coordinates=coords)
-        )
+        assert not verify_strong_product_split(graph, replace(split, coordinates=coords))
     coords = dict(split.coordinates)
     del coords[(0, 0)]
     assert not verify_strong_product_split(graph, replace(split, coordinates=coords))
