@@ -35,6 +35,13 @@ class Theorem:
         "and all remaining cells have a common dimension; thus the Morse "
         "complex is a wedge of spheres [Dong2003, Forman1998]."
     )
+    SYMBOLIC_INTEGRAL_MORSE_HUREWICZ = (
+        "Exact integral symbolic Morse boundaries give torsion-free reduced "
+        "homology supported in at most two consecutive degrees >=2. "
+        "A replayed connected-link order proves simple connectivity. "
+        "Absolute and relative Hurewicz and homological Whitehead "
+        "then certify the wedge (including the acyclic case)."
+    )
     SYMBOLIC_INTEGRAL_MORSE = (
         "Dong's sequential augmented matching is acyclic. Exact signed "
         "gradient paths yield its integral Morse boundary. Critical cells "

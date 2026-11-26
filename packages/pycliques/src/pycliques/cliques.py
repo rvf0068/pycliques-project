@@ -9,6 +9,7 @@ from typing import TypeAlias
 
 import networkx as nx
 
+from ._bitsets import iter_indices
 from .octahedral_boolean import enumerate_maximal_intersecting_families
 
 
@@ -74,6 +75,89 @@ def _cliques_by_vertex(
             return None
 
     return cliques, cliques_of
+
+
+class _CliqueCountLimit(Exception):
+    """The bounded exact clique count did not finish."""
+
+
+def count_maximal_cliques(
+    graph: nx.Graph, *, max_states: int = 1_000_000, max_cache: int = 1_000_000
+) -> int | None:
+    """Count cliques without enumerating them or constructing K(graph).
+
+    Count maximal independent sets in the complement, equivalently
+    independent dominating sets. A state contains undominated vertices
+    and the subset still eligible for selection. Branch on an undominated
+    vertex, partitioning solutions by their first selected closed neighbor.
+    Independent complement components multiply their counts.
+
+    Returns an exact integer or None on a state or recursion limit.
+    As in NetworkX find_cliques, the empty graph has zero cliques.
+    Counting an induced subgraph gives a lower bound on the full count:
+    distinct maximal cliques extend to distinct maximal cliques of graph.
+    """
+    if (
+        not isinstance(graph, nx.Graph)
+        or graph.is_directed()
+        or graph.is_multigraph()
+        or nx.number_of_selfloops(graph)
+    ):
+        raise ValueError("Require a simple undirected loopless graph")
+    if type(max_states) is not int or max_states < 1:
+        raise ValueError("max_states must be a positive integer")
+    if type(max_cache) is not int or max_cache < 0:
+        raise ValueError("max_cache must be a nonnegative integer")
+    if not graph:
+        return 0
+    vertices = tuple(graph)
+    index = {v: i for i, v in enumerate(vertices)}
+    full = (1 << len(vertices)) - 1
+    closed = [full ^ sum(1 << index[w] for w in graph[v]) for v in vertices]
+    states = 0
+
+    @lru_cache(maxsize=max_cache)
+    def count(undominated: int, available: int) -> int:
+        nonlocal states
+        if not undominated:
+            return 1
+        if states >= max_states:
+            raise _CliqueCountLimit
+        states += 1
+
+        frontier = undominated & -undominated
+        component = 0
+        while frontier:
+            component |= frontier
+            adjacent = 0
+            for v in iter_indices(frontier):
+                adjacent |= closed[v]
+            frontier = adjacent & undominated & ~component
+        if component != undominated:
+            return count(component, available & component) * count(
+                undominated ^ component, available & ~component
+            )
+
+        pivot = min(
+            iter_indices(undominated),
+            key=lambda v: (closed[v] & available).bit_count(),
+        )
+        candidates = closed[pivot] & available
+        total = 0
+        for v in sorted(
+            iter_indices(candidates),
+            key=lambda v: -(closed[v] & undominated).bit_count(),
+        ):
+            total += count(undominated & ~closed[v], available & ~closed[v])
+            available &= ~(1 << v)
+        return total
+
+    try:
+        return count(full, full)
+    except (_CliqueCountLimit, RecursionError, MemoryError):
+        return None
+    finally:
+        count.cache_clear()
 
 
 @singledispatch
