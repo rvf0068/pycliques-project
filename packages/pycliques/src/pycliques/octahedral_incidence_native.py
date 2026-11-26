@@ -42,7 +42,9 @@ def build_incidence_native(
         exe = Path(directory) / "walk"
         run = subprocess.run(
             [cxx, "-O3", "-std=c++17", str(_source()), "-o", str(exe)],
-            capture_output=True, text=True, check=False,
+            capture_output=True,
+            text=True,
+            check=False,
         )
         if run.returncode:
             raise RuntimeError(f"Incidence walk build failed: {run.stderr[-2000:]}")

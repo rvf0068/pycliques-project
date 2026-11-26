@@ -61,12 +61,7 @@ def _write_cnf(
         allowed = {i for i in allowed if any(j in allowed for j in complement[i])}
     x = [{w: new() for w in row if w in allowed} for row in complement]
     y = [new() for _ in complement]
-    pairs = {
-        (i, j): new()
-        for i in sorted(allowed)
-        for j in x[i]
-        if i < j
-    }
+    pairs = {(i, j): new() for i in sorted(allowed) for j in x[i] if i < j}
     with path.open("w", encoding="ascii") as stream:
         stream.write(" " * 80 + "\n")
 

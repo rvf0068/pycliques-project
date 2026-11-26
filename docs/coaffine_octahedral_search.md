@@ -121,3 +121,58 @@ EXHAUSTED. Only an exact UNSAT response or an elementary impossibility
 precheck yields EXHAUSTED. The existing Python certificate checks verify
 every returned map and retraction independently. A missing optional
 system library raises RuntimeError.
+
+## Incidence-based octahedral retractions
+
+For a clique iterate, retain its clique supports using `ImplicitCliqueGraph`.
+The new specialized entry point shares the ordinary retraction result and
+verification conventions, but operates on the intersection representation.
+
+```python
+import pycliques as pc
+
+# base is the preceding pared iterate, not the host itself.
+raw = pc.ImplicitCliqueGraph.from_graph(base, max_cliques=3000)
+if raw is not None:
+    pared = raw.pare()
+    assert pc.verify_implicit_paring(raw, pared)
+    proof = pc.find_octahedral_retraction_incidence(
+        pared.core, backend="hybrid", max_steps=100_000,
+        time_limit=60, max_states=500_000,
+    )
+```
+
+Compile the optional weighted walk explicitly with
+`python -m pycliques.octahedral_incidence_native --build` (GNU C++17/libstdc++).
+The walk currently supports at most 64 ground atoms and 1280 active host
+vertices. Its state is a family of compatible antipodal pairs and cuts
+separating their supports. A cut covers every support contained wholly in
+one shore. An anchored weighted minimum-cut optimization favors uncovered
+and singly covered supports; adaptive pair replacement and random restarts
+repair holes without fixing the target dimension in advance. A zero-miss
+cover is an exact certificate. Every native checkpoint is checked, including
+when a timeout occurs. Checkpoints use original active clique IDs and masks
+in the host's base-vertex order. `states_explored` records the best checkpoint
+step (not the total number of walk moves).
+
+The exact `backend="sat"` works with wider support masks and uses the same
+optional Linux Z3 worker and resource limits as the general coaffine backend.
+For a choice f(u)=v, all atoms of the support of u must belong to the
+fibre union for v. No atom may belong to two opposite fibre unions. One
+true image choice per source suffices; the selected endpoints must induce
+a matching in the complement. This is equivalent to the existence of a
+retraction, by f = antipodal involution composed with the retraction.
+
+`retained_pairs` optionally restricts exact completion. EXHAUSTED then means
+no solution containing those pairs, not global nonexistence. In hybrid mode
+the walk uses half the wall budget and SAT uses the remaining time to attempt
+completion retaining a deterministic random half of the best pairs.
+An unsuccessful hybrid search is inconclusive. The optional
+`starting_matchings` are restart candidates only. No native executable
+is built implicitly. Positive maps are independently verified after discovery;
+this final verification is not included in the discovery time budget.
+
+The result adds `partial_cuts`, `uncovered`, and `retained_pairs`.
+If SAT completes a partial cover, the partial-cut fields still describe the
+walk checkpoint, not necessarily the returned retraction. Use
+`antipodal_pairs` and `retraction` for the final witness.

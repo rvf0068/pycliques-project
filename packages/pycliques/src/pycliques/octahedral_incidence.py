@@ -19,9 +19,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
+from .coaffine_endomorphisms import verify_coaffine_endomorphism
 from .implicit_clique_graph import ImplicitCliqueGraph
 from .octahedral_coaffine import CoaffineOctahedronResult
-from .coaffine_endomorphisms import verify_coaffine_endomorphism
 from .octahedral_incidence_native import (
     MAX_WALK_GROUND,
     MAX_WALK_ORDER,
@@ -113,13 +113,23 @@ def _found(
         or not verify_induced_octahedron(graph, pairs)
         or not verify_coaffine_endomorphism(graph, f)
         or not verify_retraction_witness(graph, target, (r, inclusion))
-        or any(r[v] != f[f[v]] for v in graph)
+        or set(f.values()) != image
+        or any(r[v] != f[f[v]] or f[r[v]] != f[v] for v in graph)
         or not all(f[a] == b and f[b] == a for a, b in retained)
     ):
         raise RuntimeError("Incidence backend returned an invalid certificate")
     return IncidenceOctahedronResult(
-        RetractionSearchStatus.FOUND, pairs, r, inclusion, f,
-        states, 0, 0, cuts, 0, retained,
+        RetractionSearchStatus.FOUND,
+        pairs,
+        r,
+        inclusion,
+        f,
+        states,
+        0,
+        0,
+        cuts,
+        _check_cuts(host, cuts)[1] if cuts else None,
+        retained,
     )
 
 
@@ -142,21 +152,30 @@ def _walk(
         )
         (directory / "starts.txt").write_text(
             "".join(
-                " ".join(map(str, [len(pairs), *(
-                    position[v] for pair in pairs for v in pair
-                )])) + "\n"
+                " ".join(
+                    map(str, [len(pairs), *(position[v] for p in pairs for v in p)])
+                )
+                + "\n"
                 for pairs in starts
             ),
             encoding="ascii",
         )
         command = [
-            str(executable.resolve()), "weighted", str(seed),
-            str(max_steps), str(min_dimension),
+            str(executable.resolve()),
+            "weighted",
+            str(seed),
+            str(max_steps),
+            str(min_dimension),
         ]
         try:
             run = subprocess.run(
-                command, cwd=directory, stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE, timeout=time_limit, check=False, text=True,
+                command,
+                cwd=directory,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                timeout=time_limit,
+                check=False,
+                text=True,
             )
             if run.returncode:
                 raise RuntimeError(f"Incidence walk failed: {run.stderr[-2000:]}")
@@ -224,8 +243,10 @@ def find_octahedral_retraction_incidence(
     if type(min_dimension) is not int or min_dimension < 3:
         raise ValueError("min_dimension must be an integer >= 3")
     for value, maximum in (
-        (max_steps, 2**31 - 1), (max_states, 2**32 - 1),
-        (sat_max_clauses, 2**31 - 1), (sat_memory_limit_mb, 2**32 - 1),
+        (max_steps, 2**31 - 1),
+        (max_states, 2**32 - 1),
+        (sat_max_clauses, 2**31 - 1),
+        (sat_memory_limit_mb, 2**32 - 1),
     ):
         if type(value) is not int or not 1 <= value <= maximum:
             raise ValueError("search budgets must be positive bounded integers")
@@ -262,16 +283,22 @@ def find_octahedral_retraction_incidence(
     if backend != "sat":
         if len(host) > MAX_WALK_ORDER or len(host.base_vertices) > MAX_WALK_GROUND:
             raise ValueError("walk supports at most 1280 cliques and 64 ground atoms")
-        remaining = None if time_limit is None else time_limit - (
-            time.monotonic() - started
+        remaining = (
+            None if time_limit is None else time_limit - (time.monotonic() - started)
         )
         if remaining is not None and remaining <= 0:
             return negative(RetractionSearchStatus.LIMIT_REACHED)
         cuts, missed, states = _walk(
-            host, executable or find_incidence_native(),
-            seed=seed, max_steps=max_steps, min_dimension=min_dimension,
-            time_limit=remaining / 2 if backend == "hybrid" and remaining is not None
-            else remaining,
+            host,
+            executable or find_incidence_native(),
+            seed=seed,
+            max_steps=max_steps,
+            min_dimension=min_dimension,
+            time_limit=(
+                remaining / 2
+                if backend == "hybrid" and remaining is not None
+                else remaining
+            ),
             starts=starting_matchings,
         )
         if missed == 0 and len(cuts) >= min_dimension:
@@ -294,8 +321,11 @@ def find_octahedral_retraction_incidence(
         return negative(RetractionSearchStatus.LIMIT_REACHED)
     position = {v: i for i, v in enumerate(host)}
     result = search_sat(
-        host, min_dimension=min_dimension, max_states=max_states,
-        time_limit=remaining, max_clauses=sat_max_clauses,
+        host,
+        min_dimension=min_dimension,
+        max_states=max_states,
+        time_limit=remaining,
+        max_clauses=sat_max_clauses,
         memory_limit_mb=sat_memory_limit_mb,
         retained=tuple((position[a], position[b]) for a, b in retained),
     )
