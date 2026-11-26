@@ -100,7 +100,10 @@ def _write_cnf(
                 add(-literal, y[j])
             # Every used endpoint has a selected reciprocal pair.
             if i in allowed:
-                add(-y[i], *(pairs[min(i, j), max(i, j)] for j in row))
+                incident = [pairs[min(i, j), max(i, j)] for j in row]
+                add(-y[i], *incident)
+                if supports is not None:
+                    amo(incident)
             else:
                 add(-y[i])
         for i in sorted(ends):
@@ -128,6 +131,7 @@ def _write_cnf(
                 exclude(a, node.left, allowed)
                 exclude(a, node.right, allowed)
 
+        atoms: list[dict[int, int]] = [{} for _ in complement]
         if supports is None:
             trees = [tree(j, row) if row else None for j, row in enumerate(complement)]
             closed = [
@@ -136,7 +140,6 @@ def _write_cnf(
         else:
             # Atom flags describe the unions of supports assigned to each
             # endpoint. One flag per (target, atom), shared by all sources.
-            atoms: list[dict[int, int]] = [{} for _ in complement]
             for u, row in enumerate(x):
                 for j, literal in row.items():
                     for t in iter_indices(supports[u]):
@@ -238,8 +241,13 @@ def search_sat(
         with tempfile.TemporaryDirectory(prefix="pycliques-sat-") as directory:
             path = Path(directory) / "problem.cnf"
             x = _write_cnf(
-                complement, path, min_dimension, max_clauses, deadline,
-                supports=supports, retained=retained,
+                complement,
+                path,
+                min_dimension,
+                max_clauses,
+                deadline,
+                supports=supports,
+                retained=retained,
             )
             remaining = deadline - time.monotonic()
             if remaining <= 0:
