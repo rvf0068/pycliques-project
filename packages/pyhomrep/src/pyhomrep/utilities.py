@@ -410,7 +410,7 @@ def partitions_list(n: int) -> list[list[int]]:
     p = IntegerPartition([n])
     w: list[list[int]] = []
     while list(p.args[1]) not in w:
-        w.append(list(p.args[1]))
+        w.append([int(part) for part in p.args[1]])
         p = p.next_lex()
     return w
 
@@ -517,4 +517,4 @@ def size_conjugacy_class(partition: list[int], n: int) -> int:
         part**count * math.factorial(count)
         for part, count in Counter(partition).items()
     )
-    return math.factorial(n) // centralizer
+    return int(math.factorial(n) // centralizer)

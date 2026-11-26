@@ -77,8 +77,8 @@ trace on boundaries). It is then expanded in the irreducible characters
 ### Notes
 
 * The vertices must be exactly `0, ..., n-1`; S_n acts by permuting them.
-* Computation uses exact symbolic linear algebra (SymPy), so it is intended
-  for small complexes.
+* The legacy character backend uses numerical SVD with integer rounding;
+  the signed-orbit backend below uses exact rational ranks.
 
 
 ## Exact signed-orbit homology
@@ -115,3 +115,7 @@ Only the requested skeleton is enumerated; this is not an implicit
 orbit-generation algorithm and the trivial subgroup can still be expensive.
 The existing SVD-based routines remain available. `YoungTableaux.CMNR`
 now uses cached rim-hook recursion rather than enumerating tableaux.
+
+For stabilizer calculations, `decompose_induced_character(n, weights, order)`
+uses Frobenius reciprocity. The weights are sums of the subgroup character
+over elements of each ambient symmetric-group cycle type.

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from functools import cache
 from typing import Any
 
@@ -12,12 +12,13 @@ from sympy.combinatorics import Permutation
 
 from pyhomrep.orbits import OrbitChainComplex, homology_map_rank
 from pyhomrep.utilities import partitions_list
+from pyhomrep.young import YoungTableaux
 
 
 def _partitions(n: int) -> list[tuple[int, ...]]:
     if n < 0:
         raise ValueError("n must be nonnegative")
-    return [()] if n == 0 else [tuple(p) for p in partitions_list(n)]
+    return [()] if n == 0 else [tuple(map(int, p)) for p in partitions_list(n)]
 
 
 def _generators(alpha, action):
@@ -122,4 +123,33 @@ def bouc_decomposition(n: int, k: int) -> dict[tuple[int, ...], int]:
         diagonal = sum(row >= i for i, row in enumerate(lam, 1))
         if lam == conjugate and diagonal == n - 2 * (k + 1):
             result[lam] = 1
+    return result
+
+
+def decompose_induced_character(
+    n: int, weighted_cycle_counts: Mapping[tuple[int, ...], int], subgroup_order: int
+) -> dict[tuple[int, ...], int]:
+    """Decompose an induced S_n-character using Frobenius reciprocity.
+
+    Each weight is the sum of the subgroup character values on elements
+    of the specified S_n cycle type. The input character must be integer
+    valued. The caller supplies the subgroup order, including zero weights.
+    """
+    if subgroup_order <= 0:
+        raise ValueError("Subgroup order must be positive")
+    if any(
+        sum(rho) != n or any(r <= 0 for r in rho) for rho in weighted_cycle_counts
+    ):
+        raise ValueError("Invalid cycle type")
+    result = {}
+    for lam in _partitions(n):
+        value = sum(
+            weight * YoungTableaux(list(lam), list(rho)).CMNR()
+            for rho, weight in weighted_cycle_counts.items()
+        )
+        multiplicity, remainder = divmod(value, subgroup_order)
+        if remainder or multiplicity < 0:
+            raise ValueError("Weights do not give an induced character")
+        if multiplicity:
+            result[lam] = multiplicity
     return result

@@ -61,6 +61,7 @@ from pyhomrep.utilities import (
 from pyhomrep.young import YoungTableaux
 from pyhomrep.young_subgroups import (
     bouc_decomposition,
+    decompose_induced_character,
     decompose_young_homology,
     decompose_young_homology_map,
     specht_multiplicities,
@@ -72,6 +73,7 @@ __all__ = [
     "OrbitChainComplex",
     "homology_map_rank",
     "bouc_decomposition",
+    "decompose_induced_character",
     "decompose_young_homology",
     "decompose_young_homology_map",
     "specht_multiplicities",

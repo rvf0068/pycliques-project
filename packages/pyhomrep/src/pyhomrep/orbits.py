@@ -74,7 +74,7 @@ class OrbitChainComplex:
             raise ValueError("Relative complex must be a subcomplex")
         faces = all_faces - excluded
         unseen = set(faces)
-        reps = []
+        reps: list[tuple[int, ...]] = []
         coords = {}
         for seed in sorted(faces):
             if seed not in unseen:

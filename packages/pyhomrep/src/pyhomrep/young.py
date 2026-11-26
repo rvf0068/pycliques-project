@@ -229,4 +229,6 @@ class YoungTableaux:
         """
         if sum(self.p_lambda) != sum(self.p_rho):
             return 0
-        return _rim_hook_character(tuple(self.p_lambda), tuple(self.p_rho))
+        return _rim_hook_character(
+            tuple(map(int, self.p_lambda)), tuple(map(int, self.p_rho))
+        )
