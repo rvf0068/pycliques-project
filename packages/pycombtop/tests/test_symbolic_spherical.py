@@ -1,0 +1,112 @@
+"""Integral generation by octahedral sphere cycles."""
+
+from dataclasses import replace
+
+import networkx as nx
+import pytest
+from pycombtop import (
+    symbolic_integral_morse_certificate,
+    verify_symbolic_spherical,
+)
+from pycombtop._symbolic_spherical import spherical_generation
+
+
+def _wedge_octahedra(*dimensions):
+    graph = nx.Graph()
+    offset = 1
+    for d in dimensions:
+        sphere = nx.complete_multipartite_graph(*([2] * (d + 1)))
+        graph.add_edges_from(
+            (0 if u == 0 else u + offset - 1, 0 if v == 0 else v + offset - 1)
+            for u, v in sphere.edges
+        )
+        offset += len(sphere) - 1
+    return graph
+
+
+def test_multiple_required_degrees_and_replay():
+    graph = _wedge_octahedra(2, 4, 5)
+    old = symbolic_integral_morse_certificate(graph)
+    assert old is not None
+    assert old.betti == {2: 1, 4: 1, 5: 1}
+    assert old.wedge_spheres is None
+    assert old.spherical is None
+    proof = symbolic_integral_morse_certificate(graph, max_spherical_states=10000)
+    assert proof is not None
+    assert proof.spherical is not None and proof.spherical.complete
+    assert proof.wedge_spheres == old.betti
+    assert [d.degree for d in proof.spherical.degrees] == [4, 5]
+    assert all(d.smith_factors == (1,) for d in proof.spherical.degrees)
+    assert verify_symbolic_spherical(graph, proof)
+    d = proof.spherical.degrees[0]
+    c = d.cycles[0]
+    forged = replace(c, projection=tuple(2 * x for x in c.projection))
+    bad = replace(
+        proof.spherical,
+        degrees=(replace(d, cycles=(forged,)), *proof.spherical.degrees[1:]),
+    )
+    assert not verify_symbolic_spherical(graph, replace(proof, spherical=bad))
+
+
+def test_partial_seed_replay_and_budget():
+    graph = _wedge_octahedra(2, 4, 5)
+    proof = symbolic_integral_morse_certificate(graph, max_spherical_states=10000)
+    assert proof is not None and proof.spherical is not None
+    first = tuple(c.pairs for c in proof.spherical.degrees[0].cycles)
+    partial = symbolic_integral_morse_certificate(
+        graph,
+        max_spherical_states=10000,
+        spherical_seed=first,
+        spherical_search=False,
+    )
+    assert partial is not None and partial.spherical is not None
+    assert not partial.spherical.complete and partial.wedge_spheres is None
+    assert partial.spherical.degrees[0].complete
+    assert not partial.spherical.degrees[1].complete
+    assert not verify_symbolic_spherical(graph, partial)
+    resumed = symbolic_integral_morse_certificate(
+        graph, max_spherical_states=10000, spherical_seed=first
+    )
+    assert resumed is not None and verify_symbolic_spherical(graph, resumed)
+    limited = symbolic_integral_morse_certificate(graph, max_spherical_states=1)
+    assert limited is not None and limited.spherical is not None
+    assert limited.spherical.limited and not limited.spherical.complete
+    assert limited.betti == proof.betti and limited.wedge_spheres is None
+
+
+def test_odd_index_is_not_integral_generation(monkeypatch):
+    # Synthetic projection of an index-three subgroup of Z. Full mod-2
+    # rank must never be interpreted as integral generation.
+    graph = nx.complete_multipartite_graph(*([2] * 5))
+    monkeypatch.setattr(
+        "pycombtop._symbolic_spherical._project_sphere", lambda *args: (3,)
+    )
+    proof = spherical_generation(
+        graph,
+        tuple(graph),
+        {4: [31]},
+        {},
+        {2: 1, 4: 1},
+        lambda _: None,
+        10000,
+    )
+    assert not proof.complete and not proof.limited
+    assert proof.degrees[0].lattice_rank == 1
+    assert proof.degrees[0].smith_factors == (3,)
+
+
+def test_validation_and_steenrod_compatibility():
+    graph = _wedge_octahedra(2, 4)
+    with pytest.raises(ValueError):
+        symbolic_integral_morse_certificate(graph, max_spherical_states=-1)
+    with pytest.raises(ValueError):
+        symbolic_integral_morse_certificate(
+            graph, max_spherical_states=1000, spherical_seed=(((0, 0),),)
+        )
+    graph = _wedge_octahedra(3, 5)
+    proof = symbolic_integral_morse_certificate(
+        graph, max_sq2_states=10000, max_spherical_states=10000
+    )
+    assert proof is not None and proof.sq2 is not None
+    assert proof.sq2.rank == 0 and proof.spherical is None
+    assert proof.wedge_spheres == {3: 1, 5: 1}
