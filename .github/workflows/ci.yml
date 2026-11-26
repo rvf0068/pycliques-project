@@ -40,6 +40,10 @@ jobs:
       - name: Install locked test dependencies
         run: uv sync --locked --python "$PYTHON_VERSION" --no-default-groups --group test
 
+      - name: Install optional SAT test backend
+        if: matrix.package == 'pycliques'
+        run: sudo apt-get update && sudo apt-get install -y libz3-4
+
       - name: Run Tests
         timeout-minutes: 15
         run: |
