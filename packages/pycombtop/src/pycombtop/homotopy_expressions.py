@@ -131,5 +131,10 @@ class SuspendedHopfType:
 
 
 HomotopyType = (
-    SphereType | MooreSpaceType | SurfaceType | WedgeType | ProductType | SuspendedHopfType
+    SphereType
+    | MooreSpaceType
+    | SurfaceType
+    | WedgeType
+    | ProductType
+    | SuspendedHopfType
 )

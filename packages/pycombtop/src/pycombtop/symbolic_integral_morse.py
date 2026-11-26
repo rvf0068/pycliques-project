@@ -62,7 +62,9 @@ class SymbolicIntegralMorseCertificate:
         if self.wedge_spheres is None:
             return None
         return WedgeType(
-            tuple((SphereType(d), b) for d, b in sorted(self.wedge_spheres.items()) if b)
+            tuple(
+                (SphereType(d), b) for d, b in sorted(self.wedge_spheres.items()) if b
+            )
         )
 
 

@@ -47,10 +47,7 @@ def _reduce(mask: int, basis: dict[int, int]) -> int:
 
 
 def _columns(rows: tuple[tuple[int, ...], ...], n: int) -> list[int]:
-    return [
-        sum((row[j] & 1) << i for i, row in enumerate(rows))
-        for j in range(n)
-    ]
+    return [sum((row[j] & 1) << i for i, row in enumerate(rows)) for j in range(n)]
 
 
 def _homology_basis(
@@ -94,10 +91,7 @@ def _homology_basis(
                 a |= 1 << p
         if any((a & b).bit_count() % 2 for b in up):
             raise ArithmeticError("Morse cochain is not a cocycle")
-        if any(
-            (a & c).bit_count() % 2 != (i == j)
-            for i, c in enumerate(cycles)
-        ):
+        if any((a & c).bit_count() % 2 != (i == j) for i, c in enumerate(cycles)):
             raise ArithmeticError("Morse bases are not dual")
         cocycles.append(a)
     return cycles, cocycles
