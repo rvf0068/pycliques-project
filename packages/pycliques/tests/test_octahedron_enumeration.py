@@ -43,3 +43,14 @@ def test_early_stop_and_limits():
         enumerate_induced_octahedra(graph, target_dimension=0)
     with pytest.raises(ValueError):
         enumerate_induced_octahedra(graph, target_dimension=4, max_states=0)
+
+
+def test_enumeration_resource_error_is_not_exhaustion(monkeypatch):
+    def unavailable(_):
+        raise RecursionError("simulated recursion limit")
+
+    graph = nx.complete_multipartite_graph(2, 2, 2)
+    search = enumerate_induced_octahedra(graph, target_dimension=3)
+    monkeypatch.setattr("pycliques.octahedral_nonlocal_search._bits", unavailable)
+    assert list(search) == []
+    assert search.limited and not search.exhausted
