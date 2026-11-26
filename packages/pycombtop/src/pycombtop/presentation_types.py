@@ -111,7 +111,7 @@ def _classify_reduced(presentation: CellularPresentation) -> WedgeType | None:
         relators = [word for word, support in supports if support <= block]
         if len(block) == 1:
             # Cell slides realize the Euclidean algorithm on attaching degrees.
-            degree = gcd(*(abs(sum(1 if x > 0 else -1 for x in w)) for w in relators))
+            degree = gcd(*map(len, relators))
             if not degree:
                 add(SphereType(1))
                 add(SphereType(2), len(relators))
@@ -131,9 +131,7 @@ def _classify_reduced(presentation: CellularPresentation) -> WedgeType | None:
                 # Only use exponent sums for the actual one-vertex torus.
                 if surface != SurfaceType(1) or vertices != 1:
                     continue
-                if any(
-                    any(w.count(g) != w.count(-g) for g in block) for w in extra
-                ):
+                if any(any(w.count(g) != w.count(-g) for g in block) for w in extra):
                     continue
             if surface == SurfaceType(0):
                 add(SphereType(2))
