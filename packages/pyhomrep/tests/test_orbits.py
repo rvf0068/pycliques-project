@@ -40,6 +40,7 @@ def test_homology_map():
     # A trivial S_2 action on both complexes.
     def action(g, v):
         return v
+
     result = decompose_young_homology_map(sc, tgt, 2, 1, action, action, lambda v: v)
     assert result == {"kernel": {(2,): 1}, "image": {}, "cokernel": {}}
 

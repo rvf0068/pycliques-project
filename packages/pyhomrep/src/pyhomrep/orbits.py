@@ -14,9 +14,7 @@ VertexMap = Callable[[Any], Any]
 
 
 def _sign(values: Sequence[int]) -> int:
-    return (-1) ** sum(
-        a > b for i, a in enumerate(values) for b in values[i + 1 :]
-    )
+    return (-1) ** sum(a > b for i, a in enumerate(values) for b in values[i + 1 :])
 
 
 def _rank(matrix) -> int:
@@ -71,9 +69,7 @@ class OrbitChainComplex:
         if k in self._orbits:
             return self._orbits[k]
         all_faces = self._faces(self.complex, k)
-        excluded = (
-            self._faces(self.relative, k) if self.relative is not None else set()
-        )
+        excluded = self._faces(self.relative, k) if self.relative is not None else set()
         if not excluded <= all_faces:
             raise ValueError("Relative complex must be a subcomplex")
         faces = all_faces - excluded
@@ -111,9 +107,7 @@ class OrbitChainComplex:
 
     def representatives(self, k: int) -> tuple:
         """Oriented orbit representatives expressed in original vertex labels."""
-        return tuple(
-            tuple(self.vertices[i] for i in face) for face in self._data(k)[0]
-        )
+        return tuple(tuple(self.vertices[i] for i in face) for face in self._data(k)[0])
 
     def chain_dimension(self, k: int) -> int:
         return len(self._data(k)[0])
@@ -142,9 +136,7 @@ class OrbitChainComplex:
     def betti_number(self, k: int) -> int:
         """Dimension of invariant (equivalently coinvariant) rational homology."""
         return (
-            self.chain_dimension(k)
-            - self.boundary_rank(k)
-            - self.boundary_rank(k + 1)
+            self.chain_dimension(k) - self.boundary_rank(k) - self.boundary_rank(k + 1)
         )
 
     def map_matrix(self, target: OrbitChainComplex, f: VertexMap, k: int):
@@ -171,7 +163,8 @@ class OrbitChainComplex:
             raw = tuple(image[i] for i in face)
             support = tuple(sorted(set(raw)))
             image_faces = (
-                target_faces if len(support) == len(face)
+                target_faces
+                if len(support) == len(face)
                 else target._data(len(support) - 1)[2]
             )
             if support not in image_faces:
@@ -199,7 +192,5 @@ def homology_map_rank(
     source.map_matrix(target, f, k + 1)
     d = source.boundary_matrix(k)
     b = target.boundary_matrix(k + 1)
-    block = d.row_join(SparseMatrix(d.rows, b.cols, {})).col_join(
-        matrix.row_join(b)
-    )
+    block = d.row_join(SparseMatrix(d.rows, b.cols, {})).col_join(matrix.row_join(b))
     return _rank(block) - source.boundary_rank(k) - target.boundary_rank(k + 1)

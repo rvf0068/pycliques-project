@@ -26,8 +26,7 @@ def _rim_hook_character(shape: tuple[int, ...], cycles: tuple[int, ...]) -> int:
         sign = (-1) ** sum(dest < a < b for a in beta)
         new_beta = sorted((occupied - {b}) | {dest}, reverse=True)
         new_shape = tuple(
-            a - length + i + 1 for i, a in enumerate(new_beta)
-            if a - length + i + 1 > 0
+            a - length + i + 1 for i, a in enumerate(new_beta) if a - length + i + 1 > 0
         )
         total += sign * _rim_hook_character(new_shape, cycles[1:])
     return total
