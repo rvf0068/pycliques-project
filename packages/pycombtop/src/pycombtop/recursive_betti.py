@@ -249,8 +249,7 @@ def recursive_betti_upper_bounds(
                     if value != chi:
                         raise ArithmeticError("Inconsistent Euler characteristic")
                     candidate = {
-                        d: min(rank, candidate.get(d, 0))
-                        for d, rank in best.items()
+                        d: min(rank, candidate.get(d, 0)) for d, rank in best.items()
                     }
                 chi = value
                 best = refine(candidate, chi)
