@@ -61,7 +61,7 @@ def _homology_basis(
             span[reduced.bit_length() - 1] = reduced
     boundary_rank = len(span)
     pairs: dict[int, tuple[int, int]] = {}
-    cycles = []
+    cycles: list[int] = []
     homology_pivots: dict[int, int] = {}
     for j, x in enumerate(down):
         v = 1 << j
