@@ -210,6 +210,12 @@ from .retractions import (
     verify_special_octahedron_witness,
 )
 from .stiff_retractions import StiffRetractionResult, search_proper_stiff_retraction
+from .strong_products import (
+    StrongProductSplit,
+    find_strong_product_split,
+    strong_product_factors,
+    verify_strong_product_split,
+)
 from .surfaces import (
     is_closed_surface,
     is_cycle,
@@ -363,6 +369,10 @@ def __dir__() -> list[str]:
 
 __all__ = [
     "__version__",
+    "StrongProductSplit",
+    "find_strong_product_split",
+    "strong_product_factors",
+    "verify_strong_product_split",
     "CoaffineEndomorphismResult",
     "find_coaffine_endomorphism",
     "verify_coaffine_endomorphism",

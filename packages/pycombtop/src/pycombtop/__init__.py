@@ -113,6 +113,11 @@ from .presentation_types import (
     verify_presentation_type,
     verify_two_complex_type,
 )
+from .product_types import (
+    ProductTypeCertificate,
+    product_type_certificate,
+    verify_product_type,
+)
 from .recursive_betti import RecursiveBettiBounds, recursive_betti_upper_bounds
 from .recursive_wedges import (
     RecursiveWedgeCertificate,
@@ -212,8 +217,8 @@ __all__ = [
     "SymbolicDongCertificate",
     "symbolic_dong_certificate",
     "SymbolicIntegralMorseCertificate",
-    "SymbolicSq2Certificate",
     "verify_symbolic_sq2",
+    "SymbolicSq2Certificate",
     "symbolic_integral_morse_certificate",
     "WeightedConicityCertificate",
     "find_weighted_conicity_certificate",
@@ -270,6 +275,9 @@ __all__ = [
     "SuspendedHopfType",
     "WedgeType",
     "ProductType",
+    "ProductTypeCertificate",
+    "product_type_certificate",
+    "verify_product_type",
     "ComplexTypeCertificate",
     "complex_type_certificate",
     "verify_complex_type",
