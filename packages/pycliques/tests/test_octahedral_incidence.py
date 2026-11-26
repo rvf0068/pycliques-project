@@ -304,3 +304,35 @@ def test_native_build_errors(monkeypatch, tmp_path):
     monkeypatch.setattr(native, "_cached", lambda: tmp_path / "missing")
     with pytest.raises(RuntimeError, match="Build the incidence walk"):
         native.find_incidence_native()
+
+
+def test_cached_native_discovery(executable, monkeypatch):
+    from pycliques import octahedral_incidence_native as native
+
+    monkeypatch.setattr(native, "_cached", lambda: executable)
+    assert native.find_incidence_native() == executable
+    host = cube()
+    result = pc.find_octahedral_retraction_incidence(host, max_steps=20)
+    verify(host, result)
+
+
+def test_reject_nonimplicit_host_and_bad_certificate():
+    with pytest.raises(TypeError, match="ImplicitCliqueGraph"):
+        pc.find_octahedral_retraction_incidence(nx.octahedral_graph())
+    host = cube()
+    identity = {v: v for v in host}
+    with pytest.raises(RuntimeError, match="invalid certificate"):
+        inc._found(host, ((0, 1), (2, 3), (4, 5)), identity, identity, 0, (), (), 3)
+
+
+def test_checkpoint_incorrect_coverage(monkeypatch):
+    host = cube()
+
+    def wrong_count(*args, **kwargs):
+        checkpoint = kwargs["cwd"] / "best.txt"
+        checkpoint.write_text(f"0 1 1\n0 1 {host.clique_masks[0]}\n")
+        return subprocess.CompletedProcess(args[0], 0, "", "")
+
+    monkeypatch.setattr(inc.subprocess, "run", wrong_count)
+    with pytest.raises(RuntimeError, match="Invalid incidence walk checkpoint"):
+        pc.find_octahedral_retraction_incidence(host, executable=Path("dummy"))
