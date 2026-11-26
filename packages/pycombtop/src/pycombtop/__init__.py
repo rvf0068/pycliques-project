@@ -102,9 +102,12 @@ from .morse_certificates import (
     graph_morse_certificate,
 )
 from .presentation_types import (
+    ComplexTypeCertificate,
     PresentationTypeCertificate,
+    complex_type_certificate,
     presentation_type_certificate,
     two_complex_type_certificate,
+    verify_complex_type,
     verify_presentation_type,
     verify_two_complex_type,
 )
@@ -261,6 +264,9 @@ __all__ = [
     "SurfaceType",
     "WedgeType",
     "ProductType",
+    "ComplexTypeCertificate",
+    "complex_type_certificate",
+    "verify_complex_type",
     "PresentationTypeCertificate",
     "presentation_type_certificate",
     "two_complex_type_certificate",
