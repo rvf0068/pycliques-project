@@ -234,3 +234,14 @@ def test_complex_limits_and_failed_relative_collapse():
     sphere = SimplicialComplex(range(5), facet_set=combinations(range(5), 4))
     assert complex_type_certificate(sphere) is None
     assert complex_type_certificate(triangle, max_total_letters=1) is not None
+
+
+def test_complex_presentation_budget_and_mixed_facets():
+    disk = SimplicialComplex(range(4), facet_set=[(0, 1, 2), (0, 1, 3)])
+    assert complex_type_certificate(disk, max_total_letters=1) is None
+    sc = SimplicialComplex(range(5), facet_set=[(0, 1, 2, 3), (0, 4)])
+    assert complex_type_certificate(sc, max_target_facets=3) is None
+    cert = complex_type_certificate(sc, max_target_facets=4)
+    assert cert is not None
+    assert cert.homotopy_type == WedgeType()
+    assert verify_complex_type(sc, cert)
