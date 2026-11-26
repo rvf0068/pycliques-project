@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
+from itertools import combinations
 from math import gcd
 
 import networkx as nx
@@ -23,7 +24,12 @@ from .homotopy_expressions import (
     SurfaceType,
     WedgeType,
 )
-from .simplex import SimplicialComplex
+from .indexed_relative_collapse import (
+    indexed_relative_collapse,
+    verify_indexed_relative_collapse,
+)
+from .relative_collapse import CollapseStatus
+from .simplex import Simplex, SimplicialComplex, _stable_vertex_key
 
 
 @dataclass(frozen=True)
@@ -199,5 +205,92 @@ def verify_two_complex_type(
     """Reconstruct the cellular presentation and verify its certificate."""
     try:
         return verify_presentation_type(cellular_presentation(complex_), certificate)
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+
+@dataclass(frozen=True)
+class ComplexTypeCertificate:
+    """A relative collapse followed by a certified presentation type."""
+
+    core: SimplicialComplex
+    collapse_pairs: tuple[tuple[Simplex, Simplex], ...]
+    presentation: PresentationTypeCertificate
+
+    @property
+    def homotopy_type(self) -> WedgeType:
+        return self.presentation.homotopy_type
+
+    @property
+    def verdict(self) -> str:
+        return self.presentation.verdict
+
+
+def complex_type_certificate(
+    complex_: SimplicialComplex,
+    *,
+    max_target_facets: int = 25_000,
+    max_bad_faces: int = 25_000,
+    max_total_letters: int = 1_000_000,
+) -> ComplexTypeCertificate | None:
+    """Try a bounded collapse to dimension two, then recognize its CW type.
+
+    For each maximal simplex choose an apex and retain all its apex
+    triangles and their faces. The union includes the whole 1-skeleton.
+    When distinct facets intersect in at most an edge, this target always
+    admits a relative collapse. In general, the indexed relative-collapse
+    verifier must establish the claimed collapse, or the search returns None.
+    """
+    if type(max_target_facets) is not int or max_target_facets < 1:
+        raise ValueError("max_target_facets must be positive")
+    if type(max_bad_faces) is not int or max_bad_faces < 0:
+        raise ValueError("max_bad_faces must be nonnegative")
+    pairs: tuple[tuple[Simplex, Simplex], ...] = ()
+    core = complex_
+    if complex_.dimension() > 2:
+        facets: set[Simplex] = set()
+        for face in complex_.facet_set:
+            if len(face) <= 3:
+                facets.add(face)
+            else:
+                apex = min(face, key=_stable_vertex_key)
+                for u, v in combinations(face - {apex}, 2):
+                    facets.add(Simplex((apex, u, v)))
+                    if len(facets) > max_target_facets:
+                        return None
+            if len(facets) > max_target_facets:
+                return None
+        core = SimplicialComplex(complex_.vertex_set, facet_set=facets)
+        result = indexed_relative_collapse(complex_, core, max_bad_faces=max_bad_faces)
+        if result.status is not CollapseStatus.PROVED:
+            return None
+        pairs = result.pairs
+    if len(core.facet_set) > max_target_facets:
+        return None
+    presentation = two_complex_type_certificate(
+        core, max_total_letters=max_total_letters
+    )
+    if presentation is None:
+        return None
+    return ComplexTypeCertificate(core, pairs, presentation)
+
+
+def verify_complex_type(
+    complex_: SimplicialComplex,
+    certificate: ComplexTypeCertificate,
+    *,
+    max_bad_faces: int = 25_000,
+) -> bool:
+    """Verify both the relative collapse and the cellular recognition."""
+    try:
+        return (
+            verify_indexed_relative_collapse(
+                complex_,
+                certificate.core,
+                certificate.collapse_pairs,
+                max_bad_faces=max_bad_faces,
+            )
+            and verify_two_complex_type(certificate.core, certificate.presentation)
+        )
     except (ValueError, TypeError, AttributeError):
         return False
