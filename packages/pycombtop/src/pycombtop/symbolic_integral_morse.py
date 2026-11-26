@@ -489,6 +489,7 @@ def verify_symbolic_sq2(
     max_critical: int = 128,
     max_gradient_states: int = 200_000,
     max_sq2_states: int = 2_000_000,
+    max_spherical_states: int = 2_000_000,
 ) -> bool:
     """Replay a square certificate in its recorded order with bounded resources."""
     try:
@@ -505,7 +506,21 @@ def verify_symbolic_sq2(
             steenrod_degree=certificate.sq2.degree,
         )
         if replay is not None and certificate.spherical is not None:
-            # This verifier checks the square, not an additional spherical proof.
+            if certificate.spherical.complete:
+                if not verify_symbolic_spherical(
+                    graph,
+                    certificate,
+                    max_vertices=max_vertices,
+                    max_nodes=max_nodes,
+                    max_critical=max_critical,
+                    max_gradient_states=max_gradient_states,
+                    max_spherical_states=max_spherical_states,
+                ):
+                    return False
+            elif certificate.wedge_spheres != replay.wedge_spheres:
+                return False
+            if certificate.connectivity_order != connected_link_order(graph):
+                return False
             certificate = replace(
                 certificate,
                 spherical=None,
@@ -537,7 +552,11 @@ def verify_symbolic_spherical(
         proof = certificate.spherical
         if proof is None or not proof.complete:
             return False
-        if certificate.wedge_spheres != certificate.betti or certificate.torsion:
+        if (
+            certificate.wedge_spheres != certificate.betti
+            or certificate.torsion
+            or certificate.sq2_homotopy_type is not None
+        ):
             return False
         replay = symbolic_integral_morse_certificate(
             graph,

@@ -6,8 +6,10 @@ import networkx as nx
 import pytest
 from pycliques import CliqueSequence
 from pycombtop import (
+    WedgeType,
     symbolic_integral_morse_certificate,
     verify_symbolic_spherical,
+    verify_symbolic_sq2,
 )
 from pycombtop._symbolic_spherical import spherical_generation
 
@@ -126,3 +128,20 @@ def test_cubic13_first_iterate():
     assert proof.betti == {4: 5, 7: 1}
     assert proof.wedge_spheres == proof.betti
     assert verify_symbolic_spherical(graph, proof)
+
+
+def test_combined_square_and_spherical_verifiers():
+    graph = _wedge_octahedra(2, 4)
+    proof = symbolic_integral_morse_certificate(
+        graph, steenrod_degree=2, max_sq2_states=10000, max_spherical_states=10000
+    )
+    assert proof is not None
+    assert proof.sq2 is not None and proof.sq2.rank == 0
+    assert proof.spherical is not None and proof.spherical.complete
+    assert verify_symbolic_sq2(graph, proof)
+    assert verify_symbolic_spherical(graph, proof)
+    forged = replace(proof, wedge_spheres={4: 1})
+    assert not verify_symbolic_sq2(graph, forged)
+    assert not verify_symbolic_spherical(graph, forged)
+    forged = replace(proof, sq2_homotopy_type=WedgeType())
+    assert not verify_symbolic_spherical(graph, forged)
