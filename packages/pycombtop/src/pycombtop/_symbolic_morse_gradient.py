@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from functools import lru_cache
 
 from sympy import ZZ, Matrix
@@ -13,14 +13,8 @@ class _MorseLimit(Exception):
     """The gradient recursion exceeded a resource budget."""
 
 
-def morse_boundaries(
-    diagram, roots: Sequence[int], faces: dict[int, list[int]], max_states: int
-):
-    """Return (integral boundaries, ranks, torsion factors, visited states).
-
-    No original simplices are enumerated. A face's matching pivot is the
-    first stage at which it leaves the descending ZDD face family.
-    """
+def matching_pivot(diagram, roots: Sequence[int]) -> Callable[[int], int | None]:
+    """Return a bounded, per-matching pivot lookup shared by gradient passes."""
     n = len(roots) - 1
 
     @lru_cache(maxsize=65_536)
@@ -48,6 +42,26 @@ def morse_boundaries(
             else:
                 hi = middle
         return lo
+
+    return matched_pivot
+
+
+def morse_boundaries(
+    diagram,
+    roots: Sequence[int],
+    faces: dict[int, list[int]],
+    max_states: int,
+    *,
+    pivot_lookup: Callable[[int], int | None] | None = None,
+):
+    """Return (integral boundaries, ranks, torsion factors, visited states).
+
+    No original simplices are enumerated. Reuse a supplied pivot lookup
+    across subsequent cohomology calculations on the same matching.
+    """
+    matched_pivot = (
+        pivot_lookup if pivot_lookup is not None else matching_pivot(diagram, roots)
+    )
 
     boundaries: dict[int, tuple[tuple[int, ...], ...]] = {}
     ranks: dict[int, int] = {}

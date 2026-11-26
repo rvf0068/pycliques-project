@@ -4,6 +4,7 @@ pycombtop: Combinatorial topology and simplicial complexes.
 
 # Use relative imports to pull from your complex.py module
 # fundamental_group
+from ._symbolic_steenrod import SymbolicSq2Certificate
 from .closed_trace_contractibility import (
     ClosedTraceResult,
     check_closed_trace_contractibility,
@@ -58,6 +59,7 @@ from .homotopy_expressions import (
     ProductType,
     SphereType,
     SurfaceType,
+    SuspendedHopfType,
     WedgeType,
 )
 from .homotopy_results import BettiProfile, HomotopyKind
@@ -175,6 +177,7 @@ from .symbolic_dong import SymbolicDongCertificate, symbolic_dong_certificate
 from .symbolic_integral_morse import (
     SymbolicIntegralMorseCertificate,
     symbolic_integral_morse_certificate,
+    verify_symbolic_sq2,
 )
 from .weighted_conicity import (
     WeightedConicityCertificate,
@@ -214,6 +217,8 @@ __all__ = [
     "SymbolicDongCertificate",
     "symbolic_dong_certificate",
     "SymbolicIntegralMorseCertificate",
+    "verify_symbolic_sq2",
+    "SymbolicSq2Certificate",
     "symbolic_integral_morse_certificate",
     "WeightedConicityCertificate",
     "find_weighted_conicity_certificate",
@@ -267,6 +272,7 @@ __all__ = [
     "SphereType",
     "MooreSpaceType",
     "SurfaceType",
+    "SuspendedHopfType",
     "WedgeType",
     "ProductType",
     "ProductTypeCertificate",

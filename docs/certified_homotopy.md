@@ -853,3 +853,78 @@ is inconclusive, including for graphs with true twins. Explicit
 coordinates can be verified even for nonthin graphs with
 `pycliques.verify_strong_product_split`. The new API is opt-in:
 the legacy sphere-wedge verdict and census format are unchanged.
+
+
+## Symbolic Steenrod squares and suspended Hopf attachments
+
+The symbolic integral Morse computation can optionally evaluate
+\(\mathrm{Sq}^2:H^d(-;\mathbb F_2)\to H^{d+2}(-;\mathbb F_2)\) using
+the same matching, its stage roots and the shared pivot cache. It computes
+a dual Morse cohomology basis in degree \(d\) and a Morse homology basis
+in degree \(d+2\). Mod-2 gradient projection evaluates source cocycles
+only where required, and reverse gradient paths lift the target cycles.
+The algorithm checks that the lifted chains have zero boundary, contain
+only critical or downward-matched faces, and have their prescribed
+critical coefficients. It then evaluates the ordered cup-\((d-2)\)
+formula on the union of their supports. It does not enumerate the full
+face family or assemble full simplicial boundary matrices.
+
+For example:
+
+```python
+from pycombtop import (
+    symbolic_integral_morse_certificate,
+    verify_symbolic_sq2,
+)
+
+proof = symbolic_integral_morse_certificate(
+    G, max_critical=128, max_sq2_states=2_000_000
+)
+if proof is not None and proof.sq2 is not None:
+    print(proof.sq2.rank, proof.sq2.lifted_faces)
+    assert verify_symbolic_sq2(G, proof)
+    if proof.homotopy_type is not None:
+        print(proof.homotopy_type.to_latex())
+```
+
+The direct certificate API leaves the square computation disabled by
+default. A positive budget automatically attempts the operation when
+the stable-range recognition hypotheses hold. Specify
+`steenrod_degree=d` as well to compute the square in another degree
+\(d\ge2\), even in the presence of torsion, without applying the
+stable-range classification theorem there. The square has its own
+bounded work counter (cycle lifting, verification, projection and cup
+terms); exceeding it retains the exact integral certificate with
+`sq2=None` and `sq2_limited=True`. The matrix rows are bitsets indexed
+by target homology generators and columns by dual source generators.
+The verifier repeats the computation in the recorded vertex order;
+larger original resource caps must also be supplied on replay.
+
+### Stable-range classification
+
+Suppose a finite CW complex is simply connected, has torsion-free
+reduced integral homology, and its nonzero homology is supported in
+degrees \(d,d+1,d+2\), with \(d\ge3\). The relative Hurewicz theorem
+gives a model with a wedge of \(d\)- and \((d+1)\)-spheres and
+\((d+2)\)-cells attached. The integral attaching degrees vanish.
+The remaining attaching classes are in
+\(\pi_{d+1}(\bigvee S^d)\cong(\mathbb Z/2)^a\), with no Whitehead
+cross terms in this range. Their matrix is detected by the Steenrod
+square. Row and column basis changes reduce it to rank-normal form.
+For rank \(r\), the type is a wedge with \(a-r\) spheres of dimension
+\(d\), \(b\) spheres of dimension \(d+1\), \(c-r\) spheres of dimension
+\(d+2\), and \(r\) copies of
+\(\Sigma^{d-2}\mathbb{CP}^2\). A connected-link order is the sufficient
+simple-connectivity witness used here.
+
+The composable type API represents each of the last summands as
+`SuspendedHopfType(d)`. This extends the structured types introduced
+for cellular presentations without changing that recognition algorithm.
+Only a rank-zero proof is promoted to a legacy sphere-wedge
+`HomotopyVerdict`. A nonzero square in this range is reported through
+the symbolic certificate's structured `homotopy_type`, never as a
+sphere wedge. No such classification is made from a square alone when
+the integral-homology or connectivity hypotheses fail.
+
+The cup-i formula follows A. M. Medina-Mardones, *New formulas for
+cup-i products and fast computation of Steenrod squares* (2023).
