@@ -17,8 +17,15 @@ import networkx as nx
 from sympy import ZZ, Matrix
 from sympy.matrices.normalforms import smith_normal_form
 
-from ._symbolic_morse_gradient import _MorseLimit, morse_boundaries
+from ._symbolic_morse_gradient import _MorseLimit, matching_pivot, morse_boundaries
+from ._symbolic_steenrod import SymbolicSq2Certificate, compute_sq2
 from .fundamental_group import connected_link_order
+from .homotopy_expressions import (
+    HomotopyType,
+    SphereType,
+    SuspendedHopfType,
+    WedgeType,
+)
 from .simplex import _stable_vertex_key
 from .symbolic_dong import _ZDD, _DiagramLimit
 
@@ -42,6 +49,37 @@ class SymbolicIntegralMorseCertificate:
     gradient_states: int
     critical_masks: tuple[int, ...]
     connectivity_order: tuple[Hashable, ...] | None = None
+    vertex_order: tuple[Hashable, ...] = ()
+    sq2: SymbolicSq2Certificate | None = None
+    sq2_limited: bool = False
+    sq2_homotopy_type: WedgeType | None = None
+
+    @property
+    def homotopy_type(self) -> WedgeType | None:
+        """A certified structured type, never a type inferred from Betti alone."""
+        if self.sq2_homotopy_type is not None:
+            return self.sq2_homotopy_type
+        if self.wedge_spheres is None:
+            return None
+        return WedgeType(
+            tuple((SphereType(d), b) for d, b in sorted(self.wedge_spheres.items()) if b)
+        )
+
+
+def _sq2_type(
+    betti: dict[int, int], square: SymbolicSq2Certificate
+) -> WedgeType:
+    """Assemble the type in the simply connected torsion-free stable range."""
+    d, r = square.degree, square.rank
+    counts = dict(betti)
+    counts[d] -= r
+    counts[d + 2] -= r
+    terms: list[tuple[HomotopyType, int]] = [
+        (SphereType(k), n) for k, n in sorted(counts.items()) if n
+    ]
+    if r:
+        terms.append((SuspendedHopfType(d), r))
+    return WedgeType(tuple(terms))
 
 
 def _wedge_after_01_cancellation(
@@ -211,6 +249,8 @@ def symbolic_integral_morse_certificate(
     max_nodes: int = 250_000,
     max_critical: int = 64,
     max_gradient_states: int = 200_000,
+    max_sq2_states: int = 0,
+    steenrod_degree: int | None = None,
 ) -> SymbolicIntegralMorseCertificate | None:
     """Compute an exact integral Morse complex without listing its faces.
 
@@ -229,9 +269,24 @@ def symbolic_integral_morse_certificate(
     verified connected-link order, also proves a wedge by relative
     Hurewicz and Whitehead. Unsupported patterns give exact homology
     but no wedge.
+
+    Set max_sq2_states positive to attempt symbolic Sq^2 on torsion-free
+    homology spanning degrees d through d+2, d>=3, with a connected-link
+    order. The rank determines the number of suspended Hopf summands.
+    An explicit steenrod_degree >=2 also computes the operation outside
+    this range, without claiming a type there. A square limit retains
+    the integral certificate and sets sq2_limited, never a zero matrix.
     """
     if min(max_nodes, max_critical, max_gradient_states) < 1 or max_vertices < 0:
         raise ValueError("resource limits must be positive; max_vertices >= 0")
+    if type(max_sq2_states) is not int or max_sq2_states < 0:
+        raise ValueError("max_sq2_states must be a nonnegative integer")
+    if steenrod_degree is not None and (
+        type(steenrod_degree) is not int or steenrod_degree < 2 or not max_sq2_states
+    ):
+        raise ValueError(
+            "steenrod_degree requires degree >=2 and a positive square budget"
+        )
     n = len(graph)
     if n > max_vertices:
         return None
@@ -272,8 +327,9 @@ def symbolic_integral_morse_certificate(
         for mask in masks:
             faces[mask.bit_count() - 1].append(mask)
         critical = dict(Counter(mask.bit_count() - 1 for mask in masks))
+        pivot_lookup = matching_pivot(diagram, roots)
         boundaries, ranks, torsion, states = morse_boundaries(
-            diagram, roots, faces, max_gradient_states
+            diagram, roots, faces, max_gradient_states, pivot_lookup=pivot_lookup
         )
         # An independent chain-complex consistency check: d^2 must vanish.
         for degree in boundaries:
@@ -313,6 +369,45 @@ def symbolic_integral_morse_certificate(
                 connectivity_order = connected_link_order(graph)
                 if connectivity_order is not None:
                     wedge = {d: b for d, b in betti.items() if b}
+        square = None
+        square_limited = False
+        square_type = None
+        support = sorted(d for d, rank in betti.items() if rank)
+        in_range = (
+            not torsion
+            and bool(support)
+            and support[0] >= 3
+            and support[-1] - support[0] == 2
+        )
+        degree = steenrod_degree
+        if max_sq2_states and in_range and (degree is None or degree == support[0]):
+            connectivity_order = connected_link_order(graph)
+            if connectivity_order is not None:
+                degree = support[0]
+        if degree is not None and max_sq2_states:
+            try:
+                square = compute_sq2(
+                    faces, boundaries, pivot_lookup, degree, max_sq2_states
+                )
+            except (_MorseLimit, MemoryError, RecursionError):
+                square_limited = True
+            if (
+                square is not None
+                and in_range
+                and degree == support[0]
+                and connectivity_order is not None
+            ):
+                if (square.source_rank, square.target_rank) != (
+                    betti[degree],
+                    betti[degree + 2],
+                ):
+                    raise ArithmeticError("mod-2 and integral homology disagree")
+                square_type = _sq2_type(betti, square)
+                if square.rank == 0:
+                    wedge = {d: b for d, b in betti.items() if b}
+                else:
+                    # Never publish a non-spherical type as a sphere wedge.
+                    wedge = None
         return SymbolicIntegralMorseCertificate(
             critical=critical,
             boundaries=boundaries,
@@ -324,6 +419,10 @@ def symbolic_integral_morse_certificate(
             gradient_states=states,
             critical_masks=masks,
             connectivity_order=connectivity_order,
+            vertex_order=tuple(vertices),
+            sq2=square,
+            sq2_limited=square_limited,
+            sq2_homotopy_type=square_type,
         )
     except (MemoryError, RecursionError, _DiagramLimit, _MorseLimit):
         return None
@@ -335,3 +434,32 @@ def symbolic_integral_morse_certificate(
             diagram.difference.cache_clear()
             diagram.pivot.cache_clear()
             diagram.face_size_counts.cache_clear()
+
+
+def verify_symbolic_sq2(
+    graph: nx.Graph,
+    certificate: SymbolicIntegralMorseCertificate,
+    *,
+    max_vertices: int = 80,
+    max_nodes: int = 250_000,
+    max_critical: int = 128,
+    max_gradient_states: int = 200_000,
+    max_sq2_states: int = 2_000_000,
+) -> bool:
+    """Replay a square certificate in its recorded order with bounded resources."""
+    try:
+        if certificate.sq2 is None:
+            return False
+        replay = symbolic_integral_morse_certificate(
+            graph,
+            vertex_order=certificate.vertex_order,
+            max_vertices=max_vertices,
+            max_nodes=max_nodes,
+            max_critical=max_critical,
+            max_gradient_states=max_gradient_states,
+            max_sq2_states=max_sq2_states,
+            steenrod_degree=certificate.sq2.degree,
+        )
+        return replay == certificate
+    except (ValueError, TypeError, AttributeError, ArithmeticError):
+        return False
