@@ -9,7 +9,7 @@ can certify clique divergence.
 from __future__ import annotations
 
 import random
-from collections.abc import Hashable, Sequence
+from collections.abc import Hashable, Iterator, Sequence
 from dataclasses import dataclass
 from enum import Enum
 
@@ -205,3 +205,83 @@ def find_induced_octahedron_amplified(
         best_dimension,
         best_common,
     )
+
+
+class InducedOctahedronEnumeration:
+    """One-shot bounded enumeration of induced octahedra of a fixed dimension.
+
+    Exhaustion is certified only after consuming the iterator to completion
+    and checking exhausted. Stopping early or reaching max_states is not
+    evidence of nonexistence. Each matching is emitted exactly once.
+    """
+
+    def __init__(
+        self, graph: nx.Graph, target_dimension: int, max_states: int
+    ) -> None:
+        if not is_simple_graph(graph):
+            raise ValueError("require a simple undirected graph")
+        if type(target_dimension) is not int or target_dimension < 1:
+            raise ValueError("target_dimension must be a positive integer")
+        if type(max_states) is not int or max_states < 1:
+            raise ValueError("max_states must be a positive integer")
+        self.states = 0
+        self.limited = False
+        self.exhausted = False
+        nodes = tuple(graph)
+        index = {v: i for i, v in enumerate(nodes)}
+        full = (1 << len(nodes)) - 1
+        nonedges = [
+            full ^ ((1 << i) | sum(1 << index[w] for w in graph[v]))
+            for i, v in enumerate(nodes)
+        ]
+
+        def visit(
+            remaining: int, pairs: tuple[tuple[int, int], ...]
+        ) -> Iterator[tuple[tuple[Hashable, Hashable], ...]]:
+            if self.states >= max_states:
+                self.limited = True
+                return
+            self.states += 1
+            need = target_dimension - len(pairs)
+            if not need:
+                yield tuple((nodes[u], nodes[v]) for u, v in pairs)
+                return
+            if remaining.bit_count() < 2 * need:
+                return
+            degrees = {
+                v: (nonedges[v] & remaining).bit_count() for v in _bits(remaining)
+            }
+            for v, d in degrees.items():
+                if not d:
+                    remaining ^= 1 << v
+            if remaining.bit_count() < 2 * need:
+                return
+            u = min(_bits(remaining), key=lambda v: (degrees[v], v))
+            others = remaining ^ (1 << u)
+            # Every induced matching either contains exactly one edge
+            # incident with u, or avoids u. Pair branches come first.
+            for v in _bits(nonedges[u] & others):
+                allowed = others & ~(nonedges[u] | nonedges[v] | (1 << v))
+                yield from visit(allowed, (*pairs, (u, v)))
+                if self.limited:
+                    return
+            yield from visit(others, pairs)
+
+        def run() -> Iterator[tuple[tuple[Hashable, Hashable], ...]]:
+            yield from visit(full, ())
+            self.exhausted = not self.limited
+
+        self._iterator = run()
+
+    def __iter__(self) -> InducedOctahedronEnumeration:
+        return self
+
+    def __next__(self) -> tuple[tuple[Hashable, Hashable], ...]:
+        return next(self._iterator)
+
+
+def enumerate_induced_octahedra(
+    graph: nx.Graph, *, target_dimension: int, max_states: int = 500_000
+) -> InducedOctahedronEnumeration:
+    """Enumerate fixed-size induced matchings in the complement, lazily."""
+    return InducedOctahedronEnumeration(graph, target_dimension, max_states)
