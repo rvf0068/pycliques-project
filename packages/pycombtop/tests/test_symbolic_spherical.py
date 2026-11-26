@@ -4,6 +4,7 @@ from dataclasses import replace
 
 import networkx as nx
 import pytest
+from pycliques import CliqueSequence
 from pycombtop import (
     symbolic_integral_morse_certificate,
     verify_symbolic_spherical,
@@ -110,3 +111,18 @@ def test_validation_and_steenrod_compatibility():
     assert proof is not None and proof.sq2 is not None
     assert proof.sq2.rank == 0 and proof.spherical is None
     assert proof.wedge_spheres == {3: 1, 5: 1}
+
+
+def test_cubic13_first_iterate():
+    cubic = nx.from_graph6_bytes(b"M}KGGGA?gA?H?I?D_")
+    graph = CliqueSequence(
+        nx.complement(cubic), bound=1000, relabel=True, pare_initial=True
+    )[1]
+    assert graph is not None and len(graph) == 38
+    proof = symbolic_integral_morse_certificate(
+        graph, max_critical=128, max_spherical_states=500_000
+    )
+    assert proof is not None and proof.spherical is not None
+    assert proof.betti == {4: 5, 7: 1}
+    assert proof.wedge_spheres == proof.betti
+    assert verify_symbolic_spherical(graph, proof)
