@@ -17,16 +17,15 @@ from pycliques.strong_products import (
 )
 
 from .homotopy_expressions import HomotopyType, ProductType, SphereType, WedgeType
-from .homotopy_type import (
-    _graph_exceeds_simplex_budget,
-    homotopy_type_with_verdict,
-)
+from .homotopy_type import _graph_exceeds_simplex_budget
+from .morse_certificates import facet_morse_certificate
 from .presentation_types import (
     ComplexTypeCertificate,
     complex_type_certificate,
     verify_complex_type,
 )
-from .simplex import clique_complex
+from .simplex import SimplicialComplex, clique_complex
+from .wedge_certificates import certified_flag_wedge
 
 
 @dataclass(frozen=True)
@@ -53,8 +52,8 @@ class ProductTypeCertificate:
         return r"\(" + self.homotopy_type.to_latex() + r"\)"
 
 
-# A WedgeType leaf is a sphere-wedge verdict, replayed by the existing
-# classifier; a ComplexTypeCertificate leaf is a cellular certificate.
+# A WedgeType leaf is a bounded structural or facet-Morse verdict;
+# a ComplexTypeCertificate leaf retains a cellular certificate.
 FactorCertificate = WedgeType | ComplexTypeCertificate | ProductTypeCertificate
 
 
@@ -71,14 +70,13 @@ def _factor_type(certificate: FactorCertificate) -> HomotopyType:
     return wedge
 
 
-def _sphere_wedge(graph: nx.Graph, max_simplices: int) -> WedgeType | None:
-    verdict = homotopy_type_with_verdict(graph, max_simplices=max_simplices)
-    wedge = verdict.proved_wedge
-    if wedge is None:
-        return None
-    return WedgeType(
-        tuple((SphereType(d), n) for d, n in sorted(wedge.spheres.items()) if n > 0)
-    )
+def _sphere_wedge(spheres: dict[int, int]) -> WedgeType:
+    return WedgeType(tuple((SphereType(d), n) for d, n in sorted(spheres.items()) if n))
+
+
+def _facet_wedge(sc: SimplicialComplex, max_simplices: int) -> WedgeType | None:
+    proof = facet_morse_certificate(sc.facet_set, max_faces=min(12000, max_simplices))
+    return None if proof is None else _sphere_wedge(proof.spheres)
 
 
 def _recognize_factor(
@@ -87,13 +85,17 @@ def _recognize_factor(
     product = _recognize_product(graph, max_simplices, max_partitions)
     if product is not None:
         return product
-    # Reuse the legacy classifier, including its existing Morse methods.
-    wedge = _sphere_wedge(graph, max_simplices)
-    if wedge is not None:
-        return wedge
+    # Avoid the full legacy cascade (including recursive shedding search).
     if _graph_exceeds_simplex_budget(graph, max_simplices):
         return None
-    return complex_type_certificate(clique_complex(graph))
+    spheres = certified_flag_wedge(graph)
+    if spheres is not None:
+        return _sphere_wedge(spheres)
+    sc = clique_complex(graph)
+    cellular = complex_type_certificate(sc)
+    if cellular is not None:
+        return cellular
+    return _facet_wedge(sc, max_simplices)
 
 
 def _recognize_product(
@@ -141,12 +143,15 @@ def _verify_factor(
 ) -> bool:
     if isinstance(certificate, ProductTypeCertificate):
         return _verify_product(graph, certificate, max_simplices)
+    if _graph_exceeds_simplex_budget(graph, max_simplices):
+        return False
     if isinstance(certificate, WedgeType):
-        return _sphere_wedge(graph, max_simplices) == certificate
+        spheres = certified_flag_wedge(graph)
+        if spheres is not None:
+            return _sphere_wedge(spheres) == certificate
+        return _facet_wedge(clique_complex(graph), max_simplices) == certificate
     if isinstance(certificate, ComplexTypeCertificate):
-        return not _graph_exceeds_simplex_budget(
-            graph, max_simplices
-        ) and verify_complex_type(clique_complex(graph), certificate)
+        return verify_complex_type(clique_complex(graph), certificate)
     return False
 
 
@@ -167,10 +172,10 @@ def verify_product_type(
 ) -> bool:
     """Verify product coordinates and replay the factor homotopy proofs.
 
-    Cellular leaves use the explicit certificate verifier. Legacy sphere
-    leaves rerun the existing exact classifier and compare the proved wedge;
-    no Betti-only or limited result is accepted. The product search is not
-    rerun. A malformed or unrecognized certificate is rejected.
+    Cellular leaves use the explicit certificate verifier. Sphere leaves
+    rerun only the bounded structural or facet-Morse recognizer and compare
+    the proved wedge; no Betti-only or limited result is accepted. The product
+    search is not rerun. A malformed or unrecognized certificate is rejected.
     """
     if type(max_simplices) is not int or max_simplices < 1:
         raise ValueError("max_simplices must be positive")
