@@ -109,7 +109,7 @@ def spherical_generation(
     """
     states = candidates = 0
     limited = False
-    degrees = []
+    degrees: list[SphericalDegreeCertificate] = []
     index = {v: i for i, v in enumerate(vertices)}
     # Keep supplied seeds bounded even for arbitrary lazy iterables.
     supplied = tuple(islice(seed, max_states + 1))
@@ -129,8 +129,8 @@ def spherical_generation(
         lower = faces[degree]
         down = _boundary(boundaries, faces, degree)
         up = _boundary(boundaries, faces, degree + 1)
-        target_rank = len(lower) - down.rank()
         lattice = hermite_normal_form(up)
+        target_rank = lattice.cols + betti[degree]
         selected: list[SphericalCycle] = []
         pending: list[SphericalCycle] = []
         project = signed_projector(lower, pivot, charge)
@@ -212,7 +212,7 @@ def spherical_generation(
             )
         degrees.append(
             SphericalDegreeCertificate(
-                degree, betti[degree], tuple(selected), lattice.cols, factors, complete
+                degree, betti[degree], tuple(selected), int(lattice.cols), factors, complete
             )
         )
         if limited:

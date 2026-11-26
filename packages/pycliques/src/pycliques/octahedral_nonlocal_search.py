@@ -268,7 +268,10 @@ class InducedOctahedronEnumeration:
             yield from visit(others, pairs)
 
         def run() -> Iterator[tuple[tuple[Hashable, Hashable], ...]]:
-            yield from visit(full, ())
+            try:
+                yield from visit(full, ())
+            except (RecursionError, MemoryError):
+                self.limited = True
             self.exhausted = not self.limited
 
         self._iterator = run()

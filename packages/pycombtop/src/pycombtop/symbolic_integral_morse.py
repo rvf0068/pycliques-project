@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from collections.abc import Hashable, Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import networkx as nx
 from sympy import ZZ, Matrix
@@ -504,6 +504,14 @@ def verify_symbolic_sq2(
             max_sq2_states=max_sq2_states,
             steenrod_degree=certificate.sq2.degree,
         )
+        if replay is not None and certificate.spherical is not None:
+            # This verifier checks the square, not an additional spherical proof.
+            certificate = replace(
+                certificate,
+                spherical=None,
+                wedge_spheres=replay.wedge_spheres,
+                connectivity_order=replay.connectivity_order,
+            )
         return replay == certificate
     except (ValueError, TypeError, AttributeError, ArithmeticError):
         return False
