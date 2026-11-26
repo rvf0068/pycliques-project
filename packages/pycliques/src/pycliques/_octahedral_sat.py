@@ -38,7 +38,6 @@ def _write_cnf(
     deadline: float,
 ) -> list[dict[int, int]]:
     """Stream compressed CNF; return the source-to-target variable indices."""
-    n = len(complement)
     variables = clauses = 0
 
     def new() -> int:
