@@ -46,6 +46,48 @@ def matching_pivot(diagram, roots: Sequence[int]) -> Callable[[int], int | None]
     return matched_pivot
 
 
+def signed_projector(
+    lower: Sequence[int],
+    pivot_lookup: Callable[[int], int | None],
+    charge: Callable[[], None],
+):
+    """Cached integral projection to the ordered critical cells of one degree."""
+    index = {face: i for i, face in enumerate(lower)}
+    zero = (0,) * len(lower)
+    active: set[int] = set()
+
+    @lru_cache(maxsize=65_536)
+    def project(face: int) -> tuple[int, ...]:
+        charge()
+        if face in index:
+            return tuple(int(i == index[face]) for i in range(len(lower)))
+        if face in active:
+            raise ArithmeticError("cyclic Morse gradient")
+        active.add(face)
+        try:
+            pivot = pivot_lookup(face)
+            if pivot is None:
+                raise ArithmeticError("unexpected critical lower cell")
+            if face & (1 << pivot):
+                return zero  # paired with a face of dimension one less
+            coface = face | (1 << pivot)
+            incidence = -1 if (coface & ((1 << pivot) - 1)).bit_count() % 2 else 1
+            result = [0] * len(lower)
+            remaining = coface & ~(1 << pivot)
+            while remaining:
+                bit = remaining & -remaining
+                remaining ^= bit
+                sign = -1 if (coface & (bit - 1)).bit_count() % 2 else 1
+                value = project(coface ^ bit)
+                for i, c in enumerate(value):
+                    result[i] -= incidence * sign * c
+            return tuple(result)
+        finally:
+            active.remove(face)
+
+    return project
+
+
 def morse_boundaries(
     diagram,
     roots: Sequence[int],
@@ -67,45 +109,18 @@ def morse_boundaries(
     ranks: dict[int, int] = {}
     torsion: dict[int, tuple[int, ...]] = {}
     states = 0
+
+    def charge() -> None:
+        nonlocal states
+        states += 1
+        if states > max_states:
+            raise _MorseLimit
+
     for degree in sorted(faces):
         if degree <= 0 or degree - 1 not in faces:
             continue
         lower, upper = faces[degree - 1], faces[degree]
-        index = {face: i for i, face in enumerate(lower)}
-        zero = (0,) * len(lower)
-        active: set[int] = set()
-
-        @lru_cache(maxsize=65_536)
-        def project(face: int) -> tuple[int, ...]:
-            nonlocal states
-            states += 1
-            if states > max_states:
-                raise _MorseLimit
-            if face in index:
-                return tuple(int(i == index[face]) for i in range(len(lower)))
-            if face in active:
-                raise ArithmeticError("cyclic Morse gradient")
-            active.add(face)
-            try:
-                pivot = matched_pivot(face)
-                if pivot is None:
-                    raise ArithmeticError("unexpected critical lower cell")
-                if face & (1 << pivot):
-                    return zero  # paired with a face of dimension one less
-                coface = face | (1 << pivot)
-                incidence = -1 if (coface & ((1 << pivot) - 1)).bit_count() % 2 else 1
-                result = [0] * len(lower)
-                remaining = coface & ~(1 << pivot)
-                while remaining:
-                    bit = remaining & -remaining
-                    remaining ^= bit
-                    sign = -1 if (coface & (bit - 1)).bit_count() % 2 else 1
-                    value = project(coface ^ bit)
-                    for i, c in enumerate(value):
-                        result[i] -= incidence * sign * c
-                return tuple(result)
-            finally:
-                active.remove(face)
+        project = signed_projector(lower, matched_pivot, charge)
 
         columns = []
         for face in upper:
