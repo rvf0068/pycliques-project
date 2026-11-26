@@ -251,12 +251,12 @@ if TYPE_CHECKING:
         find_octahedral_retraction_coaffine,
     )
     from .octahedral_coaffine_native import build_coaffine_native
+    from .octahedral_compatibility_search import find_induced_octahedron_compatibility
     from .octahedral_incidence import (
         IncidenceOctahedronResult,
         find_octahedral_retraction_incidence,
     )
     from .octahedral_incidence_native import build_incidence_native
-    from .octahedral_compatibility_search import find_induced_octahedron_compatibility
     from .octahedral_joint_fibers import (
         PartialOctahedralFibers,
         discover_partial_octahedral_fibers,

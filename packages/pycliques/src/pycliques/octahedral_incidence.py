@@ -316,7 +316,9 @@ def find_octahedral_retraction_incidence(
 
     from ._octahedral_sat import search_sat
 
-    remaining = None if time_limit is None else time_limit - (time.monotonic() - started)
+    remaining = (
+        None if time_limit is None else time_limit - (time.monotonic() - started)
+    )
     if remaining is not None and remaining <= 0:
         return negative(RetractionSearchStatus.LIMIT_REACHED)
     position = {v: i for i, v in enumerate(host)}
