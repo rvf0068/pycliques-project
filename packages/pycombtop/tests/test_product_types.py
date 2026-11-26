@@ -114,3 +114,22 @@ def test_product_limits_and_replay():
         verify_product_type(graph, cert, max_simplices=0)
     graph.remove_edge((0, 0), (1, 1))
     assert not verify_product_type(graph, cert)
+
+
+def test_bounded_morse_factor_after_edge_subdivision():
+    # Subdivide an edge of the flag 3-sphere C5*C5. The resulting
+    # 11-vertex factor is no longer a graph join, and has nonzero H3.
+    sphere = nx.disjoint_union(nx.cycle_graph(5), nx.cycle_graph(5))
+    sphere.add_edges_from((u, v) for u in range(5) for v in range(5, 10))
+    common = set(sphere[0]) & set(sphere[5])
+    sphere.remove_edge(0, 5)
+    sphere.add_edges_from((10, u) for u in common | {0, 5})
+    assert nx.is_connected(nx.complement(sphere))
+    graph = nx.strong_product(sphere, nx.cycle_graph(4))
+    cert = product_type_certificate(graph)
+    assert cert is not None
+    assert Counter(cert.homotopy_type.factors) == {
+        SphereType(1): 1,
+        SphereType(3): 1,
+    }
+    assert verify_product_type(graph, cert)
