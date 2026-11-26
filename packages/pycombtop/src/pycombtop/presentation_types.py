@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass
 from itertools import combinations
 from math import gcd
@@ -58,16 +59,15 @@ def _polygon_surface(
 ) -> tuple[SurfaceType, int] | None:
     """Classify the surface of a paired polygon and count its vertex classes.
 
-    Each label must occur exactly twice. Gluing its two sides identifies
-    polygon corners in pairs; the resulting links are circles. The CW
-    presentation identifies all polygon vertices, adding v-1 circle summands.
+    The caller supplies a nonempty cyclically reduced word. Each label must
+    occur exactly twice. Gluing its two sides identifies polygon corners in
+    pairs; the resulting links are circles. The CW presentation identifies
+    all polygon vertices, adding v-1 circle summands.
     """
     counts = Counter(map(abs, word))
     if set(counts) != generators or any(n != 2 for n in counts.values()):
         return None
     length = len(word)
-    if not length:
-        return None
     corners = nx.utils.UnionFind(range(length))
     first: dict[int, int] = {}
     orientable = True
@@ -87,12 +87,10 @@ def _polygon_surface(
     vertices = len({corners[i] for i in range(length)})
     chi = vertices - len(generators) + 1
     genus = 2 - chi
+    # A paired polygon is a closed connected surface, so the classification
+    # theorem guarantees that the genus has the required parity and sign.
     if orientable:
-        if genus < 0 or genus % 2:
-            return None
         genus //= 2
-    elif genus < 1:
-        return None
     return SurfaceType(genus, orientable), vertices
 
 
@@ -139,9 +137,10 @@ def _classify_reduced(presentation: CellularPresentation) -> WedgeType | None:
                     continue
                 if any(any(w.count(g) != w.count(-g) for g in block) for w in extra):
                     continue
-            if surface == SurfaceType(0):
-                add(SphereType(2))
-            elif surface == SurfaceType(1, False):
+            # A cyclically reduced nonempty paired word cannot give S^2:
+            # its one-face cellulation would have a tree as its 1-skeleton,
+            # with a leaf producing cyclically adjacent inverse letters.
+            if surface == SurfaceType(1, False):
                 add(MooreSpaceType(2))
             else:
                 add(surface)
@@ -251,16 +250,19 @@ def complex_type_certificate(
     if complex_.dimension() > 2:
         facets: set[Simplex] = set()
         for face in complex_.facet_set:
+            candidates: Iterable[Simplex]
             if len(face) <= 3:
-                facets.add(face)
+                candidates = (face,)
             else:
                 apex = min(face, key=_stable_vertex_key)
-                for u, v in combinations(face - {apex}, 2):
-                    facets.add(Simplex((apex, u, v)))
-                    if len(facets) > max_target_facets:
-                        return None
-            if len(facets) > max_target_facets:
-                return None
+                candidates = (
+                    Simplex((apex, u, v))
+                    for u, v in combinations(face - {apex}, 2)
+                )
+            for candidate in candidates:
+                facets.add(candidate)
+                if len(facets) > max_target_facets:
+                    return None
         core = SimplicialComplex(complex_.vertex_set, facet_set=facets)
         result = indexed_relative_collapse(complex_, core, max_bad_faces=max_bad_faces)
         if result.status is not CollapseStatus.PROVED:
