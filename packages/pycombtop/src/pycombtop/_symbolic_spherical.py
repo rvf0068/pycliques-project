@@ -150,9 +150,7 @@ def spherical_generation(
                 return False
             normal = smith_normal_form(lattice, domain=ZZ)
             factors = tuple(
-                abs(int(normal[i, i]))
-                for i in range(min(normal.shape))
-                if normal[i, i]
+                abs(int(normal[i, i])) for i in range(min(normal.shape)) if normal[i, i]
             )
             return len(factors) == target_rank and all(x == 1 for x in factors)
 
@@ -206,9 +204,7 @@ def spherical_generation(
         if lattice.cols != target_rank:
             normal = smith_normal_form(lattice, domain=ZZ)
             factors = tuple(
-                abs(int(normal[i, i]))
-                for i in range(min(normal.shape))
-                if normal[i, i]
+                abs(int(normal[i, i])) for i in range(min(normal.shape)) if normal[i, i]
             )
         degrees.append(
             SphericalDegreeCertificate(

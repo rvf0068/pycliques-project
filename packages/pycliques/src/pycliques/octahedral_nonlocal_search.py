@@ -215,9 +215,7 @@ class InducedOctahedronEnumeration:
     evidence of nonexistence. Each matching is emitted exactly once.
     """
 
-    def __init__(
-        self, graph: nx.Graph, target_dimension: int, max_states: int
-    ) -> None:
+    def __init__(self, graph: nx.Graph, target_dimension: int, max_states: int) -> None:
         if not is_simple_graph(graph):
             raise ValueError("require a simple undirected graph")
         if type(target_dimension) is not int or target_dimension < 1:
