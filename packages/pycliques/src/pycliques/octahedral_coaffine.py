@@ -70,6 +70,8 @@ def find_octahedral_retraction_coaffine(
     time_limit: float | None = None,
     backend: str = "auto",
     value_order: str = "label",
+    sat_max_clauses: int = 4_000_000,
+    sat_memory_limit_mb: int = 2048,
 ) -> CoaffineOctahedronResult:
     """Search for a retraction onto any induced octahedron with no seed.
 
@@ -101,6 +103,16 @@ def find_octahedral_retraction_coaffine(
     normal imports. Every positive native certificate is re-verified
     independently in Python. Resource limits are always inconclusive.
 
+    backend='sat' explicitly selects the optional Linux Z3 shared-library
+    backend (sudo apt install libz3-4 on Ubuntu). It streams compressed
+    DIMACS with a clause/variable limit sat_max_clauses, runs Z3 in a
+    subprocess with a hard address-space limit sat_memory_limit_mb (MiB),
+    and interprets max_states as the SAT conflict budget. time_limit
+    includes formula construction, loading and solving. The SAT result's
+    states_explored counts solver conflicts, not recursive CSP states;
+    arc_revisions and assignments_tried are zero. SAT has its own branching
+    policy; value_order must be 'label'. No optional solver is auto-selected.
+
     >>> import networkx as nx
     >>> result = find_octahedral_retraction_coaffine(nx.octahedral_graph())
     >>> result.status is RetractionSearchStatus.FOUND
@@ -123,11 +135,20 @@ def find_octahedral_retraction_coaffine(
         raise ValueError("time_limit must be finite and strictly positive")
 
     _validate_search_order(value_order)
-    if backend not in ("auto", "python", "native"):
-        raise ValueError("backend must be 'auto', 'python', or 'native'")
+    if backend not in ("auto", "python", "native", "sat"):
+        raise ValueError("backend must be 'auto', 'python', 'native', or 'sat'")
+    if type(sat_max_clauses) is not int or sat_max_clauses < 1:
+        raise ValueError("sat_max_clauses must be a positive integer")
+    if type(sat_memory_limit_mb) is not int or not 1 <= sat_memory_limit_mb < 2**32:
+        raise ValueError("sat_memory_limit_mb must be a positive 32-bit integer")
+    if backend == "sat":
+        if value_order != "label":
+            raise ValueError("SAT backend does not support value_order='fiber'")
+        if max_states >= 2**32:
+            raise ValueError("SAT max_states must fit in an unsigned 32-bit integer")
 
     native_path = None
-    if backend != "python":
+    if backend in ("auto", "native"):
         native_path = find_coaffine_native_executable()
         if backend == "native" and native_path is None:
             raise RuntimeError(
@@ -220,13 +241,30 @@ def find_octahedral_retraction_coaffine(
         target = graph.subgraph(image)
         return all(d == 1 for _, d in nx.complement(target).degree())
 
-    result = _search_coaffine_python(
-        graph,
-        max_states=max_states,
-        time_limit=time_limit,
-        value_order=value_order,
-        accept=accept,
-    )
+    if backend == "sat":
+        from ._octahedral_sat import search_sat
+
+        result = search_sat(
+            graph,
+            min_dimension=min_dimension,
+            max_states=max_states,
+            time_limit=time_limit,
+            max_clauses=sat_max_clauses,
+            memory_limit_mb=sat_memory_limit_mb,
+        )
+        if result.endomorphism is not None and (
+            not verify_coaffine_endomorphism(graph, result.endomorphism)
+            or not accept(result.endomorphism)
+        ):
+            raise RuntimeError("SAT backend returned an invalid certificate")
+    else:
+        result = _search_coaffine_python(
+            graph,
+            max_states=max_states,
+            time_limit=time_limit,
+            value_order=value_order,
+            accept=accept,
+        )
     portable_pairs: tuple[tuple[Hashable, Hashable], ...] | None = None
     portable_projection: dict[Hashable, Hashable] | None = None
     portable_inclusion: dict[Hashable, Hashable] | None = None
