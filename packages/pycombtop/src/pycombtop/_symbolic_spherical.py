@@ -142,7 +142,7 @@ def spherical_generation(
             if pending:
                 columns = Matrix([w.projection for w in pending]).T
                 updated = hermite_normal_form(lattice.row_join(columns))
-                if updated != lattice:
+                if updated != lattice or not search:
                     selected.extend(pending)
                     lattice = updated
                 pending.clear()
@@ -177,7 +177,8 @@ def spherical_generation(
             for pairs in supplied:
                 if len(pairs) == degree + 1 and add(pairs):
                     complete = True
-                    break
+                    if search:
+                        break
             if not complete:
                 complete = flush()
             if search and not complete:
