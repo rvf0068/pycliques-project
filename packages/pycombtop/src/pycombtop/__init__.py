@@ -111,6 +111,11 @@ from .presentation_types import (
     verify_presentation_type,
     verify_two_complex_type,
 )
+from .product_types import (
+    ProductTypeCertificate,
+    product_type_certificate,
+    verify_product_type,
+)
 from .recursive_betti import RecursiveBettiBounds, recursive_betti_upper_bounds
 from .recursive_wedges import (
     RecursiveWedgeCertificate,
@@ -264,6 +269,9 @@ __all__ = [
     "SurfaceType",
     "WedgeType",
     "ProductType",
+    "ProductTypeCertificate",
+    "product_type_certificate",
+    "verify_product_type",
     "ComplexTypeCertificate",
     "complex_type_certificate",
     "verify_complex_type",
