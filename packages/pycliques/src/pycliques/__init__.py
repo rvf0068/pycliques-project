@@ -183,8 +183,10 @@ from .octahedral_boolean import (
     enumerate_maximal_intersecting_families,
 )
 from .octahedral_nonlocal_search import (
+    InducedOctahedronEnumeration,
     OctahedronSearchResult,
     OctahedronSearchStatus,
+    enumerate_induced_octahedra,
     find_induced_octahedron_amplified,
     verify_induced_octahedron,
 )
@@ -534,6 +536,8 @@ __all__ = [
     "discover_partial_octahedral_fibers",
     "BlindOctahedralRetraction",
     "find_blind_octahedral_retraction",
+    "InducedOctahedronEnumeration",
+    "enumerate_induced_octahedra",
     "OctahedronSearchResult",
     "OctahedronSearchStatus",
     "find_induced_octahedron_amplified",
