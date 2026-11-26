@@ -252,9 +252,11 @@ def find_octahedral_retraction_coaffine(
             max_clauses=sat_max_clauses,
             memory_limit_mb=sat_memory_limit_mb,
         )
-        if result.endomorphism is not None and (
-            not verify_coaffine_endomorphism(graph, result.endomorphism)
-            or not accept(result.endomorphism)
+        sat_f = result.endomorphism
+        if sat_f is not None and (
+            not verify_coaffine_endomorphism(graph, sat_f)
+            or not accept(sat_f)
+            or any(sat_f[sat_f[sat_f[v]]] != sat_f[v] for v in graph)
         ):
             raise RuntimeError("SAT backend returned an invalid certificate")
     else:

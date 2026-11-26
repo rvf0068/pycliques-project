@@ -178,10 +178,7 @@ def search_sat(
 
     labels = list(graph)
     n = len(labels)
-    if n < 2 * min_dimension:
-        return CoaffineEndomorphismResult(
-            RetractionSearchStatus.EXHAUSTED, None, 0, 0, 0
-        )
+    # The public API has already checked the minimum graph order.
     # Bound the number of domain variables before allocating the rows.
     if n * (n - 1) - 2 * graph.number_of_edges() > max_clauses:
         return limited()
