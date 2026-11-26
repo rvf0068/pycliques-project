@@ -256,8 +256,7 @@ def complex_type_certificate(
             else:
                 apex = min(face, key=_stable_vertex_key)
                 candidates = (
-                    Simplex((apex, u, v))
-                    for u, v in combinations(face - {apex}, 2)
+                    Simplex((apex, u, v)) for u, v in combinations(face - {apex}, 2)
                 )
             for candidate in candidates:
                 facets.add(candidate)
