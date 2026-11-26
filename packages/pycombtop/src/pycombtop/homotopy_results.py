@@ -35,6 +35,13 @@ class Theorem:
         "and all remaining cells have a common dimension; thus the Morse "
         "complex is a wedge of spheres [Dong2003, Forman1998]."
     )
+    SYMBOLIC_SQ2_WEDGE = (
+        "Integral symbolic Morse homology is torsion-free and supported in "
+        "three consecutive degrees starting at d>=3. Simple connectivity "
+        "and relative Hurewicz give a model with cells in those degrees. "
+        "The vanishing Steenrod square Sq^2 excludes suspended Hopf "
+        "attachments, so homological Whitehead certifies a sphere wedge."
+    )
     SYMBOLIC_INTEGRAL_MORSE_HUREWICZ = (
         "Exact integral symbolic Morse boundaries give torsion-free reduced "
         "homology supported in at most two consecutive degrees >=2. "

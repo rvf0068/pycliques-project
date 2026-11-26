@@ -4,6 +4,7 @@ pycombtop: Combinatorial topology and simplicial complexes.
 
 # Use relative imports to pull from your complex.py module
 # fundamental_group
+from ._symbolic_steenrod import SymbolicSq2Certificate
 from .closed_trace_contractibility import (
     ClosedTraceResult,
     check_closed_trace_contractibility,
@@ -35,17 +36,32 @@ from .flag_edge_star import (
     vertex_star_wedge_certificate,
 )
 from .fundamental_group import (
+    CellularPresentation,
     FundamentalRecord,
+    PresentationElimination,
+    PresentationReduction,
+    cellular_presentation,
     connected_link_order,
     covering_graph,
     first_homology_rank,
     fundamental_group,
     fundamental_group_as_permutation_group,
+    reduce_cellular_presentation,
     verify_connected_link_order,
+    verify_presentation_reduction,
 )
 from .hom_complex import graph_homomorphisms, hom_graph
 
 # homotopy_type
+from .homotopy_expressions import (
+    HomotopyType,
+    MooreSpaceType,
+    ProductType,
+    SphereType,
+    SurfaceType,
+    SuspendedHopfType,
+    WedgeType,
+)
 from .homotopy_results import BettiProfile, HomotopyKind
 from .homotopy_type import (
     HomotopyVerdict,
@@ -86,6 +102,21 @@ from .morse_certificates import (
     MorseCertificate,
     facet_morse_certificate,
     graph_morse_certificate,
+)
+from .presentation_types import (
+    ComplexTypeCertificate,
+    PresentationTypeCertificate,
+    complex_type_certificate,
+    presentation_type_certificate,
+    two_complex_type_certificate,
+    verify_complex_type,
+    verify_presentation_type,
+    verify_two_complex_type,
+)
+from .product_types import (
+    ProductTypeCertificate,
+    product_type_certificate,
+    verify_product_type,
 )
 from .recursive_betti import RecursiveBettiBounds, recursive_betti_upper_bounds
 from .recursive_wedges import (
@@ -146,6 +177,7 @@ from .symbolic_dong import SymbolicDongCertificate, symbolic_dong_certificate
 from .symbolic_integral_morse import (
     SymbolicIntegralMorseCertificate,
     symbolic_integral_morse_certificate,
+    verify_symbolic_sq2,
 )
 from .weighted_conicity import (
     WeightedConicityCertificate,
@@ -185,6 +217,8 @@ __all__ = [
     "SymbolicDongCertificate",
     "symbolic_dong_certificate",
     "SymbolicIntegralMorseCertificate",
+    "verify_symbolic_sq2",
+    "SymbolicSq2Certificate",
     "symbolic_integral_morse_certificate",
     "WeightedConicityCertificate",
     "find_weighted_conicity_certificate",
@@ -204,6 +238,12 @@ __all__ = [
     "deletion",
     "relative_betti_numbers",
     # fundamental_group
+    "CellularPresentation",
+    "PresentationElimination",
+    "PresentationReduction",
+    "cellular_presentation",
+    "reduce_cellular_presentation",
+    "verify_presentation_reduction",
     "FundamentalRecord",
     "covering_graph",
     "first_homology_rank",
@@ -228,6 +268,24 @@ __all__ = [
     "RecursiveWedgeCertificate",
     "recursive_wedge_certificate",
     "verify_recursive_wedge",
+    "HomotopyType",
+    "SphereType",
+    "MooreSpaceType",
+    "SurfaceType",
+    "SuspendedHopfType",
+    "WedgeType",
+    "ProductType",
+    "ProductTypeCertificate",
+    "product_type_certificate",
+    "verify_product_type",
+    "ComplexTypeCertificate",
+    "complex_type_certificate",
+    "verify_complex_type",
+    "PresentationTypeCertificate",
+    "presentation_type_certificate",
+    "two_complex_type_certificate",
+    "verify_presentation_type",
+    "verify_two_complex_type",
     "HomotopyVerdict",
     "HomotopyKind",
     "BettiProfile",

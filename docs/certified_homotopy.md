@@ -687,3 +687,244 @@ proof = recursive_wedge_certificate(graph)
 assert proof is not None and proof.spheres == {1: 2}
 assert verify_recursive_wedge(graph, proof)
 ```
+
+## Cellular presentations of two-dimensional complexes
+
+The low-level cellular presentation API is separate from the sphere-wedge
+classifier. It accepts a connected, nonempty simplicial complex of dimension
+at most two (not just flag complexes). Contracting a spanning tree in the
+1-skeleton gives a one-vertex CW model with one generator per remaining edge
+and one relator per triangle. Empty and duplicate attaching words are retained:
+discarding them preserves the fundamental group but not the homotopy type.
+
+```python
+from pycombtop import (
+    CellularPresentation,
+    reduce_cellular_presentation,
+    verify_presentation_reduction,
+)
+
+p = CellularPresentation((1, 2), ((1, 2), (2, 2), (), (2, 2)))
+certificate = reduce_cellular_presentation(p)
+assert verify_presentation_reduction(p, certificate)
+assert certificate.reduced == CellularPresentation((2,), ((2, 2), (), (2, 2)))
+```
+
+Use `cellular_presentation(sc)` to construct the input from a
+`SimplicialComplex`. Each recorded elimination uses a relator containing a
+generator exactly once, substitutes its solved expression in every other
+attaching word, and cancels that generator and two-cell. Free reduction of words
+is a homotopy of the attaching maps. Hence replay certifies a homotopy
+equivalence of presentation complexes, not merely an isomorphism of groups.
+The letter budget can stop the search with a valid partial reduction; a
+stalled reduction makes no negative claim.
+
+In the example the surviving presentation has a circle, two degree-two
+attaching maps and one constant attaching map, so its realization is
+the projective plane wedged with two 2-spheres. The recognition API below certifies such nonspherical homotopy types.
+Higher-dimensional input is rejected: the 2-skeleton alone does not suffice
+to determine the homotopy type of the whole complex.
+
+
+## Certified Moore-space and surface types
+
+The general recognition API is opt-in. It does not change the existing
+sphere-wedge `HomotopyVerdict` or cause legacy callers to mistake a
+nonspherical exact type for a wedge of spheres.
+
+```python
+from pycombtop import (
+    CellularPresentation,
+    MooreSpaceType,
+    SphereType,
+    SurfaceType,
+    presentation_type_certificate,
+    verify_presentation_type,
+)
+
+p = CellularPresentation((1, 2, 3), ((1, 2, -1, -2), (3, 3), ()))
+certificate = presentation_type_certificate(p)
+assert certificate is not None
+assert verify_presentation_type(p, certificate)
+assert dict(certificate.homotopy_type.summands) == {
+    SurfaceType(1): 1,
+    MooreSpaceType(2): 1,
+    SphereType(2): 1,
+}
+print(certificate.verdict)
+```
+
+The proof uses the entire cellular presentation, including repeated and
+trivial attaching words. Free and cyclic reductions preserve the free
+homotopy classes of the loops.
+
+* Empty attaching words contribute 2-spheres.
+* The graph on generators defined by common occurrence in a relator
+  splits the presentation into a wedge on disjoint generator sets.
+* For a one-generator block the attaching maps are classified by integer
+  degrees. Precomposition of the attaching map from a wedge of circles
+  by Nielsen equivalences realizes the Euclidean algorithm. Its homotopy
+  cofiber is thus a circle (all degrees zero), a point (gcd one), or the
+  degree-gcd Moore space, wedged with the remaining 2-spheres.
+* A relator in which every generator of its block occurs exactly twice
+  gives a polygon with its sides identified in pairs. Its vertex classes
+  are computed by identifying corners according to the signs of the two
+  occurrences. Each vertex link is a circle: each corner has two adjacent
+  corners under the paired edge identifications, and the corner orbit is
+  connected. Thus the quotient is a connected closed surface. The Euler
+  characteristic is v-e+1; orientability means every pair occurs with
+  opposite signs. Identifying its v vertices to a single vertex adds
+  v-1 circle summands, giving the actual presentation complex.
+* If the block gives a one-vertex torus, additional relators with zero
+  exponent sums attach nullhomotopically because the torus has fundamental
+  group Z^2. Each contributes a sphere. We do not apply this inference to
+  arbitrary surfaces or general nonabelian presentations.
+
+`two_complex_type_certificate(sc)` constructs a cellular presentation
+from a connected nonempty complex of dimension at most two.
+`complex_type_certificate(sc)` also tries a collapse of the entire input
+to a two-complex. It selects the union of the apex triangles in the
+maximal simplices (retaining all edges), and invokes the existing indexed
+relative-collapse algorithm. The target is guaranteed to admit such a
+collapse if distinct maximal simplices intersect in at most an edge:
+pair each non-apex face of size at least three with its apex extension in
+decreasing order of size. In general, the collapse must be verified;
+there is no inference from just the 2-skeleton.
+
+For graph inputs use `complex_type_certificate(clique_complex(graph))`.
+The corresponding `verify_complex_type` checks both the relative
+collapse pairs and the presentation reduction. Limits on target facets,
+relative faces and attaching-word lengths are configurable. A return
+value of `None` means an inconclusive search, not a negative result.
+
+The structured types `SphereType`, `MooreSpaceType`, `SurfaceType`,
+`WedgeType` and `ProductType` represent composable expressions.
+Constructing an expression alone is not a certificate.
+
+
+## Strong-product recognition
+
+Theorem 4.2 of Larrión, Pizaña and Villarroel-Flores (2013),
+*Discrete Morse theory and the homotopy type of clique graphs* [LPV13],
+gives the simple-homotopy equivalence between the clique complexes of
+the strong and ordered products. Realizing the ordered product gives
+the topological product. This makes a graph product certificate
+a homotopy-type certificate when the factor types are known.
+
+```python
+import networkx as nx
+from pycombtop import ProductType, SphereType, product_type_certificate, verify_product_type
+
+G = nx.strong_product(nx.cycle_graph(5), nx.cycle_graph(7))
+G = nx.convert_node_labels_to_integers(G)
+cert = product_type_certificate(G)
+assert cert is not None
+assert verify_product_type(G, cert)
+assert cert.homotopy_type == ProductType((SphereType(1), SphereType(1)))
+```
+
+The search uses the closed Cartesian skeleton of a thin graph (all
+closed neighborhoods distinct), as in Hammack and Imrich [HI14].
+It removes dispensable edges and groups the local square-relation
+classes into two candidate coordinate directions. Connected components
+of the subgraphs in those directions determine coordinates.
+
+For each candidate, the verifier checks a bijection to the rectangle
+of projected vertices. Every edge of the original graph projects to
+an edge or equality in both factors by construction. Finally, if the
+factor orders and sizes are n1, n2, m1, m2, the expected strong-product
+edge count is ((n1 + 2*m1)*(n2 + 2*m2) - n1*n2)/2.
+Equality certifies the product, not merely its Cartesian skeleton.
+The square relation is a search heuristic, not a proof of factorization.
+
+The factor classifier recursively splits smaller graphs; at leaves it
+uses the bounded structural sphere-wedge recognizer first, then the
+cellular certificate and bounded facet-Morse recognition. It does not
+invoke the full legacy classification cascade: this avoids expensive
+failed sphere-wedge searches on nonspherical factors. Verification
+reconstructs the factor graphs, replays the cellular certificates and
+reruns only the bounded sphere-wedge recognizers for sphere leaves.
+The original product's clique complex need not be enumerated.
+More advanced standalone recognizers remain available independently.
+
+The vertex and partition budgets bound the graph search; the simplex
+budget applies to each factor, not the whole product. A failed search
+is inconclusive, including for graphs with true twins. Explicit
+coordinates can be verified even for nonthin graphs with
+`pycliques.verify_strong_product_split`. The new API is opt-in:
+the legacy sphere-wedge verdict and census format are unchanged.
+
+
+## Symbolic Steenrod squares and suspended Hopf attachments
+
+The symbolic integral Morse computation can optionally evaluate
+\(\mathrm{Sq}^2:H^d(-;\mathbb F_2)\to H^{d+2}(-;\mathbb F_2)\) using
+the same matching, its stage roots and the shared pivot cache. It computes
+a dual Morse cohomology basis in degree \(d\) and a Morse homology basis
+in degree \(d+2\). Mod-2 gradient projection evaluates source cocycles
+only where required, and reverse gradient paths lift the target cycles.
+The algorithm checks that the lifted chains have zero boundary, contain
+only critical or downward-matched faces, and have their prescribed
+critical coefficients. It then evaluates the ordered cup-\((d-2)\)
+formula on the union of their supports. It does not enumerate the full
+face family or assemble full simplicial boundary matrices.
+
+For example:
+
+```python
+from pycombtop import (
+    symbolic_integral_morse_certificate,
+    verify_symbolic_sq2,
+)
+
+proof = symbolic_integral_morse_certificate(
+    G, max_critical=128, max_sq2_states=2_000_000
+)
+if proof is not None and proof.sq2 is not None:
+    print(proof.sq2.rank, proof.sq2.lifted_faces)
+    assert verify_symbolic_sq2(G, proof)
+    if proof.homotopy_type is not None:
+        print(proof.homotopy_type.to_latex())
+```
+
+The direct certificate API leaves the square computation disabled by
+default. A positive budget automatically attempts the operation when
+the stable-range recognition hypotheses hold. Specify
+`steenrod_degree=d` as well to compute the square in another degree
+\(d\ge2\), even in the presence of torsion, without applying the
+stable-range classification theorem there. The square has its own
+bounded work counter (cycle lifting, verification, projection and cup
+terms); exceeding it retains the exact integral certificate with
+`sq2=None` and `sq2_limited=True`. The matrix rows are bitsets indexed
+by target homology generators and columns by dual source generators.
+The verifier repeats the computation in the recorded vertex order;
+larger original resource caps must also be supplied on replay.
+
+### Stable-range classification
+
+Suppose a finite CW complex is simply connected, has torsion-free
+reduced integral homology, and its nonzero homology is supported in
+degrees \(d,d+1,d+2\), with \(d\ge3\). The relative Hurewicz theorem
+gives a model with a wedge of \(d\)- and \((d+1)\)-spheres and
+\((d+2)\)-cells attached. The integral attaching degrees vanish.
+The remaining attaching classes are in
+\(\pi_{d+1}(\bigvee S^d)\cong(\mathbb Z/2)^a\), with no Whitehead
+cross terms in this range. Their matrix is detected by the Steenrod
+square. Row and column basis changes reduce it to rank-normal form.
+For rank \(r\), the type is a wedge with \(a-r\) spheres of dimension
+\(d\), \(b\) spheres of dimension \(d+1\), \(c-r\) spheres of dimension
+\(d+2\), and \(r\) copies of
+\(\Sigma^{d-2}\mathbb{CP}^2\). A connected-link order is the sufficient
+simple-connectivity witness used here.
+
+The composable type API represents each of the last summands as
+`SuspendedHopfType(d)`. This extends the structured types introduced
+for cellular presentations without changing that recognition algorithm.
+Only a rank-zero proof is promoted to a legacy sphere-wedge
+`HomotopyVerdict`. A nonzero square in this range is reported through
+the symbolic certificate's structured `homotopy_type`, never as a
+sphere wedge. No such classification is made from a square alone when
+the integral-homology or connectivity hypotheses fail.
+
+The cup-i formula follows A. M. Medina-Mardones, *New formulas for
+cup-i products and fast computation of Steenrod squares* (2023).
