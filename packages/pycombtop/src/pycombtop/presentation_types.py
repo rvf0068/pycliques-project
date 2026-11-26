@@ -178,7 +178,8 @@ def verify_presentation_type(
     """Replay the elimination and independently check the recognized type."""
     try:
         return (
-            verify_presentation_reduction(presentation, certificate.reduction)
+            isinstance(certificate.homotopy_type, WedgeType)
+            and verify_presentation_reduction(presentation, certificate.reduction)
             and _classify_reduced(certificate.reduction.reduced)
             == certificate.homotopy_type
         )
