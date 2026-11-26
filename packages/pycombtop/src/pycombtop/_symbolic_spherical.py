@@ -212,7 +212,12 @@ def spherical_generation(
             )
         degrees.append(
             SphericalDegreeCertificate(
-                degree, betti[degree], tuple(selected), int(lattice.cols), factors, complete
+                degree,
+                betti[degree],
+                tuple(selected),
+                int(lattice.cols),
+                factors,
+                complete,
             )
         )
         if limited:
