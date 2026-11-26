@@ -721,8 +721,85 @@ stalled reduction makes no negative claim.
 
 In the example the surviving presentation has a circle, two degree-two
 attaching maps and one constant attaching map, so its realization is
-the projective plane wedged with two 2-spheres. Automatic recognition and
-integration of nonspherical homotopy types are separate future steps.
+the projective plane wedged with two 2-spheres. The recognition API below certifies such nonspherical homotopy types.
 Higher-dimensional input is rejected: the 2-skeleton alone does not suffice
 to determine the homotopy type of the whole complex.
 
+
+## Certified Moore-space and surface types
+
+The general recognition API is opt-in. It does not change the existing
+sphere-wedge `HomotopyVerdict` or cause legacy callers to mistake a
+nonspherical exact type for a wedge of spheres.
+
+```python
+from pycombtop import (
+    CellularPresentation,
+    MooreSpaceType,
+    SphereType,
+    SurfaceType,
+    presentation_type_certificate,
+    verify_presentation_type,
+)
+
+p = CellularPresentation((1, 2, 3), ((1, 2, -1, -2), (3, 3), ()))
+certificate = presentation_type_certificate(p)
+assert certificate is not None
+assert verify_presentation_type(p, certificate)
+assert dict(certificate.homotopy_type.summands) == {
+    SurfaceType(1): 1,
+    MooreSpaceType(2): 1,
+    SphereType(2): 1,
+}
+print(certificate.verdict)
+```
+
+The proof uses the entire cellular presentation, including repeated and
+trivial attaching words. Free and cyclic reductions preserve the free
+homotopy classes of the loops.
+
+* Empty attaching words contribute 2-spheres.
+* The graph on generators defined by common occurrence in a relator
+  splits the presentation into a wedge on disjoint generator sets.
+* For a one-generator block the attaching maps are classified by integer
+  degrees. Precomposition of the attaching map from a wedge of circles
+  by Nielsen equivalences realizes the Euclidean algorithm. Its homotopy
+  cofiber is thus a circle (all degrees zero), a point (gcd one), or the
+  degree-gcd Moore space, wedged with the remaining 2-spheres.
+* A relator in which every generator of its block occurs exactly twice
+  gives a polygon with its sides identified in pairs. Its vertex classes
+  are computed by identifying corners according to the signs of the two
+  occurrences. Each vertex link is a circle: each corner has two adjacent
+  corners under the paired edge identifications, and the corner orbit is
+  connected. Thus the quotient is a connected closed surface. The Euler
+  characteristic is v-e+1; orientability means every pair occurs with
+  opposite signs. Identifying its v vertices to a single vertex adds
+  v-1 circle summands, giving the actual presentation complex.
+* If the block gives a one-vertex torus, additional relators with zero
+  exponent sums attach nullhomotopically because the torus has fundamental
+  group Z^2. Each contributes a sphere. We do not apply this inference to
+  arbitrary surfaces or general nonabelian presentations.
+
+`two_complex_type_certificate(sc)` constructs a cellular presentation
+from a connected nonempty complex of dimension at most two.
+`complex_type_certificate(sc)` also tries a collapse of the entire input
+to a two-complex. It selects the union of the apex triangles in the
+maximal simplices (retaining all edges), and invokes the existing indexed
+relative-collapse algorithm. The target is guaranteed to admit such a
+collapse if distinct maximal simplices intersect in at most an edge:
+pair each non-apex face of size at least three with its apex extension in
+decreasing order of size. In general, the collapse must be verified;
+there is no inference from just the 2-skeleton.
+
+For graph inputs use `complex_type_certificate(clique_complex(graph))`.
+The corresponding `verify_complex_type` checks both the relative
+collapse pairs and the presentation reduction. Limits on target facets,
+relative faces and attaching-word lengths are configurable. A return
+value of `None` means an inconclusive search, not a negative result.
+
+The structured types `SphereType`, `MooreSpaceType`, `SurfaceType`,
+`WedgeType` and `ProductType` represent composable expressions.
+`ProductType` is a representation only in this release; constructing
+one does not prove a product decomposition of an input complex.
+A certified strong-product recognition method based on [LPV13,
+Theorem 4.2] is a subsequent step.

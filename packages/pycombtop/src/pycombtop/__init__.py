@@ -52,6 +52,14 @@ from .fundamental_group import (
 from .hom_complex import graph_homomorphisms, hom_graph
 
 # homotopy_type
+from .homotopy_expressions import (
+    HomotopyType,
+    MooreSpaceType,
+    ProductType,
+    SphereType,
+    SurfaceType,
+    WedgeType,
+)
 from .homotopy_results import BettiProfile, HomotopyKind
 from .homotopy_type import (
     HomotopyVerdict,
@@ -92,6 +100,16 @@ from .morse_certificates import (
     MorseCertificate,
     facet_morse_certificate,
     graph_morse_certificate,
+)
+from .presentation_types import (
+    ComplexTypeCertificate,
+    PresentationTypeCertificate,
+    complex_type_certificate,
+    presentation_type_certificate,
+    two_complex_type_certificate,
+    verify_complex_type,
+    verify_presentation_type,
+    verify_two_complex_type,
 )
 from .recursive_betti import RecursiveBettiBounds, recursive_betti_upper_bounds
 from .recursive_wedges import (
@@ -240,6 +258,20 @@ __all__ = [
     "RecursiveWedgeCertificate",
     "recursive_wedge_certificate",
     "verify_recursive_wedge",
+    "HomotopyType",
+    "SphereType",
+    "MooreSpaceType",
+    "SurfaceType",
+    "WedgeType",
+    "ProductType",
+    "ComplexTypeCertificate",
+    "complex_type_certificate",
+    "verify_complex_type",
+    "PresentationTypeCertificate",
+    "presentation_type_certificate",
+    "two_complex_type_certificate",
+    "verify_presentation_type",
+    "verify_two_complex_type",
     "HomotopyVerdict",
     "HomotopyKind",
     "BettiProfile",
