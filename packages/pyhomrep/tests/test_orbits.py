@@ -1,7 +1,7 @@
 """Tests for exact equivariant homology."""
 
 import networkx as nx
-from pycombtop import clique_complex
+from pycombtop import SimplicialComplex, clique_complex
 from pyhomrep import (
     OrbitChainComplex,
     YoungTableaux,
@@ -50,3 +50,21 @@ def test_rim_hook_characters():
             for rho in partitions_list(n):
                 yt = YoungTableaux(lam, rho)
                 assert yt.CMNR() == sum((-1) ** h for h in yt.heights())
+
+
+def test_relative_orientation():
+    sc = clique_complex(nx.complete_graph(2))
+    points = SimplicialComplex({0, 1}, facet_set=[{0}, {1}])
+    assert OrbitChainComplex(sc, relative=points).betti_number(1) == 1
+    chain = OrbitChainComplex(sc, [lambda v: 1 - v], relative=points)
+    assert chain.betti_number(1) == 0
+
+
+def test_identity_homology_map():
+    sc = clique_complex(nx.cycle_graph(4))
+
+    def action(g, v):
+        return v
+
+    result = decompose_young_homology_map(sc, sc, 2, 1, action, action, lambda v: v)
+    assert result == {"kernel": {}, "image": {(2,): 1}, "cokernel": {}}

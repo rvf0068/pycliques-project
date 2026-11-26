@@ -19,6 +19,7 @@ References
 from __future__ import annotations
 
 import math
+from collections import Counter
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -512,25 +513,8 @@ def size_conjugacy_class(partition: list[int], n: int) -> int:
     >>> size_conjugacy_class([3, 1], 4)
     8
     """
-    aux1 = 1
-    c = 0
-    aux = partition[0]
-    flag = 1
-
-    for j in range(len(partition)):
-        if aux == partition[j]:
-            c = c + 1
-            flag = 1
-        else:
-            aux1 = aux1 * (partition[j - 1] ** c) * (math.factorial(c))
-            aux = partition[j]
-            c = 1
-            flag = 0
-
-    if flag == 1:
-        aux1 = aux1 * (partition[j - 1] ** c) * (math.factorial(c))
-    else:
-        aux1 = aux1 * (partition[j] ** c) * (math.factorial(c))
-
-    card = math.factorial(n) / aux1
-    return int(card)
+    centralizer = math.prod(
+        part**count * math.factorial(count)
+        for part, count in Counter(partition).items()
+    )
+    return math.factorial(n) // centralizer

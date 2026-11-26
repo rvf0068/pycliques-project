@@ -7,7 +7,7 @@ from collections.abc import Callable, Iterable, Sequence
 from typing import Any
 
 from pycombtop import SimplicialComplex
-from sympy import SparseMatrix, zeros
+from sympy import SparseMatrix
 from sympy.polys.matrices import DomainMatrix
 
 VertexMap = Callable[[Any], Any]
@@ -71,15 +71,18 @@ class OrbitChainComplex:
         if k in self._orbits:
             return self._orbits[k]
         all_faces = self._faces(self.complex, k)
-        excluded = self._faces(self.relative, k) if self.relative else set()
+        excluded = (
+            self._faces(self.relative, k) if self.relative is not None else set()
+        )
         if not excluded <= all_faces:
             raise ValueError("Relative complex must be a subcomplex")
         faces = all_faces - excluded
         unseen = set(faces)
         reps = []
         coords = {}
-        while unseen:
-            seed = min(unseen)
+        for seed in sorted(faces):
+            if seed not in unseen:
+                continue
             signs = {seed: 1}
             todo = deque([seed])
             orientable = True
@@ -166,7 +169,12 @@ class OrbitChainComplex:
         # Validate all faces, including those whose orbit is nonorientable.
         for face in all_faces:
             raw = tuple(image[i] for i in face)
-            if len(set(raw)) == len(raw) and tuple(sorted(raw)) not in target_faces:
+            support = tuple(sorted(set(raw)))
+            image_faces = (
+                target_faces if len(support) == len(face)
+                else target._data(len(support) - 1)[2]
+            )
+            if support not in image_faces:
                 raise ValueError("Map must be simplicial")
         entries = {}
         for j, face in enumerate(reps):
@@ -185,7 +193,13 @@ def homology_map_rank(
 ) -> int:
     """Exact rank of the induced homology map on coinvariants."""
     matrix = source.map_matrix(target, f, k)
-    cycles = source.boundary_matrix(k).nullspace()
-    basis = SparseMatrix.hstack(*cycles) if cycles else zeros(matrix.cols, 0)
-    boundaries = target.boundary_matrix(k + 1)
-    return _rank(boundaries.row_join(matrix * basis)) - _rank(boundaries)
+    # The rank of [D 0; F B] is rank(D) + dim(F ker(D) + im(B)).
+    # This avoids constructing a potentially dense nullspace basis.
+    source.map_matrix(target, f, k - 1)
+    source.map_matrix(target, f, k + 1)
+    d = source.boundary_matrix(k)
+    b = target.boundary_matrix(k + 1)
+    block = d.row_join(SparseMatrix(d.rows, b.cols, {})).col_join(
+        matrix.row_join(b)
+    )
+    return _rank(block) - source.boundary_rank(k) - target.boundary_rank(k + 1)
