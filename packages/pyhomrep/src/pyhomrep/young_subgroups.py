@@ -137,9 +137,7 @@ def decompose_induced_character(
     """
     if subgroup_order <= 0:
         raise ValueError("Subgroup order must be positive")
-    if any(
-        sum(rho) != n or any(r <= 0 for r in rho) for rho in weighted_cycle_counts
-    ):
+    if any(sum(rho) != n or any(r <= 0 for r in rho) for rho in weighted_cycle_counts):
         raise ValueError("Invalid cycle type")
     result = {}
     for lam in _partitions(n):

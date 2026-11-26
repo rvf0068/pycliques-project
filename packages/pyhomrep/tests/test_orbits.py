@@ -89,6 +89,7 @@ def test_octahedral_sphere_induction():
     mult = decompose_induced_character(9, counts, 48)
     assert (5, 1, 1, 1, 1) not in mult
     assert mult[(3, 3, 3)] == 3
-    assert sum(
-        m * YoungTableaux(list(lam), [1] * 9).CMNR() for lam, m in mult.items()
-    ) == 7560
+    assert (
+        sum(m * YoungTableaux(list(lam), [1] * 9).CMNR() for lam, m in mult.items())
+        == 7560
+    )
