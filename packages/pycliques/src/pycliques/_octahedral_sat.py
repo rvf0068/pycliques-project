@@ -215,7 +215,7 @@ def search_sat(
     n = len(labels)
     # The public API has already checked the minimum graph order.
     # Bound the number of domain variables before allocating the rows.
-    if supports is None and n * (n - 1) - 2 * graph.number_of_edges() > max_clauses:
+    if n * (n - 1) - 2 * graph.number_of_edges() > max_clauses:
         return limited()
     complement: list[list[int]] = []
     for i, v in enumerate(labels):

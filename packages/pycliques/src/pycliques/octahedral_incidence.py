@@ -49,9 +49,7 @@ class IncidenceOctahedronResult(CoaffineOctahedronResult):
     retained_pairs: tuple[tuple[int, int], ...] = ()
 
 
-def _check_pairs(
-    host: ImplicitCliqueGraph, pairs: Sequence[tuple[int, int]]
-) -> None:
+def _check_pairs(host: ImplicitCliqueGraph, pairs: Sequence[tuple[int, int]]) -> None:
     endpoints = [v for pair in pairs for v in pair]
     if len(set(endpoints)) != len(endpoints):
         raise ValueError("antipodal endpoints must be distinct")
@@ -61,10 +59,7 @@ def _check_pairs(
         if host.has_edge(a, b):
             raise ValueError("antipodal supports must be disjoint")
         if any(
-            not host.has_edge(v, w)
-            for pair in pairs[:i]
-            for v in pair
-            for w in (a, b)
+            not host.has_edge(v, w) for pair in pairs[:i] for v in pair for w in (a, b)
         ):
             raise ValueError("antipodal pairs must induce an octahedron")
 

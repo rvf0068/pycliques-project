@@ -23,8 +23,11 @@ requires_z3 = pytest.mark.skipif(
 
 def cube(d=3):
     return pc.ImplicitCliqueGraph.from_family(
-        [{v for v in range(2**d) if (v >> i) & 1 == bit}
-         for i in range(d) for bit in (0, 1)]
+        [
+            {v for v in range(2**d) if (v >> i) & 1 == bit}
+            for i in range(d)
+            for bit in (0, 1)
+        ]
     )
 
 
@@ -32,8 +35,7 @@ def graph_host(graph):
     # Every graph has an intersection representation, with edge atoms and
     # a private atom at each vertex. The private atoms preserve distinctness.
     return pc.ImplicitCliqueGraph.from_family(
-        [{("v", u)} | {("e", min(u, v), max(u, v)) for v in graph[u]}
-         for u in graph]
+        [{("v", u)} | {("e", min(u, v), max(u, v)) for v in graph[u]} for u in graph]
     )
 
 
@@ -63,12 +65,18 @@ def test_incidence_exact_and_regional():
     assert regional.endomorphism[0] == 1
     assert regional.retained_pairs == ((0, 1),)
     # The CNF cannot choose only three pairs on this host.
-    assert pc.find_octahedral_retraction_incidence(
-        host, backend="sat", min_dimension=5
-    ).status is Status.EXHAUSTED
-    assert pc.find_octahedral_retraction_incidence(
-        graph_host(nx.cycle_graph(6)), backend="sat"
-    ).status is Status.EXHAUSTED
+    assert (
+        pc.find_octahedral_retraction_incidence(
+            host, backend="sat", min_dimension=5
+        ).status
+        is Status.EXHAUSTED
+    )
+    assert (
+        pc.find_octahedral_retraction_incidence(
+            graph_host(nx.cycle_graph(6)), backend="sat"
+        ).status
+        is Status.EXHAUSTED
+    )
 
 
 @requires_z3
@@ -82,11 +90,8 @@ def test_incidence_encoding_against_portable_atlas(tmp_path):
             continue
         host = graph_host(g)
         support = host.clique_masks
-        rows = [[j for j, mask in enumerate(support) if not s & mask]
-                for s in support]
-        x = sat._write_cnf(
-            rows, path, 3, 100_000, float("inf"), supports=support
-        )
+        rows = [[j for j, mask in enumerate(support) if not s & mask] for s in support]
+        x = sat._write_cnf(rows, path, 3, 100_000, float("inf"), supports=support)
         data = solve(library, path, 100_000, 1024, sum(map(len, x)))
         expected = pc.find_octahedral_retraction_coaffine(
             g, backend="python", max_states=100_000
@@ -94,8 +99,10 @@ def test_incidence_encoding_against_portable_atlas(tmp_path):
         assert data["status"] == expected.status.name
         if data["status"] == "FOUND":
             selected = set(data["selected"])
-            f = {u: next(v for v, literal in row.items() if literal in selected)
-                 for u, row in enumerate(x)}
+            f = {
+                u: next(v for v, literal in row.items() if literal in selected)
+                for u, row in enumerate(x)
+            }
             assert pc.verify_coaffine_endomorphism(g, f)
             assert all(f[f[f[v]]] == f[v] for v in g)
             assert pc.verify_induced_octahedron(
@@ -114,7 +121,10 @@ def test_walk_blind_and_seeded(executable):
     host = cube()
     for starts in ((), (((0, 1), (2, 3)),)):
         result = pc.find_octahedral_retraction_incidence(
-            host, executable=executable, max_steps=20, time_limit=10,
+            host,
+            executable=executable,
+            max_steps=20,
+            time_limit=10,
             starting_matchings=starts,
         )
         verify(host, result)
@@ -146,7 +156,8 @@ def test_walk_limit_and_hybrid(monkeypatch):
     from pycliques.coaffine_endomorphisms import CoaffineEndomorphismResult
 
     monkeypatch.setattr(
-        sat, "search_sat",
+        sat,
+        "search_sat",
         lambda *a, **k: CoaffineEndomorphismResult(Status.EXHAUSTED, None, 4, 0, 0),
     )
     result = pc.find_octahedral_retraction_incidence(
@@ -158,10 +169,12 @@ def test_walk_limit_and_hybrid(monkeypatch):
 
 def test_timeout_checkpoint(monkeypatch):
     host = cube()
+
     def timed_out(*args, **kwargs):
         checkpoint = kwargs["cwd"] / "best.txt"
         checkpoint.write_text(f"4 1 1\n0 1 {host.clique_masks[0]}\n")
         raise subprocess.TimeoutExpired(args[0], 1)
+
     monkeypatch.setattr(inc.subprocess, "run", timed_out)
     result = pc.find_octahedral_retraction_incidence(host, executable=Path("dummy"))
     assert result.status is Status.LIMIT_REACHED
@@ -194,18 +207,23 @@ def test_invalid_cuts_and_checkpoint(monkeypatch):
     host = cube()
     with pytest.raises(ValueError):
         inc._check_cuts(host, ((0, 1, 0),))
+
     def invalid(*args, **kwargs):
         (kwargs["cwd"] / "best.txt").write_text("0 1 1\n0 99 1\n")
         return subprocess.CompletedProcess(args[0], 0, "", "")
+
     monkeypatch.setattr(inc.subprocess, "run", invalid)
     with pytest.raises(RuntimeError, match="Invalid incidence walk checkpoint"):
         pc.find_octahedral_retraction_incidence(host, executable=Path("dummy"))
 
 
 def test_empty_and_universal_hosts():
-    assert pc.find_octahedral_retraction_incidence(
-        pc.ImplicitCliqueGraph.from_family([])
-    ).status is Status.EXHAUSTED
+    assert (
+        pc.find_octahedral_retraction_incidence(
+            pc.ImplicitCliqueGraph.from_family([])
+        ).status
+        is Status.EXHAUSTED
+    )
     host = pc.ImplicitCliqueGraph.from_family(
         [set(cube().clique(i)) for i in cube()] + [set(range(8))]
     )
@@ -221,3 +239,70 @@ def test_width_limit_and_formula_budget():
             cube(), backend="sat", sat_max_clauses=1
         )
         assert result.status is Status.LIMIT_REACHED
+
+
+@requires_z3
+def test_regional_exhaustion_is_not_global_exhaustion():
+    core = cube()
+    host = pc.ImplicitCliqueGraph.from_family(
+        [core.clique(i) for i in core] + [{0}]
+    )
+    verify(host, pc.find_octahedral_retraction_incidence(host, backend="sat"))
+    # The singleton has only three neighbors, so it cannot belong to O_3.
+    result = pc.find_octahedral_retraction_incidence(
+        host, backend="sat", retained_pairs=[(1, 6)]
+    )
+    assert result.status is Status.EXHAUSTED
+    assert result.retained_pairs == ((1, 6),)
+
+
+@requires_z3
+def test_sat_sparse_active_ids_and_wide_ground():
+    core = cube()
+    raw = pc.ImplicitCliqueGraph.from_family(
+        [set(range(100, 170))] + [core.clique(i) for i in core]
+    )
+    host = raw._with_active(raw.active_mask & ~1)
+    result = pc.find_octahedral_retraction_incidence(
+        host, backend="sat", retained_pairs=[(1, 2)]
+    )
+    verify(host, result)
+    assert set(result.retraction) == set(range(1, 7))
+
+
+def test_walk_failure_and_missing_checkpoint(monkeypatch):
+    host = cube()
+
+    def killed(*args, **kwargs):
+        return subprocess.CompletedProcess(args[0], -9, "", "killed")
+
+    monkeypatch.setattr(inc.subprocess, "run", killed)
+    with pytest.raises(RuntimeError, match="Incidence walk failed"):
+        pc.find_octahedral_retraction_incidence(host, executable=Path("dummy"))
+    monkeypatch.setattr(
+        inc.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "", ""),
+    )
+    result = pc.find_octahedral_retraction_incidence(host, executable=Path("dummy"))
+    assert result.status is Status.LIMIT_REACHED
+    assert result.uncovered == len(host)
+
+
+def test_native_build_errors(monkeypatch, tmp_path):
+    from pycliques import octahedral_incidence_native as native
+
+    monkeypatch.setattr(native.shutil, "which", lambda _: None)
+    with pytest.raises(RuntimeError, match="compiler"):
+        native.build_incidence_native(cache_dir=tmp_path)
+    monkeypatch.setattr(native.shutil, "which", lambda _: "/bin/false")
+    monkeypatch.setattr(
+        native.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 1, "", "bad"),
+    )
+    with pytest.raises(RuntimeError, match="build failed"):
+        native.build_incidence_native(cache_dir=tmp_path)
+    monkeypatch.setattr(native, "_cached", lambda: tmp_path / "missing")
+    with pytest.raises(RuntimeError, match="Build the incidence walk"):
+        native.find_incidence_native()
