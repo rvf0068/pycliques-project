@@ -244,9 +244,7 @@ def test_width_limit_and_formula_budget():
 @requires_z3
 def test_regional_exhaustion_is_not_global_exhaustion():
     core = cube()
-    host = pc.ImplicitCliqueGraph.from_family(
-        [core.clique(i) for i in core] + [{0}]
-    )
+    host = pc.ImplicitCliqueGraph.from_family([core.clique(i) for i in core] + [{0}])
     verify(host, pc.find_octahedral_retraction_incidence(host, backend="sat"))
     # The singleton has only three neighbors, so it cannot belong to O_3.
     result = pc.find_octahedral_retraction_incidence(
