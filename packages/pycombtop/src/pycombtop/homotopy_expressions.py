@@ -116,4 +116,20 @@ class ProductType:
         return r"\times ".join(parts) if parts else r"\mathrm{pt}"
 
 
-HomotopyType = SphereType | MooreSpaceType | SurfaceType | WedgeType | ProductType
+@dataclass(frozen=True)
+class SuspendedHopfType:
+    """The cofiber of eta: S^(d+1) -> S^d, for d >= 3."""
+
+    dimension: int
+
+    def __post_init__(self) -> None:
+        if type(self.dimension) is not int or self.dimension < 3:
+            raise ValueError("Suspended Hopf dimension must be an integer >= 3")
+
+    def to_latex(self) -> str:
+        return rf"\Sigma^{{{self.dimension - 2}}}\mathbb{{CP}}^2"
+
+
+HomotopyType = (
+    SphereType | MooreSpaceType | SurfaceType | WedgeType | ProductType | SuspendedHopfType
+)
