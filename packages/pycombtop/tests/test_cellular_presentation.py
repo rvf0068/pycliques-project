@@ -3,7 +3,6 @@
 from dataclasses import replace
 
 import pytest
-
 from pycombtop import (
     CellularPresentation,
     PresentationElimination,
