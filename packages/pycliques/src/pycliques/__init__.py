@@ -210,6 +210,12 @@ from .retractions import (
     verify_special_octahedron_witness,
 )
 from .stiff_retractions import StiffRetractionResult, search_proper_stiff_retraction
+from .strong_products import (
+    StrongProductSplit,
+    find_strong_product_split,
+    strong_product_factors,
+    verify_strong_product_split,
+)
 from .surfaces import (
     is_closed_surface,
     is_cycle,
@@ -217,12 +223,6 @@ from .surfaces import (
     is_regular,
     is_surface,
     open_neighborhood,
-)
-from .strong_products import (
-    StrongProductSplit,
-    find_strong_product_split,
-    strong_product_factors,
-    verify_strong_product_split,
 )
 from .targeted_retractions import (
     TargetRetractionResult,
