@@ -18,6 +18,11 @@ from sympy import ZZ, Matrix
 from sympy.matrices.normalforms import smith_normal_form
 
 from ._symbolic_morse_gradient import _MorseLimit, matching_pivot, morse_boundaries
+from ._symbolic_spherical import (
+    AntipodalPairs,
+    SphericalGenerationCertificate,
+    spherical_generation,
+)
 from ._symbolic_steenrod import SymbolicSq2Certificate, compute_sq2
 from .fundamental_group import connected_link_order
 from .homotopy_expressions import (
@@ -53,6 +58,7 @@ class SymbolicIntegralMorseCertificate:
     sq2: SymbolicSq2Certificate | None = None
     sq2_limited: bool = False
     sq2_homotopy_type: WedgeType | None = None
+    spherical: SphericalGenerationCertificate | None = None
 
     @property
     def homotopy_type(self) -> WedgeType | None:
@@ -251,6 +257,9 @@ def symbolic_integral_morse_certificate(
     max_gradient_states: int = 200_000,
     max_sq2_states: int = 0,
     steenrod_degree: int | None = None,
+    max_spherical_states: int = 0,
+    spherical_seed: Iterable[AntipodalPairs] = (),
+    spherical_search: bool = True,
 ) -> SymbolicIntegralMorseCertificate | None:
     """Compute an exact integral Morse complex without listing its faces.
 
@@ -276,6 +285,12 @@ def symbolic_integral_morse_certificate(
     An explicit steenrod_degree >=2 also computes the operation outside
     this range, without claiming a type there. A square limit retains
     the integral certificate and sets sq2_limited, never a zero matrix.
+
+    A positive max_spherical_states enables integral spherical generation
+    after the existing wedge and square criteria. Supply antipodal pairs
+    from previous partial certificates as spherical_seed; set spherical_search
+    false to project only those supplied spheres. All required degrees must
+    generate the full integral lattice before a wedge is asserted.
     """
     if min(max_nodes, max_critical, max_gradient_states) < 1 or max_vertices < 0:
         raise ValueError("resource limits must be positive; max_vertices >= 0")
@@ -287,6 +302,10 @@ def symbolic_integral_morse_certificate(
         raise ValueError(
             "steenrod_degree requires degree >=2 and a positive square budget"
         )
+    if type(max_spherical_states) is not int or max_spherical_states < 0:
+        raise ValueError("max_spherical_states must be a nonnegative integer")
+    if type(spherical_search) is not bool:
+        raise ValueError("spherical_search must be boolean")
     n = len(graph)
     if n > max_vertices:
         return None
@@ -408,6 +427,30 @@ def symbolic_integral_morse_certificate(
                 else:
                     # Never publish a non-spherical type as a sphere wedge.
                     wedge = None
+        spherical = None
+        if (
+            max_spherical_states
+            and wedge is None
+            and square_type is None
+            and not torsion
+            and support
+            and support[0] >= 2
+        ):
+            connectivity_order = connected_link_order(graph)
+            if connectivity_order is not None:
+                spherical = spherical_generation(
+                    graph,
+                    vertices,
+                    faces,
+                    boundaries,
+                    {d: b for d, b in betti.items() if b},
+                    pivot_lookup,
+                    max_spherical_states,
+                    seed=spherical_seed,
+                    search=spherical_search,
+                )
+                if spherical.complete:
+                    wedge = {d: b for d, b in betti.items() if b}
         return SymbolicIntegralMorseCertificate(
             critical=critical,
             boundaries=boundaries,
@@ -423,6 +466,7 @@ def symbolic_integral_morse_certificate(
             sq2=square,
             sq2_limited=square_limited,
             sq2_homotopy_type=square_type,
+            spherical=spherical,
         )
     except (MemoryError, RecursionError, _DiagramLimit, _MorseLimit):
         return None
@@ -461,5 +505,56 @@ def verify_symbolic_sq2(
             steenrod_degree=certificate.sq2.degree,
         )
         return replay == certificate
+    except (ValueError, TypeError, AttributeError, ArithmeticError):
+        return False
+
+
+def verify_symbolic_spherical(
+    graph: nx.Graph,
+    certificate: SymbolicIntegralMorseCertificate,
+    *,
+    max_vertices: int = 80,
+    max_nodes: int = 250_000,
+    max_critical: int = 128,
+    max_gradient_states: int = 200_000,
+    max_spherical_states: int = 2_000_000,
+) -> bool:
+    """Replay a complete spherical proof without searching for new spheres.
+
+    Rebuild the matching, integral boundaries, connectivity witness and
+    signed projections. Compare every selected cycle and lattice invariant;
+    search work counters are not part of the mathematical claim.
+    """
+    try:
+        proof = certificate.spherical
+        if proof is None or not proof.complete:
+            return False
+        if certificate.wedge_spheres != certificate.betti or certificate.torsion:
+            return False
+        replay = symbolic_integral_morse_certificate(
+            graph,
+            vertex_order=certificate.vertex_order,
+            max_vertices=max_vertices,
+            max_nodes=max_nodes,
+            max_critical=max_critical,
+            max_gradient_states=max_gradient_states,
+            max_spherical_states=max_spherical_states,
+            spherical_seed=(c.pairs for d in proof.degrees for c in d.cycles),
+            spherical_search=False,
+        )
+        if replay is None or replay.spherical is None:
+            return False
+        return (
+            replay.spherical.complete
+            and replay.spherical.degrees == proof.degrees
+            and replay.critical == certificate.critical
+            and replay.critical_masks == certificate.critical_masks
+            and replay.boundaries == certificate.boundaries
+            and replay.betti == certificate.betti
+            and replay.torsion == certificate.torsion
+            and replay.wedge_spheres == certificate.wedge_spheres
+            and replay.connectivity_order == certificate.connectivity_order
+            and replay.total_faces == certificate.total_faces
+        )
     except (ValueError, TypeError, AttributeError, ArithmeticError):
         return False
