@@ -35,13 +35,19 @@ from .flag_edge_star import (
     vertex_star_wedge_certificate,
 )
 from .fundamental_group import (
+    CellularPresentation,
     FundamentalRecord,
+    PresentationElimination,
+    PresentationReduction,
+    cellular_presentation,
     connected_link_order,
     covering_graph,
     first_homology_rank,
     fundamental_group,
     fundamental_group_as_permutation_group,
+    reduce_cellular_presentation,
     verify_connected_link_order,
+    verify_presentation_reduction,
 )
 from .hom_complex import graph_homomorphisms, hom_graph
 
@@ -204,6 +210,12 @@ __all__ = [
     "deletion",
     "relative_betti_numbers",
     # fundamental_group
+    "CellularPresentation",
+    "PresentationElimination",
+    "PresentationReduction",
+    "cellular_presentation",
+    "reduce_cellular_presentation",
+    "verify_presentation_reduction",
     "FundamentalRecord",
     "covering_graph",
     "first_homology_rank",
