@@ -799,7 +799,54 @@ value of `None` means an inconclusive search, not a negative result.
 
 The structured types `SphereType`, `MooreSpaceType`, `SurfaceType`,
 `WedgeType` and `ProductType` represent composable expressions.
-`ProductType` is a representation only in this release; constructing
-one does not prove a product decomposition of an input complex.
-A certified strong-product recognition method based on [LPV13,
-Theorem 4.2] is a subsequent step.
+Constructing an expression alone is not a certificate.
+
+
+## Strong-product recognition
+
+Theorem 4.2 of Larrión, Pizaña and Villarroel-Flores (2013),
+*Discrete Morse theory and the homotopy type of clique graphs* [LPV13],
+gives the simple-homotopy equivalence between the clique complexes of
+the strong and ordered products. Realizing the ordered product gives
+the topological product. This makes a graph product certificate
+a homotopy-type certificate when the factor types are known.
+
+```python
+import networkx as nx
+from pycombtop import ProductType, SphereType, product_type_certificate, verify_product_type
+
+G = nx.strong_product(nx.cycle_graph(5), nx.cycle_graph(7))
+G = nx.convert_node_labels_to_integers(G)
+cert = product_type_certificate(G)
+assert cert is not None
+assert verify_product_type(G, cert)
+assert cert.homotopy_type == ProductType((SphereType(1), SphereType(1)))
+```
+
+The search uses the closed Cartesian skeleton of a thin graph (all
+closed neighborhoods distinct), as in Hammack and Imrich [HI14].
+It removes dispensable edges and groups the local square-relation
+classes into two candidate coordinate directions. Connected components
+of the subgraphs in those directions determine coordinates.
+
+For each candidate, the verifier checks a bijection to the rectangle
+of projected vertices. Every edge of the original graph projects to
+an edge or equality in both factors by construction. Finally, if the
+factor orders and sizes are n1, n2, m1, m2, the expected strong-product
+edge count is ((n1 + 2*m1)*(n2 + 2*m2) - n1*n2)/2.
+Equality certifies the product, not merely its Cartesian skeleton.
+The square relation is a search heuristic, not a proof of factorization.
+
+The factor classifier recursively splits smaller graphs; at leaves it
+reuses the existing certified sphere-wedge classifier or the
+two-dimensional cellular certificate. Verification reconstructs the
+factor graphs, replays the cellular certificates and reruns exact legacy
+sphere-wedge recognition for sphere leaves. The original product's
+clique complex need not be enumerated.
+
+The vertex and partition budgets bound the graph search; the simplex
+budget applies to each factor, not the whole product. A failed search
+is inconclusive, including for graphs with true twins. Explicit
+coordinates can be verified even for nonthin graphs with
+`pycliques.verify_strong_product_split`. The new API is opt-in:
+the legacy sphere-wedge verdict and census format are unchanged.
