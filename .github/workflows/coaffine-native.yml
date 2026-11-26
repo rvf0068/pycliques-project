@@ -10,6 +10,9 @@ on:
       - "packages/pycliques/src/pycliques/_octahedral_sat*.py"
       - "packages/pycliques/tests/test_octahedral_sat.py"
       - "research/replay_cubic14_sat.py"
+      - "research/replay_cubic14_incidence.py"
+      - "packages/pycliques/src/pycliques/*incidence*"
+      - "packages/pycliques/tests/test_octahedral_incidence.py"
       - "packages/pycliques/src/pycliques/octahedral_coaffine_native.py"
       - "packages/pycliques/tests/test_octahedral_coaffine_native.py"
       - "packages/pycliques/tests/test_general_retraction_searches.py"
@@ -54,3 +57,5 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libz3-4
           uv run python research/replay_cubic14_sat.py
+      - name: Run bounded cubic incidence searches
+        run: uv run python research/replay_cubic14_incidence.py

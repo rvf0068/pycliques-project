@@ -1,48 +1,46 @@
-"""Research-only serial SAT tranche after PR #66. No saved retractions."""
-
+"""Research-only incidence walk tranche after PR #67."""
 import json
 import time
 
 import networkx as nx
 import pycliques as pc
 from pyg6data import list_cubic_graphs
-from pycliques.retractions import RetractionSearchStatus
 
-IDS = [441, 206, 94, 442, 185, 451, 283, 308]
+IDS = [451, 441, 442, 94, 185, 206, 283, 308, 320, 344, 363, 473, 127, 287, 368, 462, 497]
 
-
-def test_research_cubic14_sat(capsys):
+def test_research_cubic14_incidence(capsys):
     cubic = list_cubic_graphs(14)
     assert len(cubic) == 509
+    exe = pc.build_incidence_native()
     with capsys.disabled():
         for index in IDS:
+            seq = pc.CliqueSequence(nx.complement(cubic[index-1]), bound=3000,
+                                    relabel=True, pare_initial=True)
+            base = seq[1]
+            assert base is not None
+            raw = pc.ImplicitCliqueGraph.from_graph(base, max_cliques=3000)
+            assert raw is not None
+            pared = raw.pare()
+            assert pc.verify_implicit_paring(raw, pared)
+            host = pared.core
             start = time.monotonic()
-            seq = pc.CliqueSequence(
-                nx.complement(cubic[index - 1]), bound=10_000,
-                relabel=True, pare_initial=True,
+            result = pc.find_octahedral_retraction_incidence(
+                host, backend="walk", executable=exe, seed=137,
+                max_steps=250_000 if index in (451,441,442) else 50_000,
+                time_limit=30,
             )
-            host = seq[2]
-            assert host is not None
-            proof = pc.find_octahedral_retraction_coaffine(
-                host, backend="sat", max_states=2_000_000,
-                time_limit=65, sat_max_clauses=8_000_000,
-                sat_memory_limit_mb=3072,
-            )
-            row = dict(id=index, n=len(host), m=host.number_of_edges(),
-                       status=proof.status.name, dimension=proof.dimension,
-                       conflicts=proof.states_explored,
-                       seconds=round(time.monotonic()-start, 3))
-            if proof.status is RetractionSearchStatus.FOUND:
-                f = proof.endomorphism
-                r = proof.retraction
-                assert f is not None and r is not None
-                assert proof.inclusion is not None and proof.antipodal_pairs
-                assert pc.verify_coaffine_endomorphism(host, f)
-                assert all(f[f[f[u]]] == f[u] and r[u] == f[f[u]] for u in host)
-                assert pc.verify_induced_octahedron(host, proof.antipodal_pairs)
+            row = dict(index=index, order=len(host), ground=len(host.base_vertices),
+                       status=result.status.name, dimension=result.dimension,
+                       partial_dimension=len(result.partial_cuts), missed=result.uncovered,
+                       states=result.states_explored, seconds=round(time.monotonic()-start,3))
+            row.update(cuts=result.partial_cuts)
+            if result.retraction is not None:
+                graph = host.to_networkx()
+                assert graph is not None
+                assert result.inclusion is not None and result.antipodal_pairs
+                assert pc.verify_induced_octahedron(graph, result.antipodal_pairs)
                 assert pc.verify_retraction_witness(
-                    host, host.subgraph(r.values()), (r, proof.inclusion)
-                )
-                row.update(mapping=[f[u] for u in range(len(host))],
-                           pairs=proof.antipodal_pairs)
-            print("POST66_ROW " + json.dumps(row), flush=True)
+                    graph, graph.subgraph(result.retraction.values()),
+                    (result.retraction,result.inclusion))
+                row.update(pairs=result.antipodal_pairs, projection=result.retraction)
+            print("POST67_ROW " + json.dumps(row), flush=True)

@@ -252,6 +252,11 @@ if TYPE_CHECKING:
     )
     from .octahedral_coaffine_native import build_coaffine_native
     from .octahedral_compatibility_search import find_induced_octahedron_compatibility
+    from .octahedral_incidence import (
+        IncidenceOctahedronResult,
+        find_octahedral_retraction_incidence,
+    )
+    from .octahedral_incidence_native import build_incidence_native
     from .octahedral_joint_fibers import (
         PartialOctahedralFibers,
         discover_partial_octahedral_fibers,
@@ -311,6 +316,11 @@ _LAZY_MODULES = {
         "find_octahedral_retraction_coaffine",
     ),
     "octahedral_coaffine_native": ("build_coaffine_native",),
+    "octahedral_incidence": (
+        "IncidenceOctahedronResult",
+        "find_octahedral_retraction_incidence",
+    ),
+    "octahedral_incidence_native": ("build_incidence_native",),
     "octahedral_compatibility_search": ("find_induced_octahedron_compatibility",),
     "octahedral_joint_fibers": (
         "PartialOctahedralFibers",
@@ -564,6 +574,9 @@ __all__ = [
     "find_octahedral_retraction_shores",
     "CoaffineOctahedronResult",
     "find_octahedral_retraction_coaffine",
+    "find_octahedral_retraction_incidence",
+    "IncidenceOctahedronResult",
+    "build_incidence_native",
     "build_coaffine_native",
     "find_special_octahedron_witness",
     "graph_from_gap_adjacency_list",

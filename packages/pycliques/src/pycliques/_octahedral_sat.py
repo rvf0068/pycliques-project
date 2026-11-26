@@ -14,7 +14,9 @@ from pathlib import Path
 
 import networkx as nx
 
+from ._bitsets import iter_indices
 from .coaffine_endomorphisms import CoaffineEndomorphismResult
+from .implicit_clique_graph import ImplicitCliqueGraph
 from .retractions import RetractionSearchStatus
 
 
@@ -36,6 +38,9 @@ def _write_cnf(
     min_dimension: int,
     max_clauses: int,
     deadline: float,
+    *,
+    supports: Sequence[int] | None = None,
+    retained: Sequence[tuple[int, int]] = (),
 ) -> list[dict[int, int]]:
     """Stream compressed CNF; return the source-to-target variable indices."""
     variables = clauses = 0
@@ -47,9 +52,16 @@ def _write_cnf(
             raise _Limit
         return variables
 
-    x = [{w: new() for w in row} for row in complement]
+    ends = {v for pair in retained for v in pair}
+    allowed = set(range(len(complement)))
+    if ends:
+        allowed = ends | {
+            i for i, row in enumerate(complement) if not ends.intersection(row)
+        }
+        allowed = {i for i in allowed if any(j in allowed for j in complement[i])}
+    x = [{w: new() for w in row if w in allowed} for row in complement]
     y = [new() for _ in complement]
-    pairs = {(i, j): new() for i, row in enumerate(complement) for j in row if i < j}
+    pairs = {(i, j): new() for i in sorted(allowed) for j in x[i] if i < j}
     with path.open("w", encoding="ascii") as stream:
         stream.write(" " * 80 + "\n")
 
@@ -77,11 +89,20 @@ def _write_cnf(
         for i, row in enumerate(x):
             values = list(row.values())
             add(*values)
-            amo(values)
+            if supports is None:
+                amo(values)
             for j, literal in row.items():
                 add(-literal, y[j])
             # Every used endpoint has a selected reciprocal pair.
-            add(-y[i], *(pairs[min(i, j), max(i, j)] for j in row))
+            if i in allowed:
+                incident = [pairs[min(i, j), max(i, j)] for j in row]
+                add(-y[i], *incident)
+                if supports is not None:
+                    amo(incident)
+            else:
+                add(-y[i])
+        for i in sorted(ends):
+            add(y[i])
 
         def tree(j: int, sources: Sequence[int]) -> _Tree:
             if len(sources) == 1:
@@ -105,20 +126,37 @@ def _write_cnf(
                 exclude(a, node.left, allowed)
                 exclude(a, node.right, allowed)
 
-        trees = [tree(j, row) if row else None for j, row in enumerate(complement)]
-        closed = [
-            (1 << i) | sum(1 << j for j in row) for i, row in enumerate(complement)
-        ]
+        atoms: list[dict[int, int]] = [{} for _ in complement]
+        if supports is None:
+            trees = [tree(j, row) if row else None for j, row in enumerate(complement)]
+            closed = [
+                (1 << i) | sum(1 << j for j in row) for i, row in enumerate(complement)
+            ]
+        else:
+            # Atom flags describe the unions of supports assigned to each
+            # endpoint. One flag per (target, atom), shared by all sources.
+            for u, row in enumerate(x):
+                for j, literal in row.items():
+                    for t in iter_indices(supports[u]):
+                        if t not in atoms[j]:
+                            atoms[j][t] = new()
+                        add(-literal, atoms[j][t])
+
         for (i, j), literal in pairs.items():
             add(-literal, x[i][j])
             add(-literal, x[j][i])
             add(-literal, y[i])
             add(-literal, y[j])
             add(-y[i], -y[j], literal)
-            # Source edges cannot be mapped to a nonedge i,j. Shared OR
-            # trees replace groups of pairwise conflicts by one clause.
-            for a in complement[i]:
-                exclude(x[a][i], trees[j], closed[a])
+            if supports is None:
+                # General edge-image constraints on inverse domain trees.
+                for a in complement[i]:
+                    exclude(x[a][i], trees[j], closed[a])
+            else:
+                # Opposite fibres may not share a ground atom. This is
+                # equivalent to the morphism constraints for intersections.
+                for t in atoms[i].keys() & atoms[j].keys():
+                    add(-atoms[i][t], -atoms[j][t])
 
         # Backward cardinality counter: a true C(i,k) requires at least
         # k selected vertices among the first i. The reverse implication
@@ -145,13 +183,14 @@ def _write_cnf(
 
 
 def search_sat(
-    graph: nx.Graph,
+    graph: nx.Graph | ImplicitCliqueGraph,
     *,
     min_dimension: int,
     max_states: int,
     time_limit: float | None,
     max_clauses: int,
     memory_limit_mb: int,
+    retained: Sequence[tuple[int, int]] = (),
 ) -> CoaffineEndomorphismResult:
     """Search in an isolated Z3 worker; interrupted runs are inconclusive."""
     deadline = time.monotonic() + time_limit if time_limit is not None else float("inf")
@@ -167,17 +206,26 @@ def search_sat(
             RetractionSearchStatus.LIMIT_REACHED, None, 0, 0, 0
         )
 
-    labels = list(graph)
+    labels: list[Hashable] = list(graph)
+    supports = (
+        tuple(graph.clique_masks[i] for i in graph)
+        if isinstance(graph, ImplicitCliqueGraph)
+        else None
+    )
     n = len(labels)
     # The public API has already checked the minimum graph order.
     # Bound the number of domain variables before allocating the rows.
     if n * (n - 1) - 2 * graph.number_of_edges() > max_clauses:
         return limited()
     complement: list[list[int]] = []
-    for v in labels:
+    for i, v in enumerate(labels):
         if time.monotonic() >= deadline:
             return limited()
-        row = [j for j, w in enumerate(labels) if v != w and w not in graph[v]]
+        if supports is not None:
+            row = [j for j, mask in enumerate(supports) if not supports[i] & mask]
+        else:
+            assert isinstance(graph, nx.Graph)
+            row = [j for j, w in enumerate(labels) if v != w and w not in graph[v]]
         if not row:
             return CoaffineEndomorphismResult(
                 RetractionSearchStatus.EXHAUSTED, None, 0, 0, 0
@@ -187,7 +235,15 @@ def search_sat(
     try:
         with tempfile.TemporaryDirectory(prefix="pycliques-sat-") as directory:
             path = Path(directory) / "problem.cnf"
-            x = _write_cnf(complement, path, min_dimension, max_clauses, deadline)
+            x = _write_cnf(
+                complement,
+                path,
+                min_dimension,
+                max_clauses,
+                deadline,
+                supports=supports,
+                retained=retained,
+            )
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 return limited()
@@ -224,7 +280,7 @@ def search_sat(
         mapping = {}
         for u, domain in enumerate(x):
             targets = [v for v, literal in domain.items() if literal in selected]
-            if len(targets) != 1:
+            if not targets or (supports is None and len(targets) != 1):
                 raise RuntimeError("SAT backend returned an incomplete assignment")
             mapping[labels[u]] = labels[targets[0]]
     return CoaffineEndomorphismResult(status, mapping, conflicts, 0, 0)
