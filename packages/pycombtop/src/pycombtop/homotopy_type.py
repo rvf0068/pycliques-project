@@ -386,10 +386,13 @@ def _try_symbolic_dong_order(
     # Mixed critical dimensions can still admit an exact integral Morse
     # boundary proof. Never infer a wedge from Betti numbers alone.
     integral = (
-        symbolic_integral_morse_certificate(graph)
+        symbolic_integral_morse_certificate(graph, max_sq2_states=2_000_000)
         if vertex_order is None
         else symbolic_integral_morse_certificate(
-            graph, vertex_order=vertex_order, max_critical=128
+            graph,
+            vertex_order=vertex_order,
+            max_critical=128,
+            max_sq2_states=2_000_000,
         )
     )
     if integral is None:
@@ -397,7 +400,9 @@ def _try_symbolic_dong_order(
     if integral.wedge_spheres is not None:
         c0 = integral.critical.get(0, 0)
         c1 = integral.critical.get(1, 0)
-        if integral.connectivity_order is not None:
+        if integral.sq2_homotopy_type is not None:
+            reason = Theorem.SYMBOLIC_SQ2_WEDGE
+        elif integral.connectivity_order is not None:
             reason = Theorem.SYMBOLIC_INTEGRAL_MORSE_HUREWICZ
         elif integral.wedge_spheres.get(1, 0) == 1 and c0 == 0 and c1 == 1:
             reason = Theorem.SYMBOLIC_INTEGRAL_MORSE_ZERO_DEGREE_CIRCLE
