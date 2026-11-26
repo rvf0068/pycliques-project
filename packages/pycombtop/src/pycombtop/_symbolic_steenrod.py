@@ -207,9 +207,7 @@ def compute_sq2(
         for v in _bits(m):
             charge()
             bd[m ^ (1 << v)] ^= w
-    if any(bd.values()) or any(
-        lifted.get(m, 0) != w for m, w in initial.items()
-    ):
+    if any(bd.values()) or any(lifted.get(m, 0) != w for m, w in initial.items()):
         raise ArithmeticError("invalid lifted Morse cycles")
 
     # Medina-Mardones cup-(degree-2) formula: delete four vertices

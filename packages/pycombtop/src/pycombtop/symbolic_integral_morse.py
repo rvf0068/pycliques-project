@@ -68,9 +68,7 @@ class SymbolicIntegralMorseCertificate:
         )
 
 
-def _sq2_type(
-    betti: dict[int, int], square: SymbolicSq2Certificate
-) -> WedgeType:
+def _sq2_type(betti: dict[int, int], square: SymbolicSq2Certificate) -> WedgeType:
     """Assemble the type in the simply connected torsion-free stable range."""
     d, r = square.degree, square.rank
     counts = dict(betti)
