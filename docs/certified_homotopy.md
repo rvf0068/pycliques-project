@@ -838,11 +838,14 @@ Equality certifies the product, not merely its Cartesian skeleton.
 The square relation is a search heuristic, not a proof of factorization.
 
 The factor classifier recursively splits smaller graphs; at leaves it
-reuses the existing certified sphere-wedge classifier or the
-two-dimensional cellular certificate. Verification reconstructs the
-factor graphs, replays the cellular certificates and reruns exact legacy
-sphere-wedge recognition for sphere leaves. The original product's
-clique complex need not be enumerated.
+uses the bounded structural sphere-wedge recognizer first, then the
+cellular certificate and bounded facet-Morse recognition. It does not
+invoke the full legacy classification cascade: this avoids expensive
+failed sphere-wedge searches on nonspherical factors. Verification
+reconstructs the factor graphs, replays the cellular certificates and
+reruns only the bounded sphere-wedge recognizers for sphere leaves.
+The original product's clique complex need not be enumerated.
+More advanced standalone recognizers remain available independently.
 
 The vertex and partition budgets bound the graph search; the simplex
 budget applies to each factor, not the whole product. A failed search
