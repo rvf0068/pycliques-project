@@ -19,7 +19,7 @@ class StrongProductSplit:
 
 
 def _valid_graph(graph: nx.Graph) -> bool:
-    return (
+    return bool(
         len(graph) > 0
         and not graph.is_directed()
         and not graph.is_multigraph()
