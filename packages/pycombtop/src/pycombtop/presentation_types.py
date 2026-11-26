@@ -284,14 +284,11 @@ def verify_complex_type(
 ) -> bool:
     """Verify both the relative collapse and the cellular recognition."""
     try:
-        return (
-            verify_indexed_relative_collapse(
-                complex_,
-                certificate.core,
-                certificate.collapse_pairs,
-                max_bad_faces=max_bad_faces,
-            )
-            and verify_two_complex_type(certificate.core, certificate.presentation)
-        )
+        return verify_indexed_relative_collapse(
+            complex_,
+            certificate.core,
+            certificate.collapse_pairs,
+            max_bad_faces=max_bad_faces,
+        ) and verify_two_complex_type(certificate.core, certificate.presentation)
     except (ValueError, TypeError, AttributeError):
         return False
