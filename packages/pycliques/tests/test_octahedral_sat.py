@@ -6,11 +6,12 @@ import ctypes.util
 import json
 import subprocess
 import sys
+import tempfile
+from pathlib import Path
 
 import networkx as nx
-import pytest
-
 import pycliques as pc
+import pytest
 from pycliques import _octahedral_sat as sat
 from pycliques.coaffine_endomorphisms import CoaffineEndomorphismResult
 from pycliques.retractions import RetractionSearchStatus as Status
@@ -31,12 +32,10 @@ def test_sat_matches_portable_search():
         nx.disjoint_union(nx.octahedral_graph(), nx.path_graph(2)),
     ]
     # Exercise the encoding in-process on this small corpus rather than
-    # starting a subprocess for each of 159 atlas graphs.
+    # starting a subprocess for each of 156 atlas graphs.
     from pycliques._octahedral_sat_worker import solve
 
     library = ctypes.util.find_library("z3")
-    import tempfile
-    from pathlib import Path
 
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory) / "problem.cnf"
@@ -96,9 +95,7 @@ def test_public_sat_negative_and_formula_budget():
         {"sat_max_clauses": 25},
         {"time_limit": 1e-12},
     ):
-        result = pc.find_octahedral_retraction_coaffine(
-            graph, backend="sat", **kwargs
-        )
+        result = pc.find_octahedral_retraction_coaffine(graph, backend="sat", **kwargs)
         assert result.status is Status.LIMIT_REACHED
         assert result.retraction is None
 
