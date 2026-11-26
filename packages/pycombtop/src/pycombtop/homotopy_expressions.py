@@ -110,7 +110,7 @@ class ProductType:
         parts = []
         for factor in self.factors:
             latex = factor.to_latex()
-            if isinstance(factor, WedgeType) and len(factor.summands) > 1:
+            if isinstance(factor, WedgeType) and factor.summands:
                 latex = rf"\left({latex}\right)"
             parts.append(latex)
         return r"\times ".join(parts) if parts else r"\mathrm{pt}"
