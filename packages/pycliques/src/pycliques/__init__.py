@@ -218,6 +218,12 @@ from .surfaces import (
     is_surface,
     open_neighborhood,
 )
+from .strong_products import (
+    StrongProductSplit,
+    find_strong_product_split,
+    strong_product_factors,
+    verify_strong_product_split,
+)
 from .targeted_retractions import (
     TargetRetractionResult,
     TargetSearchStatus,
@@ -363,6 +369,10 @@ def __dir__() -> list[str]:
 
 __all__ = [
     "__version__",
+    "StrongProductSplit",
+    "find_strong_product_split",
+    "strong_product_factors",
+    "verify_strong_product_split",
     "CoaffineEndomorphismResult",
     "find_coaffine_endomorphism",
     "verify_coaffine_endomorphism",
