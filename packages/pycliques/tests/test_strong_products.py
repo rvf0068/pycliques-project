@@ -83,7 +83,8 @@ def test_malformed_coordinates():
     for value in ((-1, 0), (True, 0), (1,), [0, 0], (1, 0)):
         coords = dict(split.coordinates)
         coords[(0, 0)] = value
-        assert not verify_strong_product_split(graph, replace(split, coordinates=coords))
+        altered = replace(split, coordinates=coords)
+        assert not verify_strong_product_split(graph, altered)
     coords = dict(split.coordinates)
     del coords[(0, 0)]
     assert not verify_strong_product_split(graph, replace(split, coordinates=coords))
@@ -95,4 +96,5 @@ def test_malformed_coordinates():
 def test_thick_product_explicit_coordinates():
     graph = nx.strong_product(nx.complete_graph(2), nx.cycle_graph(5))
     assert find_strong_product_split(graph) is None
-    assert verify_strong_product_split(graph, StrongProductSplit({v: v for v in graph}))
+    split = StrongProductSplit({v: v for v in graph})
+    assert verify_strong_product_split(graph, split)
