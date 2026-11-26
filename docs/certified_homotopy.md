@@ -687,3 +687,42 @@ proof = recursive_wedge_certificate(graph)
 assert proof is not None and proof.spheres == {1: 2}
 assert verify_recursive_wedge(graph, proof)
 ```
+
+## Cellular presentations of two-dimensional complexes
+
+The low-level cellular presentation API is separate from the sphere-wedge
+classifier. It accepts a connected, nonempty simplicial complex of dimension
+at most two (not just flag complexes). Contracting a spanning tree in the
+1-skeleton gives a one-vertex CW model with one generator per remaining edge
+and one relator per triangle. Empty and duplicate attaching words are retained:
+discarding them preserves the fundamental group but not the homotopy type.
+
+```python
+from pycombtop import (
+    CellularPresentation,
+    reduce_cellular_presentation,
+    verify_presentation_reduction,
+)
+
+p = CellularPresentation((1, 2), ((1, 2), (2, 2), (), (2, 2)))
+certificate = reduce_cellular_presentation(p)
+assert verify_presentation_reduction(p, certificate)
+assert certificate.reduced == CellularPresentation((2,), ((2, 2), (), (2, 2)))
+```
+
+Use `cellular_presentation(sc)` to construct the input from a
+`SimplicialComplex`. Each recorded elimination uses a relator containing a
+generator exactly once, substitutes its solved expression in every other
+attaching word, and cancels that generator and two-cell. Free reduction of words
+is a homotopy of the attaching maps. Hence replay certifies a homotopy
+equivalence of presentation complexes, not merely an isomorphism of groups.
+The letter budget can stop the search with a valid partial reduction; a
+stalled reduction makes no negative claim.
+
+In the example the surviving presentation has a circle, two degree-two
+attaching maps and one constant attaching map, so its realization is
+the projective plane wedged with two 2-spheres. Automatic recognition and
+integration of nonspherical homotopy types are separate future steps.
+Higher-dimensional input is rejected: the 2-skeleton alone does not suffice
+to determine the homotopy type of the whole complex.
+

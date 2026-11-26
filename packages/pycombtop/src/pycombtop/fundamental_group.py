@@ -52,8 +52,8 @@ Public API
 
 from __future__ import annotations
 
-from collections import deque
-from collections.abc import Hashable, Sequence
+from collections import Counter, deque
+from collections.abc import Hashable, Iterable, Sequence
 from dataclasses import dataclass
 
 import networkx as nx
@@ -61,6 +61,8 @@ from sympy import Matrix
 from sympy.combinatorics import Permutation, PermutationGroup
 from sympy.combinatorics.fp_groups import FpGroup
 from sympy.combinatorics.free_groups import FreeGroup, free_group
+
+from .simplex import SimplicialComplex, _stable_vertex_key
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -480,6 +482,203 @@ def fundamental_group(graph: nx.Graph) -> FundamentalRecord:
         relators=relators,
         rank=ngens,
     )
+
+
+# ---------------------------------------------------------------------------
+# Cellular presentations (retain all two-cells, not just group relations)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class CellularPresentation:
+    """A one-vertex presentation complex with signed integer words.
+
+    Each relator is a separate two-cell, including empty and repeated words.
+    Generator identifiers are positive integers and need not be consecutive.
+    """
+
+    generators: tuple[int, ...]
+    relators: tuple[tuple[int, ...], ...]
+
+    def __post_init__(self) -> None:
+        gens = set(self.generators)
+        if (
+            len(gens) != len(self.generators)
+            or any(type(g) is not int or g <= 0 for g in gens)
+            or any(
+                type(letter) is not int or abs(letter) not in gens
+                for word in self.relators
+                for letter in word
+            )
+        ):
+            raise ValueError("Invalid signed-integer cellular presentation")
+
+
+@dataclass(frozen=True)
+class PresentationElimination:
+    """Remove one generator using a relator in which it occurs once."""
+
+    generator: int
+    relator_index: int
+
+
+@dataclass(frozen=True)
+class PresentationReduction:
+    """Replayable reduction by homotopy-preserving generator eliminations."""
+
+    steps: tuple[PresentationElimination, ...]
+    reduced: CellularPresentation
+    limited: bool = False
+
+
+def _cellular_free_reduce(word: Iterable[int]) -> tuple[int, ...]:
+    stack: list[int] = []
+    for letter in word:
+        if stack and stack[-1] == -letter:
+            stack.pop()
+        else:
+            stack.append(letter)
+    return tuple(stack)
+
+
+def cellular_presentation(complex_: SimplicialComplex) -> CellularPresentation:
+    """Contract a spanning tree in a nonempty connected complex of dimension <=2.
+
+    Unlike :func:`fundamental_group`, retain every triangular two-cell,
+    even when its attaching word is trivial or duplicates another word.
+    The resulting CW complex is homotopy equivalent to the input.
+    Reject higher-dimensional inputs rather than silently discarding cells.
+    """
+    if not 0 <= complex_.dimension() <= 2:
+        raise ValueError("Require a nonempty complex of dimension at most two")
+    vertices = sorted(
+        (next(iter(face)) for face in complex_.faces_of_dimension(0)),
+        key=_stable_vertex_key,
+    )
+    index = {v: i for i, v in enumerate(vertices)}
+    edges = sorted(
+        tuple(sorted(index[v] for v in face)) for face in complex_.faces_of_dimension(1)
+    )
+    graph = nx.Graph()
+    graph.add_nodes_from(range(len(vertices)))
+    graph.add_edges_from(edges)
+    if not nx.is_connected(graph):
+        raise ValueError("Require a connected complex")
+    tree = {tuple(sorted(edge)) for edge in nx.bfs_edges(graph, 0)}
+    generators = {
+        edge: i
+        for i, edge in enumerate((edge for edge in edges if edge not in tree), start=1)
+    }
+
+    def label(u: int, v: int) -> int:
+        return generators.get((min(u, v), max(u, v)), 0) * (1 if u < v else -1)
+
+    triangles = sorted(
+        tuple(sorted(index[v] for v in face)) for face in complex_.faces_of_dimension(2)
+    )
+    relators = []
+    for u, v, w in triangles:
+        relators.append(
+            _cellular_free_reduce(
+                g for g in (label(u, v), label(v, w), label(w, u)) if g
+            )
+        )
+    return CellularPresentation(tuple(generators.values()), tuple(relators))
+
+
+def _inverse_word(word: tuple[int, ...]) -> tuple[int, ...]:
+    return tuple(-letter for letter in reversed(word))
+
+
+def _eliminate_cellular_generator(
+    presentation: CellularPresentation, step: PresentationElimination
+) -> CellularPresentation:
+    g, i = step.generator, step.relator_index
+    if g not in presentation.generators or not 0 <= i < len(presentation.relators):
+        raise ValueError("Invalid elimination")
+    word = presentation.relators[i]
+    occurrences = [j for j, letter in enumerate(word) if abs(letter) == g]
+    if len(occurrences) != 1:
+        raise ValueError("Defining relator must contain the generator exactly once")
+    j = occurrences[0]
+    # u g^epsilon v = 1, so g^epsilon = u^-1 v^-1.
+    replacement = _inverse_word(word[:j]) + _inverse_word(word[j + 1 :])
+    if word[j] < 0:
+        replacement = _inverse_word(replacement)
+    replacement = _cellular_free_reduce(replacement)
+    inverse = _inverse_word(replacement)
+
+    def substitute(relator: tuple[int, ...]) -> tuple[int, ...]:
+        return _cellular_free_reduce(
+            new_letter
+            for letter in relator
+            for new_letter in (
+                replacement if letter == g else inverse if letter == -g else (letter,)
+            )
+        )
+
+    return CellularPresentation(
+        tuple(h for h in presentation.generators if h != g),
+        tuple(substitute(r) for k, r in enumerate(presentation.relators) if k != i),
+    )
+
+
+def reduce_cellular_presentation(
+    presentation: CellularPresentation, *, max_total_letters: int = 1_000_000
+) -> PresentationReduction:
+    """Greedily cancel generator/relator pairs, retaining all other two-cells.
+
+    Short defining words are preferred. The letter budget bounds explicit
+    substitution growth; a limited result remains a valid partial reduction.
+    Failure to simplify is not a negative homotopy-type certificate.
+    """
+    if type(max_total_letters) is not int or max_total_letters < 1:
+        raise ValueError("max_total_letters must be positive")
+    current = presentation
+    steps: list[PresentationElimination] = []
+    while True:
+        total = sum(map(len, current.relators))
+        if total > max_total_letters:
+            return PresentationReduction(tuple(steps), current, True)
+        chosen = None
+        indices = sorted(
+            range(len(current.relators)), key=lambda i: (len(current.relators[i]), i)
+        )
+        for i in indices:
+            word = current.relators[i]
+            counts = Counter(map(abs, word))
+            singletons = [g for g, count in counts.items() if count == 1]
+            if singletons:
+                chosen = PresentationElimination(min(singletons), i)
+                break
+        if chosen is None:
+            return PresentationReduction(tuple(steps), current)
+        # Bound the unreduced substitution size before constructing new words.
+        g, i = chosen.generator, chosen.relator_index
+        defining = current.relators[i]
+        other_letters = total - len(defining)
+        occurrences = sum(
+            sum(abs(letter) == g for letter in word)
+            for k, word in enumerate(current.relators)
+            if k != i
+        )
+        if other_letters + occurrences * (len(defining) - 2) > max_total_letters:
+            return PresentationReduction(tuple(steps), current, True)
+        current = _eliminate_cellular_generator(current, chosen)
+        steps.append(chosen)
+
+
+def verify_presentation_reduction(
+    presentation: CellularPresentation, certificate: PresentationReduction
+) -> bool:
+    """Replay each elementary elimination and check the claimed final complex."""
+    current = presentation
+    try:
+        for step in certificate.steps:
+            current = _eliminate_cellular_generator(current, step)
+        return current == certificate.reduced
+    except (ValueError, TypeError, IndexError, AttributeError):
+        return False
 
 
 # ---------------------------------------------------------------------------

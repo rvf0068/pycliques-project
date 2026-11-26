@@ -42,6 +42,14 @@ group of the clique graph*, European J. Combin. 30 (2009), 288–294.
 Fundamental groups are preserved by the clique-graph operator; this does
 not prove a general homotopy equivalence.
 
+**[LPV13]** F. Larrión, M. A. Pizaña, R. Villarroel-Flores, *Discrete
+Morse theory and the homotopy type of clique graphs*, Ann. Comb. 17 (2013),
+743–754. `doi:10.1007/s00026-013-0204-7 <https://doi.org/10.1007/s00026-013-0204-7>`_.
+Theorem 4.2: the clique complexes of the strong and ordered products
+are simple-homotopy equivalent; the realization of the ordered product
+is the topological product of the realizations. This supplies the
+mathematical basis for a future certified strong-product recognizer.
+
 **[RS00]** S. Rees, L. H. Soicher, *An algorithmic approach to fundamental
 groups and covers of combinatorial cell complexes*, J. Symbolic Comput. 29
 (2000), 59–77.
