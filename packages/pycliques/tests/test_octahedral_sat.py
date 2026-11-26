@@ -77,9 +77,12 @@ def test_public_sat_witness_arbitrary_labels_and_dimension():
     assert result.endomorphism is not None
     assert result.arc_revisions == result.assignments_tried == 0
     assert pc.verify_coaffine_endomorphism(graph, result.endomorphism)
-    assert pc.find_octahedral_retraction_coaffine(
-        graph, backend="sat", min_dimension=5
-    ).status is Status.EXHAUSTED
+    assert (
+        pc.find_octahedral_retraction_coaffine(
+            graph, backend="sat", min_dimension=5
+        ).status
+        is Status.EXHAUSTED
+    )
 
 
 @requires_z3

@@ -49,12 +49,7 @@ def _write_cnf(
 
     x = [{w: new() for w in row} for row in complement]
     y = [new() for _ in complement]
-    pairs = {
-        (i, j): new()
-        for i, row in enumerate(complement)
-        for j in row
-        if i < j
-    }
+    pairs = {(i, j): new() for i, row in enumerate(complement) for j in row if i < j}
     with path.open("w", encoding="ascii") as stream:
         stream.write(" " * 80 + "\n")
 
@@ -112,8 +107,7 @@ def _write_cnf(
 
         trees = [tree(j, row) if row else None for j, row in enumerate(complement)]
         closed = [
-            (1 << i) | sum(1 << j for j in row)
-            for i, row in enumerate(complement)
+            (1 << i) | sum(1 << j for j in row) for i, row in enumerate(complement)
         ]
         for (i, j), literal in pairs.items():
             add(-literal, x[i][j])
@@ -160,9 +154,7 @@ def search_sat(
     memory_limit_mb: int,
 ) -> CoaffineEndomorphismResult:
     """Search in an isolated Z3 worker; interrupted runs are inconclusive."""
-    deadline = (
-        time.monotonic() + time_limit if time_limit is not None else float("inf")
-    )
+    deadline = time.monotonic() + time_limit if time_limit is not None else float("inf")
     library = ctypes.util.find_library("z3")
     if not sys.platform.startswith("linux") or library is None:
         raise RuntimeError(
