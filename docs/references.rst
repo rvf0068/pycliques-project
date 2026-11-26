@@ -48,7 +48,11 @@ Morse theory and the homotopy type of clique graphs*, Ann. Comb. 17 (2013),
 Theorem 4.2: the clique complexes of the strong and ordered products
 are simple-homotopy equivalent; the realization of the ordered product
 is the topological product of the realizations. This supplies the
-mathematical basis for a future certified strong-product recognizer.
+mathematical basis for the certified strong-product recognizer.
+
+**[HI14]** R. H. Hammack, W. Imrich, *Fast recognition of direct and strong
+products*, Ars Math. Contemp. 7 (2014), 487–497.
+Section 2: closed Cartesian skeleton and its product identity.
 
 **[RS00]** S. Rees, L. H. Soicher, *An algorithmic approach to fundamental
 groups and covers of combinatorial cell complexes*, J. Symbolic Comput. 29
@@ -109,3 +113,10 @@ Source-to-implementation map
    * - ``pycombtop.fundamental_group``
      - [RS00], [LPV09]
      - Coset enumeration and covers; fundamental-group context.
+
+   * - ``pycliques.strong_products``
+     - [HI14, Section 2]
+     - Closed Cartesian skeleton supplies candidate directions; full adjacency is verified.
+   * - ``pycombtop.product_types``
+     - [LPV13, Theorem 4.2]
+     - Verified strong-product splits and certified factor homotopy types.
