@@ -557,8 +557,7 @@ def cellular_presentation(complex_: SimplicialComplex) -> CellularPresentation:
     )
     index = {v: i for i, v in enumerate(vertices)}
     edges = sorted(
-        tuple(sorted(index[v] for v in face))
-        for face in complex_.faces_of_dimension(1)
+        tuple(sorted(index[v] for v in face)) for face in complex_.faces_of_dimension(1)
     )
     graph = nx.Graph()
     graph.add_nodes_from(range(len(vertices)))
@@ -568,17 +567,14 @@ def cellular_presentation(complex_: SimplicialComplex) -> CellularPresentation:
     tree = {tuple(sorted(edge)) for edge in nx.bfs_edges(graph, 0)}
     generators = {
         edge: i
-        for i, edge in enumerate(
-            (edge for edge in edges if edge not in tree), start=1
-        )
+        for i, edge in enumerate((edge for edge in edges if edge not in tree), start=1)
     }
 
     def label(u: int, v: int) -> int:
         return generators.get((min(u, v), max(u, v)), 0) * (1 if u < v else -1)
 
     triangles = sorted(
-        tuple(sorted(index[v] for v in face))
-        for face in complex_.faces_of_dimension(2)
+        tuple(sorted(index[v] for v in face)) for face in complex_.faces_of_dimension(2)
     )
     relators = []
     for u, v, w in triangles:
