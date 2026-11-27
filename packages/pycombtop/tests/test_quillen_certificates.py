@@ -98,14 +98,21 @@ def test_weak_point_verifier_rejects_malformed_moves_and_links():
     assert not verify_weak_point_reduction(
         chain, replace(valid, moves=(object(),))
     )
+    missing_point = WeakPointMove(99, "upper", BeatReduction(Poset([0]), ()))
     assert not verify_weak_point_reduction(
-        chain, replace(valid, moves=(WeakPointMove(99, "upper", BeatReduction(Poset([0]), ())),))
+        chain, replace(valid, moves=(missing_point,))
+    )
+    invalid_direction = WeakPointMove(
+        0, "sideways", BeatReduction(Poset([1]), ())
     )
     assert not verify_weak_point_reduction(
-        chain, replace(valid, moves=(WeakPointMove(0, "sideways", BeatReduction(Poset([1]), ())),))
+        chain, replace(valid, moves=(invalid_direction,))
+    )
+    invalid_link = WeakPointMove(
+        0, "upper", BeatReduction(Poset([99]), ())
     )
     assert not verify_weak_point_reduction(
-        chain, replace(valid, moves=(WeakPointMove(0, "upper", BeatReduction(Poset([99]), ())),))
+        chain, replace(valid, moves=(invalid_link,))
     )
 
 
