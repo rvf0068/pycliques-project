@@ -228,7 +228,6 @@ def test_prism_operator_rejects_noncontiguous_maps():
         prism_chain_homotopy(first, second, 0)
 
 
-
 def test_simplicial_map_argument_validation_equality_and_repr():
     from typing import Any, cast
 
