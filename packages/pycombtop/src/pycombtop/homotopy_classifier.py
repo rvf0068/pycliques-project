@@ -144,9 +144,7 @@ def classify_homotopy(
     Failure to recognize a type is not evidence that the space is not a
     wedge, contractible, or homotopy equivalent to another space.
     """
-    if max_vertices is not None and (
-        type(max_vertices) is not int or max_vertices < 0
-    ):
+    if max_vertices is not None and (type(max_vertices) is not int or max_vertices < 0):
         raise ValueError("max_vertices must be a nonnegative integer or None")
     if max_simplices is not None and (
         type(max_simplices) is not int or max_simplices < 0
@@ -192,11 +190,7 @@ def classify_homotopy(
 
     if not isinstance(space, nx.Graph):
         raise TypeError("space must be a NetworkX graph or SimplicialComplex")
-    if (
-        space.is_directed()
-        or space.is_multigraph()
-        or nx.number_of_selfloops(space)
-    ):
+    if space.is_directed() or space.is_multigraph() or nx.number_of_selfloops(space):
         raise ValueError("graph input must be simple, undirected, and loopless")
     if not space:
         raise ValueError("Homotopy classification requires a nonempty realization")
