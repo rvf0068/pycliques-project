@@ -37,7 +37,9 @@ class HomotopyClassification:
     Exactly one of the following is returned:
     - PROVED_TYPE: homotopy_type is a proved structured homotopy type.
     - BETTI_ONLY: betti_numbers are known, but no homotopy type was proved.
-    - INCONCLUSIVE: configured limits prevented a conclusion.
+    - INCONCLUSIVE: configured limits prevented a conclusion, or the input
+      lies outside the connected-realization scope currently supported by
+      the structured HomotopyType model.
 
     A certificate is supplied when a dedicated certificate recognizer
     succeeded. A legacy HomotopyVerdict records the theorem strategy used by
@@ -165,6 +167,12 @@ def classify_homotopy(
                 HomotopyClassificationStatus.INCONCLUSIVE,
                 f"vertex limit {max_vertices} exceeded",
             )
+        if not nx.is_connected(space.one_skeleton_graph()):
+            return HomotopyClassification(
+                HomotopyClassificationStatus.INCONCLUSIVE,
+                "The realization is disconnected; the current HomotopyType "
+                "expressions represent connected based homotopy types.",
+            )
         certificate = complex_type_certificate(
             space,
             max_target_facets=25_000,
@@ -198,6 +206,12 @@ def classify_homotopy(
         return HomotopyClassification(
             HomotopyClassificationStatus.INCONCLUSIVE,
             f"vertex limit {max_vertices} exceeded",
+        )
+    if not nx.is_connected(space):
+        return HomotopyClassification(
+            HomotopyClassificationStatus.INCONCLUSIVE,
+            "The realization is disconnected; the current HomotopyType "
+            "expressions represent connected based homotopy types.",
         )
 
     if recognize_products:

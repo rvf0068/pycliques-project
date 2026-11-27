@@ -58,3 +58,38 @@ def test_validates_budgets() -> None:
         pycombtop.classify_homotopy(nx.path_graph(2), max_simplices=-1)
     with pytest.raises(ValueError, match="max_total_letters"):
         pycombtop.classify_homotopy(nx.path_graph(2), max_total_letters=0)
+
+
+def test_disconnected_graph_is_inconclusive() -> None:
+    graph = nx.disjoint_union(nx.cycle_graph(4), nx.cycle_graph(5))
+
+    result = pycombtop.classify_homotopy(graph)
+
+    assert result.status is pycombtop.HomotopyClassificationStatus.INCONCLUSIVE
+    assert result.homotopy_type is None
+    assert "realization is disconnected" in result.reason
+
+
+def test_disconnected_complex_is_inconclusive() -> None:
+    complex_ = pycombtop.SimplicialComplex(
+        {"a", "b", "c", "d"},
+        [{"a", "b"}, {"c", "d"}],
+    )
+
+    result = pycombtop.classify_homotopy(complex_)
+
+    assert result.status is pycombtop.HomotopyClassificationStatus.INCONCLUSIVE
+    assert result.homotopy_type is None
+    assert "realization is disconnected" in result.reason
+
+
+def test_vertex_limit_precedes_disconnected_complex_check() -> None:
+    complex_ = pycombtop.SimplicialComplex(
+        {"a", "b", "c", "d"},
+        [{"a", "b"}, {"c", "d"}],
+    )
+
+    result = pycombtop.classify_homotopy(complex_, max_vertices=3)
+
+    assert result.status is pycombtop.HomotopyClassificationStatus.INCONCLUSIVE
+    assert result.reason == "vertex limit 3 exceeded"
