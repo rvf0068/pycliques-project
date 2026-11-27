@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from importlib import import_module
+import importlib
+import sys
 from typing import Any
 
 import pytest
 
-pycombtop: Any = import_module("pycombtop")
+pycombtop: Any = importlib.import_module("pycombtop")
 
 
 RP2_FACETS = [
@@ -192,3 +193,63 @@ def test_betti_numbers_sc_accepts_ambiguous_hashable_vertex_labels():
     )
 
     assert pycombtop.betti_numbers_sc(circle) == [0, 1]
+
+
+
+def test_homology_result_accessors_and_gudhi_constraints():
+    triangle = pycombtop.SimplicialComplex({0, 1, 2}, [{0, 1, 2}])
+    boundary = pycombtop.SimplicialComplex(
+        {0, 1, 2},
+        [{0, 1}, {1, 2}, {0, 2}],
+    )
+    result = pycombtop.simplicial_homology(triangle, backend="python")
+
+    assert result.max_dimension == 2
+    assert result.betti_number(0) == 0
+    assert result.betti_number(9) == 0
+
+    with pytest.raises(TypeError, match="reduced"):
+        pycombtop.simplicial_homology(triangle, reduced=1, backend="python")
+    with pytest.raises(TypeError, match="relative_to"):
+        pycombtop.simplicial_homology(triangle, relative_to=[], backend="python")
+    with pytest.raises(ValueError, match="46337"):
+        pycombtop.simplicial_homology(triangle, field="Q", backend="gudhi")
+    with pytest.raises(ValueError, match="46337"):
+        pycombtop.simplicial_homology(
+            triangle, relative_to=boundary, backend="gudhi"
+        )
+
+    large_prime = pycombtop.simplicial_homology(
+        triangle, field=65537, backend="auto"
+    )
+    assert large_prime.backend == "python"
+    with pytest.raises(ValueError, match="46337"):
+        pycombtop.simplicial_homology(
+            triangle, field=65537, backend="gudhi"
+        )
+
+
+def test_gudhi_facets_backend_validation_and_face_budgets():
+    backend = pycombtop.homology_backend.gudhi_betti_facets
+
+    with pytest.raises(ValueError, match="max_faces"):
+        backend([], max_faces=0)
+    with pytest.raises(ValueError, match="prime"):
+        backend([], field=4)
+    with pytest.raises(ValueError, match="46337"):
+        backend([], field=65537)
+    with pytest.raises(TypeError, match="reduced"):
+        backend([], reduced=1)
+    with pytest.raises(pycombtop.HomologyResourceLimit):
+        backend([{0, 1, 2}], max_faces=6)
+    with pytest.raises(pycombtop.HomologyResourceLimit):
+        backend([{0, 1}, {2, 3}], max_faces=4)
+
+    assert backend([set()]) == []
+    assert backend([{0}], reduced=False) == [1]
+
+
+def test_gudhi_backend_reports_a_missing_optional_module(monkeypatch):
+    monkeypatch.setitem(sys.modules, "gudhi", None)
+    with pytest.raises(ImportError, match="unavailable"):
+        pycombtop.homology_backend.gudhi_betti_facets([{0}])
