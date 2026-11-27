@@ -160,6 +160,12 @@ def classify_homotopy(
     if isinstance(space, SimplicialComplex):
         if not space.vertex_set:
             raise ValueError("Homotopy classification requires a nonempty realization")
+        if not nx.is_connected(space.one_skeleton_graph()):
+            return HomotopyClassification(
+                HomotopyClassificationStatus.INCONCLUSIVE,
+                "The realization is disconnected; the current HomotopyType "
+                "expressions represent connected based homotopy types.",
+            )
         if max_vertices is not None and len(space.vertex_set) > max_vertices:
             return HomotopyClassification(
                 HomotopyClassificationStatus.INCONCLUSIVE,
@@ -194,6 +200,12 @@ def classify_homotopy(
         raise ValueError("graph input must be simple, undirected, and loopless")
     if not space:
         raise ValueError("Homotopy classification requires a nonempty realization")
+    if not nx.is_connected(space):
+        return HomotopyClassification(
+            HomotopyClassificationStatus.INCONCLUSIVE,
+            "The realization is disconnected; the current HomotopyType "
+            "expressions represent connected based homotopy types.",
+        )
     if max_vertices is not None and space.number_of_nodes() > max_vertices:
         return HomotopyClassification(
             HomotopyClassificationStatus.INCONCLUSIVE,
