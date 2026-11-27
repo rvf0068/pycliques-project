@@ -308,7 +308,7 @@ representation can be supplied instead.
 
 
 Graph multihomomorphism posets
------------------------------
+------------------------------
 
 For undirected graphs (loops allowed), Dochtermann's Hom poset consists
 of nonempty set-valued vertex maps with every source edge mapped to a
