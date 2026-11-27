@@ -1,7 +1,6 @@
 """Tests for simplicial maps, contiguity, and induced chain maps."""
 
 import pytest
-from sympy import eye, zeros
 
 from pycombtop import (
     SimplicialComplex,
@@ -12,6 +11,7 @@ from pycombtop import (
     simplicial_boundary_matrix,
     simplicial_chain_basis,
 )
+from sympy import eye, zeros
 
 
 def test_simplicial_map_can_collapse_simplices():
