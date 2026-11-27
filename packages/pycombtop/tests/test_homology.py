@@ -214,18 +214,12 @@ def test_homology_result_accessors_and_gudhi_constraints():
     with pytest.raises(ValueError, match="46337"):
         pycombtop.simplicial_homology(triangle, field="Q", backend="gudhi")
     with pytest.raises(ValueError, match="46337"):
-        pycombtop.simplicial_homology(
-            triangle, relative_to=boundary, backend="gudhi"
-        )
+        pycombtop.simplicial_homology(triangle, relative_to=boundary, backend="gudhi")
 
-    large_prime = pycombtop.simplicial_homology(
-        triangle, field=65537, backend="auto"
-    )
+    large_prime = pycombtop.simplicial_homology(triangle, field=65537, backend="auto")
     assert large_prime.backend == "python"
     with pytest.raises(ValueError, match="46337"):
-        pycombtop.simplicial_homology(
-            triangle, field=65537, backend="gudhi"
-        )
+        pycombtop.simplicial_homology(triangle, field=65537, backend="gudhi")
 
 
 def test_gudhi_facets_backend_validation_and_face_budgets():
