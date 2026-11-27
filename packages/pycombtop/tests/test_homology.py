@@ -31,8 +31,12 @@ def test_portable_backend_handles_basic_complexes_and_reduced_conventions():
 
     triangle_result = pycombtop.simplicial_homology(triangle, backend="python")
     assert triangle_result.betti_numbers == (0, 0, 0)
-    assert pycombtop.simplicial_homology(circle, backend="python").betti_numbers == (0, 1)
-    assert pycombtop.simplicial_homology(disconnected, backend="python").betti_numbers == (1,)
+    circle_result = pycombtop.simplicial_homology(circle, backend="python")
+    disconnected_result = pycombtop.simplicial_homology(
+        disconnected, backend="python"
+    )
+    assert circle_result.betti_numbers == (0, 1)
+    assert disconnected_result.betti_numbers == (1,)
     assert pycombtop.simplicial_homology(
         disconnected, backend="python", reduced=False
     ).betti_numbers == (2,)
@@ -105,7 +109,9 @@ def test_auto_backend_falls_back_when_gudhi_is_unavailable(monkeypatch):
         raise ImportError("synthetic missing GUDHI")
 
     monkeypatch.setitem(
-        pycombtop.simplicial_homology.__globals__, "gudhi_betti_facets", unavailable
+        pycombtop.simplicial_homology.__globals__,
+        "gudhi_betti_facets",
+        unavailable,
     )
     result = pycombtop.simplicial_homology(complex_, backend="auto")
     assert result.backend == "python"
@@ -129,8 +135,12 @@ def test_empty_complex_conventions_and_ghost_labels():
     ghosted = pycombtop.SimplicialComplex({"actual", "ghost"}, [{"actual"}])
 
     assert pycombtop.simplicial_homology(void, backend="python").betti_numbers == ()
-    assert pycombtop.simplicial_homology(empty_face, backend="python").betti_numbers == ()
-    assert pycombtop.simplicial_homology(ghosted, backend="python").betti_numbers == (0,)
+    empty_face_result = pycombtop.simplicial_homology(
+        empty_face, backend="python"
+    )
+    ghosted_result = pycombtop.simplicial_homology(ghosted, backend="python")
+    assert empty_face_result.betti_numbers == ()
+    assert ghosted_result.betti_numbers == (0,)
 
 
 def test_invalid_inputs_and_non_subcomplex_are_rejected():
@@ -138,7 +148,9 @@ def test_invalid_inputs_and_non_subcomplex_are_rejected():
     unrelated = pycombtop.SimplicialComplex({0, 1, 3}, [{0, 1, 3}])
 
     with pytest.raises(TypeError, match="complex_"):
-        pycombtop.simplicial_homology([{0, 1}], backend="python")  # type: ignore[arg-type]
+        pycombtop.simplicial_homology(  # type: ignore[arg-type]
+            [{0, 1}], backend="python"
+        )
     with pytest.raises(ValueError, match="subcomplex"):
         pycombtop.simplicial_homology(triangle, relative_to=unrelated, backend="python")
     with pytest.raises(ValueError, match="prime"):
@@ -148,7 +160,9 @@ def test_invalid_inputs_and_non_subcomplex_are_rejected():
     with pytest.raises(ValueError, match="max_faces"):
         pycombtop.simplicial_homology(triangle, max_faces=0, backend="python")
     with pytest.raises(ValueError, match="backend"):
-        pycombtop.simplicial_homology(triangle, backend="numpy")  # type: ignore[arg-type]
+        pycombtop.simplicial_homology(  # type: ignore[arg-type]
+            triangle, backend="numpy"
+        )
     with pytest.raises(ValueError, match="degree"):
         pycombtop.simplicial_homology(triangle, backend="python").betti_number(-1)
 
