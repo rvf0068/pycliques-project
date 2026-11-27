@@ -122,6 +122,21 @@ def test_default_chain_basis_handles_mixed_hashable_labels():
     assert set(basis) == {frozenset({1}), frozenset({"a"}), frozenset({(2, 3)})}
 
 
+def test_chain_matrix_functions_accept_one_shot_vertex_orders():
+    complex_ = SimplicialComplex({0, 1, 2}, [{0, 1, 2}])
+    boundary = simplicial_boundary_matrix(complex_, 1, vertex_order=iter([0, 1, 2]))
+    assert boundary.shape == (3, 3)
+
+    identity = SimplicialMap(complex_, complex_, {0: 0, 1: 1, 2: 2})
+    matrix = induced_chain_map(
+        identity,
+        1,
+        source_order=iter([0, 1, 2]),
+        target_order=iter([0, 1, 2]),
+    )
+    assert matrix == eye(3)
+
+
 def test_boundary_matrices_square_to_zero():
     complex_ = SimplicialComplex({0, 1, 2}, [{0, 1, 2}])
 
