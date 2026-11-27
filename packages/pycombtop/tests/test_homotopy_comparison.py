@@ -27,7 +27,7 @@ def test_homology_mismatch_proves_not_homotopy_equivalent():
 
     assert result.status is HomotopyComparisonStatus.PROVED_NOT_EQUIVALENT
     assert result.is_equivalent is False
-    assert result.field_profiles[0] == (2, (1,), ())
+    assert result.field_profiles[0] == (2, (0, 1), ())
     assert "GF(2)" in result.reason
 
 
@@ -42,7 +42,7 @@ def test_matching_homology_without_certificate_is_inconclusive():
 
     assert result.status is HomotopyComparisonStatus.INCONCLUSIVE
     assert result.is_equivalent is None
-    assert result.field_profiles == ((2, (1,), (1,)), ("Q", (1,), (1,)))
+    assert result.field_profiles == ((2, (0, 1), (0, 1)), ("Q", (0, 1), (0, 1)))
     assert "does not prove" in result.reason
 
 
@@ -67,17 +67,24 @@ def test_verified_certificate_proves_equivalence_without_homology():
     assert result.field_profiles == ()
 
 
-def test_invalid_certificate_does_not_create_positive_verdict():
-    source = circle()
+def test_invalid_certificate_falls_back_to_homology_obstruction():
+    edge = SimplicialComplex({0, 1}, [{0, 1}])
+    target = point()
+    forward = SimplicialMap(edge, target, {0: "p", 1: "p"})
+    backward = SimplicialMap(target, edge, {"p": 0})
+    certificate = simplicial_homotopy_equivalence_certificate(forward, backward)
+
     result = compare_homotopy(
-        source,
-        source,
-        certificate=None,
+        circle(),
+        target,
+        certificate=certificate,
         backend="python",
     )
 
-    assert result.status is HomotopyComparisonStatus.INCONCLUSIVE
-    assert result.is_equivalent is None
+    assert result.status is HomotopyComparisonStatus.PROVED_NOT_EQUIVALENT
+    assert result.diagnostic == (
+        "The supplied homotopy-equivalence certificate did not verify."
+    )
 
 
 def test_homology_resource_limit_is_inconclusive():
