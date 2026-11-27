@@ -66,16 +66,14 @@ def weak_point_core(poset: Poset) -> WeakPointReduction:
     """Delete certified weak points until none remain."""
     current = poset
     moves: list[WeakPointMove] = []
-    while (available := weak_point_moves(current)):
+    while available := weak_point_moves(current):
         move = available[0]
         moves.append(move)
         current = current.induced(x for x in current if x != move.point)
     return WeakPointReduction(current, tuple(moves))
 
 
-def verify_weak_point_reduction(
-    poset: Poset, reduction: WeakPointReduction
-) -> bool:
+def verify_weak_point_reduction(poset: Poset, reduction: WeakPointReduction) -> bool:
     """Replay all link-contractibility witnesses and check the terminal core."""
     if not isinstance(reduction, WeakPointReduction):
         return False
@@ -155,9 +153,6 @@ def verify_quillen_fiber_certificate(
         return False
     for point, reduction in certificate.fibers:
         fiber = fibers[point]
-        if (
-            not verify_beat_reduction(fiber, reduction)
-            or len(reduction.core) != 1
-        ):
+        if not verify_beat_reduction(fiber, reduction) or len(reduction.core) != 1:
             return False
     return True

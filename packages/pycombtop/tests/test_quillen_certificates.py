@@ -21,12 +21,8 @@ def test_weak_point_reduction_and_verification():
     reduction = weak_point_core(chain)
     assert len(reduction.core) == 1
     assert verify_weak_point_reduction(chain, reduction)
-    assert not verify_weak_point_reduction(
-        chain, replace(reduction, moves=())
-    )
-    assert not verify_weak_point_reduction(
-        chain, replace(reduction, core=chain)
-    )
+    assert not verify_weak_point_reduction(chain, replace(reduction, moves=()))
+    assert not verify_weak_point_reduction(chain, replace(reduction, core=chain))
 
 
 def test_weak_points_detect_contractible_links_but_not_empty_links():
