@@ -45,7 +45,9 @@ def test_verified_certificate_proves_equivalence_without_homology():
     target = point()
     forward = pycombtop.SimplicialMap(source, target, {0: "p", 1: "p"})
     backward = pycombtop.SimplicialMap(target, source, {"p": 0})
-    certificate = pycombtop.simplicial_homotopy_equivalence_certificate(forward, backward)
+    certificate = pycombtop.simplicial_homotopy_equivalence_certificate(
+        forward, backward
+    )
 
     result = pycombtop.compare_homotopy(
         source,
@@ -66,7 +68,9 @@ def test_invalid_certificate_falls_back_to_homology_obstruction():
     target = point()
     forward = pycombtop.SimplicialMap(edge, target, {0: "p", 1: "p"})
     backward = pycombtop.SimplicialMap(target, edge, {"p": 0})
-    certificate = pycombtop.simplicial_homotopy_equivalence_certificate(forward, backward)
+    certificate = pycombtop.simplicial_homotopy_equivalence_certificate(
+        forward, backward
+    )
 
     result = pycombtop.compare_homotopy(
         circle(),
@@ -82,7 +86,9 @@ def test_invalid_certificate_falls_back_to_homology_obstruction():
 
 
 def test_homology_resource_limit_is_inconclusive():
-    result = pycombtop.compare_homotopy(circle(), point(), max_faces=0, backend="python")
+    result = pycombtop.compare_homotopy(
+        circle(), point(), max_faces=0, backend="python"
+    )
 
     assert result.status is pycombtop.HomotopyComparisonStatus.INCONCLUSIVE
     assert result.is_equivalent is None
