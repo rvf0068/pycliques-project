@@ -201,19 +201,19 @@ def classify_homotopy(
         )
 
     if recognize_products:
-        certificate = product_type_certificate(
+        product_certificate = product_type_certificate(
             space,
             max_vertices=256 if max_vertices is None else max_vertices,
             max_simplices=25_000,
             max_partitions=max_product_partitions,
         )
-        if certificate is not None:
+        if product_certificate is not None:
             return HomotopyClassification(
                 HomotopyClassificationStatus.PROVED_TYPE,
                 "A strong-product split and certified factor types "
                 "recognized the homotopy type.",
-                homotopy_type=certificate.homotopy_type,
-                certificate=certificate,
+                homotopy_type=product_certificate.homotopy_type,
+                certificate=product_certificate,
             )
 
     return _from_verdict(
