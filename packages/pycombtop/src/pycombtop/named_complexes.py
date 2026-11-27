@@ -33,12 +33,12 @@ def chessboard_complex(m: int, n: int) -> SimplicialComplex:
     graph = nx.Graph()
     graph.add_nodes_from((i, j) for i in range(m) for j in range(n))
     graph.add_edges_from(
-        ((i, j), (k, l))
+        ((i, j), (k, column))
         for i in range(m)
         for k in range(i + 1, m)
         for j in range(n)
-        for l in range(n)
-        if j != l
+        for column in range(n)
+        if j != column
     )
     return clique_complex(graph)
 
