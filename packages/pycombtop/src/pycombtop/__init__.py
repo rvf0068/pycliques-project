@@ -79,7 +79,12 @@ from .hom_complex import (
 )
 from .homology import HomologyResult, simplicial_homology
 from .homology_backend import HomologyResourceLimit
-from .homotopy_classifier import (\n    HomotopyClassification,\n    HomotopyClassificationStatus,\n    classify_homotopy,\n)\nfrom .homotopy_comparison import (
+from .homotopy_classifier import (
+    HomotopyClassification,
+    HomotopyClassificationStatus,
+    classify_homotopy,
+)
+from .homotopy_comparison import (
     HomotopyComparisonResult,
     HomotopyComparisonStatus,
     compare_homotopy,
