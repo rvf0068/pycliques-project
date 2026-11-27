@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Hashable, Iterable, Mapping
+from dataclasses import dataclass
 from types import MappingProxyType
 
 from sympy import SparseMatrix
@@ -382,3 +383,167 @@ def prism_chain_homotopy(
         len(source_basis),
         {key: value for key, value in entries.items() if value},
     )
+
+
+@dataclass(frozen=True)
+class SimplicialHomotopyEquivalenceCertificate:
+    """Maps and contiguity chains proving a simplicial homotopy equivalence.
+
+    source_homotopy starts at backward composed with forward and ends at
+    the identity on the source. target_homotopy starts at forward composed
+    with backward and ends at the identity on the target. Consecutive maps
+    in each tuple must be contiguous; endpoints are included.
+    """
+
+    forward: SimplicialMap
+    backward: SimplicialMap
+    source_homotopy: tuple[SimplicialMap, ...]
+    target_homotopy: tuple[SimplicialMap, ...]
+
+
+def _compose_simplicial_maps(
+    first: SimplicialMap, second: SimplicialMap
+) -> SimplicialMap:
+    """Return second composed with first."""
+    if not _same_complex(first.target, second.source):
+        raise ValueError(
+            "the target of the first map must equal the source of the second"
+        )
+    return SimplicialMap(
+        first.source,
+        second.target,
+        {vertex: second(first(vertex)) for vertex in first.source.vertex_set},
+    )
+
+
+def _identity_simplicial_map(complex_: SimplicialComplex) -> SimplicialMap:
+    return SimplicialMap(
+        complex_,
+        complex_,
+        {vertex: vertex for vertex in complex_.vertex_set},
+    )
+
+
+def _is_contiguity_chain(
+    chain: tuple[SimplicialMap, ...],
+    source: SimplicialComplex,
+    target: SimplicialComplex,
+    start: SimplicialMap,
+    end: SimplicialMap,
+) -> bool:
+    if (
+        not isinstance(chain, tuple)
+        or not chain
+        or chain[0] != start
+        or chain[-1] != end
+    ):
+        return False
+    if any(not isinstance(mapping, SimplicialMap) for mapping in chain):
+        return False
+    if any(
+        not _same_complex(mapping.source, source)
+        or not _same_complex(mapping.target, target)
+        for mapping in chain
+    ):
+        return False
+    return all(are_contiguous(first, second) for first, second in zip(chain, chain[1:]))
+
+
+def simplicial_homotopy_equivalence_certificate(
+    forward: SimplicialMap,
+    backward: SimplicialMap,
+    *,
+    source_homotopy: Iterable[SimplicialMap] = (),
+    target_homotopy: Iterable[SimplicialMap] = (),
+) -> SimplicialHomotopyEquivalenceCertificate | None:
+    """Build a certificate when the supplied maps are homotopy inverses.
+
+    The optional homotopy iterables contain intermediate maps only. The
+    function inserts the composite and identity endpoints, then checks every
+    consecutive pair for contiguity. It returns None when either chain fails.
+    The two maps must have opposite source and target complexes.
+    """
+    if not isinstance(forward, SimplicialMap) or not isinstance(
+        backward, SimplicialMap
+    ):
+        raise TypeError("forward and backward must be SimplicialMap instances")
+    if not _same_complex(forward.source, backward.target) or not _same_complex(
+        forward.target, backward.source
+    ):
+        raise ValueError("forward and backward maps must have opposite endpoints")
+
+    source_composite = _compose_simplicial_maps(forward, backward)
+    target_composite = _compose_simplicial_maps(backward, forward)
+    certificate = SimplicialHomotopyEquivalenceCertificate(
+        forward,
+        backward,
+        (
+            source_composite,
+            *tuple(source_homotopy),
+            _identity_simplicial_map(forward.source),
+        ),
+        (
+            target_composite,
+            *tuple(target_homotopy),
+            _identity_simplicial_map(forward.target),
+        ),
+    )
+    return (
+        certificate
+        if verify_simplicial_homotopy_equivalence(
+            forward.source, forward.target, certificate
+        )
+        else None
+    )
+
+
+def verify_simplicial_homotopy_equivalence(
+    source: SimplicialComplex,
+    target: SimplicialComplex,
+    certificate: SimplicialHomotopyEquivalenceCertificate,
+) -> bool:
+    """Verify a simplicial homotopy-equivalence certificate independently.
+
+    The maps are homotopy inverses, with homotopies given by finite chains
+    of contiguous simplicial maps. Thus the geometric realizations are
+    homotopy equivalent. This verifier uses no homology computations.
+    """
+    if (
+        not isinstance(source, SimplicialComplex)
+        or not isinstance(target, SimplicialComplex)
+        or not isinstance(certificate, SimplicialHomotopyEquivalenceCertificate)
+    ):
+        return False
+    forward = certificate.forward
+    backward = certificate.backward
+    if not isinstance(forward, SimplicialMap) or not isinstance(
+        backward, SimplicialMap
+    ):
+        return False
+    if not _same_complex(forward.source, source) or not _same_complex(
+        forward.target, target
+    ):
+        return False
+    if not _same_complex(backward.source, target) or not _same_complex(
+        backward.target, source
+    ):
+        return False
+
+    try:
+        source_composite = _compose_simplicial_maps(forward, backward)
+        target_composite = _compose_simplicial_maps(backward, forward)
+        return _is_contiguity_chain(
+            certificate.source_homotopy,
+            source,
+            source,
+            source_composite,
+            _identity_simplicial_map(source),
+        ) and _is_contiguity_chain(
+            certificate.target_homotopy,
+            target,
+            target,
+            target_composite,
+            _identity_simplicial_map(target),
+        )
+    except (TypeError, ValueError):
+        return False
