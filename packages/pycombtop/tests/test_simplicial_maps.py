@@ -524,7 +524,7 @@ def test_simplicial_homotopy_equivalence_verifier_checks_both_chain_endpoints():
 
 
 
-def test_simplicial_homotopy_equivalence_rejects_noncontiguous_source_and_target_chains():
+def test_simplicial_homotopy_equivalence_rejects_noncontiguous_chains():
     from pycombtop import simplicial_homotopy_equivalence_certificate
 
     path = SimplicialComplex({0, 1, 2}, [{0, 1}, {1, 2}])
@@ -561,7 +561,11 @@ def test_simplicial_homotopy_equivalence_verifier_rejects_wrong_chain_codomain()
     assert certificate is not None
 
     wrong_codomain = SimplicialMap(path, other_point, {0: "x", 1: "x"})
-    chain = (certificate.source_homotopy[0], wrong_codomain, certificate.source_homotopy[-1])
+    chain = (
+        certificate.source_homotopy[0],
+        wrong_codomain,
+        certificate.source_homotopy[-1],
+    )
     assert not verify_simplicial_homotopy_equivalence(
         path, point, replace(certificate, source_homotopy=chain)
     )
