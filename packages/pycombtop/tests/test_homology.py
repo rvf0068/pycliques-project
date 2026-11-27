@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-import pycombtop.homology as homology_module
 from pycombtop import (
     HomologyResourceLimit,
     SimplicialComplex,
+    homology,
     simplicial_homology,
 )
 
@@ -106,7 +106,7 @@ def test_auto_backend_falls_back_when_gudhi_is_unavailable(monkeypatch):
     def unavailable(*_args, **_kwargs):
         raise ImportError("synthetic missing GUDHI")
 
-    monkeypatch.setattr(homology_module, "gudhi_betti_facets", unavailable)
+    monkeypatch.setattr(homology, "gudhi_betti_facets", unavailable)
     result = simplicial_homology(complex_, backend="auto")
     assert result.backend == "python"
     assert result.betti_numbers == (0, 0, 0)
