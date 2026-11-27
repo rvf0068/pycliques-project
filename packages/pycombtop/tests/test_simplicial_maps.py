@@ -226,3 +226,81 @@ def test_prism_operator_rejects_noncontiguous_maps():
 
     with pytest.raises(ValueError, match="requires contiguous maps"):
         prism_chain_homotopy(first, second, 0)
+
+def test_simplicial_map_argument_validation_equality_and_repr():
+    from typing import Any, cast
+
+    source = SimplicialComplex({0}, [{0}])
+    target = SimplicialComplex({"a"}, [{"a"}])
+    mapping = SimplicialMap(source, target, {0: "a"})
+
+    with pytest.raises(TypeError, match="source and target"):
+        SimplicialMap(cast(Any, object()), target, {})
+    with pytest.raises(TypeError, match="source and target"):
+        SimplicialMap(source, cast(Any, object()), {})
+    with pytest.raises(TypeError, match="vertex_map"):
+        SimplicialMap(source, target, cast(Any, []))
+
+    assert mapping == SimplicialMap(source, target, {0: "a"})
+    assert mapping != object()
+    other_source = SimplicialComplex({1}, [{1}])
+    assert mapping != SimplicialMap(other_source, target, {1: "a"})
+    assert repr(mapping) == "SimplicialMap({0: 'a'})"
+
+
+def test_contiguity_and_induced_map_reject_wrong_argument_types():
+    from typing import Any, cast
+
+    source = SimplicialComplex({0}, [{0}])
+    target = SimplicialComplex({"a"}, [{"a"}])
+    mapping = SimplicialMap(source, target, {0: "a"})
+
+    with pytest.raises(TypeError, match="both arguments"):
+        are_contiguous(cast(Any, object()), mapping)
+    with pytest.raises(TypeError, match="both arguments"):
+        are_contiguous(mapping, cast(Any, object()))
+    with pytest.raises(TypeError, match="SimplicialMap instance"):
+        induced_chain_map(cast(Any, object()), 0)
+
+
+def test_chain_basis_validates_degrees_and_explicit_orders():
+    complex_ = SimplicialComplex({0, 1}, [{0, 1}])
+
+    for degree in (-1, True):
+        with pytest.raises(ValueError, match="nonnegative integer"):
+            simplicial_chain_basis(complex_, degree)
+
+    with pytest.raises(ValueError, match="exactly once"):
+        simplicial_chain_basis(complex_, 0, vertex_order=[0, 0])
+
+
+def test_default_vertex_order_handles_nested_labels_and_rejects_key_collisions():
+    nested_labels = {frozenset({1}), frozenset({2})}
+    nested = SimplicialComplex(nested_labels, [nested_labels])
+    assert len(simplicial_chain_basis(nested, 0)) == 2
+
+    class ReprCollision:
+        def __repr__(self) -> str:
+            return "same"
+
+    first, second = ReprCollision(), ReprCollision()
+    ambiguous = SimplicialComplex({first, second}, [{first, second}])
+    with pytest.raises(ValueError, match="ambiguous stable keys"):
+        simplicial_chain_basis(ambiguous, 0)
+
+
+def test_prism_operator_cancels_repeated_terms():
+    source = SimplicialComplex({0, 1}, [{0, 1}])
+    target = SimplicialComplex({"a", "b", "c"}, [{"a", "b", "c"}])
+    first = SimplicialMap(source, target, {0: "a", 1: "b"})
+    second = SimplicialMap(source, target, {0: "b", 1: "c"})
+
+    prism = prism_chain_homotopy(
+        first,
+        second,
+        1,
+        source_order=[0, 1],
+        target_order=["a", "b", "c"],
+    )
+    assert prism == zeros(1, 1)
+
