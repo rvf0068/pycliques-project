@@ -138,7 +138,11 @@ def verify_quillen_fiber_certificate(
     certificate: QuillenFiberCertificate,
 ) -> bool:
     """Verify every lower-fiber witness without trusting its construction."""
-    if not isinstance(certificate, QuillenFiberCertificate):
+    if (
+        not isinstance(source, Poset)
+        or not isinstance(target, Poset)
+        or not isinstance(certificate, QuillenFiberCertificate)
+    ):
         return False
     try:
         fibers = lower_fibers(source, target, mapping)
