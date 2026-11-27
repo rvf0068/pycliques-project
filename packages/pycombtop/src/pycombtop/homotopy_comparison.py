@@ -127,7 +127,6 @@ def compare_homotopy(
             "The supplied homotopy-equivalence certificate did not verify."
         )
 
-
     profiles: list[tuple[CoefficientField, tuple[int, ...], tuple[int, ...]]] = []
     for field in selected_fields:
         try:
