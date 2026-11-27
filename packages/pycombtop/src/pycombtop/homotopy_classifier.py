@@ -126,7 +126,9 @@ def classify_homotopy(
         A simple undirected loopless NetworkX graph or a nonempty
         SimplicialComplex.
     max_vertices, max_simplices:
-        Resource limits forwarded to the established classifier.
+        Resource limits forwarded to the established graph/complex cascade.
+        Specialized certificate recognizers have separate fixed internal
+        budgets and may establish a type without enumerating the full complex.
     max_total_letters:
         Bound for the cellular presentation recognizer.
     recognize_products:
@@ -167,7 +169,8 @@ def classify_homotopy(
             )
         certificate = complex_type_certificate(
             space,
-            max_target_facets=25_000 if max_simplices is None else max(1, max_simplices),
+            max_target_facets=25_000,
+            max_bad_faces=25_000,
             max_total_letters=max_total_letters,
         )
         if certificate is not None:
@@ -197,12 +200,17 @@ def classify_homotopy(
         raise ValueError("graph input must be simple, undirected, and loopless")
     if not space:
         raise ValueError("Homotopy classification requires a nonempty realization")
+    if max_vertices is not None and space.number_of_nodes() > max_vertices:
+        return HomotopyClassification(
+            HomotopyClassificationStatus.INCONCLUSIVE,
+            f"vertex limit {max_vertices} exceeded",
+        )
 
     if recognize_products:
         certificate = product_type_certificate(
             space,
             max_vertices=256 if max_vertices is None else max_vertices,
-            max_simplices=25_000 if max_simplices is None else max(1, max_simplices),
+            max_simplices=25_000,
             max_partitions=max_product_partitions,
         )
         if certificate is not None:
