@@ -486,8 +486,6 @@ def test_simplicial_homotopy_equivalence_rejects_malformed_maps_and_spaces():
         path, point, replace(certificate, backward=cast(Any, object()))
     )
 
-
-
 def test_simplicial_map_composition_rejects_incompatible_endpoints():
     from pycombtop.simplicial_maps import _compose_simplicial_maps
 
