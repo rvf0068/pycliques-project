@@ -1,8 +1,7 @@
 """Tests for conservative comparisons of simplicial homotopy types."""
 
-import pytest
-
 import pycombtop
+import pytest
 
 
 def circle() -> pycombtop.SimplicialComplex:
