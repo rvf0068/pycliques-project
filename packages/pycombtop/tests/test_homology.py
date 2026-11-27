@@ -195,7 +195,6 @@ def test_betti_numbers_sc_accepts_ambiguous_hashable_vertex_labels():
     assert pycombtop.betti_numbers_sc(circle) == [0, 1]
 
 
-
 def test_homology_result_accessors_and_gudhi_constraints():
     triangle = pycombtop.SimplicialComplex({0, 1, 2}, [{0, 1, 2}])
     boundary = pycombtop.SimplicialComplex(
