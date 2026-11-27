@@ -4,13 +4,6 @@ from itertools import combinations
 
 import networkx as nx
 import pytest
-from sympy.combinatorics.named_groups import (
-    AbelianGroup,
-    CyclicGroup,
-    DihedralGroup,
-    SymmetricGroup,
-)
-
 from pycombtop import (
     Poset,
     SubgroupEnumerationLimit,
@@ -28,6 +21,12 @@ from pycombtop import (
     refines,
     subgroup_conjugation,
     subgroup_lattice,
+)
+from sympy.combinatorics.named_groups import (
+    AbelianGroup,
+    CyclicGroup,
+    DihedralGroup,
+    SymmetricGroup,
 )
 
 
