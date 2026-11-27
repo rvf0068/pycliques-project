@@ -190,7 +190,7 @@ def test_induced_chain_maps_commute_with_boundary():
 def test_prism_operator_is_chain_homotopy_for_contiguous_maps():
     source = SimplicialComplex({0, 1}, [{0, 1}])
     target = SimplicialComplex({"a", "b", "c"}, [{"a", "b", "c"}])
-    first = SimplicialMap(source, target, {0: "a", 1: "b"})
+    first = SimplicialMap(source, target, {0: "a", 1: "a"})
     second = SimplicialMap(source, target, {0: "b", 1: "c"})
     source_order = [0, 1]
     target_order = ["a", "b", "c"]
@@ -216,6 +216,7 @@ def test_prism_operator_is_chain_homotopy_for_contiguous_maps():
         simplicial_boundary_matrix(target, 1, vertex_order=target_order) * prism_0
         == difference_0
     )
+    assert prism_1 == eye(1)
     assert (
         simplicial_boundary_matrix(target, 2, vertex_order=target_order) * prism_1
         + prism_0
