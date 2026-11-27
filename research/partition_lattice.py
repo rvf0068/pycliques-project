@@ -21,10 +21,15 @@ from __future__ import annotations
 import argparse
 import math
 from collections.abc import Sequence
-from itertools import combinations
 
-import networkx as nx
 from pycombtop import SimplicialComplex, clique_complex
+from pycombtop.named_posets import (
+    Partition as Partition,
+    induced_permutation as induced_permutation,
+    nontrivial_partitions as nontrivial_partitions,
+    partition_graph as partition_graph,
+    refines as refines,
+)
 from pyhomrep import (
     character_p_homology,
     form_matrix_yt,
@@ -32,51 +37,8 @@ from pyhomrep import (
     partitions_list,
     size_conjugacy_class,
 )
-from sympy.combinatorics import Permutation
-from sympy.utilities.iterables import multiset_partitions
 
-Partition = frozenset[frozenset[int]]
 RepresentationDecomposition = dict[int, dict[tuple[int, ...], object]]
-
-
-def nontrivial_partitions(n: int) -> list[Partition]:
-    """Return partitions of ``{0, ..., n-1}`` with between 2 and n-1 blocks."""
-    if n < 3:
-        raise ValueError("n must be at least 3")
-    return [
-        frozenset(frozenset(b) for b in p)
-        for p in multiset_partitions(list(range(n)))
-        if 1 < len(p) < n
-    ]
-
-
-def refines(a: Partition, b: Partition) -> bool:
-    """True if every block of a lies inside a block of b."""
-    return all(any(x <= y for y in b) for x in a)
-
-
-def partition_graph(n: int) -> tuple[nx.Graph, list[Partition]]:
-    """Return the comparability graph and its indexed nontrivial partitions."""
-    if n < 3:
-        raise ValueError("n must be at least 3")
-    parts = nontrivial_partitions(n)
-    graph = nx.Graph()
-    graph.add_nodes_from(range(len(parts)))
-    for i, j in combinations(range(len(parts)), 2):
-        if refines(parts[i], parts[j]) or refines(parts[j], parts[i]):
-            graph.add_edge(i, j)
-    return graph, parts
-
-
-def induced_permutation(
-    g: Permutation, n: int, parts: list[Partition], index: dict[Partition, int]
-) -> Permutation:
-    """Return the permutation of partition indices induced by ``g`` in ``S_n``."""
-    g = Permutation(g.array_form, size=n)
-    img = [
-        index[frozenset(frozenset(g(x) for x in block) for block in p)] for p in parts
-    ]
-    return Permutation(img, size=len(parts))
 
 
 def decompose(
