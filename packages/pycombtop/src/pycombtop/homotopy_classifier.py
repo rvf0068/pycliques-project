@@ -61,7 +61,7 @@ class HomotopyClassification:
 
     @property
     def has_replayable_certificate(self) -> bool:
-        """Whether this result carries a dedicated, independently checkable certificate.
+        """Whether a dedicated, independently checkable certificate is attached.
 
         Exact legacy cascade verdicts can prove a type without carrying a
         replayable certificate; inspect the verdict separately in that case.
