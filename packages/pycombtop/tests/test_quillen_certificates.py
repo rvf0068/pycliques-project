@@ -29,8 +29,6 @@ def test_weak_point_reduction_and_verification():
 
 def test_weak_point_verifier_accepts_alternate_valid_link_reduction():
     from pycombtop.quillen_certificates import WeakPointMove, WeakPointReduction
-    from pycombtop.posets import beat_core
-
     chain = Poset([0, 1, 2, 3], [(0, 1), (1, 2), (2, 3)])
     link = Poset([1, 2, 3], [(1, 2), (2, 3)])
     alternate = BeatReduction(
@@ -38,13 +36,8 @@ def test_weak_point_verifier_accepts_alternate_valid_link_reduction():
         (BeatMove(3, 2, "down"), BeatMove(2, 1, "down")),
     )
     assert alternate != beat_core(link)
-    tail = beat_core(link)
     certificate = WeakPointReduction(
-        tail.core,
-        (WeakPointMove(0, "upper", alternate),) + tuple(
-            # The canonical tail starts from the link after deleting 0.
-            move for move in tail.moves
-        ),
+        Poset([1]), (WeakPointMove(0, "upper", alternate),)
     )
     assert verify_weak_point_reduction(chain, certificate)
 
