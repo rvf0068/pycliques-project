@@ -8,7 +8,6 @@ import pytest
 from pycliques import clique_graph, homotopy_clique_graph
 from pycliques.cliques import double_bound_graph as graph_double_bound
 from pycliques.helly import is_clique_helly
-
 from pycombtop import (
     BeatMove,
     Poset,
