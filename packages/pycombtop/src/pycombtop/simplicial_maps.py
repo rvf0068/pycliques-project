@@ -260,12 +260,13 @@ def simplicial_boundary_matrix(
     exact sympy.SparseMatrix instances over the integers.
     """
     _validate_degree(degree)
-    ranks = _vertex_ranks(complex_, vertex_order)
-    columns = simplicial_chain_basis(complex_, degree, vertex_order=vertex_order)
+    order = None if vertex_order is None else tuple(vertex_order)
+    ranks = _vertex_ranks(complex_, order)
+    columns = simplicial_chain_basis(complex_, degree, vertex_order=order)
     if degree == 0:
         return SparseMatrix(0, len(columns), {})
 
-    rows = simplicial_chain_basis(complex_, degree - 1, vertex_order=vertex_order)
+    rows = simplicial_chain_basis(complex_, degree - 1, vertex_order=order)
     row_positions = {simplex: index for index, simplex in enumerate(rows)}
     entries: dict[tuple[int, int], int] = {}
     for column, simplex in enumerate(columns):
@@ -293,6 +294,8 @@ def induced_chain_map(
     if not isinstance(simplicial_map, SimplicialMap):
         raise TypeError("simplicial_map must be a SimplicialMap instance")
     _validate_degree(degree)
+    source_order = None if source_order is None else tuple(source_order)
+    target_order = None if target_order is None else tuple(target_order)
 
     source_ranks = _vertex_ranks(simplicial_map.source, source_order)
     target_ranks = _vertex_ranks(simplicial_map.target, target_order)
@@ -343,6 +346,8 @@ def prism_chain_homotopy(
     if not are_contiguous(first, second):
         raise ValueError("the prism operator requires contiguous maps")
     _validate_degree(degree)
+    source_order = None if source_order is None else tuple(source_order)
+    target_order = None if target_order is None else tuple(target_order)
 
     source_ranks = _vertex_ranks(first.source, source_order)
     target_ranks = _vertex_ranks(first.target, target_order)
