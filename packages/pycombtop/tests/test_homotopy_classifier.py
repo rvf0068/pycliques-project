@@ -12,6 +12,7 @@ def test_graph_classifier_returns_structured_exact_type() -> None:
     assert result.homotopy_type == pycombtop.WedgeType(((pycombtop.SphereType(1), 1),))
     assert result.is_exact
     assert result.verdict is not None
+    assert not result.has_replayable_certificate
 
 
 def test_complex_classifier_uses_cellular_certificate() -> None:
@@ -20,7 +21,9 @@ def test_complex_classifier_uses_cellular_certificate() -> None:
 
     assert result.status is pycombtop.HomotopyClassificationStatus.PROVED_TYPE
     assert result.homotopy_type is not None
-    assert result.certificate is not None
+    assert isinstance(result.certificate, pycombtop.ComplexTypeCertificate)
+    assert pycombtop.verify_complex_type(complex_, result.certificate)
+    assert result.has_replayable_certificate
     assert result.is_exact
 
 
@@ -93,3 +96,14 @@ def test_vertex_limit_precedes_disconnected_complex_check() -> None:
 
     assert result.status is pycombtop.HomotopyClassificationStatus.INCONCLUSIVE
     assert result.reason == "vertex limit 3 exceeded"
+
+
+def test_graph_product_certificate_is_replayable() -> None:
+    graph = nx.strong_product(nx.cycle_graph(5), nx.cycle_graph(5))
+
+    result = pycombtop.classify_homotopy(graph)
+
+    assert result.status is pycombtop.HomotopyClassificationStatus.PROVED_TYPE
+    assert isinstance(result.certificate, pycombtop.ProductTypeCertificate)
+    assert result.has_replayable_certificate
+    assert pycombtop.verify_product_type(graph, result.certificate)

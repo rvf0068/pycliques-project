@@ -59,6 +59,15 @@ class HomotopyClassification:
         """Whether a homotopy type, rather than only homology, was proved."""
         return self.status is HomotopyClassificationStatus.PROVED_TYPE
 
+    @property
+    def has_replayable_certificate(self) -> bool:
+        """Whether a dedicated, independently checkable certificate is attached.
+
+        Exact legacy cascade verdicts can prove a type without carrying a
+        replayable certificate; inspect the verdict separately in that case.
+        """
+        return self.certificate is not None
+
 
 def _wedge_type(wedge: WedgeOfSpheres) -> WedgeType:
     """Convert the legacy sphere-wedge representation to the structured API."""
