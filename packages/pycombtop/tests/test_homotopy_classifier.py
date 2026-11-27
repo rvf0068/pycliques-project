@@ -60,7 +60,6 @@ def test_validates_budgets() -> None:
         pycombtop.classify_homotopy(nx.path_graph(2), max_total_letters=0)
 
 
-
 def test_disconnected_graph_is_inconclusive() -> None:
     graph = nx.disjoint_union(nx.cycle_graph(4), nx.cycle_graph(5))
 
