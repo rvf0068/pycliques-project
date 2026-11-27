@@ -532,12 +532,15 @@ def test_simplicial_homotopy_equivalence_rejects_noncontiguous_source_and_target
     collapse = SimplicialMap(path, point, dict.fromkeys(path.vertex_set, "*"))
     inclusion = SimplicialMap(point, path, {"*": 1})
 
+    constant_at_zero = SimplicialMap(
+        path, path, dict.fromkeys(path.vertex_set, 0)
+    )
     assert simplicial_homotopy_equivalence_certificate(
-        collapse, inclusion, source_homotopy=(inclusion,)
+        collapse, inclusion, source_homotopy=(constant_at_zero,)
     ) is None
 
     assert simplicial_homotopy_equivalence_certificate(
-        inclusion, collapse, target_homotopy=(inclusion,)
+        inclusion, collapse, target_homotopy=(constant_at_zero,)
     ) is None
 
 
