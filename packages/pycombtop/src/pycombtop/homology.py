@@ -323,7 +323,7 @@ def simplicial_homology(
     if can_use_gudhi:
         assert type(field) is int
         try:
-            betti_numbers = gudhi_betti_facets(
+            gudhi_betti_numbers = gudhi_betti_facets(
                 complex_.facet_set,
                 field=field,
                 reduced=reduced,
@@ -334,14 +334,14 @@ def simplicial_homology(
                 raise
         else:
             return HomologyResult(
-                tuple(betti_numbers),
+                tuple(gudhi_betti_numbers),
                 field,
                 reduced,
                 False,
                 "gudhi",
             )
 
-    betti_numbers = _python_betti_numbers(
+    python_betti_numbers = _python_betti_numbers(
         complex_,
         field=field,
         reduced=reduced,
@@ -350,7 +350,7 @@ def simplicial_homology(
         max_faces=max_faces,
     )
     return HomologyResult(
-        betti_numbers,
+        python_betti_numbers,
         field,
         reduced,
         relative_to is not None,
