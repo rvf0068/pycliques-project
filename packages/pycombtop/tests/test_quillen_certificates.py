@@ -6,6 +6,7 @@ import pytest
 from pycombtop import (
     BeatMove,
     BeatReduction,
+    beat_core,
     Poset,
     QuillenFiberCertificate,
     quillen_fiber_certificate,
