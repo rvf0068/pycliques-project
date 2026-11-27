@@ -5,9 +5,9 @@ import pytest
 from pycombtop import (
     compare_homotopy,
     HomotopyComparisonStatus,
+    simplicial_homotopy_equivalence_certificate,
     SimplicialComplex,
     SimplicialMap,
-    simplicial_homotopy_equivalence_certificate,
 )
 
 
