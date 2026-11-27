@@ -7,11 +7,13 @@ from pycombtop import (
     BeatMove,
     BeatReduction,
     Poset,
-    beat_core,
     QuillenFiberCertificate,
+    beat_core,
     quillen_fiber_certificate,
     verify_quillen_fiber_certificate,
     verify_weak_point_reduction,
+    WeakPointMove,
+    WeakPointReduction,
     weak_point_core,
     weak_point_moves,
 )
@@ -29,7 +31,6 @@ def test_weak_point_reduction_and_verification():
 
 
 def test_weak_point_verifier_accepts_alternate_valid_link_reduction():
-    from pycombtop.quillen_certificates import WeakPointMove, WeakPointReduction
     chain = Poset([0, 1, 2, 3], [(0, 1), (1, 2), (2, 3)])
     link = Poset([1, 2, 3], [(1, 2), (2, 3)])
     alternate = BeatReduction(
@@ -87,3 +88,63 @@ def test_quillen_fiber_certificate_checks_map_and_complete_fiber_list():
     assert verify_quillen_fiber_certificate(source, target, mapping, certificate)
     shortened = replace(certificate, fibers=certificate.fibers[:-1])
     assert not verify_quillen_fiber_certificate(source, target, mapping, shortened)
+
+
+
+def test_weak_point_verifier_rejects_malformed_moves_and_links():
+    chain = Poset([0, 1], [(0, 1)])
+    valid = weak_point_core(chain)
+    assert not verify_weak_point_reduction(chain, object())
+    assert not verify_weak_point_reduction(
+        chain, replace(valid, moves=(object(),))
+    )
+    assert not verify_weak_point_reduction(
+        chain, replace(valid, moves=(WeakPointMove(99, "upper", BeatReduction(Poset([0]), ())),))
+    )
+    assert not verify_weak_point_reduction(
+        chain, replace(valid, moves=(WeakPointMove(0, "sideways", BeatReduction(Poset([1]), ())),))
+    )
+    assert not verify_weak_point_reduction(
+        chain, replace(valid, moves=(WeakPointMove(0, "upper", BeatReduction(Poset([99]), ())),))
+    )
+
+
+def test_weak_point_verifier_rejects_non_singleton_link_core_and_nonterminal_core():
+    fork = Poset([0, 1, 2], [(0, 1), (0, 2)])
+    non_singleton_link = BeatReduction(Poset([1, 2]), ())
+    bad = WeakPointReduction(
+        Poset([1, 2]),
+        (WeakPointMove(0, "upper", non_singleton_link),),
+    )
+    assert not verify_weak_point_reduction(fork, bad)
+
+    chain = Poset([0, 1, 2], [(0, 1), (1, 2)])
+    first = weak_point_moves(chain)[0]
+    remainder = chain.induced([1, 2])
+    incomplete = WeakPointReduction(remainder, (first,))
+    assert not verify_weak_point_reduction(chain, incomplete)
+
+
+def test_quillen_verifier_rejects_invalid_inputs_and_map():
+    source = Poset([0])
+    target = Poset(["*"])
+    mapping = {0: "*"}
+    certificate = quillen_fiber_certificate(source, target, mapping)
+    assert certificate is not None
+    assert not verify_quillen_fiber_certificate(object(), target, mapping, certificate)
+    assert not verify_quillen_fiber_certificate(source, object(), mapping, certificate)
+    assert not verify_quillen_fiber_certificate(source, target, mapping, object())
+    assert not verify_quillen_fiber_certificate(source, target, {}, certificate)
+    assert not verify_quillen_fiber_certificate(source, target, None, certificate)
+
+
+def test_quillen_verifier_rejects_tampered_fiber_witness():
+    source = Poset([0])
+    target = Poset(["*"])
+    mapping = {0: "*"}
+    certificate = quillen_fiber_certificate(source, target, mapping)
+    assert certificate is not None
+    bad_fibers = ((" *", BeatReduction(Poset(["*"]), ())),)
+    assert not verify_quillen_fiber_certificate(
+        source, target, mapping, replace(certificate, fibers=bad_fibers)
+    )
