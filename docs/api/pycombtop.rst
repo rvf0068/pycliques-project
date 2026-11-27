@@ -218,3 +218,90 @@ implementation of the LPV08 Theorem 5.7 sufficient hypothesis for graphs.
    :members:
    :show-inheritance:
    :member-order: bysource
+
+
+Named posets
+------------
+
+All named constructors return the same ``Poset`` type, so the existing
+order-complex, finite-space and clique-graph tools apply without adapters.
+The Boolean lattice uses subset cardinality as rank; the partition lattice
+uses the number of elements minus the number of blocks. Both support
+inclusive rank intervals and removal of the original minimum and maximum.
+The proper part of the Boolean lattice on four elements has the homotopy
+type of a 2-sphere; the proper part of the partition lattice on four
+elements has the homotopy type of a wedge of six circles.
+
+.. code-block:: python
+
+   from pycombtop import (
+       betti_numbers_sc,
+       boolean_lattice,
+       order_complex,
+       partition_lattice,
+   )
+
+   B = boolean_lattice(4, proper=True)
+   assert betti_numbers_sc(order_complex(B)) == [0, 0, 1]
+   Pi = partition_lattice(4, proper=True)
+   assert betti_numbers_sc(order_complex(Pi)) == [0, 6]
+
+The reusable partition enumeration, refinement, indexed comparability
+graph and induced symmetric-group permutation helpers formerly in
+``research.partition_lattice`` now live in ``pycombtop.named_posets``.
+The research module still provides its original imports and CLI.
+
+.. automodule:: pycombtop.named_posets
+   :members:
+   :show-inheritance:
+   :member-order: bysource
+
+Subgroup lattices and p-subgroup posets
+--------------------------------------
+
+The group constructors accept a SymPy finite permutation group, including
+the standard constructors for cyclic, abelian, dihedral, alternating and
+symmetric groups. Each label is a frozenset of actual group elements
+(SymPy permutations), so distinct conjugate subgroups remain distinct.
+The order is subgroup inclusion. Brown's poset includes all nontrivial
+p-subgroups; Quillen's poset includes only the nontrivial elementary
+abelian p-subgroups. The trivial subgroup is excluded in both cases,
+but the whole group is included when it satisfies the defining condition.
+A non-prime p is rejected. A prime not dividing the group order produces
+an empty poset. Conjugation induces order automorphisms, available via
+``subgroup_conjugation``.
+
+.. code-block:: python
+
+   from sympy.combinatorics.named_groups import CyclicGroup, SymmetricGroup
+   from pycombtop import (
+       brown_poset,
+       quillen_poset,
+       subgroup_lattice,
+       order_complex,
+   )
+
+   C4 = CyclicGroup(4)
+   assert len(brown_poset(C4, 2)) == 2
+   assert len(quillen_poset(C4, 2)) == 1
+
+   S3 = SymmetricGroup(3)
+   assert len(subgroup_lattice(S3)) == 6
+   Q = quillen_poset(S3, 2)
+   assert len(Q) == 3
+   X = order_complex(Q)
+
+Enumeration extends generating sets exhaustively and can restrict the
+search to p-groups or elementary abelian p-groups. It is not a conjugacy
+class enumeration. The default bounds are group order 1000 and 10000
+enumerated subgroups (including the trivial subgroup). Set either bound
+to None to disable it. An exceeded bound raises
+``SubgroupEnumerationLimit`` rather than returning an incomplete poset.
+Even within these bounds, time and storage costs can grow substantially.
+Finitely presented groups are not accepted directly: a finite permutation
+representation can be supplied instead.
+
+.. automodule:: pycombtop.subgroup_posets
+   :members:
+   :show-inheritance:
+   :member-order: bysource

@@ -126,7 +126,8 @@ def partition_graph(n: int) -> tuple[nx.Graph, list[Partition]]:
     """Historical indexed comparability graph of the proper partition lattice."""
     parts = nontrivial_partitions(n)
     graph = _partition_poset(parts).comparability_graph()
-    return nx.relabel_nodes(graph, {part: i for i, part in enumerate(parts)}), parts
+    indexed = nx.relabel_nodes(graph, {part: i for i, part in enumerate(parts)})
+    return indexed, parts
 
 
 def induced_permutation(

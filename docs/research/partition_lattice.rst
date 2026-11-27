@@ -8,7 +8,10 @@ It builds the comparability graph of nontrivial set partitions, takes its
 clique complex, computes the homology characters, and decomposes them into
 irreducible Specht modules using :mod:`pyhomrep`.
 
-The module is an exploratory research tool, not a public package API. The
+The decomposition module is an exploratory research tool. Its reusable
+partition helpers now live in :mod:`pycombtop.named_posets`; use
+``pycombtop.partition_lattice(n, proper=True)`` for the labeled poset.
+The original helper imports and indexed graph remain compatible. The
 underlying order complex is the order complex of the proper part of
 :math:`\Pi_n` because cliques in a comparability graph are chains.
 

@@ -6,6 +6,7 @@ and intended for small finite groups.
 """
 
 from collections import deque
+from collections.abc import Hashable, Iterator
 from typing import Literal
 
 from sympy import isprime
@@ -108,7 +109,7 @@ def _subgroup_poset(subgroups: tuple[Subgroup, ...]) -> Poset:
     """Inclusion order, generating only immediate inclusions."""
     ordered = sorted(subgroups, key=len)
 
-    def edges():
+    def edges() -> Iterator[tuple[Subgroup, Subgroup]]:
         for i, h in enumerate(ordered):
             covers: list[Subgroup] = []
             for k in ordered[i + 1 :]:
@@ -212,6 +213,7 @@ def subgroup_conjugation(
         conjugator = Permutation(g.array_form, size=degree)
         inverse = conjugator**-1
         mapping[h] = frozenset(inverse * x * conjugator for x in h)
-    if not poset.is_order_preserving(poset, mapping):
+    checked: dict[Hashable, Hashable] = dict(mapping)
+    if not poset.is_order_preserving(poset, checked):
         raise ValueError("conjugation does not preserve the poset")
     return mapping
