@@ -141,3 +141,80 @@ checks. The default remains the original non-inheriting strategy.
 .. automodule:: pycombtop.closed_trace_contractibility
    :members:
    :undoc-members:
+
+
+Finite posets and LPV08 constructions
+-------------------------------------
+
+The finite-poset interface stores a partial order independently of its
+order complex. Strict generating pairs are oriented from lower to upper;
+isolated elements are supplied separately. The relation constructor checks
+transitivity, and the matrix constructor requires a reflexive matrix.
+There is no new dependency.
+
+For the barycentric subdivision of a complex, use
+``order_complex(face_poset(complex_))``. The face poset contains only actual
+nonempty faces, not ghost vertices or the empty face. Construction of an
+order complex enumerates maximal chains, not every chain. Materializing
+face and interval posets can still be expensive: the order uses space
+proportional to the number of comparable pairs, and a face poset may have
+exponentially many elements.
+
+The following reproduces the graph constructions of
+Larrión, Pizaña and Villarroel-Flores, *Posets, clique graphs and their
+homotopy type*, European Journal of Combinatorics 29 (2008), 334–342,
+https://doi.org/10.1016/j.ejc.2006.04.012.
+
+.. code-block:: python
+
+   import networkx as nx
+   from pycliques import clique_graph, homotopy_clique_graph
+   from pycombtop import (
+       beat_core,
+       complete_poset,
+       interval_poset,
+       is_up_helly,
+       mho,
+       omega,
+       order_complex,
+       verify_beat_reduction,
+   )
+
+   G = nx.cycle_graph(4)
+   P = complete_poset(G)
+   assert nx.is_isomorphic(omega(P), G)
+   assert nx.is_isomorphic(mho(P), clique_graph(G))
+   assert nx.is_isomorphic(mho(interval_poset(P)), homotopy_clique_graph(G))
+   assert is_up_helly(P)
+   X = order_complex(P)
+   reduction = beat_core(P)
+   assert verify_beat_reduction(P, reduction)
+
+The last assertion verifies a finite-space beat-point core, **not** a
+classification of the homotopy type of the order complex. A one-point
+beat core proves contractibility, but a larger core need not imply
+noncontractibility of the order complex. Use the existing simplicial
+homology, homotopy and discrete-Morse tools on ``X`` for such questions.
+
+Other constructions include bounded complexes and their face posets,
+the two Helly and Sperner conditions, atomic and coatomic projections,
+join-increasing recognition, products, ideals, crosscuts, intervals,
+conical contraction witnesses and Quillen lower fibers. The functions
+``nice_fibers`` and ``lower_fibers`` return the actual subposets to be
+tested; they do not declare a homotopy equivalence on the basis of
+vanishing Betti numbers. The LPV08 conditions on bounded subsets are
+understood for nonempty subsets, as is appropriate for face posets.
+
+For graphs use the existing optimized ``pycliques.double_bound_graph(G)``
+and ``pycliques.homotopy_clique_graph(G)`` rather than materializing
+``complete_poset(G)`` only to construct those graphs. The general
+``pycombtop.double_bound_graph(P)`` accepts a poset instead. Graph nodes
+in the general constructions retain their poset labels (intervals are
+endpoint pairs); NetworkX does not allow None as a node label. The
+specialized closed-trace checker in ``pycombtop`` remains the preferred
+implementation of the LPV08 Theorem 5.7 sufficient hypothesis for graphs.
+
+.. automodule:: pycombtop.posets
+   :members:
+   :show-inheritance:
+   :member-order: bysource
