@@ -257,7 +257,7 @@ The research module still provides its original imports and CLI.
    :member-order: bysource
 
 Subgroup lattices and p-subgroup posets
---------------------------------------
+---------------------------------------
 
 The group constructors accept a SymPy finite permutation group, including
 the standard constructors for cyclic, abelian, dihedral, alternating and

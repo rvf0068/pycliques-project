@@ -213,7 +213,7 @@ def subgroup_conjugation(poset: Poset, g: Permutation) -> dict[Subgroup, Subgrou
         conjugator = Permutation(g.array_form, size=degree)
         inverse = conjugator**-1
         mapping[h] = frozenset(inverse * x * conjugator for x in h)
-    checked: dict[Hashable, Hashable] = dict(mapping)
+    checked: dict[Hashable, Hashable] = {h: image for h, image in mapping.items()}
     if not poset.is_order_preserving(poset, checked):
         raise ValueError("conjugation does not preserve the poset")
     return mapping

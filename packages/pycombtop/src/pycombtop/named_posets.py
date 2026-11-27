@@ -42,6 +42,7 @@ def boolean_lattice(
     distinct hashable labels. Rank is subset cardinality. The proper part
     excludes the empty and full subsets, including in the degenerate cases.
     """
+    labels: tuple[Hashable, ...]
     if isinstance(ground, int):
         if isinstance(ground, bool) or ground < 0:
             raise ValueError("ground size must be a nonnegative integer")
