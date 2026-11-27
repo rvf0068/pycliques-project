@@ -180,7 +180,6 @@ def test_ambiguous_vertex_labels_work_with_or_without_an_explicit_order():
     assert explicit_order.betti_numbers == default_order.betti_numbers
 
 
-
 def test_betti_numbers_sc_accepts_ambiguous_hashable_vertex_labels():
     class SameRepr:
         def __repr__(self):
