@@ -109,10 +109,7 @@ def is_multihomomorphism(
     if any(not values or not values <= target for values in images.values()):
         return False
     return all(
-        h.has_edge(x, y)
-        for u, v in g.edges()
-        for x in images[u]
-        for y in images[v]
+        h.has_edge(x, y) for u, v in g.edges() for x in images[u] for y in images[v]
     )
 
 
@@ -127,9 +124,7 @@ def iter_multihomomorphisms(g: nx.Graph, h: nx.Graph) -> Iterator[MultiHomomorph
     yield from _image_assignments(g, h, singletons=False)
 
 
-def hom_poset(
-    g: nx.Graph, h: nx.Graph, *, max_elements: int | None = 10_000
-) -> Poset:
+def hom_poset(g: nx.Graph, h: nx.Graph, *, max_elements: int | None = 10_000) -> Poset:
     """Return Hom(g,h), ordered by pointwise inclusion.
 
     See A. Dochtermann, Hom complexes and homotopy theory in the category

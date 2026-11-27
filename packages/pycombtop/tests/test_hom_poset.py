@@ -21,9 +21,7 @@ from pycombtop import (
 
 
 def _brute_force(g, h):
-    subsets = [
-        frozenset(s) for k in range(1, len(h) + 1) for s in combinations(h, k)
-    ]
+    subsets = [frozenset(s) for k in range(1, len(h) + 1) for s in combinations(h, k)]
     result = set()
     for values in product(subsets, repeat=len(g)):
         eta = dict(zip(g, values, strict=True))
