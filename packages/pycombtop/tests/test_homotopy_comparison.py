@@ -3,10 +3,10 @@
 import pytest
 
 from pycombtop import (
+    compare_homotopy,
     HomotopyComparisonStatus,
     SimplicialComplex,
     SimplicialMap,
-    compare_homotopy,
     simplicial_homotopy_equivalence_certificate,
 )
 
