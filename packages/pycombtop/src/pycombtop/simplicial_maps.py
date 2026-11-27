@@ -363,9 +363,8 @@ def prism_chain_homotopy(
     for column, simplex in enumerate(source_basis):
         vertices = _ordered_simplex(simplex, source_ranks)
         for split in range(degree + 1):
-            sequence = (
-                tuple(first(vertex) for vertex in vertices[: split + 1])
-                + tuple(second(vertex) for vertex in vertices[split:])
+            sequence = tuple(first(vertex) for vertex in vertices[: split + 1]) + tuple(
+                second(vertex) for vertex in vertices[split:]
             )
             if len(set(sequence)) != degree + 2:
                 continue
