@@ -14,6 +14,7 @@ from enum import Enum
 
 from .homology import (
     CoefficientField,
+    _normalize_field,
     HomologyBackend,
     HomologyResult,
     simplicial_homology,
@@ -100,8 +101,15 @@ def compare_homotopy(
         target, SimplicialComplex
     ):
         raise TypeError("source and target must be SimplicialComplex instances")
-    if not source.facet_set or not target.facet_set:
+    if not source.vertex_set or not target.vertex_set:
         raise ValueError("homotopy comparison requires nonempty realizations")
+
+    selected_fields = tuple(_normalize_field(field) for field in fields)
+    if not selected_fields:
+        raise ValueError("fields must contain at least one coefficient field")
+    if len(set(selected_fields)) != len(selected_fields):
+        raise ValueError("fields must not contain duplicates")
+
     certificate_diagnostic = None
     if certificate is not None:
         if not isinstance(certificate, SimplicialHomotopyEquivalenceCertificate):
@@ -119,11 +127,6 @@ def compare_homotopy(
             "The supplied homotopy-equivalence certificate did not verify."
         )
 
-    selected_fields = tuple(fields)
-    if not selected_fields:
-        raise ValueError("fields must contain at least one coefficient field")
-    if len(set(selected_fields)) != len(selected_fields):
-        raise ValueError("fields must not contain duplicates")
 
     profiles: list[tuple[CoefficientField, tuple[int, ...], tuple[int, ...]]] = []
     for field in selected_fields:
@@ -141,7 +144,11 @@ def compare_homotopy(
                     "The homology comparison exceeded its configured resource limit."
                 ),
                 field_profiles=tuple(profiles),
-                diagnostic=str(error),
+                diagnostic=(
+                    f"{certificate_diagnostic} {error}"
+                    if certificate_diagnostic
+                    else str(error)
+                ),
             )
 
         source_profile = _trim_profile(source_result)
