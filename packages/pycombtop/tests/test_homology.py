@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from importlib import import_module
+from typing import Any
+
 import pytest
 
-import pycombtop
+pycombtop: Any = import_module("pycombtop")
 
 
 RP2_FACETS = [
