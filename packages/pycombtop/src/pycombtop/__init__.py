@@ -261,12 +261,15 @@ from .simplex import (
     relative_betti_numbers,
 )
 from .simplicial_maps import (
+    SimplicialHomotopyEquivalenceCertificate,
     SimplicialMap,
     are_contiguous,
     induced_chain_map,
     prism_chain_homotopy,
     simplicial_boundary_matrix,
     simplicial_chain_basis,
+    simplicial_homotopy_equivalence_certificate,
+    verify_simplicial_homotopy_equivalence,
 )
 from .strong_collapses import (
     UniformStrongCollapseCertificate,
@@ -410,6 +413,9 @@ __all__ = [
     "verify_reduced_hopf_wedge",
     # simplicial maps and chains
     "SimplicialMap",
+    "SimplicialHomotopyEquivalenceCertificate",
+    "simplicial_homotopy_equivalence_certificate",
+    "verify_simplicial_homotopy_equivalence",
     "are_contiguous",
     "simplicial_chain_basis",
     "simplicial_boundary_matrix",
