@@ -89,10 +89,14 @@ def test_relative_homology_of_a_pair():
 
 def test_gudhi_and_python_backends_agree_when_gudhi_is_available():
     pytest.importorskip("gudhi")
-    complex_ = SimplicialComplex({0, 1, 2, 3}, [{0, 1, 2}, {0, 1, 3}])
+    projective_plane = SimplicialComplex({1, 2, 3, 4, 5, 6}, RP2_FACETS)
     for field in (2, 3, 5):
-        accelerated = simplicial_homology(complex_, field=field, backend="gudhi")
-        portable = simplicial_homology(complex_, field=field, backend="python")
+        accelerated = simplicial_homology(
+            projective_plane, field=field, backend="gudhi"
+        )
+        portable = simplicial_homology(
+            projective_plane, field=field, backend="python"
+        )
         assert accelerated.betti_numbers == portable.betti_numbers
 
 
