@@ -2,12 +2,12 @@
 
 import pytest
 
-from pycombtop import (
-    compare_homotopy,
-    HomotopyComparisonStatus,
-    SimplicialComplex,
-    simplicial_homotopy_equivalence_certificate,
+from pycombtop import compare_homotopy
+from pycombtop.homotopy_comparison import HomotopyComparisonStatus
+from pycombtop.simplex import SimplicialComplex
+from pycombtop.simplicial_maps import (
     SimplicialMap,
+    simplicial_homotopy_equivalence_certificate,
 )
 
 
