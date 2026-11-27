@@ -52,7 +52,7 @@ def test_verified_certificate_proves_equivalence_without_homology():
         source,
         target,
         certificate=certificate,
-        max_faces=0,
+        max_faces=1,
         backend="python",
     )
 
@@ -86,7 +86,7 @@ def test_invalid_certificate_falls_back_to_homology_obstruction():
 
 def test_homology_resource_limit_is_inconclusive():
     result = pycombtop.compare_homotopy(
-        circle(), point(), max_faces=1, backend="python"
+        circle(), point(), max_faces=5, backend="python"
     )
 
     assert result.status is pycombtop.HomotopyComparisonStatus.INCONCLUSIVE
@@ -105,7 +105,61 @@ def test_fields_must_be_nonempty_and_unique():
 
 
 def test_empty_realizations_are_rejected():
-    empty = pycombtop.SimplicialComplex(set(), [])
+    empty_complexes = (
+        pycombtop.SimplicialComplex(set(), []),
+        pycombtop.SimplicialComplex(set(), [set()]),
+    )
 
-    with pytest.raises(ValueError, match="nonempty realizations"):
-        pycombtop.compare_homotopy(empty, point())
+    for empty in empty_complexes:
+        with pytest.raises(ValueError, match="nonempty realizations"):
+            pycombtop.compare_homotopy(empty, point())
+
+
+
+def test_fields_are_validated_even_when_certificate_verifies():
+    source = pycombtop.SimplicialComplex({0, 1}, [{0, 1}])
+    target = point()
+    forward = pycombtop.SimplicialMap(source, target, {0: "p", 1: "p"})
+    backward = pycombtop.SimplicialMap(target, source, {"p": 0})
+    certificate = pycombtop.simplicial_homotopy_equivalence_certificate(
+        forward, backward
+    )
+
+    with pytest.raises(ValueError, match="at least one"):
+        pycombtop.compare_homotopy(
+            source, target, certificate=certificate, fields=()
+        )
+
+    with pytest.raises(ValueError, match="duplicates"):
+        pycombtop.compare_homotopy(
+            source, target, certificate=certificate, fields=(2, 2)
+        )
+
+    with pytest.raises(ValueError, match="prime integer"):
+        pycombtop.compare_homotopy(
+            source, target, certificate=certificate, fields=(4,)
+        )
+
+
+def test_resource_limit_preserves_rejected_certificate_diagnostic():
+    source = circle()
+    target = point()
+    edge = pycombtop.SimplicialComplex({0, 1}, [{0, 1}])
+    forward = pycombtop.SimplicialMap(edge, target, {0: "p", 1: "p"})
+    backward = pycombtop.SimplicialMap(target, edge, {"p": 0})
+    certificate = pycombtop.simplicial_homotopy_equivalence_certificate(
+        forward, backward
+    )
+
+    result = pycombtop.compare_homotopy(
+        source,
+        target,
+        certificate=certificate,
+        max_faces=5,
+        backend="python",
+    )
+
+    assert result.status is pycombtop.HomotopyComparisonStatus.INCONCLUSIVE
+    assert result.diagnostic is not None
+    assert "certificate did not verify" in result.diagnostic
+    assert "face budget" in result.diagnostic
