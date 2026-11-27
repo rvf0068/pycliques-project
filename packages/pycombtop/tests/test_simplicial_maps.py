@@ -76,9 +76,7 @@ def test_contiguity_checks_maximal_source_simplices():
 
 def test_contiguity_can_fail_even_when_both_maps_are_simplicial():
     source = SimplicialComplex({0, 1}, [{0, 1}])
-    target = SimplicialComplex(
-        {"a", "b", "c"}, [{"a", "b"}, {"b", "c"}, {"a", "c"}]
-    )
+    target = SimplicialComplex({"a", "b", "c"}, [{"a", "b"}, {"b", "c"}, {"a", "c"}])
     first = SimplicialMap(source, target, {0: "a", 1: "b"})
     second = SimplicialMap(source, target, {0: "b", 1: "c"})
 
@@ -150,9 +148,7 @@ def test_induced_chain_map_has_orientation_sign_and_collapses_degenerate_faces()
     target = SimplicialComplex({"a", "b"}, [{"a", "b"}])
     reverse = SimplicialMap(source, target, {0: "b", 1: "a"})
 
-    matrix = induced_chain_map(
-        reverse, 1, source_order=[0, 1], target_order=["a", "b"]
-    )
+    matrix = induced_chain_map(reverse, 1, source_order=[0, 1], target_order=["a", "b"])
     assert matrix == -eye(1)
 
     collapse = SimplicialMap(source, target, {0: "a", 1: "a"})
@@ -181,9 +177,7 @@ def test_induced_chain_maps_commute_with_boundary():
             degree - 1,
             source_order=source_order,
             target_order=target_order,
-        ) * simplicial_boundary_matrix(
-            source, degree, vertex_order=source_order
-        )
+        ) * simplicial_boundary_matrix(source, degree, vertex_order=source_order)
         assert left == right
 
 
@@ -219,8 +213,7 @@ def test_prism_operator_is_chain_homotopy_for_contiguous_maps():
     assert prism_1 == eye(1)
     assert (
         simplicial_boundary_matrix(target, 2, vertex_order=target_order) * prism_1
-        + prism_0
-        * simplicial_boundary_matrix(source, 1, vertex_order=source_order)
+        + prism_0 * simplicial_boundary_matrix(source, 1, vertex_order=source_order)
         == difference_1
     )
 
