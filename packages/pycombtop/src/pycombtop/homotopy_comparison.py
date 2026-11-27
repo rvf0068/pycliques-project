@@ -12,7 +12,12 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 
-from .homology import CoefficientField, HomologyBackend, HomologyResult, simplicial_homology
+from .homology import (
+    CoefficientField,
+    HomologyBackend,
+    HomologyResult,
+    simplicial_homology,
+)
 from .homology_backend import HomologyResourceLimit
 from .simplex import SimplicialComplex
 from .simplicial_maps import (
