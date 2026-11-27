@@ -220,9 +220,7 @@ def test_prism_operator_is_chain_homotopy_for_contiguous_maps():
 
 def test_prism_operator_rejects_noncontiguous_maps():
     source = SimplicialComplex({0, 1}, [{0, 1}])
-    target = SimplicialComplex(
-        {"a", "b", "c"}, [{"a", "b"}, {"b", "c"}, {"a", "c"}]
-    )
+    target = SimplicialComplex({"a", "b", "c"}, [{"a", "b"}, {"b", "c"}, {"a", "c"}])
     first = SimplicialMap(source, target, {0: "a", 1: "b"})
     second = SimplicialMap(source, target, {0: "b", 1: "c"})
 
