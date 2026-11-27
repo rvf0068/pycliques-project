@@ -385,7 +385,6 @@ def prism_chain_homotopy(
     )
 
 
-
 @dataclass(frozen=True)
 class SimplicialHomotopyEquivalenceCertificate:
     """Maps and contiguity chains proving a simplicial homotopy equivalence.
@@ -447,10 +446,7 @@ def _is_contiguity_chain(
         for mapping in chain
     ):
         return False
-    return all(
-        are_contiguous(first, second)
-        for first, second in zip(chain, chain[1:])
-    )
+    return all(are_contiguous(first, second) for first, second in zip(chain, chain[1:]))
 
 
 def simplicial_homotopy_equivalence_certificate(
