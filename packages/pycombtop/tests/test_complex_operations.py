@@ -80,9 +80,7 @@ def test_face_deletion():
     x = SimplicialComplex(range(5), [{0, 1, 2}, {0, 1, 3}, {2, 4}])
     d = face_deletion(x, {0, 1})
     assert d.base_set == x.base_set
-    assert d.all_simplices() == {
-        f for f in x.all_simplices() if not {0, 1} <= f
-    }
+    assert d.all_simplices() == {f for f in x.all_simplices() if not {0, 1} <= f}
     assert face_deletion(x, {1, 4}) == x
     assert face_deletion(x, set()).facet_set == set()
     assert face_deletion(x, {0}).vertex_set == x.deletion(0).vertex_set

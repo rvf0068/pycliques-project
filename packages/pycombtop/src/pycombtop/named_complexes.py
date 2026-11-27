@@ -68,8 +68,16 @@ def sphere_complex(d: int) -> SimplicialComplex:
 def projective_plane_complex() -> SimplicialComplex:
     """The six-vertex triangulation of the real projective plane."""
     triangles = [
-        (0, 1, 2), (0, 1, 3), (0, 2, 4), (0, 3, 5), (0, 4, 5),
-        (1, 2, 5), (1, 3, 4), (1, 4, 5), (2, 3, 4), (2, 3, 5),
+        (0, 1, 2),
+        (0, 1, 3),
+        (0, 2, 4),
+        (0, 3, 5),
+        (0, 4, 5),
+        (1, 2, 5),
+        (1, 3, 4),
+        (1, 4, 5),
+        (2, 3, 4),
+        (2, 3, 5),
     ]
     return SimplicialComplex(range(6), facet_set=triangles)
 

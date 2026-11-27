@@ -140,10 +140,7 @@ def minimal_nonfaces(complex_: SimplicialComplex) -> set[Simplex]:
     for facet in complex_.facet_set:
         missing = complex_.base_set - facet
         extended = {
-            Simplex(c | {v})
-            for c in candidates
-            if not c & missing
-            for v in missing
+            Simplex(c | {v}) for c in candidates if not c & missing for v in missing
         }
         extended.update(c for c in candidates if c & missing)
         candidates = set()
