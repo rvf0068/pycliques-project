@@ -270,9 +270,10 @@ def simplicial_homology(
         "gudhi" explicitly requests the accelerated backend, which supports
         absolute homology over prime fields only.
     vertex_order:
-        Optional ordering of the actual vertices. The default uses the same
-        stable-label convention as the simplicial chain-basis API. Supplying
-        an order is useful for labels whose stable representations collide.
+        Optional ordering of the actual vertices. The default uses the stable
+        label convention when available and falls back to the complex's vertex
+        iteration order if stable keys collide. Supplying an explicit order
+        gives reproducible basis ordering for such labels.
     max_faces:
         Maximum number of distinct nonempty simplices in the ambient complex.
         Exceeding the budget raises HomologyResourceLimit; no partial result
@@ -306,7 +307,15 @@ def simplicial_homology(
 
     field = _normalize_field(field)
     explicit_order = None if vertex_order is None else tuple(vertex_order)
-    ordered_vertices = _ordered_vertices(complex_.vertex_set, explicit_order)
+    if explicit_order is None:
+        try:
+            ordered_vertices = _ordered_vertices(complex_.vertex_set, None)
+        except ValueError:
+            # Homology is independent of orientation; retain support for
+            # arbitrary hashable labels even when their stable keys collide.
+            ordered_vertices = tuple(complex_.vertex_set)
+    else:
+        ordered_vertices = _ordered_vertices(complex_.vertex_set, explicit_order)
 
     can_use_gudhi = (
         relative_to is None

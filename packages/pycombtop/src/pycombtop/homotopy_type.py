@@ -231,12 +231,7 @@ def betti_numbers_sc(s_complex: SimplicialComplex) -> list[int]:
     Its actual facets are inserted: completing its one-skeleton could
     incorrectly add simplices to a nonflag complex.
     """
-    # This compatibility wrapper accepts arbitrary hashable labels. Any
-    # vertex order gives the same homology, so do not require stable sort keys.
-    result = simplicial_homology(
-        s_complex, vertex_order=tuple(s_complex.vertex_set)
-    )
-    return _simplify_betti_list(list(result.betti_numbers))
+    return _simplify_betti_list(list(simplicial_homology(s_complex).betti_numbers))
 
 
 def betti_numbers_graph(graph: nx.Graph) -> list[int]:

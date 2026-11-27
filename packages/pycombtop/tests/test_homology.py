@@ -164,7 +164,7 @@ def test_invalid_inputs_and_non_subcomplex_are_rejected():
         pycombtop.simplicial_homology(triangle, backend="python").betti_number(-1)
 
 
-def test_ambiguous_vertex_labels_require_an_explicit_order():
+def test_ambiguous_vertex_labels_work_with_or_without_an_explicit_order():
     class SameRepr:
         def __repr__(self):
             return "same"
@@ -172,12 +172,12 @@ def test_ambiguous_vertex_labels_require_an_explicit_order():
     first, second = SameRepr(), SameRepr()
     complex_ = pycombtop.SimplicialComplex({first, second}, [{first, second}])
 
-    with pytest.raises(ValueError, match="ambiguous stable keys"):
-        pycombtop.simplicial_homology(complex_, backend="python")
-    result = pycombtop.simplicial_homology(
+    default_order = pycombtop.simplicial_homology(complex_, backend="python")
+    explicit_order = pycombtop.simplicial_homology(
         complex_, backend="python", vertex_order=[first, second]
     )
-    assert result.betti_numbers == (0, 0)
+    assert default_order.betti_numbers == (0, 0)
+    assert explicit_order.betti_numbers == default_order.betti_numbers
 
 
 
