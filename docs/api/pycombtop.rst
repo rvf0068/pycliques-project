@@ -359,3 +359,76 @@ has the order complex as its clique complex.
    :members:
    :show-inheritance:
    :member-order: bysource
+
+
+Standard complex operations
+---------------------------
+
+The standard operations work on the existing ``SimplicialComplex``
+class. They preserve ambient labels (including ghost vertices) unless
+otherwise stated. A join requires disjoint base sets; relabel explicitly
+with ``relabel_complex``. Cone and suspension choose unused integer
+labels by default. A wedge identifies two actual basepoint vertices
+and rejects any other collisions. Face deletion removes all cofaces of
+a specified face and retains its ambient labels; ordinary vertex
+deletion still removes its label. The void complex (no facets) is
+distinct from the complex with only the empty face, which is the join
+identity on an empty base.
+
+Alexander duality is relative to the entire ambient base set, not
+only the actual vertices. The minimal nonfaces are computed by minimal
+transversal enumeration of the complements of facets. Both can have
+exponential output. Barycentric subdivision uses the existing face
+poset and order complex, and drops ghosts.
+
+.. code-block:: python
+
+   from pycombtop import (
+       alexander_dual,
+       barycentric_subdivision,
+       betti_numbers_sc,
+       sphere_complex,
+       suspension,
+   )
+
+   X = sphere_complex(1)
+   assert alexander_dual(alexander_dual(X)) == X
+   assert betti_numbers_sc(barycentric_subdivision(X)) == [0, 1]
+   assert betti_numbers_sc(suspension(X)) == [0, 0, 1]
+
+.. automodule:: pycombtop.complex_operations
+   :members:
+   :member-order: bysource
+
+Named simplicial complexes
+--------------------------
+
+The named complexes provide standard inputs for research experiments.
+The independence and matching complexes use clique complexes of the
+complement graph and the matching graph, respectively. The matching
+graph constructor now lives in ``pycliques.named`` and accepts a simple
+graph or an integer (a complete graph on that many vertices); the
+historical integer-based ``pyhomrep.matching_graph`` remains available.
+Chessboard vertices are row/column pairs. The cross-polytope boundary
+uses the existing octahedral graph construction. ``sphere_complex(d)``
+uses the boundary of a simplex, which is not generally flag.
+
+Surface constructors provide a six-vertex triangulation of the real
+projective plane and 16-vertex grid triangulations of the torus and
+Klein bottle. Regression tests verify vertex links, Euler
+characteristics, orientability and mod-2 homology.
+
+``vietoris_rips_complex(points, epsilon)`` is a small explicit Euclidean
+Rips construction using an inclusive distance threshold. It preserves
+distinct point indices even when coordinates coincide. It is not a
+persistence implementation; GUDHI is better suited to large
+filtrations.
+
+These constructors and operations add no external dependencies or
+native extensions. They are intended for finite explicit inputs, not
+unbounded face enumeration. Existing installation requirements of
+the workspace still apply.
+
+.. automodule:: pycombtop.named_complexes
+   :members:
+   :member-order: bysource

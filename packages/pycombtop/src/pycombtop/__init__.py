@@ -14,6 +14,18 @@ from .closed_trace_contractibility import (
     ClosedTraceResult,
     check_closed_trace_contractibility,
 )
+from .complex_operations import (
+    alexander_dual,
+    barycentric_subdivision,
+    cone,
+    face_deletion,
+    induced_subcomplex,
+    minimal_nonfaces,
+    relabel_complex,
+    simplicial_join,
+    suspension,
+    wedge_sum,
+)
 from .covering_divergence import (
     TriangularCoverDivergenceCertificate,
     verify_triangular_cover_divergence_certificate,
@@ -116,6 +128,18 @@ from .morse_certificates import (
     MorseCertificate,
     facet_morse_certificate,
     graph_morse_certificate,
+)
+from .named_complexes import (
+    chessboard_complex,
+    cross_polytope_boundary,
+    independence_complex,
+    klein_bottle_complex,
+    matching_complex,
+    projective_plane_complex,
+    simplex_boundary,
+    sphere_complex,
+    torus_complex,
+    vietoris_rips_complex,
 )
 from .named_posets import (
     Partition,
@@ -257,6 +281,27 @@ from .weighted_conicity import (
 # Explicitly declare the public API.
 # This controls what happens if someone runs `from pycombtop import *`
 __all__ = [
+    # standard complex operations and named complexes
+    "alexander_dual",
+    "barycentric_subdivision",
+    "cone",
+    "face_deletion",
+    "induced_subcomplex",
+    "minimal_nonfaces",
+    "relabel_complex",
+    "simplicial_join",
+    "suspension",
+    "wedge_sum",
+    "chessboard_complex",
+    "cross_polytope_boundary",
+    "independence_complex",
+    "klein_bottle_complex",
+    "matching_complex",
+    "projective_plane_complex",
+    "simplex_boundary",
+    "sphere_complex",
+    "torus_complex",
+    "vietoris_rips_complex",
     # Dochtermann Hom posets
     "HomPosetLimit",
     "MultiHomomorphism",

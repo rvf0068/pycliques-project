@@ -325,3 +325,14 @@ class TestDecomposePHomology:
         full = decompose_into_irreducibles(sc, 4)
         for p in range(sc.dimension() + 1):
             assert decompose_p_homology(sc, 4, p) == full[p]
+
+
+def test_matching_graph_compatibility_wrapper():
+    from pycliques import matching_graph as shared_matching_graph
+    from pyhomrep import matching_graph
+
+    for n in range(6):
+        old_api = matching_graph(n)
+        shared = shared_matching_graph(n)
+        assert list(old_api) == list(shared)
+        assert set(old_api.edges()) == set(shared.edges())

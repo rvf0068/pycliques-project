@@ -1,5 +1,7 @@
 """Generators for specific graph families."""
 
+from itertools import combinations
+
 import networkx as nx
 from networkx.algorithms.operators.unary import complement
 
@@ -182,3 +184,24 @@ def collapse_obstruction_fixture() -> nx.Graph:
     9
     """
     return nx.from_graph6_bytes(bytes("HUZv~zz", "utf8"))
+
+
+def matching_graph(graph: nx.Graph | int) -> nx.Graph:
+    """Graph of disjoint edges of a simple graph (an integer denotes K_n).
+
+    Vertices retain the edge tuples supplied by NetworkX. Two such vertices
+    are adjacent precisely when the underlying edges have no common endpoint.
+    """
+    if isinstance(graph, int):
+        if isinstance(graph, bool) or graph < 0:
+            raise nx.NetworkXError("n must be a nonnegative integer")
+        graph = nx.complete_graph(graph)
+    if graph.is_directed() or graph.is_multigraph() or nx.number_of_selfloops(graph):
+        raise ValueError("expected a simple undirected graph")
+    edges = list(graph.edges())
+    result = nx.Graph()
+    result.add_nodes_from(edges)
+    result.add_edges_from(
+        (a, b) for a, b in combinations(edges, 2) if not set(a).intersection(b)
+    )
+    return result
