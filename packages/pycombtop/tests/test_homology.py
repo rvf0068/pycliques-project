@@ -35,9 +35,7 @@ def test_portable_backend_handles_basic_complexes_and_reduced_conventions():
     triangle_result = pycombtop.simplicial_homology(triangle, backend="python")
     assert triangle_result.betti_numbers == (0, 0, 0)
     circle_result = pycombtop.simplicial_homology(circle, backend="python")
-    disconnected_result = pycombtop.simplicial_homology(
-        disconnected, backend="python"
-    )
+    disconnected_result = pycombtop.simplicial_homology(disconnected, backend="python")
     assert circle_result.betti_numbers == (0, 1)
     assert disconnected_result.betti_numbers == (1,)
     assert pycombtop.simplicial_homology(
@@ -48,9 +46,7 @@ def test_portable_backend_handles_basic_complexes_and_reduced_conventions():
 def test_exact_coefficients_distinguish_projective_plane_torsion():
     projective_plane = pycombtop.SimplicialComplex({1, 2, 3, 4, 5, 6}, RP2_FACETS)
 
-    mod_two = pycombtop.simplicial_homology(
-        projective_plane, field=2, backend="python"
-    )
+    mod_two = pycombtop.simplicial_homology(projective_plane, field=2, backend="python")
     mod_three = pycombtop.simplicial_homology(
         projective_plane, field=3, backend="python"
     )
@@ -138,9 +134,7 @@ def test_empty_complex_conventions_and_ghost_labels():
     ghosted = pycombtop.SimplicialComplex({"actual", "ghost"}, [{"actual"}])
 
     assert pycombtop.simplicial_homology(void, backend="python").betti_numbers == ()
-    empty_face_result = pycombtop.simplicial_homology(
-        empty_face, backend="python"
-    )
+    empty_face_result = pycombtop.simplicial_homology(empty_face, backend="python")
     ghosted_result = pycombtop.simplicial_homology(ghosted, backend="python")
     assert empty_face_result.betti_numbers == ()
     assert ghosted_result.betti_numbers == (0,)

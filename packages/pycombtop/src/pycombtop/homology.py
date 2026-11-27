@@ -102,17 +102,11 @@ def _enumerate_faces(
     return by_dimension
 
 
-def _rank_mod_prime(
-    columns: Iterable[dict[int, int]], prime: int
-) -> int:
+def _rank_mod_prime(columns: Iterable[dict[int, int]], prime: int) -> int:
     """Compute sparse column rank over GF(prime)."""
     pivots: dict[int, dict[int, int]] = {}
     for column in columns:
-        vector = {
-            row: value % prime
-            for row, value in column.items()
-            if value % prime
-        }
+        vector = {row: value % prime for row, value in column.items() if value % prime}
         while vector:
             pivot = max(vector)
             coefficient = vector[pivot]
@@ -214,9 +208,7 @@ def _python_betti_numbers(
 
     top = max(basis)
     boundary_ranks = [0] * (top + 2)
-    has_augmentation = reduced and (
-        relative_to is None or not relative_to.facet_set
-    )
+    has_augmentation = reduced and (relative_to is None or not relative_to.facet_set)
     if has_augmentation and basis.get(0):
         boundary_ranks[0] = 1
 
@@ -233,9 +225,7 @@ def _python_betti_numbers(
             boundary_ranks[degree] = _rank_mod_prime(columns, field)
 
     betti_numbers = tuple(
-        len(basis.get(degree, ()))
-        - boundary_ranks[degree]
-        - boundary_ranks[degree + 1]
+        len(basis.get(degree, ())) - boundary_ranks[degree] - boundary_ranks[degree + 1]
         for degree in range(top + 1)
     )
     if any(number < 0 for number in betti_numbers):
