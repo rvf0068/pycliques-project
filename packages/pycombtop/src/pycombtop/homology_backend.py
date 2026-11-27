@@ -1,41 +1,70 @@
-"""Exact finite-field simplicial homology via GUDHI.
+"""Optional GUDHI backend for exact finite-field simplicial homology.
 
-Only mathematical results from a COMPLETE simplex tree are returned. A face
-budget overflow raises HomologyResourceLimit, never an invented zero.
-Insert FACETS, not an expansion of the one-skeleton; thus nonflag
-simplicial complexes are represented correctly.
-
-The separate bounded_betti module independently computes GF(2) homology
-from integer-bitset boundary matrices for flag complexes of graphs.
+GUDHI is imported lazily so the pure-Python homology backend can be used
+without importing the accelerated library. Face-budget overflow raises
+HomologyResourceLimit; no partial profile or invented zero is returned.
 """
 
 from __future__ import annotations
 
 from collections.abc import Hashable, Iterable
 
-import gudhi
-
 DEFAULT_MAX_FACES = 250_000
 HOMOLOGY_COEFFICIENT_FIELD = 2
+GUDHI_MAX_FIELD = 46_337
 
 
 class HomologyResourceLimit(RuntimeError):
     """Exact homology could not complete within the explicit face budget."""
 
 
-def reduced_betti_facets_mod2(
+def _is_prime(number: int) -> bool:
+    """Return whether number is prime."""
+    if number < 2:
+        return False
+    if number % 2 == 0:
+        return number == 2
+    divisor = 3
+    while divisor * divisor <= number:
+        if number % divisor == 0:
+            return False
+        divisor += 2
+    return True
+
+
+def gudhi_betti_facets(
     facets: Iterable[Iterable[Hashable]],
     *,
+    field: int = HOMOLOGY_COEFFICIENT_FIELD,
+    reduced: bool = True,
     max_faces: int = DEFAULT_MAX_FACES,
 ) -> list[int]:
-    """Return all reduced Betti numbers of a finite facet complex over F_2.
+    """Return exact Betti numbers over a prime field using GUDHI.
 
-    On an empty complex return an empty profile (the project's convention).
-    A zero in the returned profile is certified. No partial profile is ever
-    returned when the configured face budget is exceeded.
+    The input consists of maximal faces, not a one-skeleton. The result
+    includes every dimension through the dimension of the complex, including
+    certified zeros. The face budget counts distinct nonempty simplices.
+
+    GUDHI supports prime coefficient fields at most 46337. Relative homology
+    and rational coefficients are handled by the separate pure-Python
+    backend.
     """
     if type(max_faces) is not int or max_faces < 1:
         raise ValueError("max_faces must be a positive integer")
+    if type(field) is not int or not _is_prime(field):
+        raise ValueError("field must be a prime integer")
+    if field > GUDHI_MAX_FIELD:
+        raise ValueError("GUDHI supports prime coefficient fields at most 46337")
+    if type(reduced) is not bool:
+        raise TypeError("reduced must be a bool")
+
+    try:
+        import gudhi
+    except ImportError as error:
+        raise ImportError(
+            "The GUDHI backend is unavailable; use backend='python' instead"
+        ) from error
+
     tree = gudhi.SimplexTree()
     indices: dict[Hashable, int] = {}
     top = -1
@@ -58,15 +87,31 @@ def reduced_betti_facets_mod2(
                 "Exact homology simplex tree exceeds the face budget"
             )
         top = max(top, len(vertices) - 1)
+
     if top == -1:
         return []
+
     tree.compute_persistence(
-        homology_coeff_field=HOMOLOGY_COEFFICIENT_FIELD,
+        homology_coeff_field=field,
         persistence_dim_max=True,
     )
     ordinary = tree.betti_numbers()
     result = [int(ordinary[i]) if i < len(ordinary) else 0 for i in range(top + 1)]
-    result[0] -= 1
-    if any(n < 0 for n in result):
-        raise AssertionError("Invalid negative reduced Betti number from GUDHI")
+    if reduced:
+        result[0] -= 1
+    if any(number < 0 for number in result):
+        raise AssertionError("Invalid negative Betti number returned by GUDHI")
     return result
+
+
+def reduced_betti_facets_mod2(
+    facets: Iterable[Iterable[Hashable]],
+    *,
+    max_faces: int = DEFAULT_MAX_FACES,
+) -> list[int]:
+    """Return all reduced Betti numbers over GF(2), using GUDHI.
+
+    This compatibility helper retains the original module-level function.
+    New code should use pycombtop.simplicial_homology.
+    """
+    return gudhi_betti_facets(facets, field=2, reduced=True, max_faces=max_faces)

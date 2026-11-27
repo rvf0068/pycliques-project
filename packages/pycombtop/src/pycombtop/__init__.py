@@ -67,6 +67,8 @@ from .fundamental_group import (
     verify_connected_link_order,
     verify_presentation_reduction,
 )
+from .homology import HomologyResult, simplicial_homology
+from .homology_backend import HomologyResourceLimit
 from .hom_complex import (
     HomPosetLimit,
     MultiHomomorphism,
@@ -447,6 +449,10 @@ __all__ = [
     "CoveringSearchResult",
     "CoveringSearchStatus",
     "search_covering_divergence",
+    # unified exact simplicial homology
+    "HomologyResourceLimit",
+    "HomologyResult",
+    "simplicial_homology",
     # homotopy_type
     "MorseCertificate",
     "facet_morse_certificate",
