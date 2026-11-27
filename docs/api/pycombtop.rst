@@ -23,6 +23,48 @@ S-Collapses
    :show-inheritance:
    :member-order: bysource
 
+Unified simplicial homology
+---------------------------
+
+Use simplicial_homology for exact homology of a finite simplicial complex or
+a pair. The coefficient field is GF(p), where p is prime, or the rationals
+(selected with field="Q"). This reports field Betti numbers, not integral
+torsion. The portable Python backend uses exact sparse boundary reduction;
+the automatic backend prefers GUDHI for absolute prime-field calculations
+when it is available. Relative pairs currently use the Python backend.
+
+The convenience function betti_numbers_sc remains the reduced mod-2 profile
+for a general complex. It now uses the same homology interface.
+
+.. code-block:: python
+
+   from pycombtop import (
+       SimplicialComplex,
+       simplicial_homology,
+   )
+
+   X = SimplicialComplex(
+       {1, 2, 3, 4, 5, 6},
+       [
+           {1, 2, 3}, {1, 2, 4}, {1, 3, 5}, {1, 4, 6}, {1, 5, 6},
+           {2, 3, 6}, {2, 4, 5}, {2, 5, 6}, {3, 4, 5}, {3, 4, 6},
+       ],
+   )
+   assert simplicial_homology(X, field=2).betti_numbers == (0, 1, 1)
+   assert simplicial_homology(X, field="Q").betti_numbers == (0, 0, 0)
+   portable = simplicial_homology(X, field=3, backend="python")
+
+For a pair (X, A), pass A as relative_to. Every facet of A must be a face
+of X. Face enumeration is bounded by max_faces; exceeding the budget raises
+HomologyResourceLimit rather than returning a partial profile.
+
+.. automodule:: pycombtop.homology
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :member-order: bysource
+
+
 Homotopy Type
 -------------
 

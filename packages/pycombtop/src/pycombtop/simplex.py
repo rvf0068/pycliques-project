@@ -7,7 +7,6 @@ from itertools import chain, combinations
 from typing import Literal
 
 import networkx as nx
-import numpy as np
 from networkx.algorithms import tournament
 from sympy import SparseMatrix
 
@@ -530,6 +529,8 @@ def relative_betti_numbers(
         if method == "exact":
             # The domain matrix performs exact elimination over the integers.
             return int(SparseMatrix(len(rows), len(cols), entries).to_DM().rank())
+        import numpy as np
+
         matrix = np.zeros((len(rows), len(cols)), dtype=int)
         for (i, j), value in entries.items():
             matrix[i, j] = value

@@ -10,7 +10,8 @@ Dependencies
 ------------
 - networkx
 - sympy
-- gudhi (exact finite-field simplicial homology)
+- exact sparse simplicial homology over prime fields and the rationals (pure Python)
+- GUDHI (accelerated finite-field backend)
 - pycliques (for :mod:`pycliques.dominated`, :mod:`pycliques.surfaces`)
 
 References
@@ -68,6 +69,7 @@ from .elementary_collapses import _is_free_face as _is_free_face
 from .elementary_collapses import _remove_simplex as _remove_simplex
 from .elementary_collapses import collapse as collapse
 from .fundamental_group import connected_link_order
+from .homology import simplicial_homology
 from .homology_backend import HomologyResourceLimit, reduced_betti_facets_mod2
 from .homotopy_results import (
     BettiProfile as BettiProfile,
@@ -229,7 +231,7 @@ def betti_numbers_sc(s_complex: SimplicialComplex) -> list[int]:
     Its actual facets are inserted: completing its one-skeleton could
     incorrectly add simplices to a nonflag complex.
     """
-    return _simplify_betti_list(reduced_betti_facets_mod2(s_complex.facet_set))
+    return _simplify_betti_list(list(simplicial_homology(s_complex).betti_numbers))
 
 
 def betti_numbers_graph(graph: nx.Graph) -> list[int]:

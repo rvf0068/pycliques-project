@@ -77,6 +77,8 @@ from .hom_complex import (
     is_multihomomorphism,
     iter_multihomomorphisms,
 )
+from .homology import HomologyResult, simplicial_homology
+from .homology_backend import HomologyResourceLimit
 
 # homotopy_type
 from .homotopy_expressions import (
@@ -447,6 +449,10 @@ __all__ = [
     "CoveringSearchResult",
     "CoveringSearchStatus",
     "search_covering_divergence",
+    # unified exact simplicial homology
+    "HomologyResourceLimit",
+    "HomologyResult",
+    "simplicial_homology",
     # homotopy_type
     "MorseCertificate",
     "facet_morse_certificate",
