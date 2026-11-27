@@ -521,3 +521,44 @@ def test_simplicial_homotopy_equivalence_verifier_checks_both_chain_endpoints():
     assert not verify_simplicial_homotopy_equivalence(
         path, point, replace(certificate, source_homotopy=(source_chain[0],))
     )
+
+
+
+def test_simplicial_homotopy_equivalence_rejects_noncontiguous_source_and_target_chains():
+    from pycombtop import simplicial_homotopy_equivalence_certificate
+
+    path = SimplicialComplex({0, 1, 2}, [{0, 1}, {1, 2}])
+    point = SimplicialComplex({"*"}, [{"*"}])
+    collapse = SimplicialMap(path, point, dict.fromkeys(path.vertex_set, "*"))
+    inclusion = SimplicialMap(point, path, {"*": 1})
+
+    assert simplicial_homotopy_equivalence_certificate(
+        collapse, inclusion, source_homotopy=(inclusion,)
+    ) is None
+
+    assert simplicial_homotopy_equivalence_certificate(
+        inclusion, collapse, target_homotopy=(inclusion,)
+    ) is None
+
+
+def test_simplicial_homotopy_equivalence_verifier_rejects_wrong_chain_codomain():
+    from dataclasses import replace
+
+    from pycombtop import (
+        simplicial_homotopy_equivalence_certificate,
+        verify_simplicial_homotopy_equivalence,
+    )
+
+    path = SimplicialComplex({0, 1}, [{0, 1}])
+    point = SimplicialComplex({"*"}, [{"*"}])
+    other_point = SimplicialComplex({"x"}, [{"x"}])
+    forward = SimplicialMap(path, point, {0: "*", 1: "*"})
+    backward = SimplicialMap(point, path, {"*": 0})
+    certificate = simplicial_homotopy_equivalence_certificate(forward, backward)
+    assert certificate is not None
+
+    wrong_codomain = SimplicialMap(path, other_point, {0: "x", 1: "x"})
+    chain = (certificate.source_homotopy[0], wrong_codomain, certificate.source_homotopy[-1])
+    assert not verify_simplicial_homotopy_equivalence(
+        path, point, replace(certificate, source_homotopy=chain)
+    )
