@@ -86,7 +86,7 @@ def test_invalid_certificate_falls_back_to_homology_obstruction():
 
 def test_homology_resource_limit_is_inconclusive():
     result = pycombtop.compare_homotopy(
-        circle(), point(), max_faces=0, backend="python"
+        circle(), point(), max_faces=1, backend="python"
     )
 
     assert result.status is pycombtop.HomotopyComparisonStatus.INCONCLUSIVE
