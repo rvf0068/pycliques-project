@@ -397,7 +397,11 @@ def test_simplicial_homotopy_equivalence_verifier_checks_chain_structure():
     point = SimplicialComplex({"*"}, [{"*"}])
     forward = SimplicialMap(path, point, dict.fromkeys(path.vertex_set, "*"))
     backward = SimplicialMap(point, path, {"*": 1})
-    certificate = simplicial_homotopy_equivalence_certificate(forward, backward)
+    first = SimplicialMap(path, path, {0: 1, 1: 1, 2: 2, 3: 2})
+    second = SimplicialMap(path, path, {0: 1, 1: 1, 2: 2, 3: 3})
+    certificate = simplicial_homotopy_equivalence_certificate(
+        forward, backward, source_homotopy=(first, second)
+    )
 
     assert certificate is not None
     start, end = certificate.source_homotopy[0], certificate.source_homotopy[-1]
@@ -426,11 +430,17 @@ def test_simplicial_homotopy_equivalence_verifier_checks_contiguity_and_target_c
     point = SimplicialComplex({"*"}, [{"*"}])
     forward = SimplicialMap(path, point, dict.fromkeys(path.vertex_set, "*"))
     backward = SimplicialMap(point, path, {"*": 1})
-    certificate = simplicial_homotopy_equivalence_certificate(forward, backward)
+    first = SimplicialMap(path, path, {0: 1, 1: 1, 2: 2, 3: 2})
+    second = SimplicialMap(path, path, {0: 1, 1: 1, 2: 2, 3: 3})
+    certificate = simplicial_homotopy_equivalence_certificate(
+        forward, backward, source_homotopy=(first, second)
+    )
 
     assert certificate is not None
     start, end = certificate.source_homotopy[0], certificate.source_homotopy[-1]
-    noncontiguous = SimplicialMap(path, path, {vertex: vertex for vertex in path.vertex_set})
+    noncontiguous = SimplicialMap(
+        path, path, {vertex: vertex for vertex in path.vertex_set}
+    )
     assert not are_contiguous(start, noncontiguous)
     assert not verify_simplicial_homotopy_equivalence(
         path,
