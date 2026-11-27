@@ -11,7 +11,6 @@ from pycombtop import (
 )
 
 
-
 RP2_FACETS = [
     {1, 2, 3},
     {1, 2, 4},
