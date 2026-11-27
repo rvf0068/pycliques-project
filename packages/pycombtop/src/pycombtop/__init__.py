@@ -67,8 +67,6 @@ from .fundamental_group import (
     verify_connected_link_order,
     verify_presentation_reduction,
 )
-from .homology import HomologyResult, simplicial_homology
-from .homology_backend import HomologyResourceLimit
 from .hom_complex import (
     HomPosetLimit,
     MultiHomomorphism,
@@ -79,6 +77,8 @@ from .hom_complex import (
     is_multihomomorphism,
     iter_multihomomorphisms,
 )
+from .homology import HomologyResult, simplicial_homology
+from .homology_backend import HomologyResourceLimit
 
 # homotopy_type
 from .homotopy_expressions import (

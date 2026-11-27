@@ -19,8 +19,8 @@ from .homology_backend import (
     HomologyResourceLimit,
     gudhi_betti_facets,
 )
-from .simplicial_maps import _ordered_vertices
 from .simplex import SimplicialComplex
+from .simplicial_maps import _ordered_vertices
 
 CoefficientField = int | Literal["Q"]
 HomologyBackend = Literal["auto", "python", "gudhi"]
@@ -271,7 +271,7 @@ def simplicial_homology(
         the empty face, as every non-void simplicial complex does.
     relative_to:
         Optional subcomplex A; when supplied, compute the homology of
-        (complex_, A). Every facet of A must be a face of complex_. The void
+        (X, A). Every facet of A must be a face of X. The void
         complex (no faces) is a valid subcomplex.
     backend:
         "auto" uses GUDHI for absolute prime-field calculations when it is
