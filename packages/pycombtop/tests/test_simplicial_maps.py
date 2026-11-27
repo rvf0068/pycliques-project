@@ -1,7 +1,6 @@
 """Tests for simplicial maps, contiguity, and induced chain maps."""
 
 import pytest
-
 from pycombtop import (
     SimplicialComplex,
     SimplicialMap,
