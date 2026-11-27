@@ -83,7 +83,6 @@ def test_disconnected_complex_is_inconclusive() -> None:
     assert "realization is disconnected" in result.reason
 
 
-
 def test_vertex_limit_precedes_disconnected_complex_check() -> None:
     complex_ = pycombtop.SimplicialComplex(
         {"a", "b", "c", "d"},
