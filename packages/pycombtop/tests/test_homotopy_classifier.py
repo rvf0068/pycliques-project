@@ -31,9 +31,7 @@ def test_nonflag_complex_is_not_replaced_by_its_flag_completion() -> None:
     result = pycombtop.classify_homotopy(boundary)
 
     assert result.status is pycombtop.HomotopyClassificationStatus.PROVED_TYPE
-    assert result.homotopy_type == pycombtop.WedgeType(
-        ((pycombtop.SphereType(1), 1),)
-    )
+    assert result.homotopy_type == pycombtop.WedgeType(((pycombtop.SphereType(1), 1),))
 
 
 def test_vertex_limit_is_inconclusive_not_a_type() -> None:
