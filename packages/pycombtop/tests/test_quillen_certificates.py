@@ -6,8 +6,8 @@ import pytest
 from pycombtop import (
     BeatMove,
     BeatReduction,
-    beat_core,
     Poset,
+    beat_core,
     QuillenFiberCertificate,
     quillen_fiber_certificate,
     verify_quillen_fiber_certificate,
@@ -37,8 +37,11 @@ def test_weak_point_verifier_accepts_alternate_valid_link_reduction():
         (BeatMove(3, 2, "down"), BeatMove(2, 1, "down")),
     )
     assert alternate != beat_core(link)
+    remainder = chain.induced([1, 2, 3])
+    tail = weak_point_core(remainder)
     certificate = WeakPointReduction(
-        Poset([1]), (WeakPointMove(0, "upper", alternate),)
+        tail.core,
+        (WeakPointMove(0, "upper", alternate), *tail.moves),
     )
     assert verify_weak_point_reduction(chain, certificate)
 
