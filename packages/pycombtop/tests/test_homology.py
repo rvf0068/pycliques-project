@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+
 from pycombtop.homology import simplicial_homology
 from pycombtop.homology_backend import HomologyResourceLimit
 from pycombtop.simplex import SimplicialComplex
