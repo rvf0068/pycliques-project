@@ -487,6 +487,10 @@ __all__ = [
     "HomologyResourceLimit",
     "HomologyResult",
     "simplicial_homology",
+    # unified homotopy classification
+    "HomotopyClassification",
+    "HomotopyClassificationStatus",
+    "classify_homotopy",
     # pairwise homotopy comparison
     "HomotopyComparisonResult",
     "HomotopyComparisonStatus",
