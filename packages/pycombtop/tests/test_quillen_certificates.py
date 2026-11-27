@@ -31,7 +31,10 @@ def test_weak_point_reduction_and_verification():
 
 def test_weak_points_detect_contractible_links_but_not_empty_links():
     chain = Poset([0, 1], [(0, 1)])
-    assert any(move.point == 0 and move.direction == "upper" for move in weak_point_moves(chain))
+    assert any(
+        move.point == 0 and move.direction == "upper"
+        for move in weak_point_moves(chain)
+    )
     antichain = Poset([0, 1, 2])
     assert not weak_point_moves(antichain)
     assert weak_point_core(antichain).core == antichain
