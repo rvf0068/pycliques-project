@@ -108,6 +108,15 @@ from .morse_certificates import (
     facet_morse_certificate,
     graph_morse_certificate,
 )
+from .named_posets import (
+    Partition,
+    boolean_lattice,
+    induced_permutation,
+    nontrivial_partitions,
+    partition_graph,
+    partition_lattice,
+    refines,
+)
 from .posets import (
     BeatMove,
     BeatReduction,
@@ -214,6 +223,15 @@ from .strong_collapses import (
     verify_uniform_strong_collapse_certificate,
     verify_uniform_strong_collapse_prefix,
 )
+from .subgroup_posets import (
+    Subgroup,
+    SubgroupEnumerationLimit,
+    brown_poset,
+    enumerate_subgroups,
+    quillen_poset,
+    subgroup_conjugation,
+    subgroup_lattice,
+)
 from .symbolic_dong import SymbolicDongCertificate, symbolic_dong_certificate
 from .symbolic_integral_morse import (
     SymbolicIntegralMorseCertificate,
@@ -230,6 +248,21 @@ from .weighted_conicity import (
 # Explicitly declare the public API.
 # This controls what happens if someone runs `from pycombtop import *`
 __all__ = [
+    # named posets
+    "boolean_lattice",
+    "partition_lattice",
+    "Partition",
+    "nontrivial_partitions",
+    "partition_graph",
+    "refines",
+    "induced_permutation",
+    "Subgroup",
+    "SubgroupEnumerationLimit",
+    "enumerate_subgroups",
+    "subgroup_lattice",
+    "brown_poset",
+    "quillen_poset",
+    "subgroup_conjugation",
     # finite posets and order complexes
     "BeatMove",
     "BeatReduction",
