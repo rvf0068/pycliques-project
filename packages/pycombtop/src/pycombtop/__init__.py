@@ -78,12 +78,12 @@ from .hom_complex import (
     iter_multihomomorphisms,
 )
 from .homology import HomologyResult, simplicial_homology
+from .homology_backend import HomologyResourceLimit
 from .homotopy_comparison import (
     HomotopyComparisonResult,
     HomotopyComparisonStatus,
     compare_homotopy,
 )
-from .homology_backend import HomologyResourceLimit
 
 # homotopy_type
 from .homotopy_expressions import (
