@@ -305,3 +305,57 @@ representation can be supplied instead.
    :members:
    :show-inheritance:
    :member-order: bysource
+
+
+Graph multihomomorphism posets
+------------------------------
+
+For undirected graphs (loops allowed), Dochtermann's Hom poset consists
+of nonempty set-valued vertex maps with every source edge mapped to a
+complete cross-product of target edges. The order is pointwise inclusion.
+See A. Dochtermann, *Hom complexes and homotopy theory in the category of
+graphs*, European Journal of Combinatorics 30 (2009), 490-509,
+https://doi.org/10.1016/j.ejc.2008.04.009.
+
+Use ``hom_poset(G, H)`` to construct the poset, and
+``hom_order_complex(G, H)`` for its order complex (the barycentric
+subdivision of the polyhedral Hom complex). The existing
+``hom_graph(G, H)`` is instead the compatibility graph on ordinary
+homomorphisms. Its clique complex is not in general the order complex
+itself, though it is homotopy equivalent by the nerve lemma.
+
+.. code-block:: python
+
+   import networkx as nx
+   from pycombtop import hom_poset, order_complex, betti_numbers_sc
+
+   P = hom_poset(nx.complete_graph(2), nx.complete_graph(3))
+   assert len(P) == 12
+   assert len(P.minimal_elements()) == 6
+   assert len(P.maximal_elements()) == 6
+   assert betti_numbers_sc(order_complex(P)) == [0, 1]
+   C = P.comparability_graph()
+   assert nx.is_isomorphic(C, nx.cycle_graph(12))
+
+Each poset element is a frozenset of (vertex, frozenset of images)
+pairs; ``dict(eta)`` recovers the set-valued map. Ordinary
+homomorphisms correspond precisely to the minimal elements. The
+shared backtracking engine preserves the edge convention, including
+loops. Adjacent vertices can have equal images only when the
+corresponding target vertex has a loop.
+
+The default explicit-poset limit is 10000 elements. Exceeding it raises
+``HomPosetLimit``, rather than returning an incomplete poset. The
+iterator ``iter_multihomomorphisms`` does not materialize the order
+and can be used to inspect individual maps. Empty domain gives one
+empty mapping; a nonempty domain and empty target give no maps.
+
+The related general bridges already exist as ``face_poset(X)``,
+``complete_poset(G)``, ``order_complex(P)``, and
+``P.comparability_graph()``. In particular, the comparability graph
+has the order complex as its clique complex.
+
+.. automodule:: pycombtop.hom_complex
+   :members:
+   :show-inheritance:
+   :member-order: bysource

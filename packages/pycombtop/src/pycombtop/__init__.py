@@ -55,7 +55,16 @@ from .fundamental_group import (
     verify_connected_link_order,
     verify_presentation_reduction,
 )
-from .hom_complex import graph_homomorphisms, hom_graph
+from .hom_complex import (
+    HomPosetLimit,
+    MultiHomomorphism,
+    graph_homomorphisms,
+    hom_graph,
+    hom_order_complex,
+    hom_poset,
+    is_multihomomorphism,
+    iter_multihomomorphisms,
+)
 
 # homotopy_type
 from .homotopy_expressions import (
@@ -248,6 +257,13 @@ from .weighted_conicity import (
 # Explicitly declare the public API.
 # This controls what happens if someone runs `from pycombtop import *`
 __all__ = [
+    # Dochtermann Hom posets
+    "HomPosetLimit",
+    "MultiHomomorphism",
+    "hom_order_complex",
+    "hom_poset",
+    "is_multihomomorphism",
+    "iter_multihomomorphisms",
     # named posets
     "boolean_lattice",
     "partition_lattice",
