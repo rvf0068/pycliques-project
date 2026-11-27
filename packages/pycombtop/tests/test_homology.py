@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from importlib import import_module
-
 import pytest
 
 from pycombtop import (
@@ -12,7 +10,6 @@ from pycombtop import (
     simplicial_homology,
 )
 
-homology_module = import_module("pycombtop.homology")
 
 
 RP2_FACETS = [
@@ -109,7 +106,9 @@ def test_auto_backend_falls_back_when_gudhi_is_unavailable(monkeypatch):
     def unavailable(*_args, **_kwargs):
         raise ImportError("synthetic missing GUDHI")
 
-    monkeypatch.setattr(homology, "gudhi_betti_facets", unavailable)
+    monkeypatch.setitem(
+        simplicial_homology.__globals__, "gudhi_betti_facets", unavailable
+    )
     result = simplicial_homology(complex_, backend="auto")
     assert result.backend == "python"
     assert result.betti_numbers == (0, 0, 0)
