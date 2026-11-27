@@ -90,30 +90,21 @@ def test_quillen_fiber_certificate_checks_map_and_complete_fiber_list():
     assert not verify_quillen_fiber_certificate(source, target, mapping, shortened)
 
 
-
 def test_weak_point_verifier_rejects_malformed_moves_and_links():
     chain = Poset([0, 1], [(0, 1)])
     valid = weak_point_core(chain)
     assert not verify_weak_point_reduction(chain, object())
-    assert not verify_weak_point_reduction(
-        chain, replace(valid, moves=(object(),))
-    )
+    assert not verify_weak_point_reduction(chain, replace(valid, moves=(object(),)))
     missing_point = WeakPointMove(99, "upper", BeatReduction(Poset([0]), ()))
     assert not verify_weak_point_reduction(
         chain, replace(valid, moves=(missing_point,))
     )
-    invalid_direction = WeakPointMove(
-        0, "sideways", BeatReduction(Poset([1]), ())
-    )
+    invalid_direction = WeakPointMove(0, "sideways", BeatReduction(Poset([1]), ()))
     assert not verify_weak_point_reduction(
         chain, replace(valid, moves=(invalid_direction,))
     )
-    invalid_link = WeakPointMove(
-        0, "upper", BeatReduction(Poset([99]), ())
-    )
-    assert not verify_weak_point_reduction(
-        chain, replace(valid, moves=(invalid_link,))
-    )
+    invalid_link = WeakPointMove(0, "upper", BeatReduction(Poset([99]), ()))
+    assert not verify_weak_point_reduction(chain, replace(valid, moves=(invalid_link,)))
 
 
 def test_weak_point_verifier_rejects_non_singleton_link_core_and_nonterminal_core():
