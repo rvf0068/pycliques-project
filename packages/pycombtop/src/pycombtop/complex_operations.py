@@ -69,6 +69,8 @@ def suspension(
     complex_: SimplicialComplex, apices: tuple[Hashable, Hashable] | None = None
 ) -> SimplicialComplex:
     """Unreduced simplicial suspension, the join with two isolated vertices."""
+    a: Hashable
+    b: Hashable
     if apices is None:
         a, b = _fresh_vertices(complex_.base_set, 2)
     else:
@@ -113,12 +115,12 @@ def face_deletion(
     face = frozenset(sigma)
     if not face <= complex_.base_set:
         raise ValueError("face outside the base set")
-    facets = []
+    facets: list[Simplex] = []
     for f in complex_.facet_set:
         if face <= f:
-            facets.extend(f - {v} for v in face)
+            facets.extend(Simplex(f - {v}) for v in face)
         else:
-            facets.append(f)
+            facets.append(Simplex(f))
     return SimplicialComplex(complex_.base_set, facet_set=facets)
 
 
