@@ -77,5 +77,45 @@ trace on boundaries). It is then expanded in the irreducible characters
 ### Notes
 
 * The vertices must be exactly `0, ..., n-1`; S_n acts by permuting them.
-* Computation uses exact symbolic linear algebra (SymPy), so it is intended
-  for small complexes.
+* The legacy character backend uses numerical SVD with integer rounding;
+  the signed-orbit backend below uses exact rational ranks.
+
+
+## Exact signed-orbit homology
+
+For a finite simplicial group action, use `OrbitChainComplex` with explicit
+generator maps on vertex labels. It computes rational coinvariant chains
+using sparse integer boundaries and exact ranks. In characteristic zero,
+coinvariant and invariant homology have the same dimension. Orientation-
+reversing simplex stabilizers contribute no chain generator. Set
+`reduced=True` for augmented chains and `relative=Y` for a relative complex.
+
+For symmetric-group representations, `decompose_young_homology` uses the
+Jacobi–Trudi formula and Young-subgroup invariants instead of dense character
+matrices. For example:
+
+```python
+from pycombtop import clique_complex
+from pyhomrep import bouc_decomposition, decompose_young_homology, matching_graph
+
+n = 5
+M = clique_complex(matching_graph(n))
+
+def action(g, edge):
+    return tuple(sorted(g(i) if i < g.size else i for i in edge))
+
+assert decompose_young_homology(M, n, 1, action, reduced=True) == (
+    bouc_decomposition(n, 1)
+)
+```
+
+The same approach with `decompose_young_homology_map` computes the kernel,
+image and cokernel of a simplicial map intertwining two explicit actions.
+Only the requested skeleton is enumerated; this is not an implicit
+orbit-generation algorithm and the trivial subgroup can still be expensive.
+The existing SVD-based routines remain available. `YoungTableaux.CMNR`
+now uses cached rim-hook recursion rather than enumerating tableaux.
+
+For stabilizer calculations, `decompose_induced_character(n, weights, order)`
+uses Frobenius reciprocity. The weights are sums of the subgroup character
+over elements of each ambient symmetric-group cycle type.

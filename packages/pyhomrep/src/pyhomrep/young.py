@@ -6,7 +6,30 @@ character values of symmetric groups using border-strip tableaux.
 
 from __future__ import annotations
 
+from functools import cache
 from itertools import permutations
+
+
+@cache
+def _rim_hook_character(shape: tuple[int, ...], cycles: tuple[int, ...]) -> int:
+    if not cycles:
+        return int(not shape)
+    r = cycles[0]
+    length = len(shape)
+    beta = tuple(row + length - i - 1 for i, row in enumerate(shape))
+    occupied = set(beta)
+    total = 0
+    for b in beta:
+        dest = b - r
+        if dest < 0 or dest in occupied:
+            continue
+        sign = (-1) ** sum(dest < a < b for a in beta)
+        new_beta = sorted((occupied - {b}) | {dest}, reverse=True)
+        new_shape = tuple(
+            a - length + i + 1 for i, a in enumerate(new_beta) if a - length + i + 1 > 0
+        )
+        total += sign * _rim_hook_character(new_shape, cycles[1:])
+    return total
 
 
 class YoungTableaux:
@@ -204,8 +227,8 @@ class YoungTableaux:
         >>> yt.CMNR()
         -2
         """
-        heights = self.heights()
-        s = 0
-        for j in heights:
-            s = s + (-1) ** j
-        return s
+        if sum(self.p_lambda) != sum(self.p_rho):
+            return 0
+        return _rim_hook_character(
+            tuple(map(int, self.p_lambda)), tuple(map(int, self.p_rho))
+        )

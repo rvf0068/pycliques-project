@@ -20,6 +20,7 @@ from pyhomrep.graphs import matching_graph
 
 # Matrix representations
 from pyhomrep.matrix import MatrixRepresentation, regular_representation
+from pyhomrep.orbits import OrbitChainComplex, homology_map_rank
 from pyhomrep.pchains import PChain
 
 # Simplicial complex functions for representation theory
@@ -58,10 +59,24 @@ from pyhomrep.utilities import (
 
 # Young tableaux and Murnaghan-Nakayama rule
 from pyhomrep.young import YoungTableaux
+from pyhomrep.young_subgroups import (
+    bouc_decomposition,
+    decompose_induced_character,
+    decompose_young_homology,
+    decompose_young_homology_map,
+    specht_multiplicities,
+)
 
 __all__ = [
     # Core classes
     "PChain",
+    "OrbitChainComplex",
+    "homology_map_rank",
+    "bouc_decomposition",
+    "decompose_induced_character",
+    "decompose_young_homology",
+    "decompose_young_homology_map",
+    "specht_multiplicities",
     "YoungTableaux",
     "MatrixRepresentation",
     # Matrix representation functions
