@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+from importlib import import_module
+
 import pytest
 
 from pycombtop import (
     HomologyResourceLimit,
     SimplicialComplex,
-    homology,
     simplicial_homology,
 )
+
+homology_module = import_module("pycombtop.homology")
 
 
 RP2_FACETS = [
