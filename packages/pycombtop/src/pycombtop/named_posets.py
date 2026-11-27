@@ -58,12 +58,7 @@ def boolean_lattice(
     ]
     return Poset(
         faces,
-        (
-            (face - {x}, face)
-            for face in faces
-            if len(face) > lower
-            for x in face
-        ),
+        ((face - {x}, face) for face in faces if len(face) > lower for x in face),
     )
 
 

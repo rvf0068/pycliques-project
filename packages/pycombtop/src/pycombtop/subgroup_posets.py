@@ -193,9 +193,7 @@ def quillen_poset(
     )
 
 
-def subgroup_conjugation(
-    poset: Poset, g: Permutation
-) -> dict[Subgroup, Subgroup]:
+def subgroup_conjugation(poset: Poset, g: Permutation) -> dict[Subgroup, Subgroup]:
     """The order automorphism H -> g**(-1) H g of a subgroup poset.
 
     Raises ValueError if the labels are not subgroup element sets, or the
@@ -204,8 +202,10 @@ def subgroup_conjugation(
     """
     mapping: dict[Subgroup, Subgroup] = {}
     for h in poset:
-        if not isinstance(h, frozenset) or not h or not all(
-            isinstance(x, Permutation) for x in h
+        if (
+            not isinstance(h, frozenset)
+            or not h
+            or not all(isinstance(x, Permutation) for x in h)
         ):
             raise ValueError("expected nonempty permutation-set labels")
         # Normalize the conjugator to the permutation degree of the labels.
