@@ -500,6 +500,54 @@ def test_simplicial_map_composition_rejects_incompatible_endpoints():
         _compose_simplicial_maps(first, second)
 
 
+def test_simplicial_homotopy_equivalence_verifier_rejects_wrong_backward_target():
+    from dataclasses import replace
+
+    from pycombtop import (
+        simplicial_homotopy_equivalence_certificate,
+        verify_simplicial_homotopy_equivalence,
+    )
+
+    path = SimplicialComplex({0, 1}, [{0, 1}])
+    point = SimplicialComplex({"*"}, [{"*"}])
+    other_path = SimplicialComplex({0, 1}, [{0}])
+    forward = SimplicialMap(path, point, {0: "*", 1: "*"})
+    backward = SimplicialMap(point, path, {"*": 0})
+    certificate = simplicial_homotopy_equivalence_certificate(forward, backward)
+
+    assert certificate is not None
+    wrong_backward = SimplicialMap(point, other_path, {"*": 0})
+    assert not verify_simplicial_homotopy_equivalence(
+        path, point, replace(certificate, backward=wrong_backward)
+    )
+
+
+@pytest.mark.parametrize("error_type", [TypeError, ValueError])
+def test_simplicial_homotopy_equivalence_verifier_handles_composition_errors(
+    monkeypatch, error_type
+):
+    import pycombtop.simplicial_maps as simplicial_maps
+
+    path = SimplicialComplex({0, 1}, [{0, 1}])
+    point = SimplicialComplex({"*"}, [{"*"}])
+    forward = SimplicialMap(path, point, {0: "*", 1: "*"})
+    backward = SimplicialMap(point, path, {"*": 0})
+    certificate = simplicial_maps.simplicial_homotopy_equivalence_certificate(
+        forward, backward
+    )
+    assert certificate is not None
+
+    def raise_composition_error(first, second):
+        raise error_type("simulated invalid composition")
+
+    monkeypatch.setattr(
+        simplicial_maps, "_compose_simplicial_maps", raise_composition_error
+    )
+    assert not simplicial_maps.verify_simplicial_homotopy_equivalence(
+        path, point, certificate
+    )
+
+
 def test_simplicial_homotopy_equivalence_verifier_checks_both_chain_endpoints():
     from dataclasses import replace
 
