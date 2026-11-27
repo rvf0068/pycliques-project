@@ -400,7 +400,7 @@ def test_simplicial_homotopy_equivalence_verifier_checks_chain_structure():
     certificate = simplicial_homotopy_equivalence_certificate(forward, backward)
 
     assert certificate is not None
-    start, end = certificate.source_homotopy
+    start, end = certificate.source_homotopy[0], certificate.source_homotopy[-1]
     assert not verify_simplicial_homotopy_equivalence(
         path, point, replace(certificate, source_homotopy=[start, end])
     )
@@ -429,8 +429,8 @@ def test_simplicial_homotopy_equivalence_verifier_checks_contiguity_and_target_c
     certificate = simplicial_homotopy_equivalence_certificate(forward, backward)
 
     assert certificate is not None
-    start, end = certificate.source_homotopy
-    noncontiguous = SimplicialMap(path, path, dict.fromkeys(path.vertex_set, 0))
+    start, end = certificate.source_homotopy[0], certificate.source_homotopy[-1]
+    noncontiguous = SimplicialMap(path, path, {vertex: vertex for vertex in path.vertex_set})
     assert not are_contiguous(start, noncontiguous)
     assert not verify_simplicial_homotopy_equivalence(
         path,
