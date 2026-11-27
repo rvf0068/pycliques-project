@@ -59,7 +59,6 @@ def test_snub_disphenoid_is_connected():
     assert nx.is_connected(snub_disphenoid())
 
 
-
 def test_matching_graph_from_complete_graph():
     graph = matching_graph(5)
     assert graph.number_of_nodes() == 10
