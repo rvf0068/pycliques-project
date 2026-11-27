@@ -79,7 +79,11 @@ def verify_weak_point_reduction(poset: Poset, reduction: WeakPointReduction) -> 
         return False
     current = poset
     for move in reduction.moves:
-        if not isinstance(move, WeakPointMove) or move not in weak_point_moves(current):
+        if (
+            not isinstance(move, WeakPointMove)
+            or move.point not in current
+            or move.direction not in ("lower", "upper")
+        ):
             return False
         link = _strict_link(current, move.point, move.direction)
         if (

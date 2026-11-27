@@ -4,6 +4,8 @@ from dataclasses import replace
 
 import pytest
 from pycombtop import (
+    BeatMove,
+    BeatReduction,
     Poset,
     QuillenFiberCertificate,
     quillen_fiber_certificate,
@@ -23,6 +25,28 @@ def test_weak_point_reduction_and_verification():
     assert verify_weak_point_reduction(chain, reduction)
     assert not verify_weak_point_reduction(chain, replace(reduction, moves=()))
     assert not verify_weak_point_reduction(chain, replace(reduction, core=chain))
+
+
+def test_weak_point_verifier_accepts_alternate_valid_link_reduction():
+    from pycombtop.quillen_certificates import WeakPointMove, WeakPointReduction
+    from pycombtop.posets import beat_core
+
+    chain = Poset([0, 1, 2, 3], [(0, 1), (1, 2), (2, 3)])
+    link = Poset([1, 2, 3], [(1, 2), (2, 3)])
+    alternate = BeatReduction(
+        Poset([1]),
+        (BeatMove(3, 2, "down"), BeatMove(2, 1, "down")),
+    )
+    assert alternate != beat_core(link)
+    tail = beat_core(link)
+    certificate = WeakPointReduction(
+        tail.core,
+        (WeakPointMove(0, "upper", alternate),) + tuple(
+            # The canonical tail starts from the link after deleting 0.
+            move for move in tail.moves
+        ),
+    )
+    assert verify_weak_point_reduction(chain, certificate)
 
 
 def test_weak_points_detect_contractible_links_but_not_empty_links():
