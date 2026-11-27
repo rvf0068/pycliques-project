@@ -400,6 +400,48 @@ poset and order complex, and drops ghosts.
    :members:
    :member-order: bysource
 
+Simplicial maps, contiguity and chains
+--------------------------------------
+
+A SimplicialMap is specified on the actual vertices of its source; it may
+identify vertices and collapse simplices. are_contiguous(f, g) checks
+whether the union of the two images of every source simplex is a simplex.
+For contiguous maps, prism_chain_homotopy constructs the standard chain
+homotopy between their induced maps.
+
+The chain bases are oriented and ordered using an explicit vertex_order
+when supplied. Otherwise, a stable order is chosen for common immutable
+labels; labels with ambiguous representations require an explicit order.
+simplicial_boundary_matrix and induced_chain_map return exact integer
+sympy.SparseMatrix objects. Their basis order is available through
+simplicial_chain_basis. The boundary matrices use ordinary, unaugmented
+simplicial chains, so the degree-zero boundary is zero.
+
+.. code-block:: python
+
+   from pycombtop import (
+       SimplicialComplex,
+       SimplicialMap,
+       are_contiguous,
+       induced_chain_map,
+       prism_chain_homotopy,
+   )
+
+   X = SimplicialComplex({0, 1}, [{0, 1}])
+   Y = SimplicialComplex({"a", "b", "c"}, [{"a", "b", "c"}])
+   f = SimplicialMap(X, Y, {0: "a", 1: "b"})
+   g = SimplicialMap(X, Y, {0: "b", 1: "c"})
+   assert are_contiguous(f, g)
+   P_0 = prism_chain_homotopy(f, g, 0)
+   F_0 = induced_chain_map(f, 0)
+   G_0 = induced_chain_map(g, 0)
+
+.. automodule:: pycombtop.simplicial_maps
+   :members:
+   :show-inheritance:
+   :member-order: bysource
+
+
 Named simplicial complexes
 --------------------------
 
