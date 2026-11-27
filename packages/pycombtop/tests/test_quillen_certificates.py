@@ -8,12 +8,12 @@ from pycombtop import (
     BeatReduction,
     Poset,
     QuillenFiberCertificate,
+    WeakPointMove,
+    WeakPointReduction,
     beat_core,
     quillen_fiber_certificate,
     verify_quillen_fiber_certificate,
     verify_weak_point_reduction,
-    WeakPointMove,
-    WeakPointReduction,
     weak_point_core,
     weak_point_moves,
 )
@@ -144,7 +144,7 @@ def test_quillen_verifier_rejects_tampered_fiber_witness():
     mapping = {0: "*"}
     certificate = quillen_fiber_certificate(source, target, mapping)
     assert certificate is not None
-    bad_fibers = ((" *", BeatReduction(Poset(["*"]), ())),)
+    bad_fibers = (("*", BeatReduction(Poset(["bad"]), ())),)
     assert not verify_quillen_fiber_certificate(
         source, target, mapping, replace(certificate, fibers=bad_fibers)
     )
