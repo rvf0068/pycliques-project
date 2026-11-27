@@ -306,7 +306,6 @@ def test_prism_operator_cancels_repeated_terms():
     assert prism == zeros(1, 1)
 
 
-
 def test_simplicial_homotopy_equivalence_certificate_for_path_to_point():
     from pycombtop import (
         simplicial_homotopy_equivalence_certificate,
