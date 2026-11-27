@@ -227,6 +227,8 @@ def test_prism_operator_rejects_noncontiguous_maps():
     with pytest.raises(ValueError, match="requires contiguous maps"):
         prism_chain_homotopy(first, second, 0)
 
+
+
 def test_simplicial_map_argument_validation_equality_and_repr():
     from typing import Any, cast
 
@@ -303,4 +305,3 @@ def test_prism_operator_cancels_repeated_terms():
         target_order=["a", "b", "c"],
     )
     assert prism == zeros(1, 1)
-
