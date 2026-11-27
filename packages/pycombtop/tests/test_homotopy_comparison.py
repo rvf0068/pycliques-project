@@ -6,8 +6,8 @@ from pycombtop import (
     compare_homotopy,
     HomotopyComparisonStatus,
     SimplicialComplex,
-    SimplicialMap,
     simplicial_homotopy_equivalence_certificate,
+    SimplicialMap,
 )
 
 
