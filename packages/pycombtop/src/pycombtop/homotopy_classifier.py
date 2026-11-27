@@ -37,7 +37,9 @@ class HomotopyClassification:
     Exactly one of the following is returned:
     - PROVED_TYPE: homotopy_type is a proved structured homotopy type.
     - BETTI_ONLY: betti_numbers are known, but no homotopy type was proved.
-    - INCONCLUSIVE: configured limits prevented a conclusion.
+    - INCONCLUSIVE: configured limits prevented a conclusion, or the input
+      lies outside the connected-realization scope currently supported by
+      the structured HomotopyType model.
 
     A certificate is supplied when a dedicated certificate recognizer
     succeeded. A legacy HomotopyVerdict records the theorem strategy used by
@@ -160,16 +162,16 @@ def classify_homotopy(
     if isinstance(space, SimplicialComplex):
         if not space.vertex_set:
             raise ValueError("Homotopy classification requires a nonempty realization")
+        if max_vertices is not None and len(space.vertex_set) > max_vertices:
+            return HomotopyClassification(
+                HomotopyClassificationStatus.INCONCLUSIVE,
+                f"vertex limit {max_vertices} exceeded",
+            )
         if not nx.is_connected(space.one_skeleton_graph()):
             return HomotopyClassification(
                 HomotopyClassificationStatus.INCONCLUSIVE,
                 "The realization is disconnected; the current HomotopyType "
                 "expressions represent connected based homotopy types.",
-            )
-        if max_vertices is not None and len(space.vertex_set) > max_vertices:
-            return HomotopyClassification(
-                HomotopyClassificationStatus.INCONCLUSIVE,
-                f"vertex limit {max_vertices} exceeded",
             )
         certificate = complex_type_certificate(
             space,
@@ -200,16 +202,16 @@ def classify_homotopy(
         raise ValueError("graph input must be simple, undirected, and loopless")
     if not space:
         raise ValueError("Homotopy classification requires a nonempty realization")
+    if max_vertices is not None and space.number_of_nodes() > max_vertices:
+        return HomotopyClassification(
+            HomotopyClassificationStatus.INCONCLUSIVE,
+            f"vertex limit {max_vertices} exceeded",
+        )
     if not nx.is_connected(space):
         return HomotopyClassification(
             HomotopyClassificationStatus.INCONCLUSIVE,
             "The realization is disconnected; the current HomotopyType "
             "expressions represent connected based homotopy types.",
-        )
-    if max_vertices is not None and space.number_of_nodes() > max_vertices:
-        return HomotopyClassification(
-            HomotopyClassificationStatus.INCONCLUSIVE,
-            f"vertex limit {max_vertices} exceeded",
         )
 
     if recognize_products:
