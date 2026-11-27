@@ -115,7 +115,6 @@ def test_empty_realizations_are_rejected():
             pycombtop.compare_homotopy(empty, point())
 
 
-
 def test_fields_are_validated_even_when_certificate_verifies():
     source = pycombtop.SimplicialComplex({0, 1}, [{0, 1}])
     target = point()
@@ -126,9 +125,7 @@ def test_fields_are_validated_even_when_certificate_verifies():
     )
 
     with pytest.raises(ValueError, match="at least one"):
-        pycombtop.compare_homotopy(
-            source, target, certificate=certificate, fields=()
-        )
+        pycombtop.compare_homotopy(source, target, certificate=certificate, fields=())
 
     with pytest.raises(ValueError, match="duplicates"):
         pycombtop.compare_homotopy(
@@ -136,9 +133,7 @@ def test_fields_are_validated_even_when_certificate_verifies():
         )
 
     with pytest.raises(ValueError, match="prime integer"):
-        pycombtop.compare_homotopy(
-            source, target, certificate=certificate, fields=(4,)
-        )
+        pycombtop.compare_homotopy(source, target, certificate=certificate, fields=(4,))
 
 
 def test_resource_limit_preserves_rejected_certificate_diagnostic():
