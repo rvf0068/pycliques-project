@@ -98,7 +98,6 @@ def test_vertex_limit_precedes_disconnected_complex_check() -> None:
     assert result.reason == "vertex limit 3 exceeded"
 
 
-
 def test_graph_product_certificate_is_replayable() -> None:
     graph = nx.strong_product(nx.cycle_graph(5), nx.cycle_graph(5))
 
