@@ -21,7 +21,7 @@ def test_complex_classifier_uses_cellular_certificate() -> None:
 
     assert result.status is pycombtop.HomotopyClassificationStatus.PROVED_TYPE
     assert result.homotopy_type is not None
-    assert result.certificate is not None
+    assert isinstance(result.certificate, pycombtop.ComplexTypeCertificate)
     assert pycombtop.verify_complex_type(complex_, result.certificate)
     assert result.has_replayable_certificate
     assert result.is_exact
