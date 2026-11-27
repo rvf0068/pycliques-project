@@ -383,3 +383,95 @@ def test_simplicial_homotopy_equivalence_requires_opposite_map_endpoints():
 
     with pytest.raises(ValueError, match="opposite endpoints"):
         simplicial_homotopy_equivalence_certificate(forward, wrong_direction)
+
+
+def test_simplicial_homotopy_equivalence_verifier_checks_chain_structure():
+    from dataclasses import replace
+
+    from pycombtop import (
+        simplicial_homotopy_equivalence_certificate,
+        verify_simplicial_homotopy_equivalence,
+    )
+
+    path = SimplicialComplex({0, 1, 2, 3}, [{0, 1}, {1, 2}, {2, 3}])
+    point = SimplicialComplex({"*"}, [{"*"}])
+    forward = SimplicialMap(path, point, dict.fromkeys(path.vertex_set, "*"))
+    backward = SimplicialMap(point, path, {"*": 1})
+    certificate = simplicial_homotopy_equivalence_certificate(forward, backward)
+
+    assert certificate is not None
+    start, end = certificate.source_homotopy
+    assert not verify_simplicial_homotopy_equivalence(
+        path, point, replace(certificate, source_homotopy=[start, end])
+    )
+    assert not verify_simplicial_homotopy_equivalence(
+        path, point, replace(certificate, source_homotopy=(start, object(), end))
+    )
+
+    wrong_domain = SimplicialMap(point, point, {"*": "*"})
+    assert not verify_simplicial_homotopy_equivalence(
+        path, point, replace(certificate, source_homotopy=(start, wrong_domain, end))
+    )
+
+
+def test_simplicial_homotopy_equivalence_verifier_checks_contiguity_and_target_chain():
+    from dataclasses import replace
+
+    from pycombtop import (
+        simplicial_homotopy_equivalence_certificate,
+        verify_simplicial_homotopy_equivalence,
+    )
+
+    path = SimplicialComplex({0, 1, 2, 3}, [{0, 1}, {1, 2}, {2, 3}])
+    point = SimplicialComplex({"*"}, [{"*"}])
+    forward = SimplicialMap(path, point, dict.fromkeys(path.vertex_set, "*"))
+    backward = SimplicialMap(point, path, {"*": 1})
+    certificate = simplicial_homotopy_equivalence_certificate(forward, backward)
+
+    assert certificate is not None
+    start, end = certificate.source_homotopy
+    noncontiguous = SimplicialMap(path, path, dict.fromkeys(path.vertex_set, 0))
+    assert not are_contiguous(start, noncontiguous)
+    assert not verify_simplicial_homotopy_equivalence(
+        path,
+        point,
+        replace(certificate, source_homotopy=(start, noncontiguous, end)),
+    )
+    assert not verify_simplicial_homotopy_equivalence(
+        path, point, replace(certificate, target_homotopy=())
+    )
+
+
+def test_simplicial_homotopy_equivalence_rejects_malformed_maps_and_spaces():
+    from dataclasses import replace
+    from typing import Any, cast
+
+    from pycombtop import (
+        simplicial_homotopy_equivalence_certificate,
+        verify_simplicial_homotopy_equivalence,
+    )
+
+    path = SimplicialComplex({0, 1}, [{0, 1}])
+    point = SimplicialComplex({"*"}, [{"*"}])
+    forward = SimplicialMap(path, point, {0: "*", 1: "*"})
+    backward = SimplicialMap(point, path, {"*": 0})
+    certificate = simplicial_homotopy_equivalence_certificate(forward, backward)
+
+    with pytest.raises(TypeError, match="forward and backward"):
+        simplicial_homotopy_equivalence_certificate(cast(Any, object()), backward)
+    with pytest.raises(TypeError, match="forward and backward"):
+        simplicial_homotopy_equivalence_certificate(forward, cast(Any, object()))
+
+    assert certificate is not None
+    assert not verify_simplicial_homotopy_equivalence(
+        cast(Any, object()), point, certificate
+    )
+    assert not verify_simplicial_homotopy_equivalence(
+        path, cast(Any, object()), certificate
+    )
+    assert not verify_simplicial_homotopy_equivalence(
+        path, point, replace(certificate, forward=cast(Any, object()))
+    )
+    assert not verify_simplicial_homotopy_equivalence(
+        path, point, replace(certificate, backward=cast(Any, object()))
+    )
