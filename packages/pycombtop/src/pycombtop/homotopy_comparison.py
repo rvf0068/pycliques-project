@@ -125,9 +125,7 @@ def compare_homotopy(
     if len(set(selected_fields)) != len(selected_fields):
         raise ValueError("fields must not contain duplicates")
 
-    profiles: list[
-        tuple[CoefficientField, tuple[int, ...], tuple[int, ...]]
-    ] = []
+    profiles: list[tuple[CoefficientField, tuple[int, ...], tuple[int, ...]]] = []
     for field in selected_fields:
         try:
             source_result = simplicial_homology(
