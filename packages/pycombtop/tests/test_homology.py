@@ -178,3 +178,18 @@ def test_ambiguous_vertex_labels_require_an_explicit_order():
         complex_, backend="python", vertex_order=[first, second]
     )
     assert result.betti_numbers == (0, 0)
+
+
+
+def test_betti_numbers_sc_accepts_ambiguous_hashable_vertex_labels():
+    class SameRepr:
+        def __repr__(self):
+            return "same"
+
+    first, second, third = SameRepr(), SameRepr(), SameRepr()
+    circle = pycombtop.SimplicialComplex(
+        {first, second, third},
+        [{first, second}, {second, third}, {first, third}],
+    )
+
+    assert pycombtop.betti_numbers_sc(circle) == [0, 1]
