@@ -486,6 +486,7 @@ def test_simplicial_homotopy_equivalence_rejects_malformed_maps_and_spaces():
         path, point, replace(certificate, backward=cast(Any, object()))
     )
 
+
 def test_simplicial_map_composition_rejects_incompatible_endpoints():
     from pycombtop.simplicial_maps import _compose_simplicial_maps
 
@@ -523,7 +524,6 @@ def test_simplicial_homotopy_equivalence_verifier_checks_both_chain_endpoints():
     )
 
 
-
 def test_simplicial_homotopy_equivalence_rejects_noncontiguous_chains():
     from pycombtop import simplicial_homotopy_equivalence_certificate
 
@@ -532,16 +532,19 @@ def test_simplicial_homotopy_equivalence_rejects_noncontiguous_chains():
     collapse = SimplicialMap(path, point, dict.fromkeys(path.vertex_set, "*"))
     inclusion = SimplicialMap(point, path, {"*": 1})
 
-    constant_at_zero = SimplicialMap(
-        path, path, dict.fromkeys(path.vertex_set, 0)
+    constant_at_zero = SimplicialMap(path, path, dict.fromkeys(path.vertex_set, 0))
+    assert (
+        simplicial_homotopy_equivalence_certificate(
+            collapse, inclusion, source_homotopy=(constant_at_zero,)
+        )
+        is None
     )
-    assert simplicial_homotopy_equivalence_certificate(
-        collapse, inclusion, source_homotopy=(constant_at_zero,)
-    ) is None
-
-    assert simplicial_homotopy_equivalence_certificate(
-        inclusion, collapse, target_homotopy=(constant_at_zero,)
-    ) is None
+    assert (
+        simplicial_homotopy_equivalence_certificate(
+            inclusion, collapse, target_homotopy=(constant_at_zero,)
+        )
+        is None
+    )
 
 
 def test_simplicial_homotopy_equivalence_verifier_rejects_wrong_chain_codomain():
