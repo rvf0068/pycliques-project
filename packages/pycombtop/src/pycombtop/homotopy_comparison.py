@@ -14,9 +14,9 @@ from enum import Enum
 
 from .homology import (
     CoefficientField,
-    _normalize_field,
     HomologyBackend,
     HomologyResult,
+    _normalize_field,
     simplicial_homology,
 )
 from .homology_backend import HomologyResourceLimit
