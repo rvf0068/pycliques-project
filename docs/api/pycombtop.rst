@@ -484,6 +484,48 @@ simplicial chains, so the degree-zero boundary is zero.
    :member-order: bysource
 
 
+Pairwise homotopy comparison
+----------------------------
+
+Use ``compare_homotopy(X, Y)`` for a conservative comparison of two
+finite simplicial complexes. A supplied
+``SimplicialHomotopyEquivalenceCertificate`` is independently verified
+and proves homotopy equivalence when valid. Without such a certificate,
+the function compares exact reduced homology over the requested fields
+(default: GF(2) and Q). A mismatch over even one field proves that the
+complexes are not homotopy equivalent. Agreement over the tested fields
+is explicitly inconclusive; it is not promoted to a positive verdict.
+Additional prime fields can be requested to test for more torsion.
+
+A homology face-budget exhaustion also returns an inconclusive result.
+The result records the status, the profiles actually compared, and any
+certificate diagnostic. No heuristic or matching Betti profile is treated
+as a homotopy-equivalence proof.
+
+.. code-block:: python
+
+   from pycombtop import (
+       HomotopyComparisonStatus,
+       compare_homotopy,
+       sphere_complex,
+       SimplicialComplex,
+   )
+
+   circle = sphere_complex(1)
+   point = SimplicialComplex({"p"}, [{"p"}])
+   result = compare_homotopy(circle, point)
+   assert result.status is HomotopyComparisonStatus.PROVED_NOT_EQUIVALENT
+
+   # Equal homology profiles alone do not settle homotopy equivalence.
+   same_profile = compare_homotopy(circle, sphere_complex(1))
+   assert same_profile.status is HomotopyComparisonStatus.INCONCLUSIVE
+
+.. automodule:: pycombtop.homotopy_comparison
+   :members:
+   :show-inheritance:
+   :member-order: bysource
+
+
 Named simplicial complexes
 --------------------------
 

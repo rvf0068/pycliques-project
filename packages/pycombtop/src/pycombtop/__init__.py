@@ -79,6 +79,11 @@ from .hom_complex import (
 )
 from .homology import HomologyResult, simplicial_homology
 from .homology_backend import HomologyResourceLimit
+from .homotopy_comparison import (
+    HomotopyComparisonResult,
+    HomotopyComparisonStatus,
+    compare_homotopy,
+)
 
 # homotopy_type
 from .homotopy_expressions import (
@@ -477,6 +482,10 @@ __all__ = [
     "HomologyResourceLimit",
     "HomologyResult",
     "simplicial_homology",
+    # pairwise homotopy comparison
+    "HomotopyComparisonResult",
+    "HomotopyComparisonStatus",
+    "compare_homotopy",
     # homotopy_type
     "MorseCertificate",
     "facet_morse_certificate",
