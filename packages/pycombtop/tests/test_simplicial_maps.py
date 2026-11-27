@@ -485,3 +485,41 @@ def test_simplicial_homotopy_equivalence_rejects_malformed_maps_and_spaces():
     assert not verify_simplicial_homotopy_equivalence(
         path, point, replace(certificate, backward=cast(Any, object()))
     )
+
+
+
+def test_simplicial_map_composition_rejects_incompatible_endpoints():
+    from pycombtop.simplicial_maps import _compose_simplicial_maps
+
+    first_space = SimplicialComplex({0}, [{0}])
+    middle_space = SimplicialComplex({1}, [{1}])
+    last_space = SimplicialComplex({"*"}, [{"*"}])
+    first = SimplicialMap(first_space, first_space, {0: 0})
+    second = SimplicialMap(middle_space, last_space, {1: "*"})
+
+    with pytest.raises(ValueError, match="target of the first map"):
+        _compose_simplicial_maps(first, second)
+
+
+def test_simplicial_homotopy_equivalence_verifier_checks_both_chain_endpoints():
+    from dataclasses import replace
+
+    from pycombtop import (
+        simplicial_homotopy_equivalence_certificate,
+        verify_simplicial_homotopy_equivalence,
+    )
+
+    path = SimplicialComplex({0, 1}, [{0, 1}])
+    point = SimplicialComplex({"*"}, [{"*"}])
+    forward = SimplicialMap(path, point, {0: "*", 1: "*"})
+    backward = SimplicialMap(point, path, {"*": 0})
+    certificate = simplicial_homotopy_equivalence_certificate(forward, backward)
+
+    assert certificate is not None
+    source_chain = certificate.source_homotopy
+    assert not verify_simplicial_homotopy_equivalence(
+        path, point, replace(certificate, source_homotopy=(source_chain[-1],))
+    )
+    assert not verify_simplicial_homotopy_equivalence(
+        path, point, replace(certificate, source_homotopy=(source_chain[0],))
+    )
