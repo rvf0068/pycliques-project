@@ -101,7 +101,7 @@ def test_auto_backend_falls_back_when_gudhi_is_unavailable(monkeypatch):
         raise ImportError("synthetic missing GUDHI")
 
     monkeypatch.setitem(
-        simplicial_homology.__globals__, "gudhi_betti_facets", unavailable
+        pycombtop.simplicial_homology.__globals__, "gudhi_betti_facets", unavailable
     )
     result = pycombtop.simplicial_homology(complex_, backend="auto")
     assert result.backend == "python"
