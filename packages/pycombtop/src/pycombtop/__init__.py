@@ -79,6 +79,11 @@ from .hom_complex import (
 )
 from .homology import HomologyResult, simplicial_homology
 from .homology_backend import HomologyResourceLimit
+from .homotopy_classifier import (
+    HomotopyClassification,
+    HomotopyClassificationStatus,
+    classify_homotopy,
+)
 from .homotopy_comparison import (
     HomotopyComparisonResult,
     HomotopyComparisonStatus,
@@ -482,6 +487,10 @@ __all__ = [
     "HomologyResourceLimit",
     "HomologyResult",
     "simplicial_homology",
+    # unified homotopy classification
+    "HomotopyClassification",
+    "HomotopyClassificationStatus",
+    "classify_homotopy",
     # pairwise homotopy comparison
     "HomotopyComparisonResult",
     "HomotopyComparisonStatus",
