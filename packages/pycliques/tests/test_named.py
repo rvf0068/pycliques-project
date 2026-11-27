@@ -71,7 +71,10 @@ def test_matching_graph_from_arbitrary_graph():
     source.add_edges_from([(0, 1), (1, 2), (3, 4)])
     graph = matching_graph(source)
     assert set(graph) == {(0, 1), (1, 2), (3, 4)}
-    assert set(graph.edges()) == {((0, 1), (3, 4))}
+    assert {frozenset(edge) for edge in graph.edges()} == {
+        frozenset({(0, 1), (3, 4)}),
+        frozenset({(1, 2), (3, 4)}),
+    }
     assert matching_graph(nx.empty_graph(4)).number_of_nodes() == 0
 
 
