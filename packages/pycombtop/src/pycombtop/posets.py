@@ -126,7 +126,8 @@ class Poset:
 
     def leq(self, a: Hashable, b: Hashable) -> bool:
         """Whether a <= b; unknown labels raise KeyError."""
-        self._upper[b]
+        if b not in self:
+            raise KeyError(b)
         return b in self._upper[a]
 
     def comparable(self, a: Hashable, b: Hashable) -> bool:
@@ -338,6 +339,8 @@ def beat_core(poset: Poset) -> BeatReduction:
 
 def verify_beat_reduction(poset: Poset, reduction: BeatReduction) -> bool:
     """Replay each strict-neighbor condition and check the endpoint is a core."""
+    if not isinstance(reduction, BeatReduction):
+        return False
     current = poset
     for move in reduction.moves:
         if not isinstance(move, BeatMove) or move not in beat_moves(current):
@@ -377,7 +380,17 @@ def bounded_complete_poset(poset: Poset, *, upper: bool = True) -> Poset:
 
 def is_down_helly(poset: Poset) -> bool:
     """Every nonempty complete of Omega has a common upper bound."""
-    return all(poset.upper_bounds(c) for c in nx.find_cliques(omega(poset)))
+    minima = tuple(poset.minimal_elements())
+    graph = nx.Graph()
+    graph.add_nodes_from(range(len(minima)))
+    graph.add_edges_from(
+        (i, j)
+        for i, j in combinations(range(len(minima)), 2)
+        if poset.upper_bounds((minima[i], minima[j]))
+    )
+    return all(
+        poset.upper_bounds(minima[i] for i in c) for c in nx.find_cliques(graph)
+    )
 
 
 def is_up_helly(poset: Poset) -> bool:
@@ -534,3 +547,36 @@ def is_crosscut(poset: Poset, elements: Iterable[Hashable]) -> bool:
                 except ValueError:
                     return False
     return True
+
+
+def join_contraction(poset: Poset, point: Hashable) -> dict[Hashable, Hashable]:
+    """Conical contraction x -> join(x, point); raise if a join is absent."""
+    if point not in poset:
+        raise ValueError("contraction point outside the poset")
+    return {x: poset.join((x, point)) for x in poset}
+
+
+def verify_conical_contraction(
+    poset: Poset, point: Hashable, mapping: Mapping[Hashable, Hashable]
+) -> bool:
+    """Verify an order-preserving map with x <= f(x) >= point."""
+    return (
+        point in poset
+        and poset.is_order_preserving(poset, mapping)
+        and all(poset.leq(x, y) and poset.leq(point, y) for x, y in mapping.items())
+    )
+
+
+def lower_fibers(
+    source: Poset, target: Poset, mapping: Mapping[Hashable, Hashable]
+) -> dict[Hashable, Poset]:
+    """Inverse images of principal lower sets, for Quillen's fiber theorem.
+
+    This constructs the fibers only, without claiming contractibility.
+    """
+    if not source.is_order_preserving(target, mapping):
+        raise ValueError("expected a total order-preserving map")
+    return {
+        y: source.induced(x for x in source if target.leq(mapping[x], y))
+        for y in target
+    }
