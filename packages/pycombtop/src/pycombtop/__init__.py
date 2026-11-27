@@ -203,6 +203,16 @@ from .product_types import (
     product_type_certificate,
     verify_product_type,
 )
+from .quillen_certificates import (
+    QuillenFiberCertificate,
+    WeakPointMove,
+    WeakPointReduction,
+    quillen_fiber_certificate,
+    verify_quillen_fiber_certificate,
+    verify_weak_point_reduction,
+    weak_point_core,
+    weak_point_moves,
+)
 from .recursive_betti import RecursiveBettiBounds, recursive_betti_upper_bounds
 from .recursive_wedges import (
     RecursiveWedgeCertificate,
@@ -368,6 +378,14 @@ __all__ = [
     "order_complex",
     "product_poset",
     "verify_beat_reduction",
+    "WeakPointMove",
+    "WeakPointReduction",
+    "weak_point_moves",
+    "weak_point_core",
+    "verify_weak_point_reduction",
+    "QuillenFiberCertificate",
+    "quillen_fiber_certificate",
+    "verify_quillen_fiber_certificate",
     "verify_conical_contraction",
     "FacetPunctureWedgeCertificate",
     "facet_puncture_wedge_certificate",
