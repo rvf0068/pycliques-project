@@ -271,12 +271,7 @@ def face_poset(complex_: SimplicialComplex) -> Poset:
     faces = {face for face in complex_.all_simplices() if face}
     return Poset(
         faces,
-        (
-            (Simplex(face - {x}), face)
-            for face in faces
-            if len(face) > 1
-            for x in face
-        ),
+        ((Simplex(face - {x}), face) for face in faces if len(face) > 1 for x in face),
     )
 
 
@@ -289,9 +284,7 @@ def product_poset(first: Poset, second: Poset) -> Poset:
     """Cartesian product with coordinatewise order."""
     elements = tuple(product(first, second))
     edges = [((a, b), (c, b)) for a, b in elements for c in first.upper_covers(a)]
-    edges.extend(
-        ((a, b), (a, d)) for a, b in elements for d in second.upper_covers(b)
-    )
+    edges.extend(((a, b), (a, d)) for a, b in elements for d in second.upper_covers(b))
     return Poset(elements, edges)
 
 
@@ -388,9 +381,7 @@ def is_down_helly(poset: Poset) -> bool:
         for i, j in combinations(range(len(minima)), 2)
         if poset.upper_bounds((minima[i], minima[j]))
     )
-    return all(
-        poset.upper_bounds(minima[i] for i in c) for c in nx.find_cliques(graph)
-    )
+    return all(poset.upper_bounds(minima[i] for i in c) for c in nx.find_cliques(graph))
 
 
 def is_up_helly(poset: Poset) -> bool:
@@ -482,9 +473,7 @@ def interval_poset(poset: Poset) -> Poset:
     """Nonempty closed intervals, labeled by endpoint pairs, ordered by inclusion."""
     intervals = tuple(poset.relation())
     edges = [((a, b), (c, b)) for a, b in intervals for c in poset.lower_covers(a)]
-    edges.extend(
-        ((a, b), (a, d)) for a, b in intervals for d in poset.upper_covers(b)
-    )
+    edges.extend(((a, b), (a, d)) for a, b in intervals for d in poset.upper_covers(b))
     return Poset(intervals, edges)
 
 

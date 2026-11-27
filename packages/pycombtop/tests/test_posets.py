@@ -106,9 +106,7 @@ def test_beat_core_trace_and_maps():
     result = beat_core(p)
     assert len(result.core) == 1
     assert verify_beat_reduction(p, result)
-    assert not verify_beat_reduction(
-        p, replace(result, moves=(BeatMove(0, 2, "up"),))
-    )
+    assert not verify_beat_reduction(p, replace(result, moves=(BeatMove(0, 2, "up"),)))
     assert not verify_beat_reduction(p, replace(result, moves=()))
     assert not verify_beat_reduction(p, replace(result, core=p))
     mapping = join_contraction(p, 1)
@@ -124,9 +122,7 @@ def test_beat_core_trace_and_maps():
 
 
 def test_face_poset_barycentric_subdivision_and_sphere_core():
-    triangle = SimplicialComplex(
-        [0, 1, 2, "ghost"], facet_set=[{0, 1}, {1, 2}, {0, 2}]
-    )
+    triangle = SimplicialComplex([0, 1, 2, "ghost"], facet_set=[{0, 1}, {1, 2}, {0, 2}])
     p = face_poset(triangle)
     assert len(p) == 6
     assert frozenset() not in p
@@ -180,9 +176,7 @@ def test_graph_bridges(graph):
     assert p.is_order_preserving(p, h)
     assert all(p.leq(x, h[x]) and h[h[x]] == h[x] for x in p)
     assert coatomic_subposet(p) == p.induced(h.values())
-    assert betti_numbers_sc(order_complex(p)) == betti_numbers_sc(
-        clique_complex(graph)
-    )
+    assert betti_numbers_sc(order_complex(p)) == betti_numbers_sc(clique_complex(graph))
     intervals = interval_poset(p)
     assert nx.is_isomorphic(omega(intervals), double_bound_graph(p))
     db = graph_double_bound(graph)
