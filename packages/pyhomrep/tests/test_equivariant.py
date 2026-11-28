@@ -453,3 +453,11 @@ def test_induced_homology_map_between_relative_pairs():
     assert target_homology.representation_matrix(swap, 1) * induced == (
         induced * source_homology.representation_matrix(swap, 1)
     )
+
+
+def test_relative_equivariant_homology_validates_relative_argument_type():
+    complex_ = SimplicialComplex({0}, facet_set=[{0}])
+    action = PermutationAction((0,), [])
+
+    with pytest.raises(TypeError, match="relative_to must be"):
+        EquivariantHomology(complex_, action, relative_to=object())
