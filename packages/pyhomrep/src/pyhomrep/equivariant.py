@@ -58,6 +58,8 @@ class EquivariantHomology:
         reduced: bool = False,
         relative_to: SimplicialComplex | None = None,
     ) -> None:
+        if relative_to is not None and not isinstance(relative_to, SimplicialComplex):
+            raise TypeError("relative_to must be a SimplicialComplex or None")
         if relative_to is None:
             action.validate_complex(complex_)
         else:
