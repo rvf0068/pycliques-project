@@ -35,9 +35,7 @@ def test_action_validates_simplicial_automorphisms():
     complex_ = SimplicialComplex(
         {"a", "b", "c"}, facet_set=[{"a", "b"}, {"b", "c"}, {"a", "c"}]
     )
-    action = PermutationAction(
-        ("a", "b", "c"), [Permutation([1, 2, 0])]
-    )
+    action = PermutationAction(("a", "b", "c"), [Permutation([1, 2, 0])])
     action.validate_complex(complex_)
 
     invalid = PermutationAction(("a", "b", "c"), [Permutation([1, 0, 2])])
@@ -50,6 +48,7 @@ def test_action_validates_poset_automorphisms():
     poset = boolean_lattice(2)
     elements = poset.elements
     index = {x: i for i, x in enumerate(elements)}
+
     def swap(x):
         return frozenset(1 - v for v in x)
 
