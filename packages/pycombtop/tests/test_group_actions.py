@@ -1,12 +1,11 @@
-from sympy.combinatorics import Permutation
-import pytest
-
 from pycombtop import (
     PermutationAction,
     Poset,
     SimplicialComplex,
     boolean_lattice,
 )
+import pytest
+from sympy.combinatorics import Permutation
 
 
 def test_permutation_action_on_labeled_set():
