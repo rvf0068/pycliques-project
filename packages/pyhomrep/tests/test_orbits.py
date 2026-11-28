@@ -93,3 +93,31 @@ def test_octahedral_sphere_induction():
         sum(m * YoungTableaux(list(lam), [1] * 9).CMNR() for lam, m in mult.items())
         == 7560
     )
+
+
+def test_orbit_chain_complex_accepts_permutation_action():
+    from sympy.combinatorics import Permutation
+    from pycombtop import PermutationAction
+
+    complex_ = clique_complex(nx.cycle_graph(3))
+    action = PermutationAction(
+        (0, 1, 2), [Permutation([1, 2, 0])]
+    )
+    chains = OrbitChainComplex(complex_, action, reduced=True)
+    assert chains.betti_number(0) == 0
+    assert chains.betti_number(1) == 0
+    assert chains.betti_number(2) == 0
+
+
+def test_orbit_chain_complex_rejects_noninvariant_relative_subcomplex():
+    import pytest
+    from sympy.combinatorics import Permutation
+    from pycombtop import PermutationAction
+
+    complex_ = clique_complex(nx.cycle_graph(3))
+    action = PermutationAction(
+        (0, 1, 2), [Permutation([1, 2, 0])]
+    )
+    relative = SimplicialComplex({0}, facet_set=[{0}])
+    with pytest.raises(ValueError, match="must be invariant"):
+        OrbitChainComplex(complex_, action, relative=relative)
