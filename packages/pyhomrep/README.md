@@ -173,3 +173,37 @@ irreducible-representation decomposition algorithm.
 For stabilizer calculations, `decompose_induced_character(n, weights, order)`
 uses Frobenius reciprocity. The weights are sums of the subgroup character
 over elements of each ambient symmetric-group cycle type.
+
+
+### Equivariant simplicial self-maps
+
+An equivariant simplicial self-map induces a linear map on rational homology
+that commutes with the action of every group element. The exact interface
+below checks equivariance on the supplied action generators and returns the
+induced matrix in the same deterministic homology basis used for the
+representation matrices:
+
+```python
+from pycombtop import PermutationAction, SimplicialComplex, SimplicialMap
+from pyhomrep import EquivariantHomology
+from sympy.combinatorics import Permutation
+
+cycle = SimplicialComplex(
+    {0, 1, 2, 3},
+    facet_set=[{0, 1}, {1, 2}, {2, 3}, {0, 3}],
+)
+reflection = Permutation([0, 3, 2, 1])
+action = PermutationAction((0, 1, 2, 3), [reflection])
+mapping = SimplicialMap(
+    cycle, cycle, {0: 0, 1: 3, 2: 2, 3: 1}
+)
+homology = EquivariantHomology(cycle, action)
+
+induced = homology.induced_homology_map(mapping, 1)
+assert induced == Matrix([[-1]])
+```
+
+This first interface handles self-maps of the acted-on complex. Maps between
+different complexes with independently represented actions require an
+explicit common acting-group identification and are not inferred from
+generator-list positions.
