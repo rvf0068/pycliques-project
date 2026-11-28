@@ -84,8 +84,10 @@ class EquivariantHomology:
 
     def _faces(self, degree: int) -> tuple[tuple[int, ...], ...]:
         if degree not in self._faces_cache:
-            if degree == -1 and self.reduced and (
-                self.relative_to is None or not self.relative_to.facet_set
+            if (
+                degree == -1
+                and self.reduced
+                and (self.relative_to is None or not self.relative_to.facet_set)
             ):
                 faces = ((),)
             elif degree < 0 or degree > self.complex.dimension():
