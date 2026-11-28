@@ -1,7 +1,10 @@
 """Tests for exact equivariant homology."""
 
 import networkx as nx
-from pycombtop import SimplicialComplex, clique_complex
+import pytest
+from sympy.combinatorics import Permutation
+
+from pycombtop import PermutationAction, SimplicialComplex, clique_complex
 from pyhomrep import (
     OrbitChainComplex,
     YoungTableaux,
@@ -96,9 +99,6 @@ def test_octahedral_sphere_induction():
 
 
 def test_orbit_chain_complex_accepts_permutation_action():
-    from sympy.combinatorics import Permutation
-    from pycombtop import PermutationAction
-
     complex_ = clique_complex(nx.cycle_graph(3))
     action = PermutationAction(
         (0, 1, 2), [Permutation([1, 2, 0])]
@@ -110,10 +110,6 @@ def test_orbit_chain_complex_accepts_permutation_action():
 
 
 def test_orbit_chain_complex_rejects_noninvariant_relative_subcomplex():
-    import pytest
-    from sympy.combinatorics import Permutation
-    from pycombtop import PermutationAction
-
     complex_ = clique_complex(nx.cycle_graph(3))
     action = PermutationAction(
         (0, 1, 2), [Permutation([1, 2, 0])]
