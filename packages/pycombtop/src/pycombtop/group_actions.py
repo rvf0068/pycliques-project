@@ -162,6 +162,7 @@ class PermutationAction:
         self, ambient: SimplicialComplex, subcomplex: SimplicialComplex
     ) -> None:
         """Raise ValueError unless subcomplex is an invariant subcomplex."""
+        self.validate_complex(ambient)
         ambient_faces = ambient.all_simplices()
         if not subcomplex.vertex_set <= ambient.vertex_set or any(
             facet not in ambient_faces for facet in subcomplex.facet_set
