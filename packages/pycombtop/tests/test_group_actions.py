@@ -1,10 +1,10 @@
+import pytest
 from pycombtop import (
     PermutationAction,
     Poset,
     SimplicialComplex,
     boolean_lattice,
 )
-import pytest
 from sympy.combinatorics import Permutation
 
 
