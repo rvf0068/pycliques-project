@@ -296,6 +296,37 @@ class EquivariantHomology:
                 "simplicial_map must send the relative subcomplex into target"
             )
 
+    def _induced_chain_map(
+        self,
+        target: EquivariantHomology,
+        simplicial_map: SimplicialMap,
+        degree: int,
+    ) -> SparseMatrix:
+        """Return the chain map projected to the relative quotient bases."""
+        ambient = induced_chain_map(
+            simplicial_map,
+            degree,
+            source_order=self.action.elements,
+            target_order=target.action.elements,
+        )
+        source_basis = tuple(
+            sorted(
+                tuple(sorted(self.action.index[vertex] for vertex in face))
+                for face in self.complex.faces_of_dimension(degree)
+            )
+        )
+        target_basis = tuple(
+            sorted(
+                tuple(sorted(target.action.index[vertex] for vertex in face))
+                for face in target.complex.faces_of_dimension(degree)
+            )
+        )
+        source_positions = {face: index for index, face in enumerate(source_basis)}
+        target_positions = {face: index for index, face in enumerate(target_basis)}
+        source_rows = [source_positions[face] for face in self._faces(degree)]
+        target_rows = [target_positions[face] for face in target._faces(degree)]
+        return ambient.extract(target_rows, source_rows)
+
     def induced_homology_map(
         self, simplicial_map: SimplicialMap, degree: int
     ) -> Matrix:
@@ -344,12 +375,7 @@ class EquivariantHomology:
         boundaries, homology, pivot_rows, inverse = self._homology_basis(degree)
         if homology.cols == 0:
             return Matrix(0, 0, [])
-        chain_map = induced_chain_map(
-            simplicial_map,
-            degree,
-            source_order=self.action.elements,
-            target_order=self.action.elements,
-        )
+        chain_map = self._induced_chain_map(self, simplicial_map, degree)
         transformed = chain_map * homology
         coordinates = inverse * transformed.extract(pivot_rows, range(homology.cols))
         result = coordinates[boundaries.cols :, :]
@@ -430,12 +456,7 @@ class EquivariantHomology:
         if source_homology.cols == 0 or target_homology.cols == 0:
             return Matrix(target_homology.cols, source_homology.cols, [])
 
-        chain_map = induced_chain_map(
-            simplicial_map,
-            degree,
-            source_order=self.action.elements,
-            target_order=target.action.elements,
-        )
+        chain_map = self._induced_chain_map(target, simplicial_map, degree)
         transformed = chain_map * source_homology
         coordinates = target_inverse * transformed.extract(
             target_pivots, range(source_homology.cols)
