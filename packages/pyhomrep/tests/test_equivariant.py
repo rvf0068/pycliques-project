@@ -142,7 +142,7 @@ def test_induced_homology_map_rejects_nonequivariant_self_map():
     )
     homology = EquivariantHomology(complex_, action)
 
-    with pytest.raises(ValueError, match="equivariant under every action generator"):
+    with pytest.raises(ValueError, match="equivariant under each action generator"):
         homology.induced_homology_map(transposition_map, 1)
 
 
