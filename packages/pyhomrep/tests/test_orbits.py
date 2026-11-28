@@ -12,6 +12,8 @@ from pyhomrep import (
     matching_graph,
     partitions_list,
 )
+
+
 def test_reversing_stabilizer():
     sc = clique_complex(nx.complete_graph(2))
     chain = OrbitChainComplex(sc, [lambda v: 1 - v], reduced=True)
