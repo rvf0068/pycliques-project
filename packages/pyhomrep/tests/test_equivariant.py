@@ -405,13 +405,47 @@ def test_relative_equivariant_homology_rejects_non_subcomplex():
         EquivariantHomology(complex_, action, relative_to=relative)
 
 
+def test_relative_induced_maps_use_quotient_chain_bases():
+    source = SimplicialComplex({0, 1}, facet_set=[{0}, {1}])
+    source_relative = SimplicialComplex({0}, facet_set=[{0}])
+    source_action = PermutationAction((0, 1), [])
+    identity = SimplicialMap(source, source, {0: 0, 1: 1})
+    source_homology = EquivariantHomology(
+        source, source_action, relative_to=source_relative
+    )
+
+    assert source_homology.induced_homology_map(identity, 0) == Matrix([[1]])
+
+    target = SimplicialComplex({"a", "b"}, facet_set=[{"a"}, {"b"}])
+    target_relative = SimplicialComplex({"a"}, facet_set=[{"a"}])
+    target_action = PermutationAction(("a", "b"), [])
+    mapping = SimplicialMap(source, target, {0: "a", 1: "b"})
+    target_homology = EquivariantHomology(
+        target, target_action, relative_to=target_relative
+    )
+
+    assert source_homology.induced_homology_map_to(target_homology, mapping, 0) == (
+        Matrix([[1]])
+    )
+
+
+def test_relative_induced_map_rejects_absolute_target():
+    complex_ = SimplicialComplex({0, 1}, facet_set=[{0}, {1}])
+    relative = SimplicialComplex({0}, facet_set=[{0}])
+    action = PermutationAction((0, 1), [])
+    homology = EquivariantHomology(complex_, action, relative_to=relative)
+    absolute_target = EquivariantHomology(complex_, action)
+    identity = SimplicialMap(complex_, complex_, {0: 0, 1: 1})
+
+    with pytest.raises(ValueError, match="send the relative subcomplex into target"):
+        homology.induced_homology_map_to(absolute_target, identity, 0)
+
+
 def test_induced_relative_homology_map_requires_map_of_pairs():
     complex_ = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1}, {1, 2}])
     relative = SimplicialComplex({0, 2}, facet_set=[{0}, {2}])
     action = PermutationAction((0, 1, 2), [])
-    homology = EquivariantHomology(
-        complex_, action, relative_to=relative
-    )
+    homology = EquivariantHomology(complex_, action, relative_to=relative)
     mapping = SimplicialMap(complex_, complex_, {0: 1, 1: 1, 2: 2})
 
     with pytest.raises(ValueError, match="send the relative subcomplex"):
