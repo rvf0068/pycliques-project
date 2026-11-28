@@ -78,6 +78,7 @@ from .hom_complex import (
     iter_multihomomorphisms,
 )
 from .homology import HomologyResult, simplicial_homology
+from .group_actions import PermutationAction
 from .homology_backend import HomologyResourceLimit
 from .homotopy_classifier import (
     HomotopyClassification,
@@ -357,6 +358,8 @@ __all__ = [
     "brown_poset",
     "quillen_poset",
     "subgroup_conjugation",
+    # finite permutation actions
+    "PermutationAction",
     # finite posets and order complexes
     "BeatMove",
     "BeatReduction",
