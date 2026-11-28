@@ -57,6 +57,9 @@ class EquivariantHomology:
         self._boundary_cache: dict[int, SparseMatrix] = {}
         self._chain_cache: dict[tuple[tuple[int, ...], int], SparseMatrix] = {}
         self._image_trace_cache: dict[tuple[tuple[int, ...], int], int] = {}
+        self._image_basis_cache: dict[
+            int, tuple[Matrix, tuple[int, ...], Matrix] | None
+        ] = {}
 
     def _faces(self, degree: int) -> tuple[tuple[int, ...], ...]:
         if degree not in self._faces_cache:
@@ -130,27 +133,40 @@ class EquivariantHomology:
             self._boundary_cache[degree] = matrix
         return self._boundary_cache[degree]
 
+    def _image_basis(self, degree: int) -> tuple[Matrix, tuple[int, ...], Matrix] | None:
+        """Cache a basis and coordinate extractor for im(d_degree)."""
+        if degree not in self._image_basis_cache:
+            basis_vectors = self._boundary_matrix(degree).columnspace()
+            if not basis_vectors:
+                self._image_basis_cache[degree] = None
+            else:
+                basis = Matrix.hstack(*basis_vectors)
+                rank = basis.cols
+                pivot_rows = tuple(basis.T.rref()[1])
+                coordinate_extractor = basis.extract(pivot_rows, range(rank)).inv()
+                self._image_basis_cache[degree] = (
+                    basis,
+                    pivot_rows,
+                    coordinate_extractor,
+                )
+        return self._image_basis_cache[degree]
+
     def _image_character(self, permutation: Permutation, degree: int) -> int:
         """Trace of the group element on im(d_degree)."""
         key = (tuple(permutation.array_form), degree)
-        if key in self._image_trace_cache:
-            return self._image_trace_cache[key]
-
-        boundary = self._boundary_matrix(degree)
-        basis_vectors = boundary.columnspace()
-        if not basis_vectors:
-            result = 0
-        else:
-            basis = Matrix.hstack(*basis_vectors)
-            rank = basis.cols
-            action_matrix = self._chain_matrix(permutation, degree - 1)
-            transformed = action_matrix * basis
-            pivot_rows = basis.T.rref()[1]
-            square = basis.extract(pivot_rows, range(rank))
-            coordinates = square.inv() * transformed.extract(pivot_rows, range(rank))
-            result = int(coordinates.trace())
-        self._image_trace_cache[key] = result
-        return result
+        if key not in self._image_trace_cache:
+            image_basis = self._image_basis(degree)
+            if image_basis is None:
+                result = 0
+            else:
+                basis, pivot_rows, coordinate_extractor = image_basis
+                transformed = self._chain_matrix(permutation, degree - 1) * basis
+                coordinates = coordinate_extractor * transformed.extract(
+                    pivot_rows, range(basis.cols)
+                )
+                result = int(coordinates.trace())
+            self._image_trace_cache[key] = result
+        return self._image_trace_cache[key]
 
     def character(self, permutation: Permutation, degree: int) -> int:
         """Return the exact character on H_degree (or reduced homology).
