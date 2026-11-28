@@ -2,6 +2,8 @@
 
 import networkx as nx
 import pytest
+from sympy.combinatorics import Permutation
+
 from pycombtop import PermutationAction, SimplicialComplex, clique_complex
 from pyhomrep import (
     OrbitChainComplex,
@@ -13,7 +15,6 @@ from pyhomrep import (
     matching_graph,
     partitions_list,
 )
-from sympy.combinatorics import Permutation
 
 
 def test_reversing_stabilizer():
