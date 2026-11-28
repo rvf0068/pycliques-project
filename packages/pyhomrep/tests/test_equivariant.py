@@ -200,15 +200,11 @@ def test_induced_homology_map_between_differently_labeled_actions():
     source_action = PermutationAction(("a", "b", "c", "d"), [rotation])
     # A different generating set for the same concrete subgroup of S_4.
     target_action = PermutationAction(("w", "x", "y", "z"), [inverse_rotation])
-    mapping = SimplicialMap(
-        source, target, {"a": "w", "b": "x", "c": "y", "d": "z"}
-    )
+    mapping = SimplicialMap(source, target, {"a": "w", "b": "x", "c": "y", "d": "z"})
     source_homology = EquivariantHomology(source, source_action)
     target_homology = EquivariantHomology(target, target_action)
 
-    induced = source_homology.induced_homology_map_to(
-        target_homology, mapping, 1
-    )
+    induced = source_homology.induced_homology_map_to(target_homology, mapping, 1)
     source_representation = source_homology.representation_matrix(rotation, 1)
     target_representation = target_homology.representation_matrix(rotation, 1)
 
@@ -229,16 +225,12 @@ def test_induced_homology_map_to_rejects_different_permutation_groups():
     reflection = Permutation([0, 3, 2, 1])
     source_action = PermutationAction((0, 1, 2, 3), [rotation])
     target_action = PermutationAction(("a", "b", "c", "d"), [reflection])
-    mapping = SimplicialMap(
-        source, target, {0: "a", 1: "b", 2: "c", 3: "d"}
-    )
+    mapping = SimplicialMap(source, target, {0: "a", 1: "b", 2: "c", 3: "d"})
     source_homology = EquivariantHomology(source, source_action)
     target_homology = EquivariantHomology(target, target_action)
 
     with pytest.raises(ValueError, match="same permutation group"):
-        source_homology.induced_homology_map_to(
-            target_homology, mapping, 1
-        )
+        source_homology.induced_homology_map_to(target_homology, mapping, 1)
 
 
 def test_induced_homology_map_to_rejects_incompatible_reduced_conventions():
@@ -266,9 +258,7 @@ def test_induced_homology_map_to_can_be_rectangular():
     )
     source_action = PermutationAction(("a", "b", "c", "d"), [])
     target_action = PermutationAction(("w", "x", "y", "z"), [])
-    mapping = SimplicialMap(
-        source, target, {"a": "w", "b": "x", "c": "y", "d": "x"}
-    )
+    mapping = SimplicialMap(source, target, {"a": "w", "b": "x", "c": "y", "d": "x"})
     source_homology = EquivariantHomology(source, source_action)
     target_homology = EquivariantHomology(target, target_action)
 
