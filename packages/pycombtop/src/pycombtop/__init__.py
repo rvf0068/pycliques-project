@@ -67,6 +67,7 @@ from .fundamental_group import (
     verify_connected_link_order,
     verify_presentation_reduction,
 )
+from .group_actions import PermutationAction
 from .hom_complex import (
     HomPosetLimit,
     MultiHomomorphism,
@@ -77,7 +78,6 @@ from .hom_complex import (
     is_multihomomorphism,
     iter_multihomomorphisms,
 )
-from .group_actions import PermutationAction
 from .homology import HomologyResult, simplicial_homology
 from .homology_backend import HomologyResourceLimit
 from .homotopy_classifier import (
