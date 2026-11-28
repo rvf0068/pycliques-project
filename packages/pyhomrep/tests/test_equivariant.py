@@ -43,6 +43,31 @@ def test_exact_representation_matrices_on_tetrahedron_boundary():
     assert homology.representation_matrix(transposition, 1) == Matrix(0, 0, [])
 
 
+
+def test_representation_matrix_on_contractible_interval():
+    complex_ = SimplicialComplex({0, 1}, facet_set=[{0, 1}])
+    swap = Permutation([1, 0])
+    action = PermutationAction((0, 1), [swap])
+    homology = EquivariantHomology(complex_, action)
+
+    assert homology.representation_matrix(Permutation(size=2), 0) == Matrix([[1]])
+    assert homology.representation_matrix(swap, 0) == Matrix([[1]])
+    assert homology.representation_matrix(swap, 1) == Matrix(0, 0, [])
+    assert homology.representation_matrix(swap, 2) == Matrix(0, 0, [])
+
+
+def test_representation_matrix_validates_element_and_degree():
+    complex_ = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1, 2}])
+    rotation = Permutation([1, 2, 0])
+    action = PermutationAction((0, 1, 2), [rotation])
+    homology = EquivariantHomology(complex_, action)
+
+    with pytest.raises(ValueError, match="degree must be"):
+        homology.representation_matrix(rotation, -1)
+    with pytest.raises(ValueError, match="not in the acting group"):
+        homology.representation_matrix(Permutation([1, 0, 2]), 1)
+
+
 def test_exact_reduced_homology_representation_matrix():
     complex_ = SimplicialComplex({0, 1}, facet_set=[{0}, {1}])
     swap = Permutation([1, 0])
