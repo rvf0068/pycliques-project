@@ -156,6 +156,8 @@ a computed basis of rational homology. Boundaries are extended to a basis of
 cycles, so coordinates are taken in the quotient by boundaries:
 
 ```python
+from sympy import Matrix
+
 rho = homology.representation_matrix(transposition, 2)
 assert rho == Matrix([[-1]])  # top homology is the sign representation
 ```
