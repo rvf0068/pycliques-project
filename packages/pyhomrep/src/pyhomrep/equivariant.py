@@ -133,7 +133,9 @@ class EquivariantHomology:
             self._boundary_cache[degree] = matrix
         return self._boundary_cache[degree]
 
-    def _image_basis(self, degree: int) -> tuple[Matrix, tuple[int, ...], Matrix] | None:
+    def _image_basis(
+        self, degree: int
+    ) -> tuple[Matrix, tuple[int, ...], Matrix] | None:
         """Cache a basis and coordinate extractor for im(d_degree)."""
         if degree not in self._image_basis_cache:
             basis_vectors = self._boundary_matrix(degree).columnspace()
