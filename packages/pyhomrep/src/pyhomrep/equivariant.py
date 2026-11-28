@@ -184,10 +184,12 @@ class EquivariantHomology:
         basis from the selected ambient coordinates.
         """
         if degree not in self._homology_basis_cache:
-            boundaries = Matrix.hstack(
-                *self._boundary_matrix(degree + 1).columnspace()
-            ) if self._boundary_matrix(degree + 1).columnspace() else Matrix(
-                self._faces(degree).__len__(), 0, []
+            boundary_vectors = self._boundary_matrix(degree + 1).columnspace()
+            chain_dimension = len(self._faces(degree))
+            boundaries = (
+                Matrix.hstack(*boundary_vectors)
+                if boundary_vectors
+                else Matrix(chain_dimension, 0, [])
             )
             cycles = self._boundary_matrix(degree).nullspace()
             homology_columns: list[Matrix] = []
@@ -203,7 +205,7 @@ class EquivariantHomology:
             homology = (
                 Matrix.hstack(*homology_columns)
                 if homology_columns
-                else Matrix(self._faces(degree).__len__(), 0, [])
+                else Matrix(chain_dimension, 0, [])
             )
             if combined.cols:
                 pivot_rows = tuple(combined.T.rref()[1])
@@ -212,7 +214,10 @@ class EquivariantHomology:
                 pivot_rows = ()
                 inverse = Matrix(0, 0, [])
             self._homology_basis_cache[degree] = (
-                boundaries, homology, pivot_rows, inverse
+                boundaries,
+                homology,
+                pivot_rows,
+                inverse,
             )
         return self._homology_basis_cache[degree]
 
