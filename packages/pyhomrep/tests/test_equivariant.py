@@ -377,9 +377,9 @@ def test_relative_equivariant_homology_of_interval_mod_boundary():
         complex_, action, relative_to=boundary
     )
 
-    assert homology.character(swap, 1) == 1
+    assert homology.character(swap, 1) == -1
     assert homology.character(swap, 0) == 0
-    assert homology.representation_matrix(swap, 1) == Matrix([[1]])
+    assert homology.representation_matrix(swap, 1) == Matrix([[-1]])
 
 
 def test_reduced_relative_homology_does_not_augment_nonempty_subcomplex():
@@ -422,7 +422,7 @@ def test_induced_relative_homology_map_requires_map_of_pairs():
     homology = EquivariantHomology(
         complex_, action, relative_to=relative
     )
-    mapping = SimplicialMap(complex_, complex_, {0: 1, 1: 0, 2: 2})
+    mapping = SimplicialMap(complex_, complex_, {0: 1, 1: 1, 2: 2})
 
     with pytest.raises(ValueError, match="send the relative subcomplex"):
         homology.induced_homology_map(mapping, 0)
