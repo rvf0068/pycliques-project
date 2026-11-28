@@ -265,3 +265,81 @@ def test_induced_homology_map_to_can_be_rectangular():
     induced = source_homology.induced_homology_map_to(target_homology, mapping, 1)
 
     assert induced == Matrix(0, 1, [])
+
+
+def test_induced_homology_map_to_validates_target_and_map_types():
+    complex_ = SimplicialComplex({0, 1}, facet_set=[{0, 1}])
+    action = PermutationAction((0, 1), [])
+    homology = EquivariantHomology(complex_, action)
+    mapping = SimplicialMap(complex_, complex_, {0: 0, 1: 1})
+
+    with pytest.raises(TypeError, match="target must be"):
+        homology.induced_homology_map_to(None, mapping, 0)
+    with pytest.raises(TypeError, match="simplicial_map must be"):
+        homology.induced_homology_map_to(homology, None, 0)
+
+
+def test_induced_homology_map_to_validates_map_complexes_and_action_sizes():
+    source = SimplicialComplex({0, 1}, facet_set=[{0}, {1}])
+    target = SimplicialComplex({"a", "b"}, facet_set=[{"a"}, {"b"}])
+    source_action = PermutationAction((0, 1), [])
+    target_action = PermutationAction(("a", "b"), [])
+    source_homology = EquivariantHomology(source, source_action)
+    target_homology = EquivariantHomology(target, target_action)
+    wrong_source = SimplicialComplex({0, 1}, facet_set=[{0, 1}])
+    wrong_map = SimplicialMap(wrong_source, target, {0: "a", 1: "b"})
+
+    with pytest.raises(ValueError, match="source and target must match"):
+        source_homology.induced_homology_map_to(target_homology, wrong_map, 0)
+
+    larger_target = SimplicialComplex(
+        {"a", "b", "c"}, facet_set=[{"a"}, {"b"}, {"c"}]
+    )
+    larger_action = PermutationAction(("a", "b", "c"), [])
+    larger_homology = EquivariantHomology(larger_target, larger_action)
+    map_to_larger = SimplicialMap(source, larger_target, {0: "a", 1: "b"})
+    with pytest.raises(ValueError, match="same number of ordered positions"):
+        source_homology.induced_homology_map_to(larger_homology, map_to_larger, 0)
+
+
+def test_induced_homology_map_to_checks_equivariance_and_degree():
+    complex_ = SimplicialComplex(
+        {0, 1, 2}, facet_set=[{0, 1}, {1, 2}, {0, 2}]
+    )
+    rotation = Permutation([1, 2, 0])
+    action = PermutationAction((0, 1, 2), [rotation])
+    homology = EquivariantHomology(complex_, action)
+    non_equivariant = SimplicialMap(
+        complex_, complex_, {0: 1, 1: 0, 2: 2}
+    )
+
+    with pytest.raises(ValueError, match="intertwine"):
+        homology.induced_homology_map_to(homology, non_equivariant, 1)
+    with pytest.raises(ValueError, match="degree must be"):
+        homology.induced_homology_map_to(
+            homology,
+            SimplicialMap(complex_, complex_, {0: 0, 1: 1, 2: 2}),
+            True,
+        )
+    with pytest.raises(ValueError, match="degree must be"):
+        homology.induced_homology_map_to(
+            homology,
+            SimplicialMap(complex_, complex_, {0: 0, 1: 1, 2: 2}),
+            -1,
+        )
+
+
+def test_induced_homology_map_to_returns_empty_matrix_when_homology_vanishes():
+    source = SimplicialComplex({0, 1}, facet_set=[{0, 1}])
+    target = SimplicialComplex({"a", "b"}, facet_set=[{"a"}, {"b"}])
+    source_action = PermutationAction((0, 1), [])
+    target_action = PermutationAction(("a", "b"), [])
+    source_homology = EquivariantHomology(source, source_action)
+    target_homology = EquivariantHomology(target, target_action)
+    mapping = SimplicialMap(source, target, {0: "a", 1: "a"})
+
+    induced = source_homology.induced_homology_map_to(
+        target_homology, mapping, 1
+    )
+
+    assert induced == Matrix(0, 0, [])
