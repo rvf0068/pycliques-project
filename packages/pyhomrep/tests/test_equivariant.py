@@ -286,8 +286,8 @@ def test_induced_homology_map_to_validates_map_complexes_and_action_sizes():
     target_action = PermutationAction(("a", "b"), [])
     source_homology = EquivariantHomology(source, source_action)
     target_homology = EquivariantHomology(target, target_action)
-    wrong_source = SimplicialComplex({0, 1}, facet_set=[{0}, {1}])
-    wrong_map = SimplicialMap(wrong_source, target, {0: "a", 1: "b"})
+    wrong_source = SimplicialComplex({0, 1}, facet_set=[{0, 1}])
+    wrong_map = SimplicialMap(wrong_source, target, {0: "a", 1: "a"})
 
     with pytest.raises(ValueError, match="source and target must match"):
         source_homology.induced_homology_map_to(target_homology, wrong_map, 0)
