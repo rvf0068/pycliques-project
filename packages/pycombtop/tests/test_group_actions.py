@@ -78,6 +78,15 @@ def test_invariant_subcomplex_validation():
     invariant = SimplicialComplex({0, 1, 2}, facet_set=[{0}, {1}, {2}])
     action.validate_invariant_subcomplex(ambient, invariant)
 
+    mismatched = PermutationAction((0, 1), [Permutation([1, 0])])
+    with pytest.raises(ValueError, match="action elements must equal"):
+        mismatched.validate_invariant_subcomplex(ambient, invariant)
+
+    path = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1}, {1, 2}])
+    nonautomorphism = PermutationAction((0, 1, 2), [Permutation([1, 2, 0])])
+    with pytest.raises(ValueError, match="preserve the simplicial complex"):
+        nonautomorphism.validate_invariant_subcomplex(path, invariant)
+
     noninvariant = SimplicialComplex({0}, facet_set=[{0}])
     with pytest.raises(ValueError, match="must be invariant"):
         action.validate_invariant_subcomplex(ambient, noninvariant)
