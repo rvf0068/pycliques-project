@@ -231,12 +231,12 @@ class EquivariantHomology:
         element = self._normalize(permutation)
         if degree > self.complex.dimension():
             return Matrix(0, 0, [])
-        _, homology, pivot_rows, inverse = self._homology_basis(degree)
+        boundaries, homology, pivot_rows, inverse = self._homology_basis(degree)
         if homology.cols == 0:
             return Matrix(0, 0, [])
         transformed = self._chain_matrix(element, degree) * homology
         coordinates = inverse * transformed.extract(pivot_rows, range(homology.cols))
-        result = coordinates[ self._boundary_matrix(degree + 1).rank():, : ]
+        result = coordinates[boundaries.cols :, :]
         if result.rows != homology.cols or result.cols != homology.cols:
             raise ArithmeticError("failed to obtain homology coordinates")
         return result
