@@ -341,7 +341,9 @@ class EquivariantHomology:
             or simplicial_map.target.vertex_set != target.complex.vertex_set
             or simplicial_map.target.facet_set != target.complex.facet_set
         ):
-            raise ValueError("simplicial_map source and target must match the homology objects")
+            raise ValueError(
+                "simplicial_map source and target must match the homology objects"
+            )
         if len(self.action) != len(target.action):
             raise ValueError("actions must have the same number of ordered positions")
 
@@ -394,9 +396,13 @@ class EquivariantHomology:
             target_pivots, range(source_homology.cols)
         )
         result = coordinates[target_boundaries.cols :, :]
-        if result.rows != target_homology.cols or result.cols != source_homology.cols:
+        if (
+            result.rows != target_homology.cols
+            or result.cols != source_homology.cols
+        ):
             raise ArithmeticError("failed to obtain induced homology coordinates")
         return result
+
     def character(self, permutation: Permutation, degree: int) -> int:
         """Return the exact character on H_degree (or reduced homology).
 
