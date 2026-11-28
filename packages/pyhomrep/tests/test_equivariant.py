@@ -1,8 +1,8 @@
 import pytest
-from sympy.combinatorics import Permutation
 
 from pycombtop import PermutationAction, SimplicialComplex
 from pyhomrep import EquivariantHomology
+from sympy.combinatorics import Permutation
 
 
 def tetrahedron_boundary():
@@ -16,9 +16,7 @@ def test_exact_character_on_tetrahedron_boundary():
     transposition = Permutation([1, 0, 2, 3])
     three_cycle = Permutation([1, 2, 0, 3])
     four_cycle = Permutation([1, 2, 3, 0])
-    action = PermutationAction(
-        ("a", "b", "c", "d"), [transposition, four_cycle]
-    )
+    action = PermutationAction(("a", "b", "c", "d"), [transposition, four_cycle])
     homology = EquivariantHomology(complex_, action)
 
     assert action.group.order() == 24
