@@ -378,7 +378,7 @@ class EquivariantHomology:
 
         if degree > min(self.complex.dimension(), target.complex.dimension()):
             return Matrix(0, 0, [])
-        source_boundaries, source_homology, _, _ = self._homology_basis(degree)
+        _, source_homology, _, _ = self._homology_basis(degree)
         target_boundaries, target_homology, target_pivots, target_inverse = (
             target._homology_basis(degree)
         )
