@@ -208,3 +208,45 @@ This first interface handles self-maps of the acted-on complex. Maps between
 different complexes with independently represented actions require an
 explicit common acting-group identification and are not inferred from
 generator-list positions.
+
+
+### Equivariant maps between different complexes
+
+```python
+from pycombtop import PermutationAction, SimplicialComplex, SimplicialMap
+from pyhomrep import EquivariantHomology
+from sympy.combinatorics import Permutation
+
+source = SimplicialComplex(
+    ("a", "b", "c", "d"),
+    facet_set=[{"a", "b"}, {"b", "c"}, {"c", "d"}, {"a", "d"}],
+)
+target = SimplicialComplex(
+    ("w", "x", "y", "z"),
+    facet_set=[{"w", "x"}, {"x", "y"}, {"y", "z"}, {"w", "z"}],
+)
+rotation = Permutation([1, 2, 3, 0])
+source_action = PermutationAction(("a", "b", "c", "d"), [rotation])
+# The inverse rotation generates the same subgroup of S_4.
+target_action = PermutationAction(
+    ("w", "x", "y", "z"), [Permutation([3, 0, 1, 2])]
+)
+mapping = SimplicialMap(
+    source, target, {"a": "w", "b": "x", "c": "y", "d": "z"}
+)
+source_homology = EquivariantHomology(source, source_action)
+target_homology = EquivariantHomology(target, target_action)
+
+F = source_homology.induced_homology_map_to(target_homology, mapping, 1)
+```
+
+The method requires an explicit common permutation-group model: both actions
+must have the same number of ordered positions and generate the same concrete
+subgroup of the symmetric group on those positions. The ordered vertex lists
+therefore specify the correspondence between the two actions. Equality is
+checked by mutual generator membership, without enumerating the group; the
+simplicial map is then checked for equivariance under the source generators.
+Different generating sets are allowed. This avoids silently identifying
+unrelated generator lists. Both homology objects must use the same reduced or
+ordinary convention. The returned matrix may be rectangular, and it satisfies
+the intertwining identity for every element of the common acting group.
