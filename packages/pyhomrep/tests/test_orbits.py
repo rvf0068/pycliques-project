@@ -2,9 +2,18 @@
 
 import networkx as nx
 import pytest
-from sympy.combinatorics import Permutation
-
 from pycombtop import PermutationAction, SimplicialComplex, clique_complex
+from pyhomrep import (
+    OrbitChainComplex,
+    YoungTableaux,
+    bouc_decomposition,
+    decompose_induced_character,
+    decompose_young_homology,
+    decompose_young_homology_map,
+    matching_graph,
+    partitions_list,
+)
+from sympy.combinatorics import Permutation
 from pyhomrep import (
     OrbitChainComplex,
     YoungTableaux,
