@@ -280,12 +280,13 @@ class EquivariantHomology:
             raise ValueError("degree must be a nonnegative integer")
         for generator in self.action.generators:
             for vertex in self.action.elements:
-                image = self.action.elements[
-                    generator(self.action.index[vertex])
-                ]
-                if simplicial_map(image) != self.action.elements[
-                    generator(self.action.index[simplicial_map(vertex)])
-                ]:
+                image = self.action.elements[generator(self.action.index[vertex])]
+                if (
+                    simplicial_map(image)
+                    != self.action.elements[
+                        generator(self.action.index[simplicial_map(vertex)])
+                    ]
+                ):
                     raise ValueError(
                         "simplicial_map must be equivariant under each action generator"
                     )
