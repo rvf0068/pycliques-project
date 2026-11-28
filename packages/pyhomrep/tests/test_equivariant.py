@@ -365,17 +365,11 @@ def test_induced_homology_map_to_restricts_a_larger_target_action():
 
 
 def test_relative_equivariant_homology_of_interval_mod_boundary():
-    complex_ = SimplicialComplex(
-        (0, 1), facet_set=[{0, 1}]
-    )
-    boundary = SimplicialComplex(
-        (0, 1), facet_set=[{0}, {1}]
-    )
+    complex_ = SimplicialComplex((0, 1), facet_set=[{0, 1}])
+    boundary = SimplicialComplex((0, 1), facet_set=[{0}, {1}])
     swap = Permutation([1, 0])
     action = PermutationAction((0, 1), [swap])
-    homology = EquivariantHomology(
-        complex_, action, relative_to=boundary
-    )
+    homology = EquivariantHomology(complex_, action, relative_to=boundary)
 
     assert homology.character(swap, 1) == -1
     assert homology.character(swap, 0) == 0
@@ -386,9 +380,7 @@ def test_reduced_relative_homology_does_not_augment_nonempty_subcomplex():
     complex_ = SimplicialComplex({0, 1}, facet_set=[{0}, {1}])
     relative = SimplicialComplex({0}, facet_set=[{0}])
     action = PermutationAction((0, 1), [])
-    homology = EquivariantHomology(
-        complex_, action, reduced=True, relative_to=relative
-    )
+    homology = EquivariantHomology(complex_, action, reduced=True, relative_to=relative)
 
     # H_0(X, A) has rank one; an erroneous augmentation would kill it.
     assert homology.representation_matrix(Permutation(size=2), 0) == Matrix([[1]])
@@ -414,9 +406,7 @@ def test_relative_equivariant_homology_rejects_non_subcomplex():
 
 
 def test_induced_relative_homology_map_requires_map_of_pairs():
-    complex_ = SimplicialComplex(
-        {0, 1, 2}, facet_set=[{0, 1}, {1, 2}]
-    )
+    complex_ = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1}, {1, 2}])
     relative = SimplicialComplex({0, 2}, facet_set=[{0}, {2}])
     action = PermutationAction((0, 1, 2), [])
     homology = EquivariantHomology(
@@ -432,9 +422,7 @@ def test_induced_homology_map_between_relative_pairs():
     source = SimplicialComplex({0, 1}, facet_set=[{0, 1}])
     source_relative = SimplicialComplex({0, 1}, facet_set=[{0}, {1}])
     target = SimplicialComplex({"a", "b"}, facet_set=[{"a", "b"}])
-    target_relative = SimplicialComplex(
-        {"a", "b"}, facet_set=[{"a"}, {"b"}]
-    )
+    target_relative = SimplicialComplex({"a", "b"}, facet_set=[{"a"}, {"b"}])
     swap = Permutation([1, 0])
     source_action = PermutationAction((0, 1), [swap])
     target_action = PermutationAction(("a", "b"), [swap])
@@ -446,9 +434,7 @@ def test_induced_homology_map_between_relative_pairs():
         target, target_action, relative_to=target_relative
     )
 
-    induced = source_homology.induced_homology_map_to(
-        target_homology, mapping, 1
-    )
+    induced = source_homology.induced_homology_map_to(target_homology, mapping, 1)
     assert induced == Matrix([[1]])
     assert target_homology.representation_matrix(swap, 1) * induced == (
         induced * source_homology.representation_matrix(swap, 1)
