@@ -240,13 +240,15 @@ target_homology = EquivariantHomology(target, target_action)
 F = source_homology.induced_homology_map_to(target_homology, mapping, 1)
 ```
 
-The method requires an explicit common permutation-group model: both actions
-must have the same number of ordered positions and generate the same concrete
-subgroup of the symmetric group on those positions. The ordered vertex lists
-therefore specify the correspondence between the two actions. Equality is
-checked by mutual generator membership, without enumerating the group; the
-simplicial map is then checked for equivariance under the source generators.
-Different generating sets are allowed. This avoids silently identifying
-unrelated generator lists. Both homology objects must use the same reduced or
-ordinary convention. The returned matrix may be rectangular, and it satisfies
-the intertwining identity for every element of the common acting group.
+The method requires an explicit common permutation model: both actions
+must have the same number of ordered positions, and the source group must be
+a subgroup of the target group in the symmetric group on those positions.
+The ordered vertex lists specify the position-by-position correspondence.
+Membership of the source generators in the target group verifies subgroup
+inclusion without enumerating either group. The target is thereby regarded as
+a source-group space by restriction, and the simplicial map is checked for
+equivariance under the source generators. Different generating sets are
+allowed. This does not infer arbitrary abstract group homomorphisms. Both
+homology objects must use the same reduced or ordinary convention. The
+returned matrix may be rectangular and intertwines the restricted
+source-group representations.

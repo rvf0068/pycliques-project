@@ -317,17 +317,17 @@ class EquivariantHomology:
     ) -> Matrix:
         """Return the exact map induced by an equivariant map to another complex.
 
-        The source and target actions must be the same concrete subgroup of
-        the symmetric group on their ordered vertex positions. Thus the
-        elements sequences specify an explicit position-by-position
-        identification, and equality of the generated permutation groups
-        identifies the acting groups independently of generator-list order.
+        The source action must be a subgroup of the target action in the
+        symmetric group on their ordered vertex positions. Thus the elements
+        sequences specify an explicit position-by-position identification,
+        and each source generator acts on the target through the same
+        permutation of positions. This treats the target as a source-group
+        space by restriction; no abstract group identification is inferred.
 
-        The map is checked against the source generators, acting on the
-        target through the same permutations of positions. Both objects must
+        The map is checked against the source generators. Both objects must
         use the same reduced/ordinary homology convention. The result is a
         rectangular matrix from the source homology basis to the target
-        homology basis.
+        homology basis and intertwines the restricted source-group actions.
         """
         if not isinstance(target, EquivariantHomology):
             raise TypeError("target must be an EquivariantHomology instance")
@@ -347,21 +347,16 @@ class EquivariantHomology:
         if len(self.action) != len(target.action):
             raise ValueError("actions must have the same number of ordered positions")
 
-        # Mutual generator membership proves equality of the concrete
-        # permutation subgroups, without enumerating either group.
+        # Membership of every source generator proves G <= H, since the
+        # source generators generate G. This avoids enumerating either group.
         if any(
             not target.action.group.contains(
                 Permutation(generator.array_form, size=len(target.action))
             )
             for generator in self.action.generators
-        ) or any(
-            not self.action.group.contains(
-                Permutation(generator.array_form, size=len(self.action))
-            )
-            for generator in target.action.generators
         ):
             raise ValueError(
-                "source and target actions must define the same permutation group "
+                "source action must be a subgroup of the target action "
                 "on ordered positions"
             )
         if not isinstance(degree, int) or isinstance(degree, bool) or degree < 0:

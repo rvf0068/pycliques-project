@@ -229,7 +229,7 @@ def test_induced_homology_map_to_rejects_different_permutation_groups():
     source_homology = EquivariantHomology(source, source_action)
     target_homology = EquivariantHomology(target, target_action)
 
-    with pytest.raises(ValueError, match="same permutation group"):
+    with pytest.raises(ValueError, match="subgroup of the target action"):
         source_homology.induced_homology_map_to(target_homology, mapping, 1)
 
 
@@ -335,3 +335,30 @@ def test_induced_homology_map_to_returns_empty_matrix_when_homology_vanishes():
     induced = source_homology.induced_homology_map_to(target_homology, mapping, 1)
 
     assert induced == Matrix(0, 0, [])
+
+
+def test_induced_homology_map_to_restricts_a_larger_target_action():
+    source = SimplicialComplex(
+        ("a", "b", "c"),
+        facet_set=[{"a", "b"}, {"b", "c"}, {"a", "c"}],
+    )
+    target = SimplicialComplex(
+        ("x", "y", "z"),
+        facet_set=[{"x", "y"}, {"y", "z"}, {"x", "z"}],
+    )
+    transposition = Permutation([1, 0, 2])
+    three_cycle = Permutation([1, 2, 0])
+    source_action = PermutationAction(("a", "b", "c"), [transposition])
+    target_action = PermutationAction(("x", "y", "z"), [transposition, three_cycle])
+    mapping = SimplicialMap(source, target, {"a": "x", "b": "y", "c": "z"})
+    source_homology = EquivariantHomology(source, source_action)
+    target_homology = EquivariantHomology(target, target_action)
+
+    induced = source_homology.induced_homology_map_to(target_homology, mapping, 1)
+    source_representation = source_homology.representation_matrix(transposition, 1)
+    target_representation = target_homology.representation_matrix(transposition, 1)
+
+    assert target_action.group.order() == 6
+    assert source_action.group.order() == 2
+    assert induced == Matrix([[1]])
+    assert target_representation * induced == induced * source_representation
