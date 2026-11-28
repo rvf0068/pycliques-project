@@ -280,13 +280,17 @@ class EquivariantHomology:
         if self.relative_to is None or not self.relative_to.facet_set:
             return
         if target.relative_to is None:
-            raise ValueError("simplicial_map must send the relative subcomplex into target")
+            raise ValueError(
+                "simplicial_map must send the relative subcomplex into target"
+            )
         target_faces = target.relative_to.all_simplices()
         if any(
             frozenset(simplicial_map(vertex) for vertex in facet) not in target_faces
             for facet in self.relative_to.facet_set
         ):
-            raise ValueError("simplicial_map must send the relative subcomplex into target")
+            raise ValueError(
+                "simplicial_map must send the relative subcomplex into target"
+            )
 
     def induced_homology_map(
         self, simplicial_map: SimplicialMap, degree: int
