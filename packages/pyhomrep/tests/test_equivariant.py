@@ -262,8 +262,6 @@ def test_induced_homology_map_to_can_be_rectangular():
     source_homology = EquivariantHomology(source, source_action)
     target_homology = EquivariantHomology(target, target_action)
 
-    induced = source_homology.induced_homology_map_to(
-        target_homology, mapping, 1
-    )
+    induced = source_homology.induced_homology_map_to(target_homology, mapping, 1)
 
     assert induced == Matrix(0, 1, [])
