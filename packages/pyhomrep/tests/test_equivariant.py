@@ -184,3 +184,72 @@ def test_induced_homology_map_returns_empty_matrix_outside_homology_range():
 
     assert homology.induced_homology_map(mapping, 1) == Matrix(0, 0, [])
     assert homology.induced_homology_map(mapping, 3) == Matrix(0, 0, [])
+
+
+def test_induced_homology_map_between_differently_labeled_actions():
+    source = SimplicialComplex(
+        ("a", "b", "c", "d"),
+        facet_set=[{"a", "b"}, {"b", "c"}, {"c", "d"}, {"a", "d"}],
+    )
+    target = SimplicialComplex(
+        ("w", "x", "y", "z"),
+        facet_set=[{"w", "x"}, {"x", "y"}, {"y", "z"}, {"w", "z"}],
+    )
+    rotation = Permutation([1, 2, 3, 0])
+    inverse_rotation = Permutation([3, 0, 1, 2])
+    source_action = PermutationAction(("a", "b", "c", "d"), [rotation])
+    # A different generating set for the same concrete subgroup of S_4.
+    target_action = PermutationAction(("w", "x", "y", "z"), [inverse_rotation])
+    mapping = SimplicialMap(
+        source, target, {"a": "w", "b": "x", "c": "y", "d": "z"}
+    )
+    source_homology = EquivariantHomology(source, source_action)
+    target_homology = EquivariantHomology(target, target_action)
+
+    induced = source_homology.induced_homology_map_to(
+        target_homology, mapping, 1
+    )
+    source_representation = source_homology.representation_matrix(rotation, 1)
+    target_representation = target_homology.representation_matrix(rotation, 1)
+
+    assert induced == Matrix([[1]])
+    assert target_representation * induced == induced * source_representation
+
+
+def test_induced_homology_map_to_rejects_different_permutation_groups():
+    source = SimplicialComplex(
+        {0, 1, 2, 3},
+        facet_set=[{0, 1}, {1, 2}, {2, 3}, {0, 3}],
+    )
+    target = SimplicialComplex(
+        {"a", "b", "c", "d"},
+        facet_set=[{"a", "b"}, {"b", "c"}, {"c", "d"}, {"a", "d"}],
+    )
+    rotation = Permutation([1, 2, 3, 0])
+    reflection = Permutation([0, 3, 2, 1])
+    source_action = PermutationAction((0, 1, 2, 3), [rotation])
+    target_action = PermutationAction(("a", "b", "c", "d"), [reflection])
+    mapping = SimplicialMap(
+        source, target, {0: "a", 1: "b", 2: "c", 3: "d"}
+    )
+    source_homology = EquivariantHomology(source, source_action)
+    target_homology = EquivariantHomology(target, target_action)
+
+    with pytest.raises(ValueError, match="same permutation group"):
+        source_homology.induced_homology_map_to(
+            target_homology, mapping, 1
+        )
+
+
+def test_induced_homology_map_to_rejects_incompatible_reduced_conventions():
+    source = SimplicialComplex({0, 1}, facet_set=[{0}, {1}])
+    target = SimplicialComplex({"a", "b"}, facet_set=[{"a"}, {"b"}])
+    swap = Permutation([1, 0])
+    source_action = PermutationAction((0, 1), [swap])
+    target_action = PermutationAction(("a", "b"), [swap])
+    mapping = SimplicialMap(source, target, {0: "a", 1: "b"})
+    source_homology = EquivariantHomology(source, source_action)
+    target_homology = EquivariantHomology(target, target_action, reduced=True)
+
+    with pytest.raises(ValueError, match="agree on reduced homology"):
+        source_homology.induced_homology_map_to(target_homology, mapping, 0)
