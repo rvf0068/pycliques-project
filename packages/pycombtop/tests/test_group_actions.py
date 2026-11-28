@@ -5,7 +5,7 @@ from pycombtop import (
     SimplicialComplex,
     boolean_lattice,
 )
-from sympy.combinatorics import Permutation
+from sympy.combinatorics import Permutation, PermutationGroup
 
 
 def test_permutation_action_on_labeled_set():
@@ -22,6 +22,17 @@ def test_permutation_action_on_labeled_set():
     assert action.image("a", Permutation([0, 2, 1])) == "a"
     assert action.is_invariant({"a", "b", "c"})
     assert not action.is_invariant({"a"})
+
+
+def test_accepts_sympy_permutation_group():
+    group = PermutationGroup([Permutation([1, 0, 2])])
+    action = PermutationAction(("left", "right", "fixed"), group)
+
+    assert action.group.order() == 2
+    assert action.fixed_points() == ("fixed",)
+    assert action.image("left", Permutation([1, 0, 2])) == "right"
+    with pytest.raises(ValueError, match="not in the acting group"):
+        action.image("left", Permutation([0, 2, 1]))
 
 
 def test_trivial_action_and_empty_generators():
