@@ -73,9 +73,7 @@ class EquivariantHomology:
                     )
                 )
             self._faces_cache[degree] = faces
-            self._face_index_cache[degree] = {
-                face: i for i, face in enumerate(faces)
-            }
+            self._face_index_cache[degree] = {face: i for i, face in enumerate(faces)}
         return self._faces_cache[degree]
 
     def _normalize(self, permutation: Permutation) -> Permutation:
@@ -88,9 +86,7 @@ class EquivariantHomology:
             raise ValueError("permutation is not in the acting group")
         return normalized
 
-    def _chain_matrix(
-        self, permutation: Permutation, degree: int
-    ) -> SparseMatrix:
+    def _chain_matrix(self, permutation: Permutation, degree: int) -> SparseMatrix:
         key = (tuple(permutation.array_form), degree)
         if key not in self._chain_cache:
             faces = self._faces(degree)
@@ -135,9 +131,7 @@ class EquivariantHomology:
             self._boundary_cache[degree] = matrix
         return self._boundary_cache[degree]
 
-    def _image_character(
-        self, permutation: Permutation, degree: int
-    ) -> int:
+    def _image_character(self, permutation: Permutation, degree: int) -> int:
         """Trace of the group element on im(d_degree)."""
         key = (tuple(permutation.array_form), degree)
         if key in self._image_trace_cache:
