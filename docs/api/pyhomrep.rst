@@ -23,6 +23,15 @@ Utilities
    :show-inheritance:
    :member-order: bysource
 
+Exact Equivariant Homology
+--------------------------
+
+.. automodule:: pyhomrep.equivariant
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :member-order: bysource
+
 Simplicial
 ----------
 

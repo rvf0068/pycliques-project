@@ -116,6 +116,44 @@ orbit-generation algorithm and the trivial subgroup can still be expensive.
 The existing SVD-based routines remain available. `YoungTableaux.CMNR`
 now uses cached rim-hook recursion rather than enumerating tableaux.
 
+
+## Exact homology characters for general finite actions
+
+The symmetric-group decomposition routines above are specialized to the
+symmetric group. For a general finite permutation group, evaluate the character
+of an individual group element on rational homology with
+`EquivariantHomology`. It accepts arbitrary vertex labels, validates the
+action, and uses exact rational linear algebra. It does not enumerate the group
+or decompose the result into irreducibles.
+
+For example, the symmetric group on four vertices acts on the boundary of a
+tetrahedron. Its action on the top homology is the sign representation:
+
+```python
+from pycombtop import PermutationAction, SimplicialComplex
+from pyhomrep import EquivariantHomology
+from sympy.combinatorics import Permutation
+
+vertices = ("a", "b", "c", "d")
+boundary = SimplicialComplex(
+    vertices, facet_set=[set(vertices) - {v} for v in vertices]
+)
+transposition = Permutation([1, 0, 2, 3])
+four_cycle = Permutation([1, 2, 3, 0])
+action = PermutationAction(vertices, [transposition, four_cycle])
+homology = EquivariantHomology(boundary, action)
+
+assert homology.character(Permutation(size=4), 2) == 1
+assert homology.character(transposition, 2) == -1
+```
+
+Pass `reduced=True` to compute characters on reduced homology. Character
+evaluation is cached across repeated calls for the same action and complex.
+The legacy symmetric-group routines remain available; this exact interface
+provides a general-purpose alternative for character values, not a general
+irreducible-representation decomposition algorithm.
+
+
 For stabilizer calculations, `decompose_induced_character(n, weights, order)`
 uses Frobenius reciprocity. The weights are sums of the subgroup character
 over elements of each ambient symmetric-group cycle type.

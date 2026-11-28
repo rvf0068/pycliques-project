@@ -14,6 +14,7 @@ from pyhomrep.decomposition import (
     reduce,
     unitary_representation,
 )
+from pyhomrep.equivariant import EquivariantHomology
 
 # Graph utilities
 from pyhomrep.graphs import matching_graph
@@ -71,6 +72,7 @@ __all__ = [
     # Core classes
     "PChain",
     "OrbitChainComplex",
+    "EquivariantHomology",
     "homology_map_rank",
     "bouc_decomposition",
     "decompose_induced_character",
