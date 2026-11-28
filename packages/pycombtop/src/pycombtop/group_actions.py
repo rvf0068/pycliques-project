@@ -75,7 +75,7 @@ class PermutationAction:
         normalized = Permutation(permutation.array_form, size=len(self.elements))
         if not self.group.contains(normalized):
             raise ValueError("permutation is not in the acting group")
-        return self.elements[normalized(self.index[element])]
+        return self.elements[int(normalized(self.index[element]))]
 
     def orbit(self, element: Hashable) -> tuple[Hashable, ...]:
         """Return the orbit in the input order of elements."""
