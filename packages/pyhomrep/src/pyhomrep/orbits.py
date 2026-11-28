@@ -24,10 +24,11 @@ def _rank(matrix) -> int:
 class OrbitChainComplex:
     """Signed coinvariant chains over Q for a finite simplicial group action.
 
-    Supply generators as explicit maps on vertex labels. All faces in the
-    requested degrees are enumerated, but only orientable orbits index the
-    boundary matrices. An optional invariant subcomplex defines relative chains.
-    The group itself is never enumerated.
+    Supply either a pycombtop PermutationAction on the complex vertices or
+    explicit generator maps on vertex labels. All faces in the requested
+    degrees are enumerated, but only orientable orbits index the boundary
+    matrices. An optional invariant subcomplex defines relative chains.
+    The acting group itself is never enumerated.
     """
 
     def __init__(
