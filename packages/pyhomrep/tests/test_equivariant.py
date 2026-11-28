@@ -1,5 +1,5 @@
 import pytest
-from pycombtop import PermutationAction, SimplicialComplex
+from pycombtop import PermutationAction, SimplicialComplex, SimplicialMap
 from pyhomrep import EquivariantHomology
 from sympy import Matrix
 from sympy.combinatorics import Permutation
@@ -107,3 +107,80 @@ def test_character_rejects_noninvariant_complex():
 
     with pytest.raises(ValueError, match="preserve the simplicial complex"):
         EquivariantHomology(complex_, action)
+
+
+def test_equivariant_simplicial_self_map_induces_intertwining_homology_map():
+    complex_ = SimplicialComplex(
+        {0, 1, 2, 3},
+        facet_set=[{0, 1}, {1, 2}, {2, 3}, {0, 3}],
+    )
+    reflection = Permutation([0, 3, 2, 1])
+    action = PermutationAction((0, 1, 2, 3), [reflection])
+    mapping = SimplicialMap(complex_, complex_, {0: 0, 1: 3, 2: 2, 3: 1})
+    homology = EquivariantHomology(complex_, action)
+
+    induced = homology.induced_homology_map(mapping, 1)
+    representation = homology.representation_matrix(reflection, 1)
+
+    assert induced == Matrix([[-1]])
+    assert representation == Matrix([[-1]])
+    assert representation * induced == induced * representation
+
+
+def test_induced_homology_map_rejects_nonequivariant_self_map():
+    complex_ = SimplicialComplex(
+        {0, 1, 2},
+        facet_set=[{0, 1}, {1, 2}, {0, 2}],
+    )
+    rotation = Permutation([1, 2, 0])
+    action = PermutationAction((0, 1, 2), [rotation])
+    transposition_map = SimplicialMap(complex_, complex_, {0: 1, 1: 0, 2: 2})
+    homology = EquivariantHomology(complex_, action)
+
+    with pytest.raises(ValueError, match="equivariant under each action generator"):
+        homology.induced_homology_map(transposition_map, 1)
+
+
+def test_reduced_induced_homology_map():
+    complex_ = SimplicialComplex({0, 1}, facet_set=[{0}, {1}])
+    swap = Permutation([1, 0])
+    action = PermutationAction((0, 1), [swap])
+    mapping = SimplicialMap(complex_, complex_, {0: 1, 1: 0})
+    homology = EquivariantHomology(complex_, action, reduced=True)
+
+    assert homology.induced_homology_map(mapping, 0) == Matrix([[-1]])
+
+
+def test_induced_homology_map_rejects_different_complex():
+    complex_ = SimplicialComplex({0, 1}, facet_set=[{0}, {1}])
+    other = SimplicialComplex({0, 1}, facet_set=[{0, 1}])
+    action = PermutationAction((0, 1), [Permutation([1, 0])])
+    mapping = SimplicialMap(complex_, other, {0: 0, 1: 1})
+    homology = EquivariantHomology(complex_, action)
+
+    with pytest.raises(ValueError, match="self-map of the acted-on complex"):
+        homology.induced_homology_map(mapping, 0)
+
+
+def test_induced_homology_map_validates_type_and_degree():
+    complex_ = SimplicialComplex({0, 1}, facet_set=[{0, 1}])
+    action = PermutationAction((0, 1), [])
+    mapping = SimplicialMap(complex_, complex_, {0: 0, 1: 1})
+    homology = EquivariantHomology(complex_, action)
+
+    with pytest.raises(TypeError, match="must be a SimplicialMap"):
+        homology.induced_homology_map(None, 0)
+    with pytest.raises(ValueError, match="degree must be"):
+        homology.induced_homology_map(mapping, -1)
+    with pytest.raises(ValueError, match="degree must be"):
+        homology.induced_homology_map(mapping, True)
+
+
+def test_induced_homology_map_returns_empty_matrix_outside_homology_range():
+    complex_ = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1, 2}])
+    action = PermutationAction((0, 1, 2), [])
+    mapping = SimplicialMap(complex_, complex_, {0: 0, 1: 1, 2: 2})
+    homology = EquivariantHomology(complex_, action)
+
+    assert homology.induced_homology_map(mapping, 1) == Matrix(0, 0, [])
+    assert homology.induced_homology_map(mapping, 3) == Matrix(0, 0, [])

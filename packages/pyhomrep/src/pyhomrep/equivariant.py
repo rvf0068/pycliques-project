@@ -7,7 +7,12 @@ All chain and image-subspace calculations use exact rational linear algebra.
 
 from __future__ import annotations
 
-from pycombtop import PermutationAction, SimplicialComplex
+from pycombtop import (
+    PermutationAction,
+    SimplicialComplex,
+    SimplicialMap,
+    induced_chain_map,
+)
 from sympy import Matrix, SparseMatrix
 from sympy.combinatorics import Permutation
 
@@ -242,6 +247,66 @@ class EquivariantHomology:
         result = coordinates[boundaries.cols :, :]
         if result.rows != homology.cols or result.cols != homology.cols:
             raise ArithmeticError("failed to obtain homology coordinates")
+        return result
+
+    def induced_homology_map(
+        self, simplicial_map: SimplicialMap, degree: int
+    ) -> Matrix:
+        """Return the exact map induced on rational homology by an equivariant self-map.
+
+        The simplicial map must have this complex as both source and target,
+        and it must commute with every generator of the stored permutation
+        action. The returned matrix uses the deterministic homology basis
+        used by :meth:`representation_matrix`. For reduced homology, the
+        augmented chain map is used in degree zero as well.
+
+        This initial interface deliberately treats self-maps only: relating
+        actions on different vertex sets requires an explicit identification
+        of their acting groups, which PermutationAction does not currently
+        encode.
+        """
+        if not isinstance(simplicial_map, SimplicialMap):
+            raise TypeError("simplicial_map must be a SimplicialMap instance")
+        if (
+            simplicial_map.source.vertex_set != self.complex.vertex_set
+            or simplicial_map.source.facet_set != self.complex.facet_set
+            or simplicial_map.target.vertex_set != self.complex.vertex_set
+            or simplicial_map.target.facet_set != self.complex.facet_set
+        ):
+            raise ValueError(
+                "simplicial_map must be a self-map of the acted-on complex"
+            )
+        if not isinstance(degree, int) or isinstance(degree, bool) or degree < 0:
+            raise ValueError("degree must be a nonnegative integer")
+        for generator in self.action.generators:
+            for vertex in self.action.elements:
+                image = self.action.elements[generator(self.action.index[vertex])]
+                if (
+                    simplicial_map(image)
+                    != self.action.elements[
+                        generator(self.action.index[simplicial_map(vertex)])
+                    ]
+                ):
+                    raise ValueError(
+                        "simplicial_map must be equivariant under each action generator"
+                    )
+        if degree > self.complex.dimension():
+            return Matrix(0, 0, [])
+
+        boundaries, homology, pivot_rows, inverse = self._homology_basis(degree)
+        if homology.cols == 0:
+            return Matrix(0, 0, [])
+        chain_map = induced_chain_map(
+            simplicial_map,
+            degree,
+            source_order=self.action.elements,
+            target_order=self.action.elements,
+        )
+        transformed = chain_map * homology
+        coordinates = inverse * transformed.extract(pivot_rows, range(homology.cols))
+        result = coordinates[boundaries.cols :, :]
+        if result.rows != homology.cols or result.cols != homology.cols:
+            raise ArithmeticError("failed to obtain induced homology coordinates")
         return result
 
     def character(self, permutation: Permutation, degree: int) -> int:
