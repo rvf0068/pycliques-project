@@ -28,7 +28,6 @@ def test_exact_character_on_tetrahedron_boundary():
     assert homology.character(transposition, 1) == 0
 
 
-
 def test_exact_representation_matrices_on_tetrahedron_boundary():
     complex_ = tetrahedron_boundary()
     transposition = Permutation([1, 0, 2, 3])
