@@ -397,10 +397,7 @@ class EquivariantHomology:
             target_pivots, range(source_homology.cols)
         )
         result = coordinates[target_boundaries.cols :, :]
-        if (
-            result.rows != target_homology.cols
-            or result.cols != source_homology.cols
-        ):
+        if result.rows != target_homology.cols or result.cols != source_homology.cols:
             raise ArithmeticError("failed to obtain induced homology coordinates")
         return result
 
