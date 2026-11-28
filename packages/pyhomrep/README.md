@@ -186,6 +186,7 @@ representation matrices:
 ```python
 from pycombtop import PermutationAction, SimplicialComplex, SimplicialMap
 from pyhomrep import EquivariantHomology
+from sympy import Matrix
 from sympy.combinatorics import Permutation
 
 cycle = SimplicialComplex(
