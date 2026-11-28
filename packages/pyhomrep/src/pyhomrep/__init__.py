@@ -14,7 +14,6 @@ from pyhomrep.decomposition import (
     reduce,
     unitary_representation,
 )
-
 from pyhomrep.equivariant import EquivariantHomology
 
 # Graph utilities
