@@ -252,3 +252,31 @@ allowed. This does not infer arbitrary abstract group homomorphisms. Both
 homology objects must use the same reduced or ordinary convention. The
 returned matrix may be rectangular and intertwines the restricted
 source-group representations.
+
+
+### Relative equivariant homology
+
+Pass an invariant subcomplex with `relative_to` to compute exact rational
+homology representations of a pair `(X, A)`. The action must preserve both
+the ambient complex and the subcomplex. Relative chains use the quotient basis
+of simplices in `X` that are not in `A`; no augmentation is applied when
+`A` is nonempty, even if `reduced=True`.
+
+```python
+from pycombtop import PermutationAction, SimplicialComplex
+from pyhomrep import EquivariantHomology
+from sympy.combinatorics import Permutation
+
+interval = SimplicialComplex((0, 1), facet_set=[{0, 1}])
+boundary = SimplicialComplex((0, 1), facet_set=[{0}, {1}])
+swap = Permutation([1, 0])
+action = PermutationAction((0, 1), [swap])
+relative_homology = EquivariantHomology(
+    interval, action, relative_to=boundary
+)
+
+assert relative_homology.character(swap, 1) == 1
+```
+
+The induced-map methods also accept maps of pairs: every simplex of the
+source relative subcomplex must map into the target relative subcomplex.
