@@ -1,6 +1,7 @@
 """Tests for exact equivariant homology."""
 
 import networkx as nx
+import pytest
 from pycombtop import PermutationAction, SimplicialComplex, clique_complex
 from pyhomrep import (
     OrbitChainComplex,
@@ -12,7 +13,6 @@ from pyhomrep import (
     matching_graph,
     partitions_list,
 )
-import pytest
 from sympy.combinatorics import Permutation
 
 
