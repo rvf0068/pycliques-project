@@ -109,7 +109,6 @@ def test_character_rejects_noninvariant_complex():
         EquivariantHomology(complex_, action)
 
 
-
 def test_equivariant_simplicial_self_map_induces_intertwining_homology_map():
     complex_ = SimplicialComplex(
         {0, 1, 2, 3},
@@ -117,9 +116,7 @@ def test_equivariant_simplicial_self_map_induces_intertwining_homology_map():
     )
     reflection = Permutation([0, 3, 2, 1])
     action = PermutationAction((0, 1, 2, 3), [reflection])
-    mapping = SimplicialMap(
-        complex_, complex_, {0: 0, 1: 3, 2: 2, 3: 1}
-    )
+    mapping = SimplicialMap(complex_, complex_, {0: 0, 1: 3, 2: 2, 3: 1})
     homology = EquivariantHomology(complex_, action)
 
     induced = homology.induced_homology_map(mapping, 1)
@@ -137,9 +134,7 @@ def test_induced_homology_map_rejects_nonequivariant_self_map():
     )
     rotation = Permutation([1, 2, 0])
     action = PermutationAction((0, 1, 2), [rotation])
-    transposition_map = SimplicialMap(
-        complex_, complex_, {0: 1, 1: 0, 2: 2}
-    )
+    transposition_map = SimplicialMap(complex_, complex_, {0: 1, 1: 0, 2: 2})
     homology = EquivariantHomology(complex_, action)
 
     with pytest.raises(ValueError, match="equivariant under each action generator"):
