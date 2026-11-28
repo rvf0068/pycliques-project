@@ -39,7 +39,11 @@ class PermutationAction:
         self.index = {element: i for i, element in enumerate(self.elements)}
         degree = len(self.elements)
 
-        raw = generators.generators if isinstance(generators, PermutationGroup) else generators
+        raw = (
+            generators.generators
+            if isinstance(generators, PermutationGroup)
+            else generators
+        )
         normalized: list[Permutation] = []
         for generator in raw:
             if not isinstance(generator, Permutation):
