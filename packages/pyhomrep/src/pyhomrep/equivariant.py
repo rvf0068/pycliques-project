@@ -249,7 +249,9 @@ class EquivariantHomology:
             raise ArithmeticError("failed to obtain homology coordinates")
         return result
 
-    def induced_homology_map(self, simplicial_map: SimplicialMap, degree: int) -> Matrix:
+    def induced_homology_map(
+        self, simplicial_map: SimplicialMap, degree: int
+    ) -> Matrix:
         """Return the exact map induced on rational homology by an equivariant self-map.
 
         The simplicial map must have this complex as both source and target,
@@ -271,7 +273,9 @@ class EquivariantHomology:
             or simplicial_map.target.vertex_set != self.complex.vertex_set
             or simplicial_map.target.facet_set != self.complex.facet_set
         ):
-            raise ValueError("simplicial_map must be a self-map of the acted-on complex")
+            raise ValueError(
+                "simplicial_map must be a self-map of the acted-on complex"
+            )
         if not isinstance(degree, int) or isinstance(degree, bool) or degree < 0:
             raise ValueError("degree must be a nonnegative integer")
         for generator in self.action.generators:
@@ -283,7 +287,7 @@ class EquivariantHomology:
                     generator(self.action.index[simplicial_map(vertex)])
                 ]:
                     raise ValueError(
-                        "simplicial_map must be equivariant under every action generator"
+                        "simplicial_map must be equivariant under each action generator"
                     )
         if degree > self.complex.dimension():
             return Matrix(0, 0, [])
