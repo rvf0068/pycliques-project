@@ -60,6 +60,9 @@ class EquivariantHomology:
         self._image_basis_cache: dict[
             int, tuple[Matrix, tuple[int, ...], Matrix] | None
         ] = {}
+        self._homology_basis_cache: dict[
+            int, tuple[Matrix, Matrix, tuple[int, ...], Matrix]
+        ] = {}
 
     def _faces(self, degree: int) -> tuple[tuple[int, ...], ...]:
         if degree not in self._faces_cache:
@@ -169,6 +172,74 @@ class EquivariantHomology:
                 result = int(coordinates.trace())
             self._image_trace_cache[key] = result
         return self._image_trace_cache[key]
+
+    def _homology_basis(
+        self, degree: int
+    ) -> tuple[Matrix, Matrix, tuple[int, ...], Matrix]:
+        """Return boundary and homology bases with an exact coordinate extractor.
+
+        The returned tuple is (B, H, pivot_rows, inverse), where columns of B
+        form a basis of boundaries, columns of H complete them to a basis of
+        cycles, and inverse extracts coordinates in the combined [B | H]
+        basis from the selected ambient coordinates.
+        """
+        if degree not in self._homology_basis_cache:
+            boundaries = Matrix.hstack(
+                *self._boundary_matrix(degree + 1).columnspace()
+            ) if self._boundary_matrix(degree + 1).columnspace() else Matrix(
+                self._faces(degree).__len__(), 0, []
+            )
+            cycles = self._boundary_matrix(degree).nullspace()
+            homology_columns: list[Matrix] = []
+            combined = boundaries
+            rank = combined.cols
+            for cycle in cycles:
+                candidate = combined.row_join(cycle)
+                new_rank = candidate.rank()
+                if new_rank > rank:
+                    homology_columns.append(cycle)
+                    combined = candidate
+                    rank = new_rank
+            homology = (
+                Matrix.hstack(*homology_columns)
+                if homology_columns
+                else Matrix(self._faces(degree).__len__(), 0, [])
+            )
+            if combined.cols:
+                pivot_rows = tuple(combined.T.rref()[1])
+                inverse = combined.extract(pivot_rows, range(combined.cols)).inv()
+            else:
+                pivot_rows = ()
+                inverse = Matrix(0, 0, [])
+            self._homology_basis_cache[degree] = (
+                boundaries, homology, pivot_rows, inverse
+            )
+        return self._homology_basis_cache[degree]
+
+    def representation_matrix(
+        self, permutation: Permutation, degree: int
+    ) -> Matrix:
+        """Return the exact matrix of a group element on rational homology.
+
+        The basis is computed deterministically from the ordered simplex
+        basis: a basis of boundaries is extended by cycle vectors to a basis
+        of cycles. Coordinates are taken modulo boundaries. No group
+        enumeration or numerical linear algebra is used.
+        """
+        if not isinstance(degree, int) or isinstance(degree, bool) or degree < 0:
+            raise ValueError("degree must be a nonnegative integer")
+        element = self._normalize(permutation)
+        if degree > self.complex.dimension():
+            return Matrix(0, 0, [])
+        _, homology, pivot_rows, inverse = self._homology_basis(degree)
+        if homology.cols == 0:
+            return Matrix(0, 0, [])
+        transformed = self._chain_matrix(element, degree) * homology
+        coordinates = inverse * transformed.extract(pivot_rows, range(homology.cols))
+        result = coordinates[ self._boundary_matrix(degree + 1).rank():, : ]
+        if result.rows != homology.cols or result.cols != homology.cols:
+            raise ArithmeticError("failed to obtain homology coordinates")
+        return result
 
     def character(self, permutation: Permutation, degree: int) -> int:
         """Return the exact character on H_degree (or reduced homology).
