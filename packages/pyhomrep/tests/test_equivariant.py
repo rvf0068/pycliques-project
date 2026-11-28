@@ -160,3 +160,28 @@ def test_induced_homology_map_rejects_different_complex():
 
     with pytest.raises(ValueError, match="self-map of the acted-on complex"):
         homology.induced_homology_map(mapping, 0)
+
+
+
+def test_induced_homology_map_validates_type_and_degree():
+    complex_ = SimplicialComplex({0, 1}, facet_set=[{0, 1}])
+    action = PermutationAction((0, 1), [])
+    mapping = SimplicialMap(complex_, complex_, {0: 0, 1: 1})
+    homology = EquivariantHomology(complex_, action)
+
+    with pytest.raises(TypeError, match="must be a SimplicialMap"):
+        homology.induced_homology_map(None, 0)
+    with pytest.raises(ValueError, match="degree must be"):
+        homology.induced_homology_map(mapping, -1)
+    with pytest.raises(ValueError, match="degree must be"):
+        homology.induced_homology_map(mapping, True)
+
+
+def test_induced_homology_map_returns_empty_matrix_outside_homology_range():
+    complex_ = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1, 2}])
+    action = PermutationAction((0, 1, 2), [])
+    mapping = SimplicialMap(complex_, complex_, {0: 0, 1: 1, 2: 2})
+    homology = EquivariantHomology(complex_, action)
+
+    assert homology.induced_homology_map(mapping, 1) == Matrix(0, 0, [])
+    assert homology.induced_homology_map(mapping, 3) == Matrix(0, 0, [])
