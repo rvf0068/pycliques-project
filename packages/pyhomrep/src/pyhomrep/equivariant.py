@@ -7,10 +7,9 @@ All chain and image-subspace calculations use exact rational linear algebra.
 
 from __future__ import annotations
 
+from pycombtop import PermutationAction, SimplicialComplex
 from sympy import Matrix, SparseMatrix
 from sympy.combinatorics import Permutation
-
-from pycombtop import PermutationAction, SimplicialComplex
 
 
 def _orientation_sign(values: tuple[int, ...]) -> int:
@@ -30,7 +29,7 @@ class EquivariantHomology:
     complex_:
         A finite simplicial complex.
     action:
-        A permutation action on exactly the vertices of complex_.
+        A permutation action on exactly the vertices of the given complex.
     reduced:
         If true, use augmented chains and compute reduced homology.
 
