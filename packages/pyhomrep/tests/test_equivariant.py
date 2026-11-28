@@ -253,3 +253,27 @@ def test_induced_homology_map_to_rejects_incompatible_reduced_conventions():
 
     with pytest.raises(ValueError, match="agree on reduced homology"):
         source_homology.induced_homology_map_to(target_homology, mapping, 0)
+
+
+def test_induced_homology_map_to_can_be_rectangular():
+    source = SimplicialComplex(
+        ("a", "b", "c", "d"),
+        facet_set=[{"a", "b"}, {"b", "c"}, {"c", "d"}, {"a", "d"}],
+    )
+    target = SimplicialComplex(
+        ("w", "x", "y", "z"),
+        facet_set=[{"w", "x"}, {"x", "y"}, {"y", "z"}],
+    )
+    source_action = PermutationAction(("a", "b", "c", "d"), [])
+    target_action = PermutationAction(("w", "x", "y", "z"), [])
+    mapping = SimplicialMap(
+        source, target, {"a": "w", "b": "x", "c": "y", "d": "x"}
+    )
+    source_homology = EquivariantHomology(source, source_action)
+    target_homology = EquivariantHomology(target, target_action)
+
+    induced = source_homology.induced_homology_map_to(
+        target_homology, mapping, 1
+    )
+
+    assert induced == Matrix(0, 1, [])
