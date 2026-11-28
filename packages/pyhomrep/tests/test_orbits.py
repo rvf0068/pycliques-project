@@ -1,7 +1,7 @@
 """Tests for exact equivariant homology."""
 
 import networkx as nx
-from pycombtop import SimplicialComplex, clique_complex
+from pycombtop import PermutationAction, SimplicialComplex, clique_complex
 from pyhomrep import (
     OrbitChainComplex,
     YoungTableaux,
@@ -93,3 +93,28 @@ def test_octahedral_sphere_induction():
         sum(m * YoungTableaux(list(lam), [1] * 9).CMNR() for lam, m in mult.items())
         == 7560
     )
+
+
+def test_orbit_chain_complex_accepts_permutation_action():
+    from sympy.combinatorics import Permutation
+
+    complex_ = clique_complex(nx.cycle_graph(3))
+    action = PermutationAction((0, 1, 2), [Permutation([1, 2, 0])])
+    chains = OrbitChainComplex(complex_, action, reduced=True)
+    assert chains.betti_number(0) == 0
+    assert chains.betti_number(1) == 0
+    assert chains.betti_number(2) == 0
+
+
+def test_orbit_chain_complex_rejects_noninvariant_relative_subcomplex():
+    from sympy.combinatorics import Permutation
+
+    complex_ = clique_complex(nx.cycle_graph(3))
+    action = PermutationAction((0, 1, 2), [Permutation([1, 2, 0])])
+    relative = SimplicialComplex({0}, facet_set=[{0}])
+    try:
+        OrbitChainComplex(complex_, action, relative=relative)
+    except ValueError as error:
+        assert "must be invariant" in str(error)
+    else:
+        raise AssertionError("expected a non-invariant relative complex to fail")

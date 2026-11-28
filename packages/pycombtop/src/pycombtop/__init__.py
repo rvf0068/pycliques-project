@@ -67,6 +67,7 @@ from .fundamental_group import (
     verify_connected_link_order,
     verify_presentation_reduction,
 )
+from .group_actions import PermutationAction
 from .hom_complex import (
     HomPosetLimit,
     MultiHomomorphism,
@@ -357,6 +358,8 @@ __all__ = [
     "brown_poset",
     "quillen_poset",
     "subgroup_conjugation",
+    # finite permutation actions
+    "PermutationAction",
     # finite posets and order complexes
     "BeatMove",
     "BeatReduction",
