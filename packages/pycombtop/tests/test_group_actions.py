@@ -1,5 +1,5 @@
-import pytest
 from sympy.combinatorics import Permutation
+import pytest
 
 from pycombtop import (
     PermutationAction,
@@ -51,7 +51,9 @@ def test_action_validates_poset_automorphisms():
     poset = boolean_lattice(2)
     elements = poset.elements
     index = {x: i for i, x in enumerate(elements)}
-    swap = lambda x: frozenset(1 - v for v in x)
+    def swap(x):
+        return frozenset(1 - v for v in x)
+
     generator = Permutation([index[swap(x)] for x in elements], size=len(elements))
     PermutationAction(elements, [generator]).validate_poset(poset)
 
