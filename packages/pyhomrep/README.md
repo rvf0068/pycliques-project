@@ -275,7 +275,7 @@ relative_homology = EquivariantHomology(
     interval, action, relative_to=boundary
 )
 
-assert relative_homology.character(swap, 1) == 1
+assert relative_homology.character(swap, 1) == -1
 ```
 
 The induced-map methods also accept maps of pairs: every simplex of the
