@@ -376,8 +376,6 @@ class EquivariantHomology:
                         "simplicial_map must intertwine the corresponding action generators"
                     )
 
-        if degree > min(self.complex.dimension(), target.complex.dimension()):
-            return Matrix(0, 0, [])
         _, source_homology, _, _ = self._homology_basis(degree)
         target_boundaries, target_homology, target_pivots, target_inverse = (
             target._homology_basis(degree)
