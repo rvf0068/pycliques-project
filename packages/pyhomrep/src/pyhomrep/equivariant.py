@@ -375,7 +375,8 @@ class EquivariantHomology:
                 ]
                 if simplicial_map(source_image) != target_image:
                     raise ValueError(
-                        "simplicial_map must intertwine the corresponding action generators"
+                        "simplicial_map must intertwine the corresponding "
+                        "action generators"
                     )
 
         _, source_homology, _, _ = self._homology_basis(degree)
