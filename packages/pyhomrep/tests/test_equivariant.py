@@ -43,7 +43,6 @@ def test_exact_representation_matrices_on_tetrahedron_boundary():
     assert homology.representation_matrix(transposition, 1) == Matrix(0, 0, [])
 
 
-
 def test_representation_matrix_on_contractible_interval():
     complex_ = SimplicialComplex({0, 1}, facet_set=[{0, 1}])
     swap = Permutation([1, 0])
