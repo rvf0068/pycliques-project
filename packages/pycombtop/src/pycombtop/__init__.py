@@ -77,8 +77,8 @@ from .hom_complex import (
     is_multihomomorphism,
     iter_multihomomorphisms,
 )
-from .homology import HomologyResult, simplicial_homology
 from .group_actions import PermutationAction
+from .homology import HomologyResult, simplicial_homology
 from .homology_backend import HomologyResourceLimit
 from .homotopy_classifier import (
     HomotopyClassification,
