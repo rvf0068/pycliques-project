@@ -162,7 +162,6 @@ def test_induced_homology_map_rejects_different_complex():
         homology.induced_homology_map(mapping, 0)
 
 
-
 def test_induced_homology_map_validates_type_and_degree():
     complex_ = SimplicialComplex({0, 1}, facet_set=[{0, 1}])
     action = PermutationAction((0, 1), [])
