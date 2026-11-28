@@ -36,7 +36,11 @@ class EquivariantHomology:
     action:
         A permutation action on exactly the vertices of the given complex.
     reduced:
-        If true, use augmented chains and compute reduced homology.
+        If true, use augmented chains and compute reduced homology. For a
+        nonempty relative subcomplex, relative chains are not augmented.
+    relative_to:
+        Optional invariant subcomplex A; when supplied, compute homology of
+        the pair (X, A).
 
     Notes
     -----
@@ -52,11 +56,20 @@ class EquivariantHomology:
         action: PermutationAction,
         *,
         reduced: bool = False,
+        relative_to: SimplicialComplex | None = None,
     ) -> None:
-        action.validate_complex(complex_)
+        if relative_to is not None and not isinstance(relative_to, SimplicialComplex):
+            raise TypeError("relative_to must be a SimplicialComplex or None")
+        if relative_to is None:
+            action.validate_complex(complex_)
+        else:
+            action.validate_invariant_subcomplex(complex_, relative_to)
+        if type(reduced) is not bool:
+            raise TypeError("reduced must be a bool")
         self.complex = complex_
         self.action = action
         self.reduced = reduced
+        self.relative_to = relative_to
         self._faces_cache: dict[int, tuple[tuple[int, ...], ...]] = {}
         self._face_index_cache: dict[int, dict[tuple[int, ...], int]] = {}
         self._boundary_cache: dict[int, SparseMatrix] = {}
@@ -71,15 +84,25 @@ class EquivariantHomology:
 
     def _faces(self, degree: int) -> tuple[tuple[int, ...], ...]:
         if degree not in self._faces_cache:
-            if degree == -1 and self.reduced:
+            if (
+                degree == -1
+                and self.reduced
+                and (self.relative_to is None or not self.relative_to.facet_set)
+            ):
                 faces = ((),)
             elif degree < 0 or degree > self.complex.dimension():
                 faces = ()
             else:
+                relative_faces = (
+                    set()
+                    if self.relative_to is None
+                    else set(self.relative_to.faces_of_dimension(degree))
+                )
                 faces = tuple(
                     sorted(
                         tuple(sorted(self.action.index[v] for v in face))
                         for face in self.complex.faces_of_dimension(degree)
+                        if face not in relative_faces
                     )
                 )
             self._faces_cache[degree] = faces
@@ -119,7 +142,10 @@ class EquivariantHomology:
         if degree not in self._boundary_cache:
             source = self._faces(degree)
             if degree == 0:
-                if self.reduced:
+                has_augmentation = self.reduced and (
+                    self.relative_to is None or not self.relative_to.facet_set
+                )
+                if has_augmentation:
                     matrix = SparseMatrix(
                         1, len(source), {(0, j): 1 for j in range(len(source))}
                     )
@@ -134,7 +160,9 @@ class EquivariantHomology:
                 for column, face in enumerate(source):
                     for i in range(len(face)):
                         boundary_face = face[:i] + face[i + 1 :]
-                        entries[target_index[boundary_face], column] = (-1) ** i
+                        row = target_index.get(boundary_face)
+                        if row is not None:
+                            entries[row, column] = (-1) ** i
                 matrix = SparseMatrix(
                     len(self._faces(degree - 1)), len(source), entries
                 )
@@ -249,6 +277,56 @@ class EquivariantHomology:
             raise ArithmeticError("failed to obtain homology coordinates")
         return result
 
+    def _validate_relative_map(
+        self, simplicial_map: SimplicialMap, target: EquivariantHomology
+    ) -> None:
+        """Check that the simplicial map sends the source subcomplex into target."""
+        if self.relative_to is None or not self.relative_to.facet_set:
+            return
+        if target.relative_to is None:
+            raise ValueError(
+                "simplicial_map must send the relative subcomplex into target"
+            )
+        target_faces = target.relative_to.all_simplices()
+        if any(
+            frozenset(simplicial_map(vertex) for vertex in facet) not in target_faces
+            for facet in self.relative_to.facet_set
+        ):
+            raise ValueError(
+                "simplicial_map must send the relative subcomplex into target"
+            )
+
+    def _induced_chain_map(
+        self,
+        target: EquivariantHomology,
+        simplicial_map: SimplicialMap,
+        degree: int,
+    ) -> SparseMatrix:
+        """Return the chain map projected to the relative quotient bases."""
+        ambient = induced_chain_map(
+            simplicial_map,
+            degree,
+            source_order=self.action.elements,
+            target_order=target.action.elements,
+        )
+        source_basis = tuple(
+            sorted(
+                tuple(sorted(self.action.index[vertex] for vertex in face))
+                for face in self.complex.faces_of_dimension(degree)
+            )
+        )
+        target_basis = tuple(
+            sorted(
+                tuple(sorted(target.action.index[vertex] for vertex in face))
+                for face in target.complex.faces_of_dimension(degree)
+            )
+        )
+        source_positions = {face: index for index, face in enumerate(source_basis)}
+        target_positions = {face: index for index, face in enumerate(target_basis)}
+        source_rows = [source_positions[face] for face in self._faces(degree)]
+        target_rows = [target_positions[face] for face in target._faces(degree)]
+        return ambient.extract(target_rows, source_rows)
+
     def induced_homology_map(
         self, simplicial_map: SimplicialMap, degree: int
     ) -> Matrix:
@@ -276,6 +354,7 @@ class EquivariantHomology:
             raise ValueError(
                 "simplicial_map must be a self-map of the acted-on complex"
             )
+        self._validate_relative_map(simplicial_map, self)
         if not isinstance(degree, int) or isinstance(degree, bool) or degree < 0:
             raise ValueError("degree must be a nonnegative integer")
         for generator in self.action.generators:
@@ -296,12 +375,7 @@ class EquivariantHomology:
         boundaries, homology, pivot_rows, inverse = self._homology_basis(degree)
         if homology.cols == 0:
             return Matrix(0, 0, [])
-        chain_map = induced_chain_map(
-            simplicial_map,
-            degree,
-            source_order=self.action.elements,
-            target_order=self.action.elements,
-        )
+        chain_map = self._induced_chain_map(self, simplicial_map, degree)
         transformed = chain_map * homology
         coordinates = inverse * transformed.extract(pivot_rows, range(homology.cols))
         result = coordinates[boundaries.cols :, :]
@@ -344,6 +418,7 @@ class EquivariantHomology:
             raise ValueError(
                 "simplicial_map source and target must match the homology objects"
             )
+        self._validate_relative_map(simplicial_map, target)
         if len(self.action) != len(target.action):
             raise ValueError("actions must have the same number of ordered positions")
 
@@ -381,12 +456,7 @@ class EquivariantHomology:
         if source_homology.cols == 0 or target_homology.cols == 0:
             return Matrix(target_homology.cols, source_homology.cols, [])
 
-        chain_map = induced_chain_map(
-            simplicial_map,
-            degree,
-            source_order=self.action.elements,
-            target_order=target.action.elements,
-        )
+        chain_map = self._induced_chain_map(target, simplicial_map, degree)
         transformed = chain_map * source_homology
         coordinates = target_inverse * transformed.extract(
             target_pivots, range(source_homology.cols)

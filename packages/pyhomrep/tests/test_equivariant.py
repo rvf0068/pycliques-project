@@ -362,3 +362,122 @@ def test_induced_homology_map_to_restricts_a_larger_target_action():
     assert source_action.group.order() == 2
     assert induced == Matrix([[1]])
     assert target_representation * induced == induced * source_representation
+
+
+def test_relative_equivariant_homology_of_interval_mod_boundary():
+    complex_ = SimplicialComplex((0, 1), facet_set=[{0, 1}])
+    boundary = SimplicialComplex((0, 1), facet_set=[{0}, {1}])
+    swap = Permutation([1, 0])
+    action = PermutationAction((0, 1), [swap])
+    homology = EquivariantHomology(complex_, action, relative_to=boundary)
+
+    assert homology.character(swap, 1) == -1
+    assert homology.character(swap, 0) == 0
+    assert homology.representation_matrix(swap, 1) == Matrix([[-1]])
+
+
+def test_reduced_relative_homology_does_not_augment_nonempty_subcomplex():
+    complex_ = SimplicialComplex({0, 1}, facet_set=[{0}, {1}])
+    relative = SimplicialComplex({0}, facet_set=[{0}])
+    action = PermutationAction((0, 1), [])
+    homology = EquivariantHomology(complex_, action, reduced=True, relative_to=relative)
+
+    # H_0(X, A) has rank one; an erroneous augmentation would kill it.
+    assert homology.representation_matrix(Permutation(size=2), 0) == Matrix([[1]])
+
+
+def test_relative_equivariant_homology_rejects_noninvariant_subcomplex():
+    complex_ = SimplicialComplex({0, 1}, facet_set=[{0}, {1}])
+    relative = SimplicialComplex({0}, facet_set=[{0}])
+    swap = Permutation([1, 0])
+    action = PermutationAction((0, 1), [swap])
+
+    with pytest.raises(ValueError, match="relative complex must be invariant"):
+        EquivariantHomology(complex_, action, relative_to=relative)
+
+
+def test_relative_equivariant_homology_rejects_non_subcomplex():
+    complex_ = SimplicialComplex({0, 1}, facet_set=[{0}, {1}])
+    relative = SimplicialComplex({0, 1}, facet_set=[{0, 1}])
+    action = PermutationAction((0, 1), [])
+
+    with pytest.raises(ValueError, match="relative complex must be a subcomplex"):
+        EquivariantHomology(complex_, action, relative_to=relative)
+
+
+def test_relative_induced_maps_use_quotient_chain_bases():
+    source = SimplicialComplex({0, 1}, facet_set=[{0}, {1}])
+    source_relative = SimplicialComplex({0}, facet_set=[{0}])
+    source_action = PermutationAction((0, 1), [])
+    identity = SimplicialMap(source, source, {0: 0, 1: 1})
+    source_homology = EquivariantHomology(
+        source, source_action, relative_to=source_relative
+    )
+
+    assert source_homology.induced_homology_map(identity, 0) == Matrix([[1]])
+
+    target = SimplicialComplex({"a", "b"}, facet_set=[{"a"}, {"b"}])
+    target_relative = SimplicialComplex({"a"}, facet_set=[{"a"}])
+    target_action = PermutationAction(("a", "b"), [])
+    mapping = SimplicialMap(source, target, {0: "a", 1: "b"})
+    target_homology = EquivariantHomology(
+        target, target_action, relative_to=target_relative
+    )
+
+    assert source_homology.induced_homology_map_to(target_homology, mapping, 0) == (
+        Matrix([[1]])
+    )
+
+
+def test_relative_induced_map_rejects_absolute_target():
+    complex_ = SimplicialComplex({0, 1}, facet_set=[{0}, {1}])
+    relative = SimplicialComplex({0}, facet_set=[{0}])
+    action = PermutationAction((0, 1), [])
+    homology = EquivariantHomology(complex_, action, relative_to=relative)
+    absolute_target = EquivariantHomology(complex_, action)
+    identity = SimplicialMap(complex_, complex_, {0: 0, 1: 1})
+
+    with pytest.raises(ValueError, match="send the relative subcomplex into target"):
+        homology.induced_homology_map_to(absolute_target, identity, 0)
+
+
+def test_induced_relative_homology_map_requires_map_of_pairs():
+    complex_ = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1}, {1, 2}])
+    relative = SimplicialComplex({0, 2}, facet_set=[{0}, {2}])
+    action = PermutationAction((0, 1, 2), [])
+    homology = EquivariantHomology(complex_, action, relative_to=relative)
+    mapping = SimplicialMap(complex_, complex_, {0: 1, 1: 1, 2: 2})
+
+    with pytest.raises(ValueError, match="send the relative subcomplex"):
+        homology.induced_homology_map(mapping, 0)
+
+
+def test_induced_homology_map_between_relative_pairs():
+    source = SimplicialComplex({0, 1}, facet_set=[{0, 1}])
+    source_relative = SimplicialComplex({0, 1}, facet_set=[{0}, {1}])
+    target = SimplicialComplex({"a", "b"}, facet_set=[{"a", "b"}])
+    target_relative = SimplicialComplex({"a", "b"}, facet_set=[{"a"}, {"b"}])
+    swap = Permutation([1, 0])
+    source_action = PermutationAction((0, 1), [swap])
+    target_action = PermutationAction(("a", "b"), [swap])
+    mapping = SimplicialMap(source, target, {0: "a", 1: "b"})
+    source_homology = EquivariantHomology(
+        source, source_action, relative_to=source_relative
+    )
+    target_homology = EquivariantHomology(
+        target, target_action, relative_to=target_relative
+    )
+
+    induced = source_homology.induced_homology_map_to(target_homology, mapping, 1)
+    assert induced == Matrix([[1]])
+    assert target_homology.representation_matrix(swap, 1) * induced == (
+        induced * source_homology.representation_matrix(swap, 1)
+    )
+
+
+def test_relative_equivariant_homology_validates_relative_argument_type():
+    complex_ = SimplicialComplex({0}, facet_set=[{0}])
+    action = PermutationAction((0,), [])
+
+    with pytest.raises(TypeError, match="relative_to must be"):
+        EquivariantHomology(complex_, action, relative_to=object())
