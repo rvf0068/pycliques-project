@@ -309,6 +309,96 @@ class EquivariantHomology:
             raise ArithmeticError("failed to obtain induced homology coordinates")
         return result
 
+    def induced_homology_map_to(
+        self,
+        target: EquivariantHomology,
+        simplicial_map: SimplicialMap,
+        degree: int,
+    ) -> Matrix:
+        """Return the exact map induced by an equivariant map to another complex.
+
+        The source and target actions must be the same concrete subgroup of
+        the symmetric group on their ordered vertex positions. Thus the
+        elements sequences specify an explicit position-by-position
+        identification, and equality of the generated permutation groups
+        identifies the acting groups independently of generator-list order.
+
+        The map is checked against the source generators, acting on the
+        target through the same permutations of positions. Both objects must
+        use the same reduced/ordinary homology convention. The result is a
+        rectangular matrix from the source homology basis to the target
+        homology basis.
+        """
+        if not isinstance(target, EquivariantHomology):
+            raise TypeError("target must be an EquivariantHomology instance")
+        if not isinstance(simplicial_map, SimplicialMap):
+            raise TypeError("simplicial_map must be a SimplicialMap instance")
+        if self.reduced != target.reduced:
+            raise ValueError("source and target must agree on reduced homology")
+        if (
+            simplicial_map.source.vertex_set != self.complex.vertex_set
+            or simplicial_map.source.facet_set != self.complex.facet_set
+            or simplicial_map.target.vertex_set != target.complex.vertex_set
+            or simplicial_map.target.facet_set != target.complex.facet_set
+        ):
+            raise ValueError("simplicial_map source and target must match the homology objects")
+        if len(self.action) != len(target.action):
+            raise ValueError("actions must have the same number of ordered positions")
+
+        # Mutual generator membership proves equality of the concrete
+        # permutation subgroups, without enumerating either group.
+        if any(
+            not target.action.group.contains(
+                Permutation(generator.array_form, size=len(target.action))
+            )
+            for generator in self.action.generators
+        ) or any(
+            not self.action.group.contains(
+                Permutation(generator.array_form, size=len(self.action))
+            )
+            for generator in target.action.generators
+        ):
+            raise ValueError(
+                "source and target actions must define the same permutation group "
+                "on ordered positions"
+            )
+        if not isinstance(degree, int) or isinstance(degree, bool) or degree < 0:
+            raise ValueError("degree must be a nonnegative integer")
+
+        for generator in self.action.generators:
+            for position, vertex in enumerate(self.action.elements):
+                source_image = self.action.elements[generator(position)]
+                target_image = target.action.elements[
+                    generator(target.action.index[simplicial_map(vertex)])
+                ]
+                if simplicial_map(source_image) != target_image:
+                    raise ValueError(
+                        "simplicial_map must intertwine the corresponding action generators"
+                    )
+
+        if degree > min(self.complex.dimension(), target.complex.dimension()):
+            return Matrix(0, 0, [])
+        source_boundaries, source_homology, _, _ = self._homology_basis(degree)
+        target_boundaries, target_homology, target_pivots, target_inverse = (
+            target._homology_basis(degree)
+        )
+        if source_homology.cols == 0 or target_homology.cols == 0:
+            return Matrix(target_homology.cols, source_homology.cols, [])
+
+        chain_map = induced_chain_map(
+            simplicial_map,
+            degree,
+            source_order=self.action.elements,
+            target_order=target.action.elements,
+        )
+        transformed = chain_map * source_homology
+        coordinates = target_inverse * transformed.extract(
+            target_pivots, range(source_homology.cols)
+        )
+        result = coordinates[target_boundaries.cols :, :]
+        if result.rows != target_homology.cols or result.cols != source_homology.cols:
+            raise ArithmeticError("failed to obtain induced homology coordinates")
+        return result
     def character(self, permutation: Permutation, degree: int) -> int:
         """Return the exact character on H_degree (or reduced homology).
 
