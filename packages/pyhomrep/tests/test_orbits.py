@@ -110,9 +110,7 @@ def test_orbit_chain_complex_rejects_noninvariant_relative_subcomplex():
     from sympy.combinatorics import Permutation
 
     complex_ = clique_complex(nx.cycle_graph(3))
-    action = PermutationAction(
-        (0, 1, 2), [Permutation([1, 2, 0])]
-    )
+    action = PermutationAction((0, 1, 2), [Permutation([1, 2, 0])])
     relative = SimplicialComplex({0}, facet_set=[{0}])
     try:
         OrbitChainComplex(complex_, action, relative=relative)
