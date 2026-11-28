@@ -121,6 +121,7 @@ class PermutationAction:
         """Generator maps on labels, suitable for pyhomrep.OrbitChainComplex."""
         maps = []
         for generator in self.generators:
+
             def apply(element, permutation=generator):
                 if element not in self.index:
                     raise KeyError(element)
@@ -135,8 +136,7 @@ class PermutationAction:
             raise ValueError("action elements must equal the poset elements")
         for generator in self.generators:
             mapping = {
-                x: self.elements[generator(i)]
-                for i, x in enumerate(self.elements)
+                x: self.elements[generator(i)] for i, x in enumerate(self.elements)
             }
             if any(
                 poset.leq(a, b) != poset.leq(mapping[a], mapping[b])
@@ -169,10 +169,7 @@ class PermutationAction:
             raise ValueError("relative complex must be a subcomplex")
         for generator in self.generators:
             image_facets = {
-                frozenset(
-                    self.elements[generator(self.index[x])]
-                    for x in facet
-                )
+                frozenset(self.elements[generator(self.index[x])] for x in facet)
                 for facet in subcomplex.facet_set
             }
             if image_facets != subcomplex.facet_set:
