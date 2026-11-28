@@ -14,18 +14,6 @@ from pyhomrep import (
     partitions_list,
 )
 from sympy.combinatorics import Permutation
-from pyhomrep import (
-    OrbitChainComplex,
-    YoungTableaux,
-    bouc_decomposition,
-    decompose_induced_character,
-    decompose_young_homology,
-    decompose_young_homology_map,
-    matching_graph,
-    partitions_list,
-)
-
-
 def test_reversing_stabilizer():
     sc = clique_complex(nx.complete_graph(2))
     chain = OrbitChainComplex(sc, [lambda v: 1 - v], reduced=True)
