@@ -50,6 +50,7 @@ returns `{r: {λ: multiplicity}}` for `r = 0, ..., dim K`.
 The character at the identity is the dimension of H_r, i.e. the Betti number:
 
 ```python
+from sympy import Matrix
 from sympy.combinatorics import Permutation
 from pyhomrep import character_p_homology
 
@@ -149,6 +150,21 @@ assert homology.character(transposition, 2) == -1
 
 Pass `reduced=True` to compute characters on reduced homology. Character
 evaluation is cached across repeated calls for the same action and complex.
+
+The same object also returns exact matrices for individual group elements in
+a computed basis of rational homology. Boundaries are extended to a basis of
+cycles, so coordinates are taken in the quotient by boundaries:
+
+```python
+from sympy import Matrix
+
+rho = homology.representation_matrix(transposition, 2)
+assert rho == Matrix([[-1]])  # top homology is the sign representation
+```
+
+The basis is fixed by the ordered simplex basis and cached by degree. This
+provides a concrete matrix model of the representation without enumerating
+the acting group. It does not perform irreducible decomposition.
 The legacy symmetric-group routines remain available; this exact interface
 provides a general-purpose alternative for character values, not a general
 irreducible-representation decomposition algorithm.

@@ -1,6 +1,7 @@
 import pytest
 from pycombtop import PermutationAction, SimplicialComplex
 from pyhomrep import EquivariantHomology
+from sympy import Matrix
 from sympy.combinatorics import Permutation
 
 
@@ -25,6 +26,55 @@ def test_exact_character_on_tetrahedron_boundary():
     assert homology.character(three_cycle, 2) == 1
     assert homology.character(four_cycle, 2) == -1
     assert homology.character(transposition, 1) == 0
+
+
+def test_exact_representation_matrices_on_tetrahedron_boundary():
+    complex_ = tetrahedron_boundary()
+    transposition = Permutation([1, 0, 2, 3])
+    three_cycle = Permutation([1, 2, 0, 3])
+    four_cycle = Permutation([1, 2, 3, 0])
+    action = PermutationAction(("a", "b", "c", "d"), [transposition, four_cycle])
+    homology = EquivariantHomology(complex_, action)
+
+    assert homology.representation_matrix(Permutation(size=4), 0) == Matrix([[1]])
+    assert homology.representation_matrix(transposition, 2) == Matrix([[-1]])
+    assert homology.representation_matrix(three_cycle, 2) == Matrix([[1]])
+    assert homology.representation_matrix(four_cycle, 2) == Matrix([[-1]])
+    assert homology.representation_matrix(transposition, 1) == Matrix(0, 0, [])
+
+
+def test_representation_matrix_on_contractible_interval():
+    complex_ = SimplicialComplex({0, 1}, facet_set=[{0, 1}])
+    swap = Permutation([1, 0])
+    action = PermutationAction((0, 1), [swap])
+    homology = EquivariantHomology(complex_, action)
+
+    assert homology.representation_matrix(Permutation(size=2), 0) == Matrix([[1]])
+    assert homology.representation_matrix(swap, 0) == Matrix([[1]])
+    assert homology.representation_matrix(swap, 1) == Matrix(0, 0, [])
+    assert homology.representation_matrix(swap, 2) == Matrix(0, 0, [])
+
+
+def test_representation_matrix_validates_element_and_degree():
+    complex_ = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1, 2}])
+    rotation = Permutation([1, 2, 0])
+    action = PermutationAction((0, 1, 2), [rotation])
+    homology = EquivariantHomology(complex_, action)
+
+    with pytest.raises(ValueError, match="degree must be"):
+        homology.representation_matrix(rotation, -1)
+    with pytest.raises(ValueError, match="not in the acting group"):
+        homology.representation_matrix(Permutation([1, 0, 2]), 1)
+
+
+def test_exact_reduced_homology_representation_matrix():
+    complex_ = SimplicialComplex({0, 1}, facet_set=[{0}, {1}])
+    swap = Permutation([1, 0])
+    action = PermutationAction((0, 1), [swap])
+    homology = EquivariantHomology(complex_, action, reduced=True)
+
+    assert homology.representation_matrix(Permutation(size=2), 0) == Matrix([[1]])
+    assert homology.representation_matrix(swap, 0) == Matrix([[-1]])
 
 
 def test_exact_reduced_character_on_disconnected_complex():
