@@ -6,7 +6,7 @@ from collections import deque
 from collections.abc import Callable, Iterable, Sequence
 from typing import Any
 
-from pycombtop import SimplicialComplex
+from pycombtop import PermutationAction, SimplicialComplex
 from sympy import SparseMatrix
 from sympy.polys.matrices import DomainMatrix
 
@@ -33,7 +33,7 @@ class OrbitChainComplex:
     def __init__(
         self,
         complex: SimplicialComplex,
-        generators: Iterable[VertexMap] = (),
+        generators: Iterable[VertexMap] | PermutationAction = (),
         *,
         reduced: bool = False,
         relative: SimplicialComplex | None = None,
@@ -41,12 +41,19 @@ class OrbitChainComplex:
         self.complex = complex
         self.reduced = reduced
         self.relative = relative
+        if isinstance(generators, PermutationAction):
+            generators.validate_complex(complex)
+            if relative is not None:
+                generators.validate_invariant_subcomplex(complex, relative)
+            generator_maps = generators.vertex_maps
+        else:
+            generator_maps = tuple(generators)
         self.vertices = tuple(
             next(iter(face)) for face in complex.faces_of_dimension(0)
         )
         self.index = {v: i for i, v in enumerate(self.vertices)}
         self.actions = tuple(
-            tuple(self.index[g(v)] for v in self.vertices) for g in generators
+            tuple(self.index[g(v)] for v in self.vertices) for g in generator_maps
         )
         expected = set(range(len(self.vertices)))
         if any(set(g) != expected for g in self.actions):
