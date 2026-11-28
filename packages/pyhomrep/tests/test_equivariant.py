@@ -1,8 +1,8 @@
 import pytest
-
 from pycombtop import PermutationAction, SimplicialComplex
-from pyhomrep import EquivariantHomology
 from sympy.combinatorics import Permutation
+
+from pyhomrep import EquivariantHomology
 
 
 def tetrahedron_boundary():
