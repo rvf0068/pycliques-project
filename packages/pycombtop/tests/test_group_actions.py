@@ -62,9 +62,7 @@ def test_action_validates_poset_automorphisms():
 
 
 def test_invariant_subcomplex_validation():
-    ambient = SimplicialComplex(
-        {0, 1, 2}, facet_set=[{0, 1}, {1, 2}, {0, 2}]
-    )
+    ambient = SimplicialComplex({0, 1, 2}, facet_set=[{0, 1}, {1, 2}, {0, 2}])
     action = PermutationAction((0, 1, 2), [Permutation([1, 2, 0])])
     invariant = SimplicialComplex({0, 1, 2}, facet_set=[{0}, {1}, {2}])
     action.validate_invariant_subcomplex(ambient, invariant)
