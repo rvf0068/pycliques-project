@@ -99,9 +99,7 @@ def test_orbit_chain_complex_accepts_permutation_action():
     from sympy.combinatorics import Permutation
 
     complex_ = clique_complex(nx.cycle_graph(3))
-    action = PermutationAction(
-        (0, 1, 2), [Permutation([1, 2, 0])]
-    )
+    action = PermutationAction((0, 1, 2), [Permutation([1, 2, 0])])
     chains = OrbitChainComplex(complex_, action, reduced=True)
     assert chains.betti_number(0) == 0
     assert chains.betti_number(1) == 0
