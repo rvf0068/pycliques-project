@@ -221,9 +221,7 @@ class EquivariantHomology:
             )
         return self._homology_basis_cache[degree]
 
-    def representation_matrix(
-        self, permutation: Permutation, degree: int
-    ) -> Matrix:
+    def representation_matrix(self, permutation: Permutation, degree: int) -> Matrix:
         """Return the exact matrix of a group element on rational homology.
 
         The basis is computed deterministically from the ordered simplex
